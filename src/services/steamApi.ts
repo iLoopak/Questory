@@ -94,6 +94,7 @@ export async function getRecentlyPlayedGames(settings: SteamSettings): Promise<S
 export function mapSteamGamesToLocalGames(
   ownedGames: SteamOwnedGame[],
   recentlyPlayedGames: SteamRecentlyPlayedGame[],
+  importedAt?: string,
 ): Game[] {
   const recentByAppId = new Map(recentlyPlayedGames.map((game) => [game.appid, game]));
 
@@ -107,14 +108,18 @@ export function mapSteamGamesToLocalGames(
       id: `steam-${game.appid}`,
       title: game.name ?? `Steam app ${game.appid}`,
       platform: 'Steam',
-      status: recentGame ? 'Playing' : 'Backlog',
+      status: recentGame ? 'Playing' : 'Want to play',
       coverImage: `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
       playtimeHours: Math.round((game.playtime_forever ?? 0) / 60),
-      tags: ['Steam'],
+      tags: ['imported', 'steam'],
       lastPlayedAt,
       notes: recentGame
         ? `Recently played on Steam. Last two weeks: ${Math.round((recentGame.playtime_2weeks ?? 0) / 60)}h.`
         : 'Imported from Steam API test results. Not saved to local library yet.',
+      steamAppId: game.appid,
+      externalSource: 'steam',
+      externalUrl: `https://store.steampowered.com/app/${game.appid}`,
+      importedAt,
     };
   });
 }
