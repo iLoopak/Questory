@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="Bloodborne cover placeholder">
+  <rect width="360" height="520" fill="#100b0d"/>
+  <path d="M0 330c76-64 143-87 202-70 69 20 121-7 158-81v341H0z" fill="#2f1519"/>
+  <circle cx="182" cy="176" r="92" fill="#7f1d1d" opacity=".72"/>
+  <path d="M180 88v236M98 168h164M122 250l116-116M238 250 122 134" stroke="#d6d3d1" stroke-width="10" stroke-linecap="round" opacity=".7"/>
+  <text x="28" y="474" fill="#f5f5f4" font-family="Arial, sans-serif" font-size="34" font-weight="800">Bloodborne</text>
+</svg>

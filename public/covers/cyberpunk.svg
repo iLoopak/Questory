@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="Cyberpunk 2077 cover placeholder">
+  <rect width="360" height="520" fill="#111827"/>
+  <path d="M0 0h360v520H0z" fill="#facc15"/>
+  <path d="M0 390 360 250v270H0z" fill="#111827"/>
+  <path d="M44 72h272l-42 214H86z" fill="#111827"/>
+  <path d="M90 118h180M76 170h208M64 222h232" stroke="#22d3ee" stroke-width="12" opacity=".8"/>
+  <text x="28" y="455" fill="#facc15" font-family="Arial, sans-serif" font-size="36" font-weight="800">Cyberpunk</text>
+  <text x="28" y="492" fill="#facc15" font-family="Arial, sans-serif" font-size="30" font-weight="800">2077</text>
+</svg>

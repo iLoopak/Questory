@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="Tears of the Kingdom cover placeholder">
+  <rect width="360" height="520" fill="#0f172a"/>
+  <path d="M0 360c60-20 108-64 143-132 40-78 97-118 171-120 18 0 33 2 46 7v405H0z" fill="#14532d"/>
+  <circle cx="278" cy="105" r="54" fill="#fde68a"/>
+  <path d="M68 331h224l-112-188z" fill="#2dd4bf" opacity=".65"/>
+  <path d="M120 331h120l-60-104z" fill="#f8fafc" opacity=".78"/>
+  <text x="30" y="447" fill="#f8fafc" font-family="Arial, sans-serif" font-size="30" font-weight="700">Tears of the</text>
+  <text x="30" y="483" fill="#f8fafc" font-family="Arial, sans-serif" font-size="30" font-weight="700">Kingdom</text>
+</svg>
