@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
@@ -19,6 +20,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<GameStatus | typeof allOption>(allOption);
   const [tagFilter, setTagFilter] = useState<string>(allOption);
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
   useEffect(() => {
     saveGames(games);
@@ -45,6 +47,7 @@ function App() {
 
   const activeGames = games.filter((game) => game.status === 'Playing').length;
   const totalHours = games.reduce((sum, game) => sum + game.playtimeHours, 0);
+  const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
 
   function updateGameStatus(gameId: string, status: GameStatus) {
     setGames((currentGames) =>
@@ -89,6 +92,23 @@ function App() {
     );
   }
 
+  function updateGameTracking(gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'>) {
+    setGames((currentGames) =>
+      currentGames.map((game) =>
+        game.id === gameId
+          ? {
+              ...game,
+              ...tracking,
+              lastPlayedAt:
+                tracking.status === 'Playing' && game.status !== 'Playing'
+                  ? new Date().toISOString().slice(0, 10)
+                  : game.lastPlayedAt,
+            }
+          : game,
+      ),
+    );
+  }
+
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-5 lg:px-6">
@@ -107,7 +127,12 @@ function App() {
                     ? 'bg-white text-ink-950'
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
-                onClick={() => setActiveNavItem(item)}
+                onClick={() => {
+                  setActiveNavItem(item);
+                  if (item !== 'Library') {
+                    setSelectedGameId(null);
+                  }
+                }}
                 type="button"
               >
                 {item}
@@ -162,7 +187,13 @@ function App() {
             )}
           </aside>
 
-          {activeNavItem === 'Library' ? (
+          {activeNavItem === 'Library' && selectedGame ? (
+            <GameDetailView
+              game={selectedGame}
+              onBack={() => setSelectedGameId(null)}
+              onTrackingChange={updateGameTracking}
+            />
+          ) : activeNavItem === 'Library' ? (
             <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -181,6 +212,7 @@ function App() {
                       key={game.id}
                       game={game}
                       onMetadataUpdate={updateGameMetadata}
+                      onOpenDetails={() => setSelectedGameId(game.id)}
                       onStatusChange={updateGameStatus}
                     />
                   ))}

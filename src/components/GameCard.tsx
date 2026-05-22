@@ -8,6 +8,7 @@ import type { RawgMetadata, RawgSearchResult } from '../types/rawg';
 type GameCardProps = {
   game: Game;
   onMetadataUpdate: (gameId: string, metadata: RawgMetadata) => void;
+  onOpenDetails: () => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
 };
 
@@ -23,7 +24,7 @@ const initialMetadataState: MetadataState = {
   matches: [],
 };
 
-export function GameCard({ game, onMetadataUpdate, onStatusChange }: GameCardProps) {
+export function GameCard({ game, onMetadataUpdate, onOpenDetails, onStatusChange }: GameCardProps) {
   const coverSources = useMemo(() => {
     if (typeof game.steamAppId === 'number') {
       const artworkUrls = getSteamArtworkUrls(game.steamAppId);
@@ -166,14 +167,23 @@ export function GameCard({ game, onMetadataUpdate, onStatusChange }: GameCardPro
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
               {game.metadataSource === 'rawg' ? 'RAWG enriched' : 'Metadata'}
             </div>
-            <button
-              className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-              disabled={metadataState.status === 'loading' || metadataState.status === 'saving'}
-              onClick={findMetadata}
-              type="button"
-            >
-              {metadataState.status === 'loading' ? 'Searching...' : 'Find metadata'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                onClick={onOpenDetails}
+                type="button"
+              >
+                Details
+              </button>
+              <button
+                className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                disabled={metadataState.status === 'loading' || metadataState.status === 'saving'}
+                onClick={findMetadata}
+                type="button"
+              >
+                {metadataState.status === 'loading' ? 'Searching...' : 'Find metadata'}
+              </button>
+            </div>
           </div>
 
           {metadataState.message ? (

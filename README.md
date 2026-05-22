@@ -17,6 +17,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Steam connection test with raw debug output and mapped game previews.
 - Controlled Steam import with selectable games and duplicate protection.
 - Optional RAWG metadata enrichment for individual games.
+- Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
@@ -69,6 +70,16 @@ To enrich one game:
 QuestShelf fetches details for the selected match and stores metadata locally on that game, including RAWG ID, genres, RAWG tags, developers, publishers, release date, Metacritic score, average playtime, background image, metadata source, and update time.
 
 RAWG enrichment does not overwrite manually edited fields such as status, notes, custom tags, or cover image.
+
+## Game Detail View
+
+Open a game from the Library with **Details** to review one title in a focused view. The detail screen keeps local user tracking separate from imported metadata:
+
+- **My tracking** is editable and stores status, custom tags, and notes in local storage.
+- **Steam data** is read-only and shows Steam App ID, store URL, import source, and import time when available.
+- **RAWG metadata** is read-only and shows enriched fields such as genres, tags, developers, publishers, release date, Metacritic, average playtime, background image, and metadata update time when available.
+
+Imported and enriched metadata is not edited directly from this screen.
 
 ## Install
 
