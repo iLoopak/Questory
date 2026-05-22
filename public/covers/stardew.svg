@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="Stardew Valley cover placeholder">
+  <rect width="360" height="520" fill="#7dd3fc"/>
+  <circle cx="286" cy="94" r="48" fill="#fde68a"/>
+  <path d="M0 263c44-28 92-42 144-42 83 0 139 45 216 42v257H0z" fill="#22c55e"/>
+  <path d="M0 388h360v132H0z" fill="#854d0e"/>
+  <path d="M58 388v132M118 388v132M178 388v132M238 388v132M298 388v132" stroke="#facc15" stroke-width="10" opacity=".65"/>
+  <path d="M114 254h132v134H114z" fill="#f97316"/>
+  <path d="M96 254 180 184l84 70z" fill="#7f1d1d"/>
+  <text x="29" y="468" fill="#fff7ed" font-family="Arial, sans-serif" font-size="34" font-weight="800">Stardew</text>
+  <text x="29" y="502" fill="#fff7ed" font-family="Arial, sans-serif" font-size="28" font-weight="700">Valley</text>
+</svg>

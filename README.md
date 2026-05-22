@@ -1,52 +1,40 @@
 # QuestShelf
 
-QuestShelf is a React + Vite + TypeScript + Tailwind CSS starter focused on a clean dark UI shell for a handheld landscape experience.
+QuestShelf is a local-first game library foundation built with React, Vite, TypeScript, and Tailwind CSS.
 
-## Tech stack
+## Features
 
-- React
-- Vite
-- TypeScript
-- Tailwind CSS
+- Responsive dark app shell with placeholder navigation.
+- Typed local `Game` model.
+- Seeded sample games.
+- Browser `localStorage` persistence.
+- Game cards with cover image, playtime, tags, notes, and last played date.
+- Filter by platform, status, and tag.
+- Search by title.
+- Change game status directly from the library.
 
-## Included foundation
+No Steam, PSN, Capacitor, backend, accounts, or remote sync are included yet.
 
-- Project structure and tooling config
-- Dark theme tokens and base styling
-- Responsive app shell with side/top navigation behavior
-- Placeholder navigation tabs:
-  - Library
-  - Recommendation
-  - Stats
-  - Settings
-- Sample content layout suited for landscape handheld screens
-
-## Getting started
-
-### 1) Install dependencies
+## Install
 
 ```bash
 npm install
 ```
 
-### 2) Run the development server
+## Development
 
 ```bash
 npm run dev
 ```
 
-### 3) Build for production
+## Build
 
 ```bash
 npm run build
 ```
 
-### 4) Preview production build (optional)
+## Preview Production Build
 
 ```bash
 npm run preview
 ```
-
-## Notes
-
-This is intentionally only an initial foundation. No Steam, PSN, Capacitor, backend integration, or complex logic is included yet.

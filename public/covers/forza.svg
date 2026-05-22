@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="Forza Horizon 5 cover placeholder">
+  <rect width="360" height="520" fill="#0f172a"/>
+  <path d="M0 350c62-58 118-87 168-87 82 0 128 73 192 70v187H0z" fill="#15803d"/>
+  <path d="M37 294h286l-45 76H83z" fill="#f97316"/>
+  <circle cx="112" cy="372" r="38" fill="#111827"/>
+  <circle cx="248" cy="372" r="38" fill="#111827"/>
+  <circle cx="112" cy="372" r="15" fill="#e5e7eb"/>
+  <circle cx="248" cy="372" r="15" fill="#e5e7eb"/>
+  <path d="M0 118c54 22 105 18 152-12 63-40 132-39 208 3V0H0z" fill="#38bdf8"/>
+  <text x="30" y="458" fill="#f8fafc" font-family="Arial, sans-serif" font-size="34" font-weight="800">Forza</text>
+  <text x="30" y="493" fill="#f8fafc" font-family="Arial, sans-serif" font-size="28" font-weight="700">Horizon 5</text>
+</svg>

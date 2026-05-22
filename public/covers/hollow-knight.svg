@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="Hollow Knight cover placeholder">
+  <rect width="360" height="520" fill="#101219"/>
+  <path d="M0 380c56-66 121-98 195-96 66 2 122 31 165 88v148H0z" fill="#171b25"/>
+  <circle cx="180" cy="188" r="86" fill="#d7f7ff" opacity=".92"/>
+  <path d="M112 122 86 42l74 54zm136 0 26-80-74 54z" fill="#d7f7ff"/>
+  <circle cx="148" cy="188" r="12" fill="#101219"/>
+  <circle cx="212" cy="188" r="12" fill="#101219"/>
+  <text x="30" y="472" fill="#f8fafc" font-family="Arial, sans-serif" font-size="34" font-weight="700">Hollow Knight</text>
+</svg>
