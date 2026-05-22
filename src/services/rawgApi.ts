@@ -1,0 +1,96 @@
+import { loadRawgSettings } from '../lib/rawgSettingsStorage';
+import type { RawgGameDetails, RawgMetadata, RawgSearchResult } from '../types/rawg';
+
+const RAWG_API_BASE_URL = 'https://api.rawg.io/api';
+
+type RawgSearchResponse = {
+  results?: RawgSearchResult[];
+};
+
+export class RawgApiError extends Error {
+  constructor(
+    message: string,
+    public code: 'missing-api-key' | 'no-match' | 'api-failure' | 'rate-limit',
+  ) {
+    super(message);
+    this.name = 'RawgApiError';
+  }
+}
+
+function getRawgApiKey() {
+  const { apiKey } = loadRawgSettings();
+  const trimmedApiKey = apiKey.trim();
+
+  if (!trimmedApiKey) {
+    throw new RawgApiError('Add a RAWG API key in Settings before finding metadata.', 'missing-api-key');
+  }
+
+  return trimmedApiKey;
+}
+
+async function requestRawg<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+  const url = new URL(`${RAWG_API_BASE_URL}${path}`);
+  url.searchParams.set('key', getRawgApiKey());
+
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+
+  let response: Response;
+
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure');
+  }
+
+  if (response.status === 429 || response.status === 503) {
+    throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
+  }
+
+  if (!response.ok) {
+    throw new RawgApiError(`RAWG request failed with status ${response.status}.`, 'api-failure');
+  }
+
+  return (await response.json()) as T;
+}
+
+export async function searchGameByName(title: string): Promise<RawgSearchResult[]> {
+  const normalizedTitle = title.trim();
+
+  if (!normalizedTitle) {
+    throw new RawgApiError('No game title was provided for RAWG search.', 'no-match');
+  }
+
+  const response = await requestRawg<RawgSearchResponse>('/games', {
+    search: normalizedTitle,
+    page_size: '5',
+  });
+  const results = response.results ?? [];
+
+  if (results.length === 0) {
+    throw new RawgApiError('No RAWG matches found for this title.', 'no-match');
+  }
+
+  return results;
+}
+
+export async function getGameDetails(rawgId: number): Promise<RawgGameDetails> {
+  return requestRawg<RawgGameDetails>(`/games/${rawgId}`);
+}
+
+export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {
+  return {
+    rawgId: details.id,
+    genres: details.genres?.map((genre) => genre.name) ?? [],
+    rawgTags: details.tags?.slice(0, 12).map((tag) => tag.name) ?? [],
+    developers: details.developers?.map((developer) => developer.name) ?? [],
+    publishers: details.publishers?.map((publisher) => publisher.name) ?? [],
+    released: details.released,
+    metacritic: details.metacritic,
+    averagePlaytime: details.playtime ?? null,
+    backgroundImage: details.background_image,
+    metadataSource: 'rawg',
+    metadataUpdatedAt: new Date().toISOString(),
+  };
+}
