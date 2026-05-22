@@ -40,6 +40,7 @@ Steam import stays local-first:
 - Games with recent Steam playtime default to `Playing`.
 - QuestShelf stores Steam metadata locally on imported games, including Steam App ID, external source, Steam store URL, and import time.
 - Importing never overwrites manually edited local game fields.
+- Steam game covers prefer Steam library artwork, then fall back to header art, capsule art, and finally a local placeholder if images cannot load.
 
 To use the test connection:
 
