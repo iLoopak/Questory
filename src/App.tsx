@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GameCard } from './components/GameCard';
+import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { loadGames, saveGames } from './lib/gameStorage';
 import type { Game, GamePlatform, GameStatus } from './types/game';
 import { gamePlatforms, gameStatuses } from './types/game';
+import type { RawgMetadata } from './types/rawg';
 
 const navItems = ['Library', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
@@ -74,6 +76,19 @@ function App() {
     });
   }
 
+  function updateGameMetadata(gameId: string, metadata: RawgMetadata) {
+    setGames((currentGames) =>
+      currentGames.map((game) =>
+        game.id === gameId
+          ? {
+              ...game,
+              ...metadata,
+            }
+          : game,
+      ),
+    );
+  }
+
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-5 lg:px-6">
@@ -141,7 +156,7 @@ function App() {
             ) : (
               <div className="mt-5 rounded-md border border-white/10 bg-ink-950 p-3 text-sm leading-6 text-slate-400">
                 {activeNavItem === 'Settings'
-                  ? 'Steam integration settings are local to this browser.'
+                  ? 'Integration settings are local to this browser.'
                   : `${activeNavItem} remains a placeholder for a later feature pass.`}
               </div>
             )}
@@ -162,7 +177,12 @@ function App() {
               {filteredGames.length > 0 ? (
                 <div className="grid gap-3 xl:grid-cols-2">
                   {filteredGames.map((game) => (
-                    <GameCard key={game.id} game={game} onStatusChange={updateGameStatus} />
+                    <GameCard
+                      key={game.id}
+                      game={game}
+                      onMetadataUpdate={updateGameMetadata}
+                      onStatusChange={updateGameStatus}
+                    />
                   ))}
                 </div>
               ) : (
@@ -177,7 +197,10 @@ function App() {
               )}
             </section>
           ) : activeNavItem === 'Settings' ? (
-            <SteamSettingsPanel games={games} onImportGames={importGames} />
+            <section className="min-w-0 space-y-4 overflow-y-auto lg:h-[calc(100vh-116px)]">
+              <RawgSettingsPanel />
+              <SteamSettingsPanel games={games} onImportGames={importGames} />
+            </section>
           ) : (
             <PlaceholderPanel title={activeNavItem} />
           )}
