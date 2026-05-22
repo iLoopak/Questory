@@ -16,8 +16,9 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Local Steam Web API key and SteamID64 storage.
 - Steam connection test with raw debug output and mapped game previews.
 - Controlled Steam import with selectable games and duplicate protection.
+- Optional RAWG metadata enrichment for individual games.
 
-No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-sync, or remote sync are included yet.
+No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
 ## Steam Integration Foundation
 
@@ -53,6 +54,21 @@ To use the test connection:
 Steam profile privacy can prevent owned or recently played game data from being returned.
 
 During this foundation phase the Steam test runs directly from the browser. If the browser or Steam blocks the request, QuestShelf shows the API failure state instead of silently syncing.
+
+## RAWG Metadata Foundation
+
+QuestShelf includes an optional RAWG integration in Settings. The RAWG API key is stored locally in the browser.
+
+To enrich one game:
+
+1. Get a RAWG API key from <https://rawg.io/apidocs>.
+2. Open QuestShelf Settings and enter the RAWG API key.
+3. In the Library, click **Find metadata** on a game card.
+4. Pick the correct RAWG match.
+
+QuestShelf fetches details for the selected match and stores metadata locally on that game, including RAWG ID, genres, RAWG tags, developers, publishers, release date, Metacritic score, average playtime, background image, metadata source, and update time.
+
+RAWG enrichment does not overwrite manually edited fields such as status, notes, custom tags, or cover image.
 
 ## Install
 
