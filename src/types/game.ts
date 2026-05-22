@@ -18,4 +18,15 @@ export type Game = {
   externalSource?: 'steam';
   externalUrl?: string;
   importedAt?: string;
+  rawgId?: number;
+  genres?: string[];
+  rawgTags?: string[];
+  developers?: string[];
+  publishers?: string[];
+  released?: string | null;
+  metacritic?: number | null;
+  averagePlaytime?: number | null;
+  backgroundImage?: string | null;
+  metadataSource?: 'rawg';
+  metadataUpdatedAt?: string;
 };
