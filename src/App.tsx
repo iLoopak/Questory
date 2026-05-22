@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GameCard } from './components/GameCard';
+import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { loadGames, saveGames } from './lib/gameStorage';
 import type { Game, GamePlatform, GameStatus } from './types/game';
 import { gamePlatforms, gameStatuses } from './types/game';
 
-const navItems = ['Library', 'Recommendation', 'Stats', 'Settings'];
+const navItems = ['Library', 'Recommendation', 'Stats', 'Settings'] as const;
+type NavItem = (typeof navItems)[number];
 
 const allOption = 'All';
 
@@ -14,6 +16,7 @@ function App() {
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | typeof allOption>(allOption);
   const [statusFilter, setStatusFilter] = useState<GameStatus | typeof allOption>(allOption);
   const [tagFilter, setTagFilter] = useState<string>(allOption);
+  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
 
   useEffect(() => {
     saveGames(games);
@@ -69,10 +72,11 @@ function App() {
               <button
                 key={item}
                 className={`h-10 shrink-0 rounded-md px-3 text-sm font-medium transition ${
-                  item === 'Library'
+                  item === activeNavItem
                     ? 'bg-white text-ink-950'
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
+                onClick={() => setActiveNavItem(item)}
                 type="button"
               >
                 {item}
@@ -89,64 +93,78 @@ function App() {
               <Stat label="Hours" value={totalHours.toString()} />
             </div>
 
-            <div className="mt-5 space-y-4">
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
-                <input
-                  className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Find by title"
-                  type="search"
+            {activeNavItem === 'Library' ? (
+              <div className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
+                  <input
+                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Find by title"
+                    type="search"
+                  />
+                </label>
+
+                <FilterSelect
+                  label="Platform"
+                  value={platformFilter}
+                  options={[allOption, ...gamePlatforms]}
+                  onChange={(value) => setPlatformFilter(value as GamePlatform | typeof allOption)}
                 />
-              </label>
 
-              <FilterSelect
-                label="Platform"
-                value={platformFilter}
-                options={[allOption, ...gamePlatforms]}
-                onChange={(value) => setPlatformFilter(value as GamePlatform | typeof allOption)}
-              />
+                <FilterSelect
+                  label="Status"
+                  value={statusFilter}
+                  options={[allOption, ...gameStatuses]}
+                  onChange={(value) => setStatusFilter(value as GameStatus | typeof allOption)}
+                />
 
-              <FilterSelect
-                label="Status"
-                value={statusFilter}
-                options={[allOption, ...gameStatuses]}
-                onChange={(value) => setStatusFilter(value as GameStatus | typeof allOption)}
-              />
-
-              <FilterSelect label="Tag" value={tagFilter} options={[allOption, ...tags]} onChange={setTagFilter} />
-            </div>
-          </aside>
-
-          <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Library</h2>
-                <p className="mt-1 text-sm text-slate-400">{filteredGames.length} games match the current view</p>
-              </div>
-              <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                Local storage enabled
-              </div>
-            </div>
-
-            {filteredGames.length > 0 ? (
-              <div className="grid gap-3 xl:grid-cols-2">
-                {filteredGames.map((game) => (
-                  <GameCard key={game.id} game={game} onStatusChange={updateGameStatus} />
-                ))}
+                <FilterSelect label="Tag" value={tagFilter} options={[allOption, ...tags]} onChange={setTagFilter} />
               </div>
             ) : (
-              <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">No games found</h3>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-                    Adjust the search or filters to bring titles back into view.
-                  </p>
-                </div>
+              <div className="mt-5 rounded-md border border-white/10 bg-ink-950 p-3 text-sm leading-6 text-slate-400">
+                {activeNavItem === 'Settings'
+                  ? 'Steam integration settings are local to this browser.'
+                  : `${activeNavItem} remains a placeholder for a later feature pass.`}
               </div>
             )}
-          </section>
+          </aside>
+
+          {activeNavItem === 'Library' ? (
+            <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Library</h2>
+                  <p className="mt-1 text-sm text-slate-400">{filteredGames.length} games match the current view</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+                  Local storage enabled
+                </div>
+              </div>
+
+              {filteredGames.length > 0 ? (
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {filteredGames.map((game) => (
+                    <GameCard key={game.id} game={game} onStatusChange={updateGameStatus} />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">No games found</h3>
+                    <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+                      Adjust the search or filters to bring titles back into view.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+          ) : activeNavItem === 'Settings' ? (
+            <SteamSettingsPanel />
+          ) : (
+            <PlaceholderPanel title={activeNavItem} />
+          )}
         </section>
       </div>
     </main>
@@ -190,6 +208,23 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
         ))}
       </select>
     </label>
+  );
+}
+
+type PlaceholderPanelProps = {
+  title: string;
+};
+
+function PlaceholderPanel({ title }: PlaceholderPanelProps) {
+  return (
+    <section className="grid min-w-0 place-items-center rounded-lg border border-white/10 bg-ink-900/70 p-8 text-center lg:h-[calc(100vh-116px)]">
+      <div>
+        <h2 className="text-xl font-semibold text-white">{title}</h2>
+        <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+          This section is intentionally waiting for a later foundation pass.
+        </p>
+      </div>
+    </section>
   );
 }
 

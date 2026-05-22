@@ -1,4 +1,4 @@
-export const gamePlatforms = ['PC', 'Steam Deck', 'Switch', 'PlayStation', 'Xbox'] as const;
+export const gamePlatforms = ['PC', 'Steam', 'Steam Deck', 'Switch', 'PlayStation', 'Xbox'] as const;
 export const gameStatuses = ['Backlog', 'Playing', 'Paused', 'Completed', 'Dropped'] as const;
 
 export type GamePlatform = (typeof gamePlatforms)[number];
