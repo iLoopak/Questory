@@ -1,5 +1,5 @@
 export const gamePlatforms = ['PC', 'Steam', 'Steam Deck', 'Switch', 'PlayStation', 'Xbox'] as const;
-export const gameStatuses = ['Backlog', 'Playing', 'Paused', 'Completed', 'Dropped'] as const;
+export const gameStatuses = ['Want to play', 'Backlog', 'Playing', 'Paused', 'Completed', 'Dropped'] as const;
 
 export type GamePlatform = (typeof gamePlatforms)[number];
 export type GameStatus = (typeof gameStatuses)[number];
@@ -14,4 +14,8 @@ export type Game = {
   tags: string[];
   lastPlayedAt: string | null;
   notes: string;
+  steamAppId?: number;
+  externalSource?: 'steam';
+  externalUrl?: string;
+  importedAt?: string;
 };
