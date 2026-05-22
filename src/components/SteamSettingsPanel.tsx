@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
 import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../services/steamApi';
 import type { Game } from '../types/game';
@@ -350,6 +351,8 @@ type SteamImportRowProps = {
 };
 
 function SteamImportRow({ game, isDuplicate, isSelected, recentGame, onToggleSelected }: SteamImportRowProps) {
+  const artworkUrls = getSteamArtworkUrls(game.appid);
+
   return (
     <label
       className={`grid gap-3 rounded-md border p-3 transition sm:grid-cols-[auto_120px_minmax(0,1fr)_auto] sm:items-center ${
@@ -367,7 +370,8 @@ function SteamImportRow({ game, isDuplicate, isSelected, recentGame, onToggleSel
       <img
         alt=""
         className="h-16 w-full rounded-md bg-ink-800 object-cover sm:w-[120px]"
-        src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`}
+        loading="lazy"
+        src={artworkUrls.header}
       />
 
       <div className="min-w-0">

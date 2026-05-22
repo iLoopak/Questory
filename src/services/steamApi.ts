@@ -1,5 +1,6 @@
 import type { Game } from '../types/game';
 import type { SteamOwnedGame, SteamRecentlyPlayedGame, SteamSettings } from '../types/steam';
+import { getSteamArtworkUrls } from '../lib/steamArtwork';
 
 const STEAM_API_BASE_URL = 'https://api.steampowered.com/IPlayerService';
 
@@ -103,13 +104,14 @@ export function mapSteamGamesToLocalGames(
     const lastPlayedAt = game.rtime_last_played
       ? new Date(game.rtime_last_played * 1000).toISOString().slice(0, 10)
       : null;
+    const artworkUrls = getSteamArtworkUrls(game.appid);
 
     return {
       id: `steam-${game.appid}`,
       title: game.name ?? `Steam app ${game.appid}`,
       platform: 'Steam',
       status: recentGame ? 'Playing' : 'Want to play',
-      coverImage: `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
+      coverImage: artworkUrls.library,
       playtimeHours: Math.round((game.playtime_forever ?? 0) / 60),
       tags: ['imported', 'steam'],
       lastPlayedAt,
