@@ -15,6 +15,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Steam connector foundation in Settings.
 - Local Steam Web API key and SteamID64 storage.
 - Steam connection test with raw debug output and mapped game previews.
+- Controlled Steam import with selectable games and duplicate protection.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-sync, or remote sync are included yet.
 
@@ -28,6 +29,17 @@ The test action calls:
 - `getRecentlyPlayedGames()`
 
 The returned Steam games are mapped into the local `Game` model for preview in a debug panel, but they are not written into the local library yet.
+
+Steam import stays local-first:
+
+- Use **Test Steam connection** to load owned games.
+- Select individual Steam games, or use **Select all** and **Deselect all**.
+- Click **Import selected** to add selected games to the local library.
+- Games already in the library with the same Steam App ID are marked as **Already in library** and are not duplicated.
+- Imported games default to platform `Steam`, status `Want to play`, and tags `imported` and `steam`.
+- Games with recent Steam playtime default to `Playing`.
+- QuestShelf stores Steam metadata locally on imported games, including Steam App ID, external source, Steam store URL, and import time.
+- Importing never overwrites manually edited local game fields.
 
 To use the test connection:
 
