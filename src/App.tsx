@@ -58,6 +58,22 @@ function App() {
     );
   }
 
+  function importGames(importedGames: Game[]) {
+    setGames((currentGames) => {
+      const existingSteamAppIds = new Set(
+        currentGames
+          .map((game) => game.steamAppId)
+          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+      );
+
+      const newGames = importedGames.filter((game) => {
+        return typeof game.steamAppId !== 'number' || !existingSteamAppIds.has(game.steamAppId);
+      });
+
+      return [...currentGames, ...newGames];
+    });
+  }
+
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-5 lg:px-6">
@@ -161,7 +177,7 @@ function App() {
               )}
             </section>
           ) : activeNavItem === 'Settings' ? (
-            <SteamSettingsPanel />
+            <SteamSettingsPanel games={games} onImportGames={importGames} />
           ) : (
             <PlaceholderPanel title={activeNavItem} />
           )}
