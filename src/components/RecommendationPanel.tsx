@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import {
@@ -26,6 +26,11 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
   const [preferredPlatform, setPreferredPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
   const [includeFinishedGames, setIncludeFinishedGames] = useState(false);
   const [rerollIndex, setRerollIndex] = useState(0);
+  const platformOptions = useMemo(() => {
+    return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
+      first.localeCompare(second),
+    );
+  }, [games]);
 
   const preferences: RecommendationPreferences = {
     availableTime,
@@ -78,7 +83,7 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
                   updatePreference(() => setPreferredPlatform(event.target.value as GamePlatform | typeof anyPlatform))
                 }
               >
-                {[anyPlatform, ...gamePlatforms].map((platform) => (
+                {[anyPlatform, ...platformOptions].map((platform) => (
                   <option key={platform} value={platform}>
                     {platform}
                   </option>
@@ -143,20 +148,36 @@ function RecommendationCard({
 }: RecommendationCardProps) {
   const coverSources = getCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
+
+  useEffect(() => {
+    setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
+  }, [game.id]);
 
   return (
     <article className="grid gap-4 rounded-lg border border-white/10 bg-ink-800 p-4 shadow-panel xl:grid-cols-[260px_minmax(0,1fr)]">
       <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-700">
         <div className="aspect-[2/3]">
           {activeCoverSource ? (
-            <img
-              alt=""
-              className="h-full w-full object-cover"
-              loading="lazy"
-              onError={() => setCoverSourceIndex((currentIndex) => currentIndex + 1)}
-              src={activeCoverSource}
-            />
+            <div className="relative h-full">
+              {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+              <img
+                alt=""
+                className={`h-full w-full object-cover transition-opacity duration-300 ${
+                  isCoverLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+                decoding="async"
+                loading="lazy"
+                onError={() => {
+                  setIsCoverLoaded(false);
+                  setCoverSourceIndex((currentIndex) => currentIndex + 1);
+                }}
+                onLoad={() => setIsCoverLoaded(true)}
+                src={activeCoverSource}
+              />
+            </div>
           ) : (
             <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
               <div>

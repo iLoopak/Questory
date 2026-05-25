@@ -33,7 +33,7 @@ const longSessionKeywords = ['rpg', 'open world', 'strategy', 'simulation', 'sur
 
 export function getRecommendations(games: Game[], preferences: RecommendationPreferences): RecommendationResult[] {
   return games
-    .filter((game) => preferences.includeFinishedGames || game.status !== 'Completed')
+    .filter((game) => preferences.includeFinishedGames || game.status !== 'Finished')
     .map((game) => scoreGame(game, preferences))
     .sort((first, second) => second.score - first.score);
 }
@@ -46,13 +46,13 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
   if (game.status === 'Playing') {
     score += 34;
     reasons.push('Already in progress');
-  } else if (game.status === 'Backlog' || game.status === 'Want to play') {
+  } else if (game.status === 'Want to play') {
     score += 18;
     reasons.push('Ready from your backlog');
   } else if (game.status === 'Paused') {
     score += 10;
     reasons.push('Paused but easy to resume');
-  } else if (game.status === 'Completed') {
+  } else if (game.status === 'Finished') {
     score += preferences.includeFinishedGames ? 2 : -40;
     reasons.push(preferences.includeFinishedGames ? 'Finished but allowed' : 'Finished games are filtered down');
   } else if (game.status === 'Dropped') {

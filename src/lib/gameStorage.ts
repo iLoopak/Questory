@@ -1,5 +1,5 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
-import type { Game } from '../types/game';
+import type { Game, GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
@@ -18,7 +18,7 @@ export function loadGames(): Game[] {
 
   try {
     const parsedGames = JSON.parse(storedGames) as Game[];
-    return Array.isArray(parsedGames) ? parsedGames : [];
+    return Array.isArray(parsedGames) ? parsedGames.map(normalizeLoadedGame) : [];
   } catch {
     return [];
   }
@@ -42,4 +42,23 @@ export function isMockGame(game: Game) {
 
 export function removeMockGames(games: Game[]) {
   return games.filter((game) => !isMockGame(game));
+}
+
+function normalizeLoadedGame(game: Game): Game {
+  return {
+    ...game,
+    status: normalizeLoadedStatus(game.status),
+  };
+}
+
+function normalizeLoadedStatus(status: string): GameStatus {
+  if (status === 'Completed') {
+    return 'Finished';
+  }
+
+  if (status === 'Backlog') {
+    return 'Want to play';
+  }
+
+  return status as GameStatus;
 }
