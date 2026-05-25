@@ -7,10 +7,15 @@ export type RawgMatchScore = {
   result: RawgSearchResult;
 };
 
-const highConfidenceThreshold = 82;
+const highConfidenceThreshold = 90;
+const suggestedConfidenceThreshold = 70;
 
 export function getHighConfidenceThreshold() {
   return highConfidenceThreshold;
+}
+
+export function getSuggestedConfidenceThreshold() {
+  return suggestedConfidenceThreshold;
 }
 
 export function rankRawgMatches(game: Game, results: RawgSearchResult[]): RawgMatchScore[] {
@@ -26,15 +31,13 @@ export function scoreRawgMatch(game: Game, result: RawgSearchResult): RawgMatchS
   let confidence = 0;
 
   if (normalizedGameTitle === normalizedResultTitle) {
-    confidence += 58;
-    reasons.push('exact title');
+    confidence += 76;
+    reasons.push('title similarity: exact normalized title');
   } else {
     const similarity = titleSimilarity(normalizedGameTitle, normalizedResultTitle);
-    confidence += Math.round(similarity * 48);
+    confidence += Math.round(similarity * 62);
 
-    if (similarity >= 0.74) {
-      reasons.push('similar title');
-    }
+    reasons.push(`title similarity: ${Math.round(similarity * 100)}%`);
   }
 
   const platformScore = scorePlatform(game, result);
@@ -62,14 +65,26 @@ export function isHighConfidenceMatch(match: RawgMatchScore) {
   return match.confidence >= highConfidenceThreshold;
 }
 
-function normalizeTitle(title: string) {
+export function isSuggestedMatch(match: RawgMatchScore) {
+  return match.confidence >= suggestedConfidenceThreshold && match.confidence < highConfidenceThreshold;
+}
+
+export function normalizeTitle(title: string) {
   return title
     .trim()
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(complete|definitive|deluxe|edition|goty|remastered|remake)\b/g, '')
+    .replace(/[\u2122\u00ae\u00a9]/g, '')
+    .replace(/\((pc|steam|steam deck|switch|nintendo switch|playstation|ps4|ps5|xbox|xbox one|series x|series s|windows|mac|linux)\)$/g, '')
+    .replace(/\[(pc|steam|steam deck|switch|nintendo switch|playstation|ps4|ps5|xbox|xbox one|series x|series s|windows|mac|linux)\]$/g, '')
+    .replace(/\b(game of the year|goty)\b/g, '')
+    .replace(/\b(definitive|deluxe|ultimate|complete|collector'?s?|enhanced|anniversary)\s+edition\b/g, '')
+    .replace(/\b(remastered|remaster|remake|director'?s cut|hd|vr)\b/g, '')
+    .replace(/\b(pc|steam|steam deck|switch|nintendo switch|playstation|ps4|ps5|xbox|xbox one|series x|series s|windows|mac|linux)\b$/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(edition|version)\b/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -99,14 +114,14 @@ function scorePlatform(game: Game, result: RawgSearchResult) {
   const hasPc = rawgPlatforms.some((rawgPlatform) => rawgPlatform.includes('pc'));
 
   if (expectsPc && hasPc) {
-    return { points: 14, reason: 'platform match' };
+    return { points: 14, reason: 'platform similarity: match' };
   }
 
   if (rawgPlatforms.some((rawgPlatform) => rawgPlatform.includes(platform))) {
-    return { points: 14, reason: 'platform match' };
+    return { points: 14, reason: 'platform similarity: match' };
   }
 
-  return { points: 0, reason: '' };
+  return { points: -4, reason: 'platform similarity: unknown or different' };
 }
 
 function scoreReleaseYear(game: Game, result: RawgSearchResult) {
@@ -114,18 +129,18 @@ function scoreReleaseYear(game: Game, result: RawgSearchResult) {
   const resultYear = getYear(result.released);
 
   if (!gameYear || !resultYear) {
-    return { points: 0, reason: '' };
+    return { points: 0, reason: 'release year similarity: unavailable' };
   }
 
   if (gameYear === resultYear) {
-    return { points: 14, reason: 'release year match' };
+    return { points: 14, reason: 'release year similarity: exact match' };
   }
 
   if (Math.abs(gameYear - resultYear) === 1) {
-    return { points: 7, reason: 'near release year' };
+    return { points: 7, reason: 'release year similarity: near match' };
   }
 
-  return { points: -8, reason: 'release year differs' };
+  return { points: -8, reason: 'release year similarity: differs' };
 }
 
 function getYear(value: string | null) {
