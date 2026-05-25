@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
@@ -33,6 +34,7 @@ function App() {
   const [tagFilter, setTagFilter] = useState<string>(allOption);
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [isAddGameOpen, setIsAddGameOpen] = useState(false);
 
   useEffect(() => {
     saveGames(games);
@@ -50,6 +52,12 @@ function App() {
 
   const tags = useMemo(() => {
     return Array.from(new Set(games.flatMap((game) => game.tags))).sort((first, second) =>
+      first.localeCompare(second),
+    );
+  }, [games]);
+
+  const platformOptions = useMemo(() => {
+    return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
       first.localeCompare(second),
     );
   }, [games]);
@@ -99,6 +107,10 @@ function App() {
 
       return [...currentGames, ...newGames];
     });
+  }
+
+  function addManualGame(game: Game) {
+    setGames((currentGames) => [...currentGames, game]);
   }
 
   function removeGame(gameId: string) {
@@ -246,7 +258,7 @@ function App() {
                 <FilterSelect
                   label="Platform"
                   value={platformFilter}
-                  options={[allOption, ...gamePlatforms]}
+                  options={[allOption, ...platformOptions]}
                   onChange={(value) => setPlatformFilter(value as GamePlatform | typeof allOption)}
                 />
 
@@ -279,8 +291,17 @@ function App() {
                   <h2 className="text-xl font-semibold text-white">Library</h2>
                   <p className="mt-1 text-sm text-slate-400">{filteredGames.length} games match the current view</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                  Local storage enabled
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+                    onClick={() => setIsAddGameOpen(true)}
+                    type="button"
+                  >
+                    Add game
+                  </button>
+                  <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+                    Local storage enabled
+                  </div>
                 </div>
               </div>
 
@@ -343,7 +364,219 @@ function App() {
           )}
         </section>
       </div>
+
+      {isAddGameOpen ? (
+        <AddGameDialog
+          existingGameIds={new Set(games.map((game) => game.id))}
+          onClose={() => setIsAddGameOpen(false)}
+          onSave={(game) => {
+            addManualGame(game);
+            setIsAddGameOpen(false);
+            setSelectedGameId(game.id);
+          }}
+        />
+      ) : null}
     </main>
+  );
+}
+
+type AddGameDialogProps = {
+  existingGameIds: Set<string>;
+  onClose: () => void;
+  onSave: (game: Game) => void;
+};
+
+function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps) {
+  const [title, setTitle] = useState('');
+  const [platform, setPlatform] = useState<GamePlatform>('Steam');
+  const [customPlatform, setCustomPlatform] = useState('');
+  const [status, setStatus] = useState<GameStatus>('Want to play');
+  const [playtimeHours, setPlaytimeHours] = useState('0');
+  const [coverImage, setCoverImage] = useState('');
+  const [tagText, setTagText] = useState('');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+
+  function submitForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedTitle = title.trim();
+    const parsedPlaytime = Number(playtimeHours);
+    const resolvedPlatform = platform === 'Other' ? customPlatform.trim() : platform;
+
+    if (!trimmedTitle) {
+      setError('Title is required.');
+      return;
+    }
+
+    if (!resolvedPlatform) {
+      setError('Custom platform is required when Other is selected.');
+      return;
+    }
+
+    if (!Number.isFinite(parsedPlaytime) || parsedPlaytime < 0) {
+      setError('Playtime must be zero or positive.');
+      return;
+    }
+
+    const importedAt = new Date().toISOString();
+    const id = createManualGameId(trimmedTitle, existingGameIds);
+
+    onSave({
+      id,
+      title: trimmedTitle,
+      platform: resolvedPlatform as GamePlatform,
+      status,
+      coverImage: coverImage.trim(),
+      playtimeHours: parsedPlaytime,
+      tags: parseTagInput(tagText),
+      lastPlayedAt: status === 'Playing' ? importedAt.slice(0, 10) : null,
+      notes: notes.trim(),
+      externalSource: 'manual',
+      importedAt,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/75 p-3">
+      <section className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border border-white/10 bg-ink-900 shadow-panel">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950 p-4">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Add game</h2>
+            <p className="mt-1 text-sm text-slate-400">Manual games stay local and are never affected by Steam import cleanup.</p>
+          </div>
+          <button
+            className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            onClick={onClose}
+            type="button"
+          >
+            Close
+          </button>
+        </div>
+
+        <form className="max-h-[calc(92vh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block md:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Title</span>
+              <input
+                autoFocus
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Game title"
+                value={title}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
+              <select
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
+                onChange={(event) => setPlatform(event.target.value as GamePlatform)}
+                value={platform}
+              >
+                {gamePlatforms.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {platform === 'Other' ? (
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Custom platform</span>
+                <input
+                  className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                  onChange={(event) => setCustomPlatform(event.target.value)}
+                  placeholder="Dreamcast, 3DS, Arcade"
+                  value={customPlatform}
+                />
+              </label>
+            ) : null}
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Status</span>
+              <select
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
+                onChange={(event) => setStatus(event.target.value as GameStatus)}
+                value={status}
+              >
+                {gameStatuses.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Playtime hours</span>
+              <input
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                min="0"
+                onChange={(event) => setPlaytimeHours(event.target.value)}
+                step="0.1"
+                type="number"
+                value={playtimeHours}
+              />
+            </label>
+
+            <label className="block md:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Cover image URL</span>
+              <input
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                onChange={(event) => setCoverImage(event.target.value)}
+                placeholder="https://..."
+                type="url"
+                value={coverImage}
+              />
+            </label>
+
+            <label className="block md:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Tags</span>
+              <input
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                onChange={(event) => setTagText(event.target.value)}
+                placeholder="physical, handheld, retro"
+                value={tagText}
+              />
+            </label>
+
+            <label className="block md:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notes</span>
+              <textarea
+                className="mt-2 min-h-28 w-full resize-y rounded-md border border-white/10 bg-ink-950 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Physical copy, save file notes, platform details..."
+                value={notes}
+              />
+            </label>
+          </div>
+
+          {error ? (
+            <div className="mt-4 rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
+            <button
+              className="h-10 rounded-md border border-white/10 px-4 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              onClick={onClose}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+              type="submit"
+            >
+              Save game
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 
@@ -462,6 +695,34 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
       </select>
     </label>
   );
+}
+
+function parseTagInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function createManualGameId(title: string, existingGameIds: Set<string>) {
+  const baseId =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'manual-game';
+  let id = `manual-${baseId}`;
+  let suffix = 2;
+
+  while (existingGameIds.has(id)) {
+    id = `manual-${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return id;
 }
 
 type PlaceholderPanelProps = {
