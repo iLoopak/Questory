@@ -6,7 +6,7 @@ import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
-import { loadGames, saveGames } from './lib/gameStorage';
+import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import type { Game, GamePlatform, GameStatus } from './types/game';
 import { gamePlatforms, gameStatuses } from './types/game';
 import type { RawgMetadata } from './types/rawg';
@@ -87,6 +87,19 @@ function App() {
 
       return [...currentGames, ...newGames];
     });
+  }
+
+  function loadDemoData() {
+    setGames((currentGames) => {
+      const existingIds = new Set(currentGames.map((game) => game.id));
+      const newMockGames = getMockGames().filter((game) => !existingIds.has(game.id));
+
+      return [...currentGames, ...newMockGames];
+    });
+  }
+
+  function removeDemoGames() {
+    setGames((currentGames) => removeMockGames(currentGames));
   }
 
   function updateGameMetadata(gameId: string, metadata: RawgMetadata) {
@@ -279,6 +292,11 @@ function App() {
             />
           ) : activeNavItem === 'Settings' ? (
             <section className="min-w-0 space-y-4 overflow-y-auto lg:h-[calc(100vh-116px)]">
+              <DemoDataPanel
+                demoGameCount={games.filter(isMockGame).length}
+                onLoadDemoData={loadDemoData}
+                onRemoveDemoGames={removeDemoGames}
+              />
               <RawgSettingsPanel />
               <SteamSettingsPanel games={games} onImportGames={importGames} />
             </section>
@@ -288,6 +306,51 @@ function App() {
         </section>
       </div>
     </main>
+  );
+}
+
+type DemoDataPanelProps = {
+  demoGameCount: number;
+  onLoadDemoData: () => void;
+  onRemoveDemoGames: () => void;
+};
+
+function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: DemoDataPanelProps) {
+  return (
+    <section className="rounded-lg border border-white/10 bg-ink-900/70 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-white">Library data</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            New installs start empty. Demo games are optional and never overwrite imported Steam games.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {import.meta.env.DEV ? (
+            <button
+              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+              onClick={onLoadDemoData}
+              type="button"
+            >
+              Load demo data
+            </button>
+          ) : null}
+          <button
+            className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+            disabled={demoGameCount === 0}
+            onClick={onRemoveDemoGames}
+            type="button"
+          >
+            Remove demo games
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+        {demoGameCount} known demo games in this browser.
+      </div>
+    </section>
   );
 }
 
