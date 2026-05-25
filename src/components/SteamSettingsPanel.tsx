@@ -57,6 +57,7 @@ export function SteamSettingsPanel({
   const existingSteamAppIds = useMemo(() => {
     return new Set(
       games
+        .filter((game) => game.collectionType === 'library')
         .map((game) => game.steamAppId)
         .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
     );
