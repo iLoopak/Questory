@@ -1,0 +1,183 @@
+import type { Game, GamePlatform } from '../types/game';
+
+export const availableTimeOptions = ['15 min', '30 min', '1 hour', 'long session'] as const;
+export const moodOptions = ['brain off', 'story', 'grind', 'challenge', 'comfort'] as const;
+
+export type AvailableTime = (typeof availableTimeOptions)[number];
+export type RecommendationMood = (typeof moodOptions)[number];
+
+export type RecommendationPreferences = {
+  availableTime: AvailableTime;
+  includeFinishedGames: boolean;
+  mood: RecommendationMood;
+  preferredPlatform: GamePlatform | 'Any';
+};
+
+export type RecommendationResult = {
+  confidence: number;
+  game: Game;
+  reasons: string[];
+  score: number;
+};
+
+const moodKeywords: Record<RecommendationMood, string[]> = {
+  'brain off': ['casual', 'cozy', 'relaxing', 'sandbox', 'arcade', 'simulation', 'open world'],
+  story: ['story', 'narrative', 'adventure', 'rpg', 'singleplayer', 'atmospheric', 'choices matter'],
+  grind: ['grind', 'loot', 'roguelike', 'roguelite', 'action', 'rpg', 'survival', 'crafting'],
+  challenge: ['difficult', 'souls-like', 'strategy', 'tactical', 'competitive', 'precision', 'hardcore'],
+  comfort: ['cozy', 'relaxing', 'family friendly', 'cute', 'wholesome', 'simulation', 'farming'],
+};
+
+const shortSessionKeywords = ['arcade', 'roguelike', 'roguelite', 'platformer', 'puzzle', 'casual'];
+const longSessionKeywords = ['rpg', 'open world', 'strategy', 'simulation', 'survival', 'story'];
+
+export function getRecommendations(games: Game[], preferences: RecommendationPreferences): RecommendationResult[] {
+  return games
+    .filter((game) => preferences.includeFinishedGames || game.status !== 'Completed')
+    .map((game) => scoreGame(game, preferences))
+    .sort((first, second) => second.score - first.score);
+}
+
+export function scoreGame(game: Game, preferences: RecommendationPreferences): RecommendationResult {
+  const reasons: string[] = [];
+  let score = 0;
+
+  // Status is the strongest signal: continue what is already active, keep backlog viable, and avoid abandoned games.
+  if (game.status === 'Playing') {
+    score += 34;
+    reasons.push('Already in progress');
+  } else if (game.status === 'Backlog' || game.status === 'Want to play') {
+    score += 18;
+    reasons.push('Ready from your backlog');
+  } else if (game.status === 'Paused') {
+    score += 10;
+    reasons.push('Paused but easy to resume');
+  } else if (game.status === 'Completed') {
+    score += preferences.includeFinishedGames ? 2 : -40;
+    reasons.push(preferences.includeFinishedGames ? 'Finished but allowed' : 'Finished games are filtered down');
+  } else if (game.status === 'Dropped') {
+    score -= 32;
+    reasons.push('Dropped games are heavily penalized');
+  }
+
+  // Recency favors games that have not been touched lately, while still allowing never-started games to surface.
+  const daysSincePlayed = getDaysSincePlayed(game.lastPlayedAt);
+
+  if (daysSincePlayed === null) {
+    score += 8;
+    reasons.push('Not started recently');
+  } else if (daysSincePlayed >= 21) {
+    score += 18;
+    reasons.push('Not played in a while');
+  } else if (daysSincePlayed >= 7) {
+    score += 10;
+    reasons.push('Fresh enough to revisit');
+  } else {
+    score -= 5;
+    reasons.push('Played recently');
+  }
+
+  // Platform preference is a direct boost, with Steam Deck treated as compatible with Steam.
+  if (preferences.preferredPlatform !== 'Any') {
+    if (game.platform === preferences.preferredPlatform) {
+      score += 18;
+      reasons.push(`Matches ${preferences.preferredPlatform}`);
+    } else if (preferences.preferredPlatform === 'Steam Deck' && game.platform === 'Steam') {
+      score += 10;
+      reasons.push('Steam library fits handheld play');
+    } else {
+      score -= 12;
+      reasons.push(`Not on ${preferences.preferredPlatform}`);
+    }
+  }
+
+  const keywordText = collectKeywords(game);
+  const moodMatches = moodKeywords[preferences.mood].filter((keyword) => keywordText.includes(keyword));
+
+  if (moodMatches.length > 0) {
+    score += Math.min(24, moodMatches.length * 8);
+    reasons.push(`Fits ${preferences.mood} mood`);
+  }
+
+  // Session fit combines explicit playtime metadata with broad genre/tag hints.
+  const timeFit = scoreTimeFit(game, preferences.availableTime, keywordText);
+  score += timeFit.points;
+
+  if (timeFit.reason) {
+    reasons.push(timeFit.reason);
+  }
+
+  // Missing metadata should not hide a game, but it lowers confidence in the recommendation.
+  if (game.metadataSource !== 'rawg') {
+    score -= 8;
+    reasons.push('RAWG metadata is missing');
+  }
+
+  const confidence = Math.max(5, Math.min(98, Math.round(score)));
+
+  return {
+    confidence,
+    game,
+    reasons: reasons.slice(0, 5),
+    score,
+  };
+}
+
+function scoreTimeFit(game: Game, availableTime: AvailableTime, keywordText: string) {
+  const averagePlaytime = game.averagePlaytime ?? null;
+  const hasShortSessionHint = shortSessionKeywords.some((keyword) => keywordText.includes(keyword));
+  const hasLongSessionHint = longSessionKeywords.some((keyword) => keywordText.includes(keyword));
+
+  if (availableTime === '15 min') {
+    if (hasShortSessionHint) {
+      return { points: 18, reason: 'Works for a quick session' };
+    }
+
+    if (averagePlaytime && averagePlaytime >= 30) {
+      return { points: -10, reason: 'May want more time' };
+    }
+
+    return { points: 4, reason: 'Can fit a short check-in' };
+  }
+
+  if (availableTime === '30 min') {
+    if (hasShortSessionHint || game.status === 'Playing') {
+      return { points: 14, reason: 'Fits a short session' };
+    }
+
+    return { points: 6, reason: 'Reasonable for a half hour' };
+  }
+
+  if (availableTime === '1 hour') {
+    if (hasLongSessionHint || game.status === 'Playing') {
+      return { points: 14, reason: 'Good for a focused hour' };
+    }
+
+    return { points: 8, reason: 'Enough time to make progress' };
+  }
+
+  if (hasLongSessionHint || (averagePlaytime && averagePlaytime >= 12)) {
+    return { points: 18, reason: 'Rewards a longer session' };
+  }
+
+  return { points: 6, reason: 'Still playable in a long session' };
+}
+
+function collectKeywords(game: Game) {
+  return [...game.tags, ...(game.genres ?? []), ...(game.rawgTags ?? [])].join(' ').toLowerCase();
+}
+
+function getDaysSincePlayed(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const playedAt = new Date(value).getTime();
+
+  if (!Number.isFinite(playedAt)) {
+    return null;
+  }
+
+  const dayMs = 1000 * 60 * 60 * 24;
+  return Math.floor((Date.now() - playedAt) / dayMs);
+}

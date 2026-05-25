@@ -19,6 +19,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Optional RAWG metadata enrichment for individual games.
 - Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
 - Metadata enrichment workflow for larger libraries with batch processing and manual match review.
+- Local Recommendation Engine v1 for choosing what to play next.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
@@ -93,6 +94,21 @@ Open **Metadata** to review games that are missing RAWG metadata. The workflow s
 - Use **Stop enrichment** to halt an active batch after the current item finishes.
 
 Automatic confidence scoring considers exact title match, normalized title similarity, platform similarity, and release year similarity when a release year is available. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
+
+## Recommendation Engine v1
+
+Open **Recommendation** to get a local **What should I play?** pick. The engine does not call AI or any external API.
+
+Inputs:
+
+- Available time: 15 min, 30 min, 1 hour, or long session.
+- Mood: brain off, story, grind, challenge, or comfort.
+- Preferred platform: any platform or a specific local platform.
+- Include finished games: enabled or disabled.
+
+The recommendation score uses local status, last played date, playtime, RAWG average playtime, genres, RAWG tags, custom tags, and platform. It prefers games already marked `Playing`, games not played recently, mood matches, and games that fit the selected session length. It penalizes completed games unless enabled, dropped games, and missing RAWG metadata without excluding those games entirely.
+
+The main recommendation card shows the selected game, cover, platform, status, playtime, matching reasons, and confidence score. **Reroll** moves to the next best candidate, **Mark as Playing** updates local tracking, and **Open Detail** opens the focused game detail view.
 
 ## Install
 
