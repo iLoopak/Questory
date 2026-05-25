@@ -1,9 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
-import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../services/steamApi';
+import {
+  clearSteamApiDebugLog,
+  getOwnedGames,
+  getRecentlyPlayedGames,
+  getSteamApiDebugLog,
+  mapSteamGamesToLocalGames,
+  SteamApiError,
+} from '../services/steamApi';
 import type { Game } from '../types/game';
-import type { SteamConnectionState, SteamOwnedGame, SteamRecentlyPlayedGame, SteamSettings } from '../types/steam';
+import type {
+  SteamApiDebugEntry,
+  SteamConnectionState,
+  SteamDebugResult,
+  SteamOwnedGame,
+  SteamRecentlyPlayedGame,
+  SteamSettings,
+} from '../types/steam';
 
 const initialConnectionState: SteamConnectionState = {
   status: 'idle',
@@ -50,11 +64,14 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
 
   const debugOutput = useMemo(() => {
     if (!connectionState.data) {
-      return '{\n  "ownedGames": [],\n  "recentlyPlayedGames": [],\n  "mappedGames": []\n}';
+      return JSON.stringify(createEmptyDebugResult(settings.steamId64), null, 2);
     }
 
     return JSON.stringify(connectionState.data, null, 2);
-  }, [connectionState.data]);
+  }, [connectionState.data, settings.steamId64]);
+
+  const apiDebugEntries = connectionState.data?.apiDebugEntries ?? [];
+  const latestApiDebugEntry = apiDebugEntries[apiDebugEntries.length - 1];
 
   function updateSetting(field: keyof SteamSettings, value: string) {
     setSettings((currentSettings) => ({
@@ -64,6 +81,7 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
   }
 
   async function testConnection() {
+    clearSteamApiDebugLog();
     setConnectionState({
       status: 'loading',
       message: 'Testing Steam connection...',
@@ -79,11 +97,15 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
       setSelectedAppIds(new Set());
       setConnectionState({
         status: 'success',
-        message: `Loaded ${ownedGames.length} owned games and ${recentlyPlayedGames.length} recently played games. Select games below to import them locally.`,
+        message:
+          ownedGames.length === 0
+            ? 'Steam returned a valid response, but the owned games library is empty.'
+            : `Loaded ${ownedGames.length} owned games and ${recentlyPlayedGames.length} recently played games. Select games below to import them locally.`,
         data: {
           ownedGames,
           recentlyPlayedGames,
           mappedGames,
+          apiDebugEntries: getSteamApiDebugLog(),
         },
       });
     } catch (error) {
@@ -95,7 +117,12 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
       setConnectionState({
         status: 'error',
         message,
-        data: connectionState.data,
+        data: {
+          ownedGames: connectionState.data?.ownedGames ?? [],
+          recentlyPlayedGames: connectionState.data?.recentlyPlayedGames ?? [],
+          mappedGames: connectionState.data?.mappedGames ?? [],
+          apiDebugEntries: getSteamApiDebugLog(),
+        },
       });
     }
   }
@@ -234,6 +261,12 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
             </div>
           ) : null}
 
+          <SteamApiDebugSummary
+            entries={apiDebugEntries}
+            latestEntry={latestApiDebugEntry}
+            steamId64={settings.steamId64}
+          />
+
           <pre className="max-h-[360px] overflow-auto rounded-md border border-white/10 bg-black/30 p-3 text-xs leading-5 text-slate-300">
             {debugOutput}
           </pre>
@@ -252,6 +285,49 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
         onToggleSelected={toggleSelectedAppId}
       />
     </section>
+  );
+}
+
+type SteamApiDebugSummaryProps = {
+  entries: SteamApiDebugEntry[];
+  latestEntry?: SteamApiDebugEntry;
+  steamId64: string;
+};
+
+function SteamApiDebugSummary({ entries, latestEntry, steamId64 }: SteamApiDebugSummaryProps) {
+  const parsedGameCount = latestEntry?.parsedGameCount;
+
+  return (
+    <div className="mb-4 rounded-md border border-white/10 bg-ink-900 p-3">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <h4 className="text-sm font-semibold text-white">Temporary Steam API debug</h4>
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">API key redacted</span>
+      </div>
+      <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+        <DebugField label="Current SteamID64" value={steamId64 || 'Not set'} />
+        <DebugField label="Last HTTP status" value={latestEntry?.httpStatus?.toString() ?? 'n/a'} />
+        <DebugField
+          label="Parsed game count"
+          value={parsedGameCount === null || parsedGameCount === undefined ? 'n/a' : parsedGameCount.toString()}
+        />
+        <DebugField label="Debug responses" value={entries.length.toString()} />
+      </div>
+      {latestEntry ? (
+        <div className="mt-3 min-w-0 rounded border border-white/10 bg-black/20 px-2 py-2 text-xs leading-5 text-slate-400">
+          <div className="truncate">Endpoint: {latestEntry.endpoint}</div>
+          <div className="truncate">Request: {latestEntry.requestUrl}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DebugField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded border border-white/10 bg-ink-950 px-2 py-2">
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-slate-200">{value}</div>
+    </div>
   );
 }
 
@@ -413,4 +489,22 @@ function DebugStat({ label, value }: DebugStatProps) {
       <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
     </div>
   );
+}
+
+function createEmptyDebugResult(steamId64: string): SteamDebugResult {
+  return {
+    ownedGames: [],
+    recentlyPlayedGames: [],
+    mappedGames: [],
+    apiDebugEntries: [
+      {
+        endpoint: 'n/a',
+        httpStatus: null,
+        parsedGameCount: null,
+        requestUrl: 'n/a',
+        responseSummary: 'No Steam API request has been run in this session.',
+        steamId64,
+      },
+    ],
+  };
 }
