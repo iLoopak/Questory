@@ -6,7 +6,8 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 
 - Responsive dark app shell with placeholder navigation.
 - Typed local `Game` model.
-- Seeded sample games.
+- Empty library by default for new users.
+- Optional development-only demo games.
 - Browser `localStorage` persistence.
 - Game cards with cover image, playtime, tags, notes, and last played date.
 - Filter by platform, status, and tag.
@@ -23,6 +24,12 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+
+## Local Library Data
+
+QuestShelf starts with an empty local library. It does not automatically insert placeholder games on startup.
+
+For development and testing, optional demo games live in `src/data/mockGames.ts`. In Vite development mode, Settings includes a **Load demo data** action. Settings also includes **Remove demo games**, which removes only known placeholder IDs and preserves user-created games and Steam-imported games.
 
 ## PWA Install and Offline Behavior
 

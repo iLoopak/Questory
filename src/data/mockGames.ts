@@ -1,6 +1,6 @@
 import type { Game } from '../types/game';
 
-export const seedGames: Game[] = [
+export const mockGames: Game[] = [
   {
     id: 'hollow-knight',
     title: 'Hollow Knight',
@@ -68,3 +68,5 @@ export const seedGames: Game[] = [
     notes: 'Year three farm cleanup and greenhouse planning.',
   },
 ];
+
+export const mockGameIds = new Set(mockGames.map((game) => game.id));
