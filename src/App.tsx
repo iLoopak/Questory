@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
@@ -15,23 +15,35 @@ import {
   saveIgnoredSteamGames,
   type IgnoredSteamGame,
 } from './lib/steamIgnoredGamesStorage';
-import type { Game, GamePlatform, GameStatus } from './types/game';
-import { gamePlatforms, gameStatuses } from './types/game';
+import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from './types/game';
+import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 
-const navItems = ['Library', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
+const navItems = ['Library', 'Wishlist', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
 
 const allOption = 'All';
+
+type CollectionFilters = {
+  platform: GamePlatform | typeof allOption;
+  searchTerm: string;
+  status: GameStatus | typeof allOption;
+  tag: string;
+};
+
+const initialCollectionFilters: CollectionFilters = {
+  platform: allOption,
+  searchTerm: '',
+  status: allOption,
+  tag: allOption,
+};
 
 function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [isAppReady, setIsAppReady] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<GamePlatform | typeof allOption>(allOption);
-  const [statusFilter, setStatusFilter] = useState<GameStatus | typeof allOption>(allOption);
-  const [tagFilter, setTagFilter] = useState<string>(allOption);
+  const [libraryFilters, setLibraryFilters] = useState<CollectionFilters>(initialCollectionFilters);
+  const [wishlistFilters, setWishlistFilters] = useState<CollectionFilters>(initialCollectionFilters);
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
@@ -56,27 +68,25 @@ function App() {
     );
   }, [games]);
 
+  const libraryGames = useMemo(() => games.filter((game) => game.collectionType === 'library'), [games]);
+  const wishlistGames = useMemo(() => games.filter((game) => game.collectionType === 'wishlist'), [games]);
+
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
       first.localeCompare(second),
     );
   }, [games]);
 
-  const filteredGames = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredLibraryGames = useMemo(() => {
+    return filterGames(libraryGames, libraryFilters);
+  }, [libraryFilters, libraryGames]);
 
-    return games.filter((game) => {
-      const matchesTitle = game.title.toLowerCase().includes(normalizedSearch);
-      const matchesPlatform = platformFilter === allOption || game.platform === platformFilter;
-      const matchesStatus = statusFilter === allOption || game.status === statusFilter;
-      const matchesTag = tagFilter === allOption || game.tags.includes(tagFilter);
+  const filteredWishlistGames = useMemo(() => {
+    return filterGames(wishlistGames, wishlistFilters);
+  }, [wishlistFilters, wishlistGames]);
 
-      return matchesTitle && matchesPlatform && matchesStatus && matchesTag;
-    });
-  }, [games, platformFilter, searchTerm, statusFilter, tagFilter]);
-
-  const activeGames = games.filter((game) => game.status === 'Playing').length;
-  const totalHours = games.reduce((sum, game) => sum + game.playtimeHours, 0);
+  const activeGames = libraryGames.filter((game) => game.status === 'Playing').length;
+  const totalHours = libraryGames.reduce((sum, game) => sum + game.playtimeHours, 0);
   const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
 
   function updateGameStatus(gameId: string, status: GameStatus) {
@@ -105,12 +115,66 @@ function App() {
         return typeof game.steamAppId !== 'number' || !existingSteamAppIds.has(game.steamAppId);
       });
 
-      return [...currentGames, ...newGames];
+      return [...currentGames, ...newGames.map((game) => ({ ...game, collectionType: 'library' as const }))];
     });
   }
 
   function addManualGame(game: Game) {
     setGames((currentGames) => [...currentGames, game]);
+  }
+
+  function addToWishlist(game: Game) {
+    const wishlistId = createCollectionCopyId(game, 'wishlist', new Set(games.map((currentGame) => currentGame.id)));
+
+    setGames((currentGames) => {
+      const alreadyWishlisted = currentGames.some((currentGame) => {
+        if (currentGame.collectionType !== 'wishlist') {
+          return false;
+        }
+
+        if (typeof game.steamAppId === 'number') {
+          return currentGame.steamAppId === game.steamAppId;
+        }
+
+        return currentGame.title.toLowerCase() === game.title.toLowerCase() && currentGame.platform === game.platform;
+      });
+
+      if (alreadyWishlisted) {
+        return currentGames;
+      }
+
+      return [
+        ...currentGames,
+        {
+          ...game,
+          id: wishlistId,
+          collectionType: 'wishlist',
+          status: 'Want to play',
+          playtimeHours: 0,
+          lastPlayedAt: null,
+          priority: game.priority ?? 'medium',
+          importedAt: new Date().toISOString(),
+        },
+      ];
+    });
+  }
+
+  function moveToLibrary(game: Game) {
+    setGames((currentGames) =>
+      currentGames.map((currentGame) =>
+        currentGame.id === game.id
+          ? {
+              ...currentGame,
+              collectionType: 'library',
+              priority: undefined,
+              expectedPlaytime: undefined,
+              priceTarget: undefined,
+              releaseDate: undefined,
+              storeUrl: undefined,
+            }
+          : currentGame,
+      ),
+    );
   }
 
   function removeGame(gameId: string) {
@@ -218,7 +282,7 @@ function App() {
                 }`}
                 onClick={() => {
                   setActiveNavItem(item);
-                  if (item !== 'Library') {
+                  if (item !== 'Library' && item !== 'Wishlist') {
                     setSelectedGameId(null);
                   }
                 }}
@@ -237,19 +301,24 @@ function App() {
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="rounded-lg border border-white/10 bg-ink-900 p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
             <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
-              <Stat label="Games" value={games.length.toString()} />
+              <Stat label="Library" value={libraryGames.length.toString()} />
+              <Stat label="Wishlist" value={wishlistGames.length.toString()} />
               <Stat label="Playing" value={activeGames.toString()} />
               <Stat label="Hours" value={totalHours.toString()} />
             </div>
 
-            {activeNavItem === 'Library' ? (
+            {activeNavItem === 'Library' || activeNavItem === 'Wishlist' ? (
               <div className="mt-5 space-y-4">
                 <label className="block">
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
+                    value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).searchTerm}
+                    onChange={(event) =>
+                      updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, {
+                        searchTerm: event.target.value,
+                      })
+                    }
                     placeholder="Find by title"
                     type="search"
                   />
@@ -257,19 +326,34 @@ function App() {
 
                 <FilterSelect
                   label="Platform"
-                  value={platformFilter}
+                  value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).platform}
                   options={[allOption, ...platformOptions]}
-                  onChange={(value) => setPlatformFilter(value as GamePlatform | typeof allOption)}
+                  onChange={(value) =>
+                    updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, {
+                      platform: value as GamePlatform | typeof allOption,
+                    })
+                  }
                 />
 
                 <FilterSelect
                   label="Status"
-                  value={statusFilter}
+                  value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).status}
                   options={[allOption, ...gameStatuses]}
-                  onChange={(value) => setStatusFilter(value as GameStatus | typeof allOption)}
+                  onChange={(value) =>
+                    updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, {
+                      status: value as GameStatus | typeof allOption,
+                    })
+                  }
                 />
 
-                <FilterSelect label="Tag" value={tagFilter} options={[allOption, ...tags]} onChange={setTagFilter} />
+                <FilterSelect
+                  label="Tag"
+                  value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).tag}
+                  options={[allOption, ...tags]}
+                  onChange={(value) =>
+                    updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, { tag: value })
+                  }
+                />
               </div>
             ) : (
               <div className="mt-5 rounded-md border border-white/10 bg-ink-950 p-3 text-sm leading-6 text-slate-400">
@@ -278,57 +362,36 @@ function App() {
             )}
           </aside>
 
-          {activeNavItem === 'Library' && selectedGame ? (
+          {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
             <GameDetailView
               game={selectedGame}
               onBack={() => setSelectedGameId(null)}
               onTrackingChange={updateGameTracking}
             />
           ) : activeNavItem === 'Library' ? (
-            <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">Library</h2>
-                  <p className="mt-1 text-sm text-slate-400">{filteredGames.length} games match the current view</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-                    onClick={() => setIsAddGameOpen(true)}
-                    type="button"
-                  >
-                    Add game
-                  </button>
-                  <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                    Local storage enabled
-                  </div>
-                </div>
-              </div>
-
-              {filteredGames.length > 0 ? (
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
-                  {filteredGames.map((game) => (
-                    <GameCard
-                      key={game.id}
-                      game={game}
-                      onOpenDetails={() => setSelectedGameId(game.id)}
-                      onRemove={removeGame}
-                      onRemoveAndIgnore={removeAndIgnoreSteamGame}
-                      onStatusChange={updateGameStatus}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">No games found</h3>
-                    <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-                      Adjust the search or filters to bring titles back into view.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </section>
+            <CollectionPanel
+              collectionType="library"
+              games={filteredLibraryGames}
+              onAddGame={() => setIsAddGameOpen(true)}
+              onAddToWishlist={addToWishlist}
+              onMoveToLibrary={moveToLibrary}
+              onOpenDetails={(gameId) => setSelectedGameId(gameId)}
+              onRemove={removeGame}
+              onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              onStatusChange={updateGameStatus}
+            />
+          ) : activeNavItem === 'Wishlist' ? (
+            <CollectionPanel
+              collectionType="wishlist"
+              games={filteredWishlistGames}
+              onAddGame={() => setIsAddGameOpen(true)}
+              onAddToWishlist={addToWishlist}
+              onMoveToLibrary={moveToLibrary}
+              onOpenDetails={(gameId) => setSelectedGameId(gameId)}
+              onRemove={removeGame}
+              onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              onStatusChange={updateGameStatus}
+            />
           ) : activeNavItem === 'Metadata' ? (
             <MetadataEnrichmentPanel
               games={games}
@@ -339,8 +402,9 @@ function App() {
             <RecommendationPanel
               games={games}
               onOpenDetails={(gameId) => {
+                const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
-                setActiveNavItem('Library');
+                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
               onStatusChange={updateGameStatus}
             />
@@ -373,6 +437,7 @@ function App() {
             addManualGame(game);
             setIsAddGameOpen(false);
             setSelectedGameId(game.id);
+            setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
           }}
         />
       ) : null}
@@ -386,8 +451,87 @@ type AddGameDialogProps = {
   onSave: (game: Game) => void;
 };
 
+type CollectionPanelProps = {
+  collectionType: GameCollectionType;
+  games: Game[];
+  onAddGame: () => void;
+  onAddToWishlist: (game: Game) => void;
+  onMoveToLibrary: (game: Game) => void;
+  onOpenDetails: (gameId: string) => void;
+  onRemove: (gameId: string) => void;
+  onRemoveAndIgnore: (game: Game) => void;
+  onStatusChange: (gameId: string, status: GameStatus) => void;
+};
+
+function CollectionPanel({
+  collectionType,
+  games,
+  onAddGame,
+  onAddToWishlist,
+  onMoveToLibrary,
+  onOpenDetails,
+  onRemove,
+  onRemoveAndIgnore,
+  onStatusChange,
+}: CollectionPanelProps) {
+  const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
+  const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
+  const emptyText =
+    collectionType === 'wishlist'
+      ? 'Add manual wishlist entries or save library games here for later.'
+      : 'Adjust the search or filters to bring titles back into view.';
+
+  return (
+    <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-white">{title}</h2>
+          <p className="mt-1 text-sm text-slate-400">{games.length} items match the current view</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            onClick={onAddGame}
+            type="button"
+          >
+            Add game
+          </button>
+          <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+            {collectionType === 'wishlist' ? 'Not owned by default' : 'Local storage enabled'}
+          </div>
+        </div>
+      </div>
+
+      {games.length > 0 ? (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
+          {games.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              onAddToWishlist={onAddToWishlist}
+              onMoveToLibrary={onMoveToLibrary}
+              onOpenDetails={() => onOpenDetails(game.id)}
+              onRemove={onRemove}
+              onRemoveAndIgnore={onRemoveAndIgnore}
+              onStatusChange={onStatusChange}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
+          <div>
+            <h3 className="text-lg font-semibold text-white">{emptyTitle}</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{emptyText}</p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps) {
   const [title, setTitle] = useState('');
+  const [collectionType, setCollectionType] = useState<GameCollectionType>('library');
   const [platform, setPlatform] = useState<GamePlatform>('Steam');
   const [customPlatform, setCustomPlatform] = useState('');
   const [status, setStatus] = useState<GameStatus>('Want to play');
@@ -395,6 +539,11 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
   const [coverImage, setCoverImage] = useState('');
   const [tagText, setTagText] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<WishlistPriority>('medium');
+  const [expectedPlaytime, setExpectedPlaytime] = useState('');
+  const [priceTarget, setPriceTarget] = useState('');
+  const [releaseDate, setReleaseDate] = useState('');
+  const [storeUrl, setStoreUrl] = useState('');
   const [error, setError] = useState('');
 
   function submitForm(event: FormEvent<HTMLFormElement>) {
@@ -402,6 +551,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
     const trimmedTitle = title.trim();
     const parsedPlaytime = Number(playtimeHours);
+    const parsedExpectedPlaytime = expectedPlaytime ? Number(expectedPlaytime) : null;
     const resolvedPlatform = platform === 'Other' ? customPlatform.trim() : platform;
 
     if (!trimmedTitle) {
@@ -419,6 +569,11 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
       return;
     }
 
+    if (parsedExpectedPlaytime !== null && (!Number.isFinite(parsedExpectedPlaytime) || parsedExpectedPlaytime < 0)) {
+      setError('Expected playtime must be zero or positive.');
+      return;
+    }
+
     const importedAt = new Date().toISOString();
     const id = createManualGameId(trimmedTitle, existingGameIds);
 
@@ -432,8 +587,14 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
       tags: parseTagInput(tagText),
       lastPlayedAt: status === 'Playing' ? importedAt.slice(0, 10) : null,
       notes: notes.trim(),
+      collectionType,
       externalSource: 'manual',
       importedAt,
+      priority: collectionType === 'wishlist' ? priority : undefined,
+      expectedPlaytime: collectionType === 'wishlist' ? parsedExpectedPlaytime : undefined,
+      priceTarget: collectionType === 'wishlist' ? priceTarget.trim() : undefined,
+      releaseDate: collectionType === 'wishlist' ? releaseDate : undefined,
+      storeUrl: collectionType === 'wishlist' ? storeUrl.trim() : undefined,
     });
   }
 
@@ -443,7 +604,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
         <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950 p-4">
           <div>
             <h2 className="text-xl font-semibold text-white">Add game</h2>
-            <p className="mt-1 text-sm text-slate-400">Manual games stay local and are never affected by Steam import cleanup.</p>
+            <p className="mt-1 text-sm text-slate-400">Manual entries stay local and can start in Library or Wishlist.</p>
           </div>
           <button
             className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
@@ -456,6 +617,18 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
         <form className="max-h-[calc(92vh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
           <div className="grid gap-4 md:grid-cols-2">
+            <label className="block md:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add to</span>
+              <select
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
+                onChange={(event) => setCollectionType(event.target.value as GameCollectionType)}
+                value={collectionType}
+              >
+                <option value="library">Library</option>
+                <option value="wishlist">Wishlist</option>
+              </select>
+            </label>
+
             <label className="block md:col-span-2">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Title</span>
               <input
@@ -551,6 +724,69 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 value={notes}
               />
             </label>
+
+            {collectionType === 'wishlist' ? (
+              <>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Priority</span>
+                  <select
+                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
+                    onChange={(event) => setPriority(event.target.value as WishlistPriority)}
+                    value={priority}
+                  >
+                    {wishlistPriorities.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Expected playtime</span>
+                  <input
+                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    min="0"
+                    onChange={(event) => setExpectedPlaytime(event.target.value)}
+                    placeholder="Hours"
+                    step="0.1"
+                    type="number"
+                    value={expectedPlaytime}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Price target</span>
+                  <input
+                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    onChange={(event) => setPriceTarget(event.target.value)}
+                    placeholder="$20, 50%, Game Pass"
+                    value={priceTarget}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Release date</span>
+                  <input
+                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    onChange={(event) => setReleaseDate(event.target.value)}
+                    type="date"
+                    value={releaseDate}
+                  />
+                </label>
+
+                <label className="block md:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Store URL</span>
+                  <input
+                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    onChange={(event) => setStoreUrl(event.target.value)}
+                    placeholder="https://..."
+                    type="url"
+                    value={storeUrl}
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
 
           {error ? (
@@ -650,6 +886,10 @@ function getNavDescription(activeNavItem: NavItem) {
     return 'RAWG enrichment runs only when you start it.';
   }
 
+  if (activeNavItem === 'Wishlist') {
+    return 'Wishlist items are separate from owned library games.';
+  }
+
   if (activeNavItem === 'Recommendation') {
     return 'Local picks based on your library.';
   }
@@ -708,6 +948,36 @@ function parseTagInput(value: string) {
   );
 }
 
+function filterGames(games: Game[], filters: CollectionFilters) {
+  const normalizedSearch = filters.searchTerm.trim().toLowerCase();
+
+  return games.filter((game) => {
+    const matchesTitle = game.title.toLowerCase().includes(normalizedSearch);
+    const matchesPlatform = filters.platform === allOption || game.platform === filters.platform;
+    const matchesStatus = filters.status === allOption || game.status === filters.status;
+    const matchesTag = filters.tag === allOption || game.tags.includes(filters.tag);
+
+    return matchesTitle && matchesPlatform && matchesStatus && matchesTag;
+  });
+}
+
+function getActiveFilters(activeNavItem: NavItem, libraryFilters: CollectionFilters, wishlistFilters: CollectionFilters) {
+  return activeNavItem === 'Wishlist' ? wishlistFilters : libraryFilters;
+}
+
+function updateActiveFilters(
+  activeNavItem: NavItem,
+  setLibraryFilters: Dispatch<SetStateAction<CollectionFilters>>,
+  setWishlistFilters: Dispatch<SetStateAction<CollectionFilters>>,
+  changes: Partial<CollectionFilters>,
+) {
+  const setFilters = activeNavItem === 'Wishlist' ? setWishlistFilters : setLibraryFilters;
+  setFilters((currentFilters) => ({
+    ...currentFilters,
+    ...changes,
+  }));
+}
+
 function createManualGameId(title: string, existingGameIds: Set<string>) {
   const baseId =
     title
@@ -719,6 +989,19 @@ function createManualGameId(title: string, existingGameIds: Set<string>) {
 
   while (existingGameIds.has(id)) {
     id = `manual-${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return id;
+}
+
+function createCollectionCopyId(game: Game, collectionType: GameCollectionType, existingGameIds: Set<string>) {
+  const baseId = `${collectionType}-${game.id.replace(/^(library|wishlist)-/, '')}`;
+  let id = baseId;
+  let suffix = 2;
+
+  while (existingGameIds.has(id)) {
+    id = `${baseId}-${suffix}`;
     suffix += 1;
   }
 
