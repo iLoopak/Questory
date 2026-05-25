@@ -11,6 +11,7 @@ export const mockGames: Game[] = [
     tags: ['Metroidvania', 'Indie', 'Bosses'],
     lastPlayedAt: '2026-05-18',
     notes: 'Working through late-game charms and optional bosses.',
+    collectionType: 'library',
   },
   {
     id: 'zelda-tears',
@@ -22,6 +23,7 @@ export const mockGames: Game[] = [
     tags: ['Adventure', 'Open World', 'Creative'],
     lastPlayedAt: '2026-04-28',
     notes: 'Return when in the mood for exploration and shrine cleanup.',
+    collectionType: 'library',
   },
   {
     id: 'cyberpunk-2077',
@@ -33,6 +35,7 @@ export const mockGames: Game[] = [
     tags: ['RPG', 'Story', 'Open World'],
     lastPlayedAt: null,
     notes: 'Fresh save planned for a story-heavy run.',
+    collectionType: 'library',
   },
   {
     id: 'forza-horizon-5',
@@ -44,6 +47,7 @@ export const mockGames: Game[] = [
     tags: ['Racing', 'Chill', 'Arcade'],
     lastPlayedAt: '2026-03-12',
     notes: 'Good comfort pick for quick events.',
+    collectionType: 'library',
   },
   {
     id: 'bloodborne',
@@ -55,6 +59,7 @@ export const mockGames: Game[] = [
     tags: ['Soulslike', 'Action', 'Gothic'],
     lastPlayedAt: '2025-12-02',
     notes: 'Restart later with a cleaner build path.',
+    collectionType: 'library',
   },
   {
     id: 'stardew-valley',
@@ -66,6 +71,7 @@ export const mockGames: Game[] = [
     tags: ['Cozy', 'Farming', 'Indie'],
     lastPlayedAt: '2026-05-20',
     notes: 'Year three farm cleanup and greenhouse planning.',
+    collectionType: 'library',
   },
 ];
 
