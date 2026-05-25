@@ -5,13 +5,23 @@ import { gameStatuses } from '../types/game';
 
 type GameCardProps = {
   game: Game;
+  onAddToWishlist?: (game: Game) => void;
+  onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
 };
 
-export function GameCard({ game, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange }: GameCardProps) {
+export function GameCard({
+  game,
+  onAddToWishlist,
+  onMoveToLibrary,
+  onOpenDetails,
+  onRemove,
+  onRemoveAndIgnore,
+  onStatusChange,
+}: GameCardProps) {
   const coverSources = useMemo(() => {
     if (typeof game.steamAppId === 'number') {
       const artworkUrls = getSteamArtworkUrls(game.steamAppId);
@@ -71,6 +81,11 @@ export function GameCard({ game, onOpenDetails, onRemove, onRemoveAndIgnore, onS
         <span className="absolute bottom-3 left-3 rounded-full border border-white/15 bg-black/50 px-2.5 py-1 text-xs font-medium text-white">
           {game.platform}
         </span>
+        {game.collectionType === 'wishlist' ? (
+          <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
+            Wishlist
+          </span>
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
@@ -101,6 +116,10 @@ export function GameCard({ game, onOpenDetails, onRemove, onRemoveAndIgnore, onS
         <div className="grid gap-2 text-sm text-slate-300">
           <CompactField label="Status" value={game.status} />
           <CompactField label="Enrichment" value={getEnrichmentStatus(game)} />
+          {game.collectionType === 'wishlist' && game.priority ? <CompactField label="Priority" value={game.priority} /> : null}
+          {game.collectionType === 'wishlist' && game.priceTarget ? (
+            <CompactField label="Price target" value={game.priceTarget} />
+          ) : null}
         </div>
 
         <div className="flex min-h-[2rem] flex-wrap gap-2">
@@ -126,6 +145,44 @@ export function GameCard({ game, onOpenDetails, onRemove, onRemoveAndIgnore, onS
               Details
             </button>
             <div className="grid gap-2 sm:grid-cols-2">
+              {game.collectionType === 'wishlist' ? (
+                <>
+                  <button
+                    className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+                    onClick={() => onMoveToLibrary?.(game)}
+                    type="button"
+                  >
+                    Move to Library
+                  </button>
+                  <button
+                    className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                    onClick={() => onRemove(game.id)}
+                    type="button"
+                  >
+                    Remove Wishlist
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                    onClick={() => onAddToWishlist?.(game)}
+                    type="button"
+                  >
+                    Add to Wishlist
+                  </button>
+                  <button
+                    className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
+                    disabled={typeof game.steamAppId !== 'number'}
+                    onClick={() => onRemoveAndIgnore(game)}
+                    type="button"
+                  >
+                    Remove + ignore
+                  </button>
+                </>
+              )}
+            </div>
+            {game.collectionType === 'library' ? (
               <button
                 className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
                 onClick={() => onRemove(game.id)}
@@ -133,15 +190,7 @@ export function GameCard({ game, onOpenDetails, onRemove, onRemoveAndIgnore, onS
               >
                 Remove
               </button>
-              <button
-                className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
-                disabled={typeof game.steamAppId !== 'number'}
-                onClick={() => onRemoveAndIgnore(game)}
-                type="button"
-              >
-                Remove + ignore
-              </button>
-            </div>
+            ) : null}
           </div>
         </div>
       </div>
