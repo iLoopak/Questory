@@ -1,9 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
 import { getCachedRawgMetadata, saveRawgMetadataCacheEntry } from '../lib/rawgMetadataCache';
-import { getHighConfidenceThreshold, isHighConfidenceMatch, rankRawgMatches, type RawgMatchScore } from '../lib/rawgMatchScoring';
+import {
+  getHighConfidenceThreshold,
+  getSuggestedConfidenceThreshold,
+  isHighConfidenceMatch,
+  isSuggestedMatch,
+  normalizeTitle,
+  rankRawgMatches,
+  type RawgMatchScore,
+} from '../lib/rawgMatchScoring';
 import { getGameDetails, mapRawgDetailsToMetadata, RawgApiError, searchGameByName } from '../services/rawgApi';
 import type { Game } from '../types/game';
-import type { RawgMetadata } from '../types/rawg';
+import type { RawgMetadata, RawgSearchResult } from '../types/rawg';
 
 type MetadataEnrichmentPanelProps = {
   games: Game[];
@@ -18,6 +26,7 @@ type EnrichmentStatus =
   | 'idle'
   | 'searching'
   | 'needs-review'
+  | 'suggested'
   | 'enriched'
   | 'cached'
   | 'skipped'
@@ -59,6 +68,10 @@ export function MetadataEnrichmentPanel({
   });
   const selectedQueueableGames = queueableGames.filter((game) => selectedGameIds.has(game.id));
   const enrichedCount = games.length - missingMetadataGames.length;
+  const reviewGames = queueableGames.filter((game) => {
+    const state = enrichmentStateByGameId[game.id];
+    return state?.status === 'suggested' || state?.status === 'needs-review';
+  });
 
   function setGameState(gameId: string, state: EnrichmentState) {
     setEnrichmentStateByGameId((currentState) => ({
@@ -99,7 +112,7 @@ export function MetadataEnrichmentPanel({
     }
 
     try {
-      const matches = rankRawgMatches(game, await searchGameByName(game.title));
+      const matches = rankRawgMatches(game, await searchRawgWithFallback(game.title));
       const bestMatch = matches[0];
 
       if (bestMatch && isHighConfidenceMatch(bestMatch)) {
@@ -109,6 +122,16 @@ export function MetadataEnrichmentPanel({
           message: `Matched ${bestMatch.result.name} at ${bestMatch.confidence}% confidence.`,
         });
         return 'enriched';
+      }
+
+      if (bestMatch && isSuggestedMatch(bestMatch)) {
+        setGameState(game.id, {
+          status: 'suggested',
+          message: `Suggested ${bestMatch.result.name} at ${bestMatch.confidence}% confidence. Confirm before saving.`,
+          matches,
+        });
+
+        return 'needs-review';
       }
 
       setGameState(game.id, {
@@ -167,6 +190,26 @@ export function MetadataEnrichmentPanel({
       setGameState(game.id, {
         status: error instanceof RawgApiError && error.code === 'rate-limit' ? 'rate-limited' : 'error',
         message: error instanceof RawgApiError ? error.message : 'Selected RAWG match failed.',
+      });
+    }
+  }
+
+  async function acceptSuggestedMatch(game: Game, match: RawgMatchScore) {
+    setGameState(game.id, {
+      status: 'searching',
+      message: `Saving suggested RAWG match ${match.result.name}...`,
+    });
+
+    try {
+      await saveMatch(game, match.result.id);
+      setGameState(game.id, {
+        status: 'enriched',
+        message: `Saved suggested RAWG match ${match.result.name}.`,
+      });
+    } catch (error) {
+      setGameState(game.id, {
+        status: error instanceof RawgApiError && error.code === 'rate-limit' ? 'rate-limited' : 'error',
+        message: error instanceof RawgApiError ? error.message : 'Suggested RAWG match failed.',
       });
     }
   }
@@ -278,6 +321,12 @@ export function MetadataEnrichmentPanel({
               </div>
             </div>
           ) : null}
+
+          {!isQueueRunning && reviewGames.length > 0 ? (
+            <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+              {reviewGames.length} games need review. Suggested matches can be accepted below or opened for a different match.
+            </div>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
@@ -290,6 +339,7 @@ export function MetadataEnrichmentPanel({
                   isQueueRunning={isQueueRunning}
                   isSelected={selectedGameIds.has(game.id)}
                   state={enrichmentStateByGameId[game.id]}
+                  onAcceptSuggested={(match) => void acceptSuggestedMatch(game, match)}
                   onFind={() => void enrichGame(game, true)}
                   onManual={() => markManual(game)}
                   onRetry={() => void enrichGame(game, true)}
@@ -327,6 +377,7 @@ type EnrichmentRowProps = {
   game: Game;
   isQueueRunning: boolean;
   isSelected: boolean;
+  onAcceptSuggested: (match: RawgMatchScore) => void;
   onFind: () => void;
   onManual: () => void;
   onRetry: () => void;
@@ -340,6 +391,7 @@ function EnrichmentRow({
   game,
   isQueueRunning,
   isSelected,
+  onAcceptSuggested,
   onFind,
   onManual,
   onRetry,
@@ -350,6 +402,8 @@ function EnrichmentRow({
 }: EnrichmentRowProps) {
   const status = getDisplayStatus(game, state);
   const canReview = state?.status === 'needs-review' && state.matches && state.matches.length > 0;
+  const suggestedMatch = state?.matches?.[0];
+  const canAcceptSuggested = Boolean(state?.status === 'suggested' && suggestedMatch && isSuggestedMatch(suggestedMatch));
 
   return (
     <article className="grid gap-3 rounded-lg border border-white/10 bg-ink-800 p-3 sm:grid-cols-[auto_76px_minmax(0,1fr)] sm:items-center">
@@ -363,7 +417,13 @@ function EnrichmentRow({
       />
 
       {game.coverImage ? (
-        <img alt="" className="aspect-[2/3] w-full rounded-md bg-ink-700 object-cover sm:w-[76px]" loading="lazy" src={game.coverImage} />
+        <img
+          alt=""
+          className="aspect-[2/3] w-full rounded-md bg-ink-700 object-cover sm:w-[76px]"
+          decoding="async"
+          loading="lazy"
+          src={game.coverImage}
+        />
       ) : (
         <div className="grid aspect-[2/3] w-full place-items-center rounded-md bg-ink-700 text-lg font-semibold text-mint sm:w-[76px]">
           {game.title.slice(0, 1).toUpperCase()}
@@ -390,6 +450,19 @@ function EnrichmentRow({
             >
               Find metadata
             </button>
+            {canAcceptSuggested ? (
+              <button
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+                onClick={() => {
+                  if (suggestedMatch) {
+                    onAcceptSuggested(suggestedMatch);
+                  }
+                }}
+                type="button"
+              >
+                Accept suggested match
+              </button>
+            ) : null}
             <button
               className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
               disabled={isQueueRunning}
@@ -398,13 +471,13 @@ function EnrichmentRow({
             >
               Retry
             </button>
-            {canReview ? (
+            {canReview || canAcceptSuggested ? (
               <button
                 className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
                 onClick={() => onReview(state.matches ?? [])}
                 type="button"
               >
-                Review matches
+                Choose different match
               </button>
             ) : null}
             <button
@@ -427,8 +500,18 @@ function EnrichmentRow({
         </div>
 
         {state?.matches && state.matches.length > 0 ? (
-          <div className="mt-3 text-xs text-slate-500">
-            Best match confidence: {state.matches[0].confidence}% - high confidence starts at {getHighConfidenceThreshold()}%
+          <div className="mt-3 space-y-1 text-xs text-slate-500">
+            <div>
+              Best match confidence: {state.matches[0].confidence}% - auto at {getHighConfidenceThreshold()}%,
+              suggested review at {getSuggestedConfidenceThreshold()}%.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {state.matches[0].reasons.map((reason) => (
+                <span key={reason} className="rounded-full bg-white/10 px-2 py-1 text-slate-300">
+                  {reason}
+                </span>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>
@@ -449,7 +532,7 @@ function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps)
         <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950 p-4">
           <div>
             <h3 className="text-lg font-semibold text-white">Pick RAWG match</h3>
-            <p className="mt-1 text-sm text-slate-400">Low-confidence results need a human choice before saving.</p>
+            <p className="mt-1 text-sm text-slate-400">Suggested and low-confidence results need a human choice before saving.</p>
           </div>
           <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10" onClick={onClose} type="button">
             Close
@@ -469,6 +552,7 @@ function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps)
                   <img
                     alt=""
                     className="aspect-video w-full rounded bg-ink-700 object-cover sm:w-24"
+                    decoding="async"
                     loading="lazy"
                     src={match.result.background_image}
                   />
@@ -479,6 +563,13 @@ function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps)
                   <div className="truncate text-sm font-semibold text-white">{match.result.name}</div>
                   <div className="mt-1 text-xs text-slate-400">
                     {getYearLabel(match.result.released)} - {match.confidence}% confidence
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {match.reasons.map((reason) => (
+                      <span key={reason} className="rounded-full bg-mint/10 px-2 py-1 text-xs text-mint">
+                        {reason}
+                      </span>
+                    ))}
                   </div>
                   {match.result.genres && match.result.genres.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -519,6 +610,36 @@ function getDisplayStatus(game: Game, state?: EnrichmentState) {
 
 function getYearLabel(value: string | null) {
   return value ? value.slice(0, 4) : 'Unknown year';
+}
+
+async function searchRawgWithFallback(title: string) {
+  const queries = getRawgSearchQueries(title);
+  const resultsById = new Map<number, RawgSearchResult>();
+  let lastError: unknown = null;
+
+  for (const query of queries) {
+    try {
+      const results = await searchGameByName(query);
+      results.forEach((result) => resultsById.set(result.id, result));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  const results = Array.from(resultsById.values());
+
+  if (results.length > 0) {
+    return results;
+  }
+
+  throw lastError ?? new RawgApiError('No RAWG matches found for this title.', 'no-match');
+}
+
+function getRawgSearchQueries(title: string) {
+  const normalizedTitle = normalizeTitle(title);
+  const titleWithoutSubtitle = title.split(/\s+[-:]\s+/)[0]?.trim() ?? title;
+
+  return Array.from(new Set([title.trim(), normalizedTitle, titleWithoutSubtitle].filter(Boolean)));
 }
 
 function delay(ms: number) {
