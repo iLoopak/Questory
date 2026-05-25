@@ -3,6 +3,7 @@ import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
+import { RecommendationPanel } from './components/RecommendationPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { loadGames, saveGames } from './lib/gameStorage';
 import type { Game, GamePlatform, GameStatus } from './types/game';
@@ -203,6 +204,8 @@ function App() {
                   ? 'Integration settings are local to this browser.'
                   : activeNavItem === 'Metadata'
                     ? 'RAWG enrichment runs only when you start it.'
+                    : activeNavItem === 'Recommendation'
+                      ? 'Local picks based on your library.'
                   : `${activeNavItem} remains a placeholder for a later feature pass.`}
               </div>
             )}
@@ -254,6 +257,15 @@ function App() {
               games={games}
               onMetadataManagementChange={updateGameMetadataManagement}
               onMetadataUpdate={updateGameMetadata}
+            />
+          ) : activeNavItem === 'Recommendation' ? (
+            <RecommendationPanel
+              games={games}
+              onOpenDetails={(gameId) => {
+                setSelectedGameId(gameId);
+                setActiveNavItem('Library');
+              }}
+              onStatusChange={updateGameStatus}
             />
           ) : activeNavItem === 'Settings' ? (
             <section className="min-w-0 space-y-4 overflow-y-auto lg:h-[calc(100vh-116px)]">
