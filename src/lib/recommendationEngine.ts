@@ -9,6 +9,7 @@ export type RecommendationMood = (typeof moodOptions)[number];
 export type RecommendationPreferences = {
   availableTime: AvailableTime;
   includeFinishedGames: boolean;
+  includeWishlist: boolean;
   mood: RecommendationMood;
   preferredPlatform: GamePlatform | 'Any';
 };
@@ -33,6 +34,7 @@ const longSessionKeywords = ['rpg', 'open world', 'strategy', 'simulation', 'sur
 
 export function getRecommendations(games: Game[], preferences: RecommendationPreferences): RecommendationResult[] {
   return games
+    .filter((game) => preferences.includeWishlist || game.collectionType === 'library')
     .filter((game) => preferences.includeFinishedGames || game.status !== 'Finished')
     .map((game) => scoreGame(game, preferences))
     .sort((first, second) => second.score - first.score);
