@@ -25,6 +25,7 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
   const [mood, setMood] = useState<RecommendationMood>('comfort');
   const [preferredPlatform, setPreferredPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
   const [includeFinishedGames, setIncludeFinishedGames] = useState(false);
+  const [includeWishlist, setIncludeWishlist] = useState(false);
   const [rerollIndex, setRerollIndex] = useState(0);
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
@@ -35,6 +36,7 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
   const preferences: RecommendationPreferences = {
     availableTime,
     includeFinishedGames,
+    includeWishlist,
     mood,
     preferredPlatform,
   };
@@ -54,14 +56,14 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-white">Recommendation</h2>
-              <p className="mt-1 text-sm text-slate-400">A local-first pick from your library and metadata.</p>
+              <p className="mt-1 text-sm text-slate-400">A local-first pick from your library, with Wishlist optional.</p>
             </div>
             <div className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
               {recommendations.length} candidates
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_auto]">
+          <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_auto_auto]">
             <SegmentedControl
               label="Available time"
               options={availableTimeOptions}
@@ -98,6 +100,15 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
                 type="checkbox"
               />
               Include finished
+            </label>
+            <label className="flex items-end gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+              <input
+                checked={includeWishlist}
+                className="mb-1 h-4 w-4 accent-mint"
+                onChange={(event) => updatePreference(() => setIncludeWishlist(event.target.checked))}
+                type="checkbox"
+              />
+              Include Wishlist
             </label>
           </div>
         </div>
@@ -197,6 +208,7 @@ function RecommendationCard({
           <h3 className="mt-2 text-3xl font-semibold text-white">{game.title}</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge>{game.platform}</Badge>
+            {game.collectionType === 'wishlist' ? <Badge>Wishlist</Badge> : null}
             <Badge>{game.status}</Badge>
             <Badge>{game.playtimeHours}h played</Badge>
             <Badge>{confidence}% confidence</Badge>

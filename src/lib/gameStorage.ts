@@ -47,6 +47,7 @@ export function removeMockGames(games: Game[]) {
 function normalizeLoadedGame(game: Game): Game {
   return {
     ...game,
+    collectionType: game.collectionType ?? 'library',
     status: normalizeLoadedStatus(game.status),
   };
 }

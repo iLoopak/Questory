@@ -1,8 +1,12 @@
 export const gamePlatforms = ['Steam', 'PS5', 'PS4', 'Switch', 'Switch 2', 'PC', 'Android', 'PSP', 'PS2', 'GBA', 'SNES', 'Other'] as const;
 export const gameStatuses = ['Want to play', 'Playing', 'Paused', 'Finished', 'Dropped'] as const;
+export const gameCollectionTypes = ['library', 'wishlist'] as const;
+export const wishlistPriorities = ['low', 'medium', 'high'] as const;
 
 export type GamePlatform = (typeof gamePlatforms)[number] | (string & {});
 export type GameStatus = (typeof gameStatuses)[number];
+export type GameCollectionType = (typeof gameCollectionTypes)[number];
+export type WishlistPriority = (typeof wishlistPriorities)[number];
 
 export type Game = {
   id: string;
@@ -14,10 +18,16 @@ export type Game = {
   tags: string[];
   lastPlayedAt: string | null;
   notes: string;
+  collectionType: GameCollectionType;
   steamAppId?: number;
   externalSource?: 'manual' | 'steam';
   externalUrl?: string;
   importedAt?: string;
+  priority?: WishlistPriority;
+  expectedPlaytime?: number | null;
+  priceTarget?: string;
+  releaseDate?: string;
+  storeUrl?: string;
   rawgId?: number;
   genres?: string[];
   rawgTags?: string[];
