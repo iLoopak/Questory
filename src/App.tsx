@@ -7,6 +7,13 @@ import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
+import {
+  addIgnoredSteamGame,
+  loadIgnoredSteamGames,
+  removeIgnoredSteamGame,
+  saveIgnoredSteamGames,
+  type IgnoredSteamGame,
+} from './lib/steamIgnoredGamesStorage';
 import type { Game, GamePlatform, GameStatus } from './types/game';
 import { gamePlatforms, gameStatuses } from './types/game';
 import type { RawgMetadata } from './types/rawg';
@@ -18,6 +25,7 @@ const allOption = 'All';
 
 function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
+  const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [isAppReady, setIsAppReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | typeof allOption>(allOption);
@@ -29,6 +37,10 @@ function App() {
   useEffect(() => {
     saveGames(games);
   }, [games]);
+
+  useEffect(() => {
+    saveIgnoredSteamGames(ignoredSteamGames);
+  }, [ignoredSteamGames]);
 
   useEffect(() => {
     const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
@@ -87,6 +99,26 @@ function App() {
 
       return [...currentGames, ...newGames];
     });
+  }
+
+  function removeGame(gameId: string) {
+    setGames((currentGames) => currentGames.filter((game) => game.id !== gameId));
+    setSelectedGameId((currentSelectedGameId) => (currentSelectedGameId === gameId ? null : currentSelectedGameId));
+  }
+
+  function removeAndIgnoreSteamGame(game: Game) {
+    if (typeof game.steamAppId !== 'number') {
+      return;
+    }
+
+    setIgnoredSteamGames((currentIgnoredGames) =>
+      addIgnoredSteamGame(currentIgnoredGames, game.steamAppId as number, game.title),
+    );
+    removeGame(game.id);
+  }
+
+  function unignoreSteamGame(steamAppId: number) {
+    setIgnoredSteamGames((currentIgnoredGames) => removeIgnoredSteamGame(currentIgnoredGames, steamAppId));
   }
 
   function loadDemoData() {
@@ -253,13 +285,14 @@ function App() {
               </div>
 
               {filteredGames.length > 0 ? (
-                <div className="grid gap-3 xl:grid-cols-2">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
                   {filteredGames.map((game) => (
                     <GameCard
                       key={game.id}
                       game={game}
-                      onMetadataUpdate={updateGameMetadata}
                       onOpenDetails={() => setSelectedGameId(game.id)}
+                      onRemove={removeGame}
+                      onRemoveAndIgnore={removeAndIgnoreSteamGame}
                       onStatusChange={updateGameStatus}
                     />
                   ))}
@@ -298,7 +331,12 @@ function App() {
                 onRemoveDemoGames={removeDemoGames}
               />
               <RawgSettingsPanel />
-              <SteamSettingsPanel games={games} onImportGames={importGames} />
+              <SteamSettingsPanel
+                games={games}
+                ignoredSteamGames={ignoredSteamGames}
+                onImportGames={importGames}
+                onUnignoreSteamGame={unignoreSteamGame}
+              />
             </section>
           ) : (
             <PlaceholderPanel title={activeNavItem} />
