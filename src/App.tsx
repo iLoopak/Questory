@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
+import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
@@ -17,6 +18,7 @@ const allOption = 'All';
 
 function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
+  const [isAppReady, setIsAppReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | typeof allOption>(allOption);
   const [statusFilter, setStatusFilter] = useState<GameStatus | typeof allOption>(allOption);
@@ -27,6 +29,12 @@ function App() {
   useEffect(() => {
     saveGames(games);
   }, [games]);
+
+  useEffect(() => {
+    const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
+
+    return () => window.cancelAnimationFrame(readyFrame);
+  }, []);
 
   const tags = useMemo(() => {
     return Array.from(new Set(games.flatMap((game) => game.tags))).sort((first, second) =>
@@ -129,6 +137,10 @@ function App() {
     );
   }
 
+  if (!isAppReady) {
+    return <AppStartupScreen />;
+  }
+
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-5 lg:px-6">
@@ -160,6 +172,10 @@ function App() {
             ))}
           </nav>
         </header>
+
+        <div className="pt-4">
+          <PwaStatusBanner />
+        </div>
 
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="rounded-lg border border-white/10 bg-ink-900 p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
@@ -200,13 +216,7 @@ function App() {
               </div>
             ) : (
               <div className="mt-5 rounded-md border border-white/10 bg-ink-950 p-3 text-sm leading-6 text-slate-400">
-                {activeNavItem === 'Settings'
-                  ? 'Integration settings are local to this browser.'
-                  : activeNavItem === 'Metadata'
-                    ? 'RAWG enrichment runs only when you start it.'
-                    : activeNavItem === 'Recommendation'
-                      ? 'Local picks based on your library.'
-                  : `${activeNavItem} remains a placeholder for a later feature pass.`}
+                {getNavDescription(activeNavItem)}
               </div>
             )}
           </aside>
@@ -279,6 +289,38 @@ function App() {
       </div>
     </main>
   );
+}
+
+function AppStartupScreen() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-ink-950 px-4 text-slate-100">
+      <div className="w-full max-w-md rounded-lg border border-white/10 bg-ink-900 p-5 shadow-panel">
+        <div className="text-sm font-medium uppercase tracking-[0.18em] text-mint">QuestShelf</div>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Loading local library</h1>
+        <div className="mt-5 space-y-3">
+          <div className="h-3 w-2/3 animate-pulse rounded bg-white/10" />
+          <div className="h-3 w-full animate-pulse rounded bg-white/10" />
+          <div className="h-3 w-4/5 animate-pulse rounded bg-white/10" />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function getNavDescription(activeNavItem: NavItem) {
+  if (activeNavItem === 'Settings') {
+    return 'Integration settings are local to this browser.';
+  }
+
+  if (activeNavItem === 'Metadata') {
+    return 'RAWG enrichment runs only when you start it.';
+  }
+
+  if (activeNavItem === 'Recommendation') {
+    return 'Local picks based on your library.';
+  }
+
+  return `${activeNavItem} remains a placeholder for a later feature pass.`;
 }
 
 type StatProps = {
