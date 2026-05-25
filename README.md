@@ -10,6 +10,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Optional development-only demo games.
 - Browser `localStorage` persistence.
 - Game cards with cover image, playtime, tags, notes, and last played date.
+- Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
 - Filter by platform, status, and tag.
 - Search by title.
 - Change game status directly from the library.
@@ -28,6 +29,10 @@ No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-
 ## Local Library Data
 
 QuestShelf starts with an empty local library. It does not automatically insert placeholder games on startup.
+
+Use **Add game** in the Library to create a local manual game without Steam or RAWG credentials. Manual games support title, platform, status, playtime, cover URL, tags, and notes. If **Other** is selected as the platform, QuestShelf stores the custom platform text on that game.
+
+Manual games are stored in the same browser `localStorage` library as imported games with `externalSource: "manual"` and an import timestamp. They are never affected by Steam import, Steam duplicates, or the ignored Steam games list. RAWG metadata can still be added later from the Metadata workflow.
 
 For development and testing, optional demo games live in `src/data/mockGames.ts`. In Vite development mode, Settings includes a **Load demo data** action. Settings also includes **Remove demo games**, which removes only known placeholder IDs and preserves user-created games and Steam-imported games.
 
@@ -116,7 +121,7 @@ To enrich one game:
 
 1. Get a RAWG API key from <https://rawg.io/apidocs>.
 2. Open QuestShelf Settings and enter the RAWG API key.
-3. In the Library, click **Find metadata** on a game card.
+3. Open Metadata and click **Find metadata** on a game row.
 4. Pick the correct RAWG match.
 
 QuestShelf fetches details for the selected match and stores metadata locally on that game, including RAWG ID, genres, RAWG tags, developers, publishers, release date, Metacritic score, average playtime, background image, metadata source, and update time.
