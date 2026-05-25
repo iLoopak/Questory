@@ -88,6 +88,8 @@ Steam import stays local-first:
 - Select individual Steam games, or use **Select all** and **Deselect all**.
 - Click **Import selected** to add selected games to the local library.
 - Games already in the library with the same Steam App ID are marked as **Already in library** and are not duplicated.
+- Steam games can be removed from the library and optionally ignored so the same Steam App ID is skipped during future imports.
+- Ignored Steam games are stored locally, listed in Settings, and can be restored from the ignored list.
 - Imported games default to platform `Steam`, status `Want to play`, and tags `imported` and `steam`.
 - Games with recent Steam playtime default to `Playing`.
 - QuestShelf stores Steam metadata locally on imported games, including Steam App ID, external source, Steam store URL, and import time.
