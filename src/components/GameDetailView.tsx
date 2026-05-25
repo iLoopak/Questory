@@ -174,6 +174,18 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
                 </label>
               </DetailSection>
 
+              {game.collectionType === 'wishlist' ? (
+                <DetailSection kicker="Wishlist" title="Wishlist planning">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <ReadOnlyField label="Priority" value={game.priority ?? 'medium'} />
+                    <ReadOnlyField label="Expected playtime" value={formatHours(game.expectedPlaytime)} />
+                    <ReadOnlyField label="Price target" value={game.priceTarget || 'n/a'} />
+                    <ReadOnlyField label="Release date" value={game.releaseDate || 'n/a'} />
+                    <ReadOnlyLink label="Store URL" value={game.storeUrl} />
+                  </div>
+                </DetailSection>
+              ) : null}
+
               <DetailSection kicker="Read-only" title="Steam data">
                 {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
                   <div className="grid gap-3 sm:grid-cols-2">
