@@ -221,6 +221,7 @@ export function mapSteamGamesToLocalGames(
       notes: recentGame
         ? `Recently played on Steam. Last two weeks: ${Math.round((recentGame.playtime_2weeks ?? 0) / 60)}h.`
         : 'Imported from Steam API test results. Not saved to local library yet.',
+      collectionType: 'library',
       steamAppId: game.appid,
       externalSource: 'steam',
       externalUrl: `https://store.steampowered.com/app/${game.appid}`,
