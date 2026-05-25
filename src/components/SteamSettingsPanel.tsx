@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import type { IgnoredSteamGame } from '../lib/steamIgnoredGamesStorage';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
 import {
   clearSteamApiDebugLog,
@@ -28,14 +29,22 @@ const initialConnectionState: SteamConnectionState = {
 type ImportSummary = {
   importedCount: number;
   skippedDuplicateCount: number;
+  skippedIgnoredCount: number;
 };
 
 type SteamSettingsPanelProps = {
   games: Game[];
+  ignoredSteamGames: IgnoredSteamGame[];
   onImportGames: (games: Game[]) => void;
+  onUnignoreSteamGame: (steamAppId: number) => void;
 };
 
-export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelProps) {
+export function SteamSettingsPanel({
+  games,
+  ignoredSteamGames,
+  onImportGames,
+  onUnignoreSteamGame,
+}: SteamSettingsPanelProps) {
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
   const [connectionState, setConnectionState] = useState<SteamConnectionState>(initialConnectionState);
   const [selectedAppIds, setSelectedAppIds] = useState<Set<number>>(() => new Set());
@@ -53,14 +62,20 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
     );
   }, [games]);
 
+  const ignoredSteamAppIds = useMemo(() => {
+    return new Set(ignoredSteamGames.map((game) => game.steamAppId));
+  }, [ignoredSteamGames]);
+
   const recentlyPlayedByAppId = useMemo(() => {
     const recentlyPlayedGames = connectionState.data?.recentlyPlayedGames ?? [];
     return new Map(recentlyPlayedGames.map((game) => [game.appid, game]));
   }, [connectionState.data]);
 
   const importableGames = useMemo(() => {
-    return (connectionState.data?.ownedGames ?? []).filter((game) => !existingSteamAppIds.has(game.appid));
-  }, [connectionState.data, existingSteamAppIds]);
+    return (connectionState.data?.ownedGames ?? []).filter(
+      (game) => !existingSteamAppIds.has(game.appid) && !ignoredSteamAppIds.has(game.appid),
+    );
+  }, [connectionState.data, existingSteamAppIds, ignoredSteamAppIds]);
 
   const debugOutput = useMemo(() => {
     if (!connectionState.data) {
@@ -71,7 +86,7 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
   }, [connectionState.data, settings.steamId64]);
 
   const apiDebugEntries = connectionState.data?.apiDebugEntries ?? [];
-  const latestApiDebugEntry = apiDebugEntries[apiDebugEntries.length - 1];
+  const latestApiDebugEntry = apiDebugEntries.at(-1);
 
   function updateSetting(field: keyof SteamSettings, value: string) {
     setSettings((currentSettings) => ({
@@ -128,7 +143,7 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
   }
 
   function toggleSelectedAppId(appId: number) {
-    if (existingSteamAppIds.has(appId)) {
+    if (existingSteamAppIds.has(appId) || ignoredSteamAppIds.has(appId)) {
       return;
     }
 
@@ -159,8 +174,11 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
     }
 
     const selectedOwnedGames = connectionState.data.ownedGames.filter((game) => selectedAppIds.has(game.appid));
-    const duplicateCount = selectedOwnedGames.filter((game) => existingSteamAppIds.has(game.appid)).length;
-    const newOwnedGames = selectedOwnedGames.filter((game) => !existingSteamAppIds.has(game.appid));
+    const duplicateCount = connectionState.data.ownedGames.filter((game) => existingSteamAppIds.has(game.appid)).length;
+    const ignoredCount = connectionState.data.ownedGames.filter((game) => ignoredSteamAppIds.has(game.appid)).length;
+    const newOwnedGames = selectedOwnedGames.filter(
+      (game) => !existingSteamAppIds.has(game.appid) && !ignoredSteamAppIds.has(game.appid),
+    );
     const importedAt = new Date().toISOString();
     const mappedGames = mapSteamGamesToLocalGames(
       newOwnedGames,
@@ -173,6 +191,7 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
     setImportSummary({
       importedCount: mappedGames.length,
       skippedDuplicateCount: duplicateCount,
+      skippedIgnoredCount: ignoredCount,
     });
   }
 
@@ -239,7 +258,8 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
 
             {importSummary ? (
               <div className="rounded-md border border-mint/40 bg-mint/10 px-3 py-3 text-sm leading-6 text-mint">
-                Imported {importSummary.importedCount} games. Skipped {importSummary.skippedDuplicateCount} duplicates.
+                Imported {importSummary.importedCount} games. Skipped {importSummary.skippedDuplicateCount} duplicates and{' '}
+                {importSummary.skippedIgnoredCount} ignored games.
               </div>
             ) : null}
           </div>
@@ -273,8 +293,11 @@ export function SteamSettingsPanel({ games, onImportGames }: SteamSettingsPanelP
         </section>
       </div>
 
+      <IgnoredSteamGamesSection ignoredSteamGames={ignoredSteamGames} onUnignoreSteamGame={onUnignoreSteamGame} />
+
       <SteamImportSection
         existingSteamAppIds={existingSteamAppIds}
+        ignoredSteamAppIds={ignoredSteamAppIds}
         importableGamesCount={importableGames.length}
         ownedGames={connectionState.data?.ownedGames ?? []}
         recentlyPlayedByAppId={recentlyPlayedByAppId}
@@ -301,15 +324,14 @@ function SteamApiDebugSummary({ entries, latestEntry, steamId64 }: SteamApiDebug
     <div className="mb-4 rounded-md border border-white/10 bg-ink-900 p-3">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h4 className="text-sm font-semibold text-white">Temporary Steam API debug</h4>
-        <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">API key redacted</span>
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+          API key redacted
+        </span>
       </div>
       <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
         <DebugField label="Current SteamID64" value={steamId64 || 'Not set'} />
         <DebugField label="Last HTTP status" value={latestEntry?.httpStatus?.toString() ?? 'n/a'} />
-        <DebugField
-          label="Parsed game count"
-          value={parsedGameCount === null || parsedGameCount === undefined ? 'n/a' : parsedGameCount.toString()}
-        />
+        <DebugField label="Parsed game count" value={parsedGameCount === null || parsedGameCount === undefined ? 'n/a' : parsedGameCount.toString()} />
         <DebugField label="Debug responses" value={entries.length.toString()} />
       </div>
       {latestEntry ? (
@@ -333,6 +355,7 @@ function DebugField({ label, value }: { label: string; value: string }) {
 
 type SteamImportSectionProps = {
   existingSteamAppIds: Set<number>;
+  ignoredSteamAppIds: Set<number>;
   importableGamesCount: number;
   ownedGames: SteamOwnedGame[];
   recentlyPlayedByAppId: Map<number, SteamRecentlyPlayedGame>;
@@ -345,6 +368,7 @@ type SteamImportSectionProps = {
 
 function SteamImportSection({
   existingSteamAppIds,
+  ignoredSteamAppIds,
   importableGamesCount,
   ownedGames,
   recentlyPlayedByAppId,
@@ -360,7 +384,7 @@ function SteamImportSection({
         <div>
           <h3 className="text-lg font-semibold text-white">Steam import</h3>
           <p className="mt-1 text-sm text-slate-400">
-            Select games to add to the local library. Existing Steam App IDs are skipped.
+            Select games to add to the local library. Existing and ignored Steam App IDs are skipped.
           </p>
         </div>
 
@@ -382,16 +406,18 @@ function SteamImportSection({
         </div>
       </div>
 
-      <div className="mb-3 grid gap-2 sm:grid-cols-3">
+      <div className="mb-3 grid gap-2 sm:grid-cols-4">
         <DebugStat label="Importable" value={importableGamesCount.toString()} />
         <DebugStat label="Selected" value={selectedAppIds.size.toString()} />
-        <DebugStat label="Duplicates" value={(ownedGames.length - importableGamesCount).toString()} />
+        <DebugStat label="Duplicates" value={ownedGames.filter((game) => existingSteamAppIds.has(game.appid)).length.toString()} />
+        <DebugStat label="Ignored" value={ownedGames.filter((game) => ignoredSteamAppIds.has(game.appid)).length.toString()} />
       </div>
 
       {ownedGames.length > 0 ? (
         <div className="max-h-[560px] space-y-2 overflow-auto pr-1">
           {ownedGames.map((game) => {
             const isDuplicate = existingSteamAppIds.has(game.appid);
+            const isIgnored = ignoredSteamAppIds.has(game.appid);
             const recentGame = recentlyPlayedByAppId.get(game.appid);
             const isSelected = selectedAppIds.has(game.appid);
 
@@ -400,6 +426,7 @@ function SteamImportSection({
                 key={game.appid}
                 game={game}
                 isDuplicate={isDuplicate}
+                isIgnored={isIgnored}
                 isSelected={isSelected}
                 recentGame={recentGame}
                 onToggleSelected={onToggleSelected}
@@ -421,24 +448,26 @@ function SteamImportSection({
 type SteamImportRowProps = {
   game: SteamOwnedGame;
   isDuplicate: boolean;
+  isIgnored: boolean;
   isSelected: boolean;
   recentGame?: SteamRecentlyPlayedGame;
   onToggleSelected: (appId: number) => void;
 };
 
-function SteamImportRow({ game, isDuplicate, isSelected, recentGame, onToggleSelected }: SteamImportRowProps) {
+function SteamImportRow({ game, isDuplicate, isIgnored, isSelected, recentGame, onToggleSelected }: SteamImportRowProps) {
   const artworkUrls = getSteamArtworkUrls(game.appid);
+  const isDisabled = isDuplicate || isIgnored;
 
   return (
     <label
       className={`grid gap-3 rounded-md border p-3 transition sm:grid-cols-[auto_120px_minmax(0,1fr)_auto] sm:items-center ${
-        isDuplicate ? 'border-white/10 bg-ink-900/50 opacity-70' : 'border-white/10 bg-ink-900 hover:border-mint/50'
+        isDisabled ? 'border-white/10 bg-ink-900/50 opacity-70' : 'border-white/10 bg-ink-900 hover:border-mint/50'
       }`}
     >
       <input
         checked={isSelected}
         className="mt-1 h-5 w-5 accent-mint sm:mt-0"
-        disabled={isDuplicate}
+        disabled={isDisabled}
         onChange={() => onToggleSelected(game.appid)}
         type="checkbox"
       />
@@ -446,6 +475,7 @@ function SteamImportRow({ game, isDuplicate, isSelected, recentGame, onToggleSel
       <img
         alt=""
         className="h-16 w-full rounded-md bg-ink-800 object-cover sm:w-[120px]"
+        decoding="async"
         loading="lazy"
         src={artworkUrls.header}
       />
@@ -462,9 +492,67 @@ function SteamImportRow({ game, isDuplicate, isSelected, recentGame, onToggleSel
       </div>
 
       <div className="text-sm font-medium text-slate-300">
-        {isDuplicate ? <span className="text-skyglass">Already in library</span> : <span>Ready</span>}
+        {isDuplicate ? (
+          <span className="text-skyglass">Already in library</span>
+        ) : isIgnored ? (
+          <span className="text-red-200">Ignored</span>
+        ) : (
+          <span>Ready</span>
+        )}
       </div>
     </label>
+  );
+}
+
+type IgnoredSteamGamesSectionProps = {
+  ignoredSteamGames: IgnoredSteamGame[];
+  onUnignoreSteamGame: (steamAppId: number) => void;
+};
+
+function IgnoredSteamGamesSection({ ignoredSteamGames, onUnignoreSteamGame }: IgnoredSteamGamesSectionProps) {
+  return (
+    <section className="mt-4 rounded-lg border border-white/10 bg-ink-950 p-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Ignored Steam games</h3>
+          <p className="mt-1 text-sm text-slate-400">
+            Ignored Steam App IDs stay local and are skipped during future imports.
+          </p>
+        </div>
+        <div className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+          {ignoredSteamGames.length} ignored
+        </div>
+      </div>
+
+      {ignoredSteamGames.length > 0 ? (
+        <div className="grid gap-2">
+          {ignoredSteamGames.map((game) => (
+            <div
+              key={game.steamAppId}
+              className="grid gap-3 rounded-md border border-white/10 bg-ink-900 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-white">
+                  {game.title || `Steam app ${game.steamAppId}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-400">Steam App ID: {game.steamAppId}</div>
+              </div>
+              <button
+                className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                onClick={() => onUnignoreSteamGame(game.steamAppId)}
+                type="button"
+              >
+                Restore
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-white/15 bg-black/20 p-4 text-sm text-slate-400">
+          No ignored Steam games yet.
+        </div>
+      )}
+    </section>
   );
 }
 
