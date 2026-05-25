@@ -4,17 +4,21 @@ export type RawgSettings = {
   apiKey: string;
 };
 
+export type RawgListItem = {
+  id: number;
+  name: string;
+};
+
 export type RawgSearchResult = {
   id: number;
   name: string;
   released: string | null;
   background_image: string | null;
   metacritic: number | null;
-};
-
-export type RawgListItem = {
-  id: number;
-  name: string;
+  genres?: RawgListItem[];
+  platforms?: Array<{
+    platform: RawgListItem;
+  }>;
 };
 
 export type RawgGameDetails = RawgSearchResult & {

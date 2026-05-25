@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
+import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { loadGames, saveGames } from './lib/gameStorage';
@@ -8,7 +9,7 @@ import type { Game, GamePlatform, GameStatus } from './types/game';
 import { gamePlatforms, gameStatuses } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 
-const navItems = ['Library', 'Recommendation', 'Stats', 'Settings'] as const;
+const navItems = ['Library', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
 
 const allOption = 'All';
@@ -86,6 +87,24 @@ function App() {
           ? {
               ...game,
               ...metadata,
+              metadataSkippedAt: undefined,
+              metadataManualManagedAt: undefined,
+            }
+          : game,
+      ),
+    );
+  }
+
+  function updateGameMetadataManagement(
+    gameId: string,
+    changes: Pick<Game, 'metadataManualManagedAt' | 'metadataSkippedAt'>,
+  ) {
+    setGames((currentGames) =>
+      currentGames.map((game) =>
+        game.id === gameId
+          ? {
+              ...game,
+              ...changes,
             }
           : game,
       ),
@@ -182,6 +201,8 @@ function App() {
               <div className="mt-5 rounded-md border border-white/10 bg-ink-950 p-3 text-sm leading-6 text-slate-400">
                 {activeNavItem === 'Settings'
                   ? 'Integration settings are local to this browser.'
+                  : activeNavItem === 'Metadata'
+                    ? 'RAWG enrichment runs only when you start it.'
                   : `${activeNavItem} remains a placeholder for a later feature pass.`}
               </div>
             )}
@@ -228,6 +249,12 @@ function App() {
                 </div>
               )}
             </section>
+          ) : activeNavItem === 'Metadata' ? (
+            <MetadataEnrichmentPanel
+              games={games}
+              onMetadataManagementChange={updateGameMetadataManagement}
+              onMetadataUpdate={updateGameMetadata}
+            />
           ) : activeNavItem === 'Settings' ? (
             <section className="min-w-0 space-y-4 overflow-y-auto lg:h-[calc(100vh-116px)]">
               <RawgSettingsPanel />

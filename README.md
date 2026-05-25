@@ -18,6 +18,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Controlled Steam import with selectable games and duplicate protection.
 - Optional RAWG metadata enrichment for individual games.
 - Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
+- Metadata enrichment workflow for larger libraries with batch processing and manual match review.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
@@ -80,6 +81,18 @@ Open a game from the Library with **Details** to review one title in a focused v
 - **RAWG metadata** is read-only and shows enriched fields such as genres, tags, developers, publishers, release date, Metacritic, average playtime, background image, and metadata update time when available.
 
 Imported and enriched metadata is not edited directly from this screen.
+
+## Metadata Enrichment Workflow
+
+Open **Metadata** to review games that are missing RAWG metadata. The workflow stays local-first and only runs when started by the user.
+
+- Use **Find metadata** on one game to search RAWG and auto-save only high-confidence matches.
+- Use **Review matches** when confidence is too low and pick the correct RAWG result manually.
+- Use **Skip** for games to revisit later or **Mark as manually managed** for games that should not be enriched automatically.
+- Use **Enrich all** or **Enrich selected** to process a lightweight queue without freezing the UI.
+- Use **Stop enrichment** to halt an active batch after the current item finishes.
+
+Automatic confidence scoring considers exact title match, normalized title similarity, platform similarity, and release year similarity when a release year is available. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
 
 ## Install
 

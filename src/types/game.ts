@@ -29,4 +29,6 @@ export type Game = {
   backgroundImage?: string | null;
   metadataSource?: 'rawg';
   metadataUpdatedAt?: string;
+  metadataSkippedAt?: string;
+  metadataManualManagedAt?: string;
 };
