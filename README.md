@@ -60,6 +60,14 @@ Known limitations:
 
 QuestShelf includes a Settings section for an early Steam integration foundation. It stores the Steam Web API key and SteamID64 locally in the browser and can test the Steam API connection.
 
+In local development, Steam API calls go through the Vite dev proxy:
+
+- Frontend base path: `/api/steam`
+- Proxy target: `https://api.steampowered.com`
+- Example rewrite: `/api/steam/IPlayerService/GetOwnedGames/v0001/` becomes `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/`
+
+Run the app with `npm run dev` so Vite can serve that proxy. If the Steam test shows a proxy/CORS error, restart the dev server after checking `vite.config.ts`. The direct Steam API URL is kept only as a production placeholder; a deployed app will still need a safe proxy/backend before real production Steam sync.
+
 The test action calls:
 
 - `getOwnedGames()`
