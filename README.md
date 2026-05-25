@@ -20,8 +20,41 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
 - Metadata enrichment workflow for larger libraries with batch processing and manual match review.
 - Local Recommendation Engine v1 for choosing what to play next.
+- Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+
+## PWA Install and Offline Behavior
+
+QuestShelf includes a basic Progressive Web App setup so it can be installed from supported desktop and Android browsers.
+
+To install:
+
+1. Run the production build and preview it, or deploy the built app over HTTPS.
+2. Open QuestShelf in Chrome, Edge, or another PWA-capable browser.
+3. Use the browser install action, or the in-app **Install QuestShelf** hint when the browser exposes the install prompt.
+
+The PWA manifest uses:
+
+- App name and short name: `QuestShelf`
+- Display mode: `standalone`
+- Orientation: landscape-friendly
+- Local placeholder SVG icons
+- Dark theme and background colors
+
+Offline support is intentionally app-shell focused:
+
+- The app shell, manifest, and local placeholder icons are cached by the service worker after the app has loaded.
+- The local library continues to work offline because game data is stored in browser `localStorage`.
+- Steam and RAWG actions require network access and will show their existing error states when offline or unavailable.
+- External Steam and RAWG images may depend on the browser cache and are not guaranteed to be available offline.
+
+Known limitations:
+
+- Service worker registration is skipped during Vite development mode.
+- The first offline launch is only reliable after the production app has been loaded at least once.
+- Browser install support varies, especially on iOS and embedded webviews.
+- This PWA layer does not add cloud sync, accounts, or a backend.
 
 ## Steam Integration Foundation
 
