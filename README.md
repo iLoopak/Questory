@@ -11,6 +11,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Browser `localStorage` persistence.
 - Game cards with cover image, playtime, tags, notes, and last played date.
 - Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
+- Separate local Wishlist collection for platform-agnostic future games.
 - Filter by platform, status, and tag.
 - Search by title.
 - Change game status directly from the library.
@@ -24,17 +25,31 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Local Recommendation Engine v1 for choosing what to play next.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 
-No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, Steam wishlist fetching, or remote sync are included yet.
 
 ## Local Library Data
 
 QuestShelf starts with an empty local library. It does not automatically insert placeholder games on startup.
 
-Use **Add game** in the Library to create a local manual game without Steam or RAWG credentials. Manual games support title, platform, status, playtime, cover URL, tags, and notes. If **Other** is selected as the platform, QuestShelf stores the custom platform text on that game.
+Use **Add game** in the Library or Wishlist to create a local manual game without Steam or RAWG credentials. Manual games support title, platform, status, playtime, cover URL, tags, and notes. If **Other** is selected as the platform, QuestShelf stores the custom platform text on that game.
 
 Manual games are stored in the same browser `localStorage` library as imported games with `externalSource: "manual"` and an import timestamp. They are never affected by Steam import, Steam duplicates, or the ignored Steam games list. RAWG metadata can still be added later from the Metadata workflow.
 
 For development and testing, optional demo games live in `src/data/mockGames.ts`. In Vite development mode, Settings includes a **Load demo data** action. Settings also includes **Remove demo games**, which removes only known placeholder IDs and preserves user-created games and Steam-imported games.
+
+## Wishlist
+
+QuestShelf has a separate **Wishlist** tab for games that are not owned or actively tracked yet. Wishlist entries use the same local `Game` model as library entries, with `collectionType: "wishlist"`.
+
+- Existing saved games without `collectionType` are safely migrated to `collectionType: "library"`.
+- Steam owned import always creates `library` games, not Wishlist items.
+- Wishlist items support title, platform, cover image, tags, notes, Steam App ID, RAWG metadata, and manual source data.
+- Optional Wishlist planning fields include priority, expected playtime, price target, release date, and store URL.
+- Library and Wishlist have separate search/filter state and separate counts.
+- Library cards can be copied into Wishlist with **Add to Wishlist**.
+- Wishlist cards can be promoted with **Move to Library** or deleted with **Remove Wishlist**.
+- RAWG enrichment works on Wishlist entries because the metadata workflow reads both collections.
+- Steam wishlist fetching is intentionally only a future integration point and is not implemented yet.
 
 ## PWA Install and Offline Behavior
 
@@ -168,6 +183,7 @@ Inputs:
 - Mood: brain off, story, grind, challenge, or comfort.
 - Preferred platform: any platform or a specific local platform.
 - Include finished games: enabled or disabled.
+- Include Wishlist items: disabled by default.
 
 The recommendation score uses local status, last played date, playtime, RAWG average playtime, genres, RAWG tags, custom tags, and platform. It prefers games already marked `Playing`, games not played recently, mood matches, and games that fit the selected session length. It penalizes completed games unless enabled, dropped games, and missing RAWG metadata without excluding those games entirely.
 
