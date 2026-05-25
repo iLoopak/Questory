@@ -1,0 +1,26 @@
+{
+  "name": "QuestShelf",
+  "short_name": "QuestShelf",
+  "description": "A local-first game library, metadata, and recommendation shelf.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "theme_color": "#101219",
+  "background_color": "#08090c",
+  "icons": [
+    {
+      "src": "/icons/questshelf-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/questshelf-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["games", "utilities", "entertainment"]
+}

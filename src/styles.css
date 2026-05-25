@@ -35,4 +35,10 @@ button {
 
 img {
   display: block;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+img[loading='lazy'] {
+  min-width: 1px;
+  min-height: 1px;
 }
