@@ -1,7 +1,7 @@
-export const gamePlatforms = ['PC', 'Steam', 'Steam Deck', 'Switch', 'PlayStation', 'Xbox'] as const;
-export const gameStatuses = ['Want to play', 'Backlog', 'Playing', 'Paused', 'Completed', 'Dropped'] as const;
+export const gamePlatforms = ['Steam', 'PS5', 'PS4', 'Switch', 'Switch 2', 'PC', 'Android', 'PSP', 'PS2', 'GBA', 'SNES', 'Other'] as const;
+export const gameStatuses = ['Want to play', 'Playing', 'Paused', 'Finished', 'Dropped'] as const;
 
-export type GamePlatform = (typeof gamePlatforms)[number];
+export type GamePlatform = (typeof gamePlatforms)[number] | (string & {});
 export type GameStatus = (typeof gameStatuses)[number];
 
 export type Game = {
@@ -15,7 +15,7 @@ export type Game = {
   lastPlayedAt: string | null;
   notes: string;
   steamAppId?: number;
-  externalSource?: 'steam';
+  externalSource?: 'manual' | 'steam';
   externalUrl?: string;
   importedAt?: string;
   rawgId?: number;
