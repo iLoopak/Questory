@@ -25,6 +25,16 @@ export type SteamDebugResult = {
   ownedGames: SteamOwnedGame[];
   recentlyPlayedGames: SteamRecentlyPlayedGame[];
   mappedGames: Game[];
+  apiDebugEntries?: SteamApiDebugEntry[];
+};
+
+export type SteamApiDebugEntry = {
+  endpoint: string;
+  httpStatus: number | null;
+  parsedGameCount: number | null;
+  requestUrl: string;
+  responseSummary: string;
+  steamId64: string;
 };
 
 export type SteamConnectionState =
