@@ -1,5 +1,5 @@
 import type { Game } from '../types/game';
-import type { SteamOwnedGame, SteamRecentlyPlayedGame, SteamSettings } from '../types/steam';
+import type { SteamApiDebugEntry, SteamOwnedGame, SteamRecentlyPlayedGame, SteamSettings } from '../types/steam';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 
 const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
@@ -21,6 +21,8 @@ type RecentlyPlayedResponse = {
   games?: SteamRecentlyPlayedGame[];
 };
 
+const steamApiDebugEntries: SteamApiDebugEntry[] = [];
+
 export class SteamApiError extends Error {
   constructor(
     message: string,
@@ -29,6 +31,8 @@ export class SteamApiError extends Error {
       | 'missing-steamid64'
       | 'invalid-steamid64'
       | 'private-profile'
+      | 'empty-library'
+      | 'malformed-response'
       | 'cors-proxy'
       | 'api-failure',
   ) {
@@ -42,11 +46,11 @@ function validateSettings(settings: SteamSettings) {
     throw new SteamApiError('Add a Steam Web API key before testing the connection.', 'missing-api-key');
   }
 
-  if (!settings.steamId64.trim()) {
+  if (!settings.steamId64) {
     throw new SteamApiError('Add a SteamID64 before testing the connection.', 'missing-steamid64');
   }
 
-  if (!/^\d{17}$/.test(settings.steamId64.trim())) {
+  if (!/^\d{17}$/.test(settings.steamId64)) {
     throw new SteamApiError('SteamID64 should be a 17-digit numeric ID, usually starting with 7656.', 'invalid-steamid64');
   }
 }
@@ -56,7 +60,7 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
 
   const url = new URL(`${STEAM_API_BASE_URL}/${endpoint}/v0001/`, window.location.origin);
   url.searchParams.set('key', settings.apiKey.trim());
-  url.searchParams.set('steamid', settings.steamId64.trim());
+  url.searchParams.set('steamid', settings.steamId64);
   url.searchParams.set('format', 'json');
 
   if (endpoint === 'GetOwnedGames') {
@@ -65,10 +69,20 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
   }
 
   let response: Response;
+  const safeRequestUrl = getSafeRequestUrl(url);
 
   try {
     response = await fetch(url);
   } catch {
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: null,
+      parsedGameCount: null,
+      requestUrl: safeRequestUrl,
+      responseSummary: 'Network request failed before an HTTP response was received.',
+      steamId64: settings.steamId64,
+    });
+
     if (import.meta.env.DEV) {
       throw new SteamApiError(
         'Steam API request failed. Make sure the Vite dev server is running with the /api/steam proxy configured.',
@@ -83,6 +97,15 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
   }
 
   if (!response.ok) {
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: response.status,
+      parsedGameCount: null,
+      requestUrl: safeRequestUrl,
+      responseSummary: `HTTP ${response.status} ${response.statusText}`,
+      steamId64: settings.steamId64,
+    });
+
     if (import.meta.env.DEV && response.status === 404) {
       throw new SteamApiError(
         'Steam proxy route was not found. Restart the Vite dev server and confirm /api/steam is configured in vite.config.ts.',
@@ -101,10 +124,33 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
     throw new SteamApiError(`Steam API request failed with status ${response.status}.`, 'api-failure');
   }
 
-  const payload = (await response.json()) as SteamApiResponse<T>;
+  let payload: SteamApiResponse<T>;
+
+  try {
+    payload = (await response.json()) as SteamApiResponse<T>;
+  } catch {
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: response.status,
+      parsedGameCount: null,
+      requestUrl: safeRequestUrl,
+      responseSummary: 'Steam returned a response that could not be parsed as JSON.',
+      steamId64: settings.steamId64,
+    });
+    throw new SteamApiError('Steam returned malformed JSON. Try the request again.', 'malformed-response');
+  }
+
+  recordSteamApiDebug({
+    endpoint,
+    httpStatus: response.status,
+    parsedGameCount: getParsedGameCount(payload.response),
+    requestUrl: safeRequestUrl,
+    responseSummary: JSON.stringify(payload, null, 2),
+    steamId64: settings.steamId64,
+  });
 
   if (!payload.response) {
-    throw new SteamApiError('Steam profile or game details are private or unavailable for this SteamID64.', 'private-profile');
+    throw new SteamApiError('Steam returned no response object. The SteamID64 may be invalid or unavailable.', 'malformed-response');
   }
 
   return payload.response;
@@ -112,6 +158,21 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
 
 export async function getOwnedGames(settings: SteamSettings): Promise<SteamOwnedGame[]> {
   const response = await requestSteamEndpoint<OwnedGamesResponse>('GetOwnedGames', settings);
+
+  if (Array.isArray(response.games)) {
+    return response.games;
+  }
+
+  if (response.game_count === 0) {
+    return [];
+  }
+
+  if (typeof response.game_count === 'number') {
+    throw new SteamApiError(
+      'Steam returned a game count but no games list. The response shape was unexpected.',
+      'malformed-response',
+    );
+  }
 
   if (!Array.isArray(response.games)) {
     throw new SteamApiError('Steam owned games are private or unavailable for this SteamID64.', 'private-profile');
@@ -124,6 +185,14 @@ export async function getRecentlyPlayedGames(settings: SteamSettings): Promise<S
   const response = await requestSteamEndpoint<RecentlyPlayedResponse>('GetRecentlyPlayedGames', settings);
 
   return Array.isArray(response.games) ? response.games : [];
+}
+
+export function clearSteamApiDebugLog() {
+  steamApiDebugEntries.length = 0;
+}
+
+export function getSteamApiDebugLog() {
+  return [...steamApiDebugEntries];
 }
 
 export function mapSteamGamesToLocalGames(
@@ -158,4 +227,36 @@ export function mapSteamGamesToLocalGames(
       importedAt,
     };
   });
+}
+
+function recordSteamApiDebug(entry: SteamApiDebugEntry) {
+  steamApiDebugEntries.push(entry);
+
+  if (steamApiDebugEntries.length > 8) {
+    steamApiDebugEntries.shift();
+  }
+
+  console.debug('[QuestShelf Steam API]', {
+    endpoint: entry.endpoint,
+    httpStatus: entry.httpStatus,
+    parsedGameCount: entry.parsedGameCount,
+    requestUrl: entry.requestUrl,
+    responseSummary: entry.responseSummary,
+    steamId64: entry.steamId64,
+  });
+}
+
+function getSafeRequestUrl(url: URL) {
+  const safeUrl = new URL(url.toString());
+  safeUrl.searchParams.set('key', '[redacted]');
+  return safeUrl.toString();
+}
+
+function getParsedGameCount(response: unknown) {
+  if (!response || typeof response !== 'object') {
+    return null;
+  }
+
+  const maybeResponse = response as { games?: unknown };
+  return Array.isArray(maybeResponse.games) ? maybeResponse.games.length : null;
 }
