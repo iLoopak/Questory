@@ -136,12 +136,20 @@ Imported and enriched metadata is not edited directly from this screen.
 Open **Metadata** to review games that are missing RAWG metadata. The workflow stays local-first and only runs when started by the user.
 
 - Use **Find metadata** on one game to search RAWG and auto-save only high-confidence matches.
-- Use **Review matches** when confidence is too low and pick the correct RAWG result manually.
+- Use **Accept suggested match** for medium-confidence matches, or **Choose different match** to pick another RAWG result manually.
 - Use **Skip** for games to revisit later or **Mark as manually managed** for games that should not be enriched automatically.
 - Use **Enrich all** or **Enrich selected** to process a lightweight queue without freezing the UI.
 - Use **Stop enrichment** to halt an active batch after the current item finishes.
 
-Automatic confidence scoring considers exact title match, normalized title similarity, platform similarity, and release year similarity when a release year is available. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
+Automatic confidence scoring considers normalized title similarity, platform similarity, and release year similarity when a release year is available. Title normalization lowercases names, removes punctuation/trademark marks, and strips common edition or platform suffixes such as GOTY, Deluxe Edition, Remastered, Complete Edition, Steam, Switch, PlayStation, and Xbox.
+
+Matching uses three tiers:
+
+- `90%+`: auto-applied during enrichment.
+- `70-89%`: shown as a suggested match that must be accepted or changed manually.
+- Below `70%`: requires manual selection.
+
+RAWG search tries the exact title first, then the normalized title, then the title without subtitle text after a colon or dash. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
 
 ## Recommendation Engine v1
 
