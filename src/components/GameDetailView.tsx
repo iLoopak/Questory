@@ -12,6 +12,7 @@ type GameDetailViewProps = {
 
 export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailViewProps) {
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
 
   const coverSources = useMemo(() => {
@@ -25,6 +26,7 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
 
   useEffect(() => {
     setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
     setTagText(game.tags.join(', '));
   }, [coverSources, game.id, game.tags]);
 
@@ -70,13 +72,23 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
               <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-800 shadow-panel">
                 <div className="aspect-[2/3] bg-ink-700">
                   {activeCoverSource ? (
-                    <img
-                      alt=""
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      onError={() => setCoverSourceIndex((currentIndex) => currentIndex + 1)}
-                      src={activeCoverSource}
-                    />
+                    <div className="relative h-full">
+                      {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+                      <img
+                        alt=""
+                        className={`h-full w-full object-cover transition-opacity duration-300 ${
+                          isCoverLoaded ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        decoding="async"
+                        loading="lazy"
+                        onError={() => {
+                          setIsCoverLoaded(false);
+                          setCoverSourceIndex((currentIndex) => currentIndex + 1);
+                        }}
+                        onLoad={() => setIsCoverLoaded(true)}
+                        src={activeCoverSource}
+                      />
+                    </div>
                   ) : (
                     <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
                       <div>
@@ -94,7 +106,13 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
 
               {game.backgroundImage ? (
                 <section className="overflow-hidden rounded-lg border border-white/10 bg-ink-800">
-                  <img alt="" className="aspect-video w-full object-cover" loading="lazy" src={game.backgroundImage} />
+                  <img
+                    alt=""
+                    className="aspect-video w-full bg-ink-700 object-cover"
+                    decoding="async"
+                    loading="lazy"
+                    src={game.backgroundImage}
+                  />
                 </section>
               ) : null}
             </div>
@@ -157,7 +175,7 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
               </DetailSection>
 
               <DetailSection kicker="Read-only" title="Steam data">
-                {typeof game.steamAppId === 'number' || game.externalUrl || game.importedAt ? (
+                {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? 'n/a'} />
                     <ReadOnlyField label="Imported" value={formatDateTime(game.importedAt)} />
