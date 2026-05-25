@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">QuestShelf maskable icon</title>
+  <rect width="512" height="512" fill="#08090c" />
+  <rect x="72" y="76" width="368" height="360" rx="48" fill="#101219" stroke="#2ee6a6" stroke-width="20" />
+  <path d="M142 154h228M142 236h228M142 318h150" stroke="#f8fafc" stroke-width="30" stroke-linecap="round" />
+  <circle cx="356" cy="334" r="40" fill="#2ee6a6" />
+</svg>
