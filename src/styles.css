@@ -71,6 +71,13 @@ img {
   overflow: hidden;
 }
 
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
 .qs-glass {
   background:
     linear-gradient(180deg, rgba(12, 26, 45, 0.88), rgba(7, 17, 31, 0.82));

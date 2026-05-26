@@ -1,49 +1,95 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import { gameStatuses } from '../types/game';
 
 type GameCardProps = {
   game: Game;
+  isMultiSelectMode?: boolean;
+  isSelected?: boolean;
   onAddToWishlist?: (game: Game) => void;
+  onFindMetadata: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
+  onToggleSelected?: () => void;
 };
 
 export function GameCard({
   game,
+  isMultiSelectMode = false,
+  isSelected = false,
   onAddToWishlist,
+  onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
   onStatusChange,
+  onToggleSelected,
 }: GameCardProps) {
   const coverSources = useMemo(() => {
     return getGameCoverSources(game);
   }, [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
   }, [coverSources]);
 
-  const lastPlayed = game.lastPlayedAt
-    ? new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(
-        new Date(game.lastPlayedAt),
-      )
-    : 'Not started';
-
   const activeCoverSource = coverSources[coverSourceIndex];
+  const enrichmentStatus = getEnrichmentStatus(game);
+
+  function handleCardClick() {
+    if (isMultiSelectMode) {
+      onToggleSelected?.();
+    }
+  }
+
+  function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!isMultiSelectMode || (event.key !== 'Enter' && event.key !== ' ')) {
+      return;
+    }
+
+    event.preventDefault();
+    onToggleSelected?.();
+  }
+
+  function stopCardAction(event: MouseEvent<HTMLElement>) {
+    event.stopPropagation();
+  }
 
   return (
-    <article className="flex h-full min-h-[420px] min-w-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-ink-800 shadow-panel">
-      <div className="relative aspect-[16/9] max-h-44 shrink-0 overflow-hidden bg-ink-700">
+    <article
+      aria-selected={isMultiSelectMode ? isSelected : undefined}
+      className={`qs-glass relative flex h-full min-h-[390px] min-w-0 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow ${
+        isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
+      } ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role={isMultiSelectMode ? 'button' : undefined}
+      tabIndex={isMultiSelectMode ? 0 : undefined}
+    >
+      {isMultiSelectMode ? (
+        <div className="absolute left-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full border border-mint/40 bg-ink-950/90 shadow-glow">
+          <input
+            aria-label={`Select ${game.title}`}
+            checked={isSelected}
+            className="h-4 w-4 accent-mint"
+            onChange={() => onToggleSelected?.()}
+            onClick={stopCardAction}
+            type="checkbox"
+          />
+        </div>
+      ) : null}
+
+      <div className="relative aspect-[16/9] max-h-40 shrink-0 overflow-hidden bg-ink-700">
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
@@ -65,15 +111,15 @@ export function GameCard({
         ) : (
           <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
             <div>
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border border-white/10 bg-ink-900 text-xl font-semibold text-mint">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border border-mint/20 bg-ink-900 text-xl font-semibold text-mint shadow-glow">
                 {game.title.slice(0, 1).toUpperCase()}
               </div>
               <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">No cover</div>
             </div>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-transparent to-transparent" />
-        <span className="absolute bottom-3 left-3 rounded-full border border-white/15 bg-black/50 px-2.5 py-1 text-xs font-medium text-white">
+        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-transparent" />
+        <span className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full border border-skyglass/20 bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
           {game.platform}
         </span>
         {game.collectionType === 'wishlist' ? (
@@ -84,21 +130,37 @@ export function GameCard({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7 text-white" title={game.title}>
+        <div className="min-w-0">
+          <h3 className="line-clamp-3 min-h-[5.25rem] text-lg font-semibold leading-7 text-white" title={game.title}>
               {game.title}
-            </h3>
-            <p className="mt-1 truncate text-sm text-slate-400">
-              {game.playtimeHours}h played - {lastPlayed}
-            </p>
-          </div>
+          </h3>
 
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="rounded-full border border-skyglass/15 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-slate-300">
+              {game.playtimeHours}h played
+            </span>
+            <span className="rounded-full border border-skyglass/15 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-slate-300">
+              {game.status}
+            </span>
+            <span
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                game.metadataSource === 'rawg'
+                  ? 'border-mint/25 bg-mint/10 text-mint'
+                  : 'border-skyglass/15 bg-ink-950/80 text-slate-400'
+              }`}
+            >
+              {enrichmentStatus}
+            </span>
+          </div>
+        </div>
+
+        {!isMultiSelectMode ? (
           <select
-            className="h-9 max-w-[9rem] shrink-0 rounded-md border border-white/10 bg-ink-900 px-2 text-sm font-medium text-slate-100 outline-none transition focus:border-mint"
+            className="h-9 w-full rounded-md border border-skyglass/15 bg-ink-950/80 px-2 text-sm font-medium text-slate-100 outline-none transition focus:border-mint"
             value={game.status}
             aria-label={`Change status for ${game.title}`}
             onChange={(event) => onStatusChange(game.id, event.target.value as GameStatus)}
+            onClick={stopCardAction}
           >
             {gameStatuses.map((status) => (
               <option key={status} value={status}>
@@ -106,86 +168,91 @@ export function GameCard({
               </option>
             ))}
           </select>
-        </div>
+        ) : null}
 
-        <div className="grid gap-2 text-sm text-slate-300">
-          <CompactField label="Status" value={game.status} />
-          <CompactField label="Enrichment" value={getEnrichmentStatus(game)} />
-          {game.collectionType === 'wishlist' && game.priority ? <CompactField label="Priority" value={game.priority} /> : null}
-          {game.collectionType === 'wishlist' && game.priceTarget ? (
-            <CompactField label="Price target" value={game.priceTarget} />
-          ) : null}
-        </div>
-
-        <div className="flex min-h-[2rem] flex-wrap gap-2">
-          {game.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-300">
+        <div className="flex min-h-[1.8rem] flex-wrap gap-2">
+          {game.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="rounded-full border border-skyglass/10 bg-skyglass/10 px-2.5 py-1 text-xs font-medium text-slate-300">
               {tag}
             </span>
           ))}
-          {game.tags.length > 4 ? (
-            <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-500">
-              +{game.tags.length - 4}
+          {game.tags.length > 3 ? (
+            <span className="rounded-full bg-skyglass/5 px-2.5 py-1 text-xs font-medium text-slate-500">
+              +{game.tags.length - 3}
             </span>
           ) : null}
         </div>
 
-        <div className="mt-auto border-t border-white/10 pt-3">
-          <div className="grid gap-2">
+        <div className="mt-auto border-t border-skyglass/15 pt-3">
+          <div className="flex items-center gap-2">
             <button
-              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
-              onClick={onOpenDetails}
+              className="h-9 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              onClick={(event) => {
+                stopCardAction(event);
+                onOpenDetails();
+              }}
               type="button"
             >
               Details
             </button>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {game.collectionType === 'wishlist' ? (
-                <>
-                  <button
-                    className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
-                    onClick={() => onMoveToLibrary?.(game)}
-                    type="button"
-                  >
-                    Move to Library
-                  </button>
-                  <button
-                    className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                    onClick={() => onRemove(game.id)}
-                    type="button"
-                  >
-                    Remove Wishlist
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                    onClick={() => onAddToWishlist?.(game)}
-                    type="button"
-                  >
-                    Add to Wishlist
-                  </button>
-                  <button
-                    className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
-                    disabled={typeof game.steamAppId !== 'number'}
-                    onClick={() => onRemoveAndIgnore(game)}
-                    type="button"
-                  >
-                    Remove + ignore
-                  </button>
-                </>
-              )}
-            </div>
-            {game.collectionType === 'library' ? (
+            <div className="relative" onClick={stopCardAction}>
               <button
-                className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                onClick={() => onRemove(game.id)}
+                aria-expanded={isActionMenuOpen}
+                aria-label={`More actions for ${game.title}`}
+                className="grid h-9 w-10 place-items-center rounded-md border border-skyglass/15 text-lg font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                onClick={() => setIsActionMenuOpen((currentValue) => !currentValue)}
                 type="button"
               >
-                Remove
+                ...
               </button>
-            ) : null}
+              {isActionMenuOpen ? (
+                <div className="absolute bottom-11 right-0 z-20 w-48 overflow-hidden rounded-md border border-skyglass/15 bg-ink-950 shadow-panel">
+                  {game.collectionType === 'wishlist' ? (
+                    <ActionMenuButton
+                      label="Move to Library"
+                      onClick={() => {
+                        onMoveToLibrary?.(game);
+                        setIsActionMenuOpen(false);
+                      }}
+                    />
+                  ) : (
+                    <ActionMenuButton
+                      label="Add to Wishlist"
+                      onClick={() => {
+                        onAddToWishlist?.(game);
+                        setIsActionMenuOpen(false);
+                      }}
+                    />
+                  )}
+                  <ActionMenuButton
+                    label="Find metadata"
+                    onClick={() => {
+                      onFindMetadata(game);
+                      setIsActionMenuOpen(false);
+                    }}
+                  />
+                  <ActionMenuButton
+                    label={game.collectionType === 'wishlist' ? 'Remove Wishlist' : 'Remove'}
+                    onClick={() => {
+                      onRemove(game.id);
+                      setIsActionMenuOpen(false);
+                    }}
+                    tone="danger"
+                  />
+                  {game.collectionType === 'library' ? (
+                    <ActionMenuButton
+                      disabled={typeof game.steamAppId !== 'number'}
+                      label="Remove + Ignore"
+                      onClick={() => {
+                        onRemoveAndIgnore(game);
+                        setIsActionMenuOpen(false);
+                      }}
+                      tone="danger"
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -193,17 +260,25 @@ export function GameCard({
   );
 }
 
-type CompactFieldProps = {
+type ActionMenuButtonProps = {
+  disabled?: boolean;
   label: string;
-  value: string;
+  onClick: () => void;
+  tone?: 'danger';
 };
 
-function CompactField({ label, value }: CompactFieldProps) {
+function ActionMenuButton({ disabled = false, label, onClick, tone }: ActionMenuButtonProps) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-ink-900 px-2.5 py-2">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
-      <div className="truncate text-right text-slate-200">{value}</div>
-    </div>
+    <button
+      className={`block h-10 w-full px-3 text-left text-sm transition hover:bg-mint/10 disabled:cursor-not-allowed disabled:text-slate-600 ${
+        tone === 'danger' ? 'text-red-200' : 'text-slate-200'
+      }`}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+    </button>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCachedRawgMetadata, saveRawgMetadataCacheEntry } from '../lib/rawgMetadataCache';
 import { getRawgMetadataWithCoverFallback } from '../lib/gameCoverImages';
 import {
@@ -16,11 +16,13 @@ import type { RawgMetadata, RawgSearchResult } from '../types/rawg';
 
 type MetadataEnrichmentPanelProps = {
   games: Game[];
+  initialSelectedGameIds?: string[];
   onMetadataManagementChange: (
     gameId: string,
     changes: Pick<Game, 'metadataManualManagedAt' | 'metadataSkippedAt'>,
   ) => void;
   onMetadataUpdate: (gameId: string, metadata: RawgMetadata) => void;
+  selectionRequestId?: number;
 };
 
 type EnrichmentStatus =
@@ -50,8 +52,10 @@ const queueDelayMs = 250;
 
 export function MetadataEnrichmentPanel({
   games,
+  initialSelectedGameIds,
   onMetadataManagementChange,
   onMetadataUpdate,
+  selectionRequestId,
 }: MetadataEnrichmentPanelProps) {
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [enrichmentStateByGameId, setEnrichmentStateByGameId] = useState<Record<string, EnrichmentState>>({});
@@ -59,6 +63,14 @@ export function MetadataEnrichmentPanel({
   const [isQueueRunning, setIsQueueRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const shouldStopQueue = useRef(false);
+
+  useEffect(() => {
+    if (!initialSelectedGameIds) {
+      return;
+    }
+
+    setSelectedGameIds(new Set(initialSelectedGameIds));
+  }, [initialSelectedGameIds, selectionRequestId]);
 
   const missingMetadataGames = useMemo(() => {
     return games.filter((game) => game.metadataSource !== 'rawg');
@@ -265,9 +277,9 @@ export function MetadataEnrichmentPanel({
   }
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-116px)]">
+    <section className="qs-glass min-w-0 overflow-hidden rounded-lg border lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="border-b border-white/10 bg-ink-950/70 p-4">
+        <div className="border-b border-skyglass/15 bg-ink-950/70 p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-white">Metadata Enrichment</h2>
@@ -278,7 +290,7 @@ export function MetadataEnrichmentPanel({
 
             <div className="flex flex-wrap gap-2">
               <button
-                className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                 disabled={isQueueRunning || queueableGames.length === 0}
                 onClick={() => void runQueue(queueableGames)}
                 type="button"
@@ -286,7 +298,7 @@ export function MetadataEnrichmentPanel({
                 Enrich all
               </button>
               <button
-                className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
                 disabled={isQueueRunning || selectedQueueableGames.length === 0}
                 onClick={() => void runQueue(selectedQueueableGames)}
                 type="button"
@@ -294,7 +306,7 @@ export function MetadataEnrichmentPanel({
                 Enrich selected
               </button>
               <button
-                className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
                 disabled={!isQueueRunning}
                 onClick={() => {
                   shouldStopQueue.current = true;
@@ -351,7 +363,7 @@ export function MetadataEnrichmentPanel({
               ))}
             </div>
           ) : (
-            <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
+            <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-8 text-center">
               <div>
                 <h3 className="text-lg font-semibold text-white">Metadata is complete</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
@@ -407,7 +419,7 @@ function EnrichmentRow({
   const canAcceptSuggested = Boolean(state?.status === 'suggested' && suggestedMatch && isSuggestedMatch(suggestedMatch));
 
   return (
-    <article className="grid gap-3 rounded-lg border border-white/10 bg-ink-800 p-3 sm:grid-cols-[auto_76px_minmax(0,1fr)] sm:items-center">
+    <article className="grid gap-3 rounded-lg border border-skyglass/15 bg-ink-800/80 p-3 transition hover:border-mint/35 hover:shadow-glow sm:grid-cols-[auto_76px_minmax(0,1fr)] sm:items-center">
       <input
         aria-label={`Select ${game.title}`}
         checked={isSelected}
@@ -444,7 +456,7 @@ function EnrichmentRow({
 
           <div className="flex flex-wrap gap-2">
             <button
-              className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+              className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
               disabled={isQueueRunning}
               onClick={onFind}
               type="button"
@@ -453,7 +465,7 @@ function EnrichmentRow({
             </button>
             {canAcceptSuggested ? (
               <button
-                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
                 onClick={() => {
                   if (suggestedMatch) {
                     onAcceptSuggested(suggestedMatch);
@@ -465,7 +477,7 @@ function EnrichmentRow({
               </button>
             ) : null}
             <button
-              className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+              className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
               disabled={isQueueRunning}
               onClick={onRetry}
               type="button"
@@ -474,15 +486,15 @@ function EnrichmentRow({
             </button>
             {canReview || canAcceptSuggested ? (
               <button
-                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
-                onClick={() => onReview(state.matches ?? [])}
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+                onClick={() => onReview(state?.matches ?? [])}
                 type="button"
               >
                 Choose different match
               </button>
             ) : null}
             <button
-              className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+              className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
               disabled={isQueueRunning}
               onClick={onSkip}
               type="button"
@@ -490,7 +502,7 @@ function EnrichmentRow({
               Skip
             </button>
             <button
-              className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+              className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
               disabled={isQueueRunning}
               onClick={onManual}
               type="button"
@@ -529,13 +541,13 @@ type ManualMatchDialogProps = {
 function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps) {
   return (
     <div className="fixed inset-0 z-20 grid place-items-center bg-black/70 p-4">
-      <section className="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-lg border border-white/10 bg-ink-900 shadow-panel">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950 p-4">
+      <section className="qs-glass max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
+        <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
             <h3 className="text-lg font-semibold text-white">Pick RAWG match</h3>
             <p className="mt-1 text-sm text-slate-400">Suggested and low-confidence results need a human choice before saving.</p>
           </div>
-          <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10" onClick={onClose} type="button">
+          <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={onClose} type="button">
             Close
           </button>
         </div>
@@ -545,7 +557,7 @@ function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps)
             {matches.map((match) => (
               <button
                 key={match.result.id}
-                className="grid gap-3 rounded-md border border-white/10 bg-ink-800 p-3 text-left transition hover:border-mint/50 sm:grid-cols-[96px_minmax(0,1fr)]"
+                className="grid gap-3 rounded-md border border-skyglass/15 bg-ink-800/80 p-3 text-left transition hover:border-mint/50 hover:shadow-glow sm:grid-cols-[96px_minmax(0,1fr)]"
                 onClick={() => onPick(match.result.id)}
                 type="button"
               >
