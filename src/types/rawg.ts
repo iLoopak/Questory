@@ -4,11 +4,6 @@ export type RawgSettings = {
   apiKey: string;
 };
 
-export type RawgListItem = {
-  id: number;
-  name: string;
-};
-
 export type RawgSearchResult = {
   id: number;
   name: string;
@@ -19,6 +14,11 @@ export type RawgSearchResult = {
   platforms?: Array<{
     platform: RawgListItem;
   }>;
+};
+
+export type RawgListItem = {
+  id: number;
+  name: string;
 };
 
 export type RawgGameDetails = RawgSearchResult & {
@@ -42,4 +42,5 @@ export type RawgMetadata = Pick<
   | 'backgroundImage'
   | 'metadataSource'
   | 'metadataUpdatedAt'
->;
+> &
+  Partial<Pick<Game, 'coverImage'>>;
