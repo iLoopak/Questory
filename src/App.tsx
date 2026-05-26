@@ -213,7 +213,7 @@ function App() {
 
     try {
       const settings = loadSteamSettings();
-      const wishlistItems = await getSteamWishlist({ steamId64: settings.steamId64 });
+      const wishlistItems = await getSteamWishlist(settings);
       const summary = importSteamWishlistItems(wishlistItems);
 
       setSteamWishlistSyncState({

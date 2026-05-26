@@ -244,6 +244,23 @@ export function SteamSettingsPanel({
               />
             </label>
 
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Steam wishlist URL
+              </span>
+              <input
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                value={settings.wishlistUrl}
+                onChange={(event) => updateSetting('wishlistUrl', event.target.value)}
+                placeholder="https://store.steampowered.com/wishlist/id/loopak/"
+                spellCheck={false}
+                type="url"
+              />
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Optional. Paste the public wishlist URL if Steam redirects your SteamID64 wishlist to a custom profile URL.
+              </p>
+            </label>
+
             <button
               className="h-11 w-full rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
               disabled={connectionState.status === 'loading'}

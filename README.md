@@ -52,7 +52,7 @@ QuestShelf has a separate **Wishlist** tab for games that are not owned or activ
 - RAWG enrichment works on Wishlist entries because the metadata workflow reads both collections.
 - Steam wishlist sync is manual and feeds the general Wishlist collection without treating those items as owned games.
 
-Steam wishlist sync is available from the Wishlist view with **Sync Steam Wishlist**. It uses the SteamID64 already saved in Steam Settings and imports public Steam wishlist entries into the general QuestShelf Wishlist collection, not the owned Library.
+Steam wishlist sync is available from the Wishlist view with **Sync Steam Wishlist**. It uses the SteamID64 already saved in Steam Settings and imports public Steam wishlist entries into the general QuestShelf Wishlist collection, not the owned Library. If Steam redirects your SteamID64 wishlist to a custom profile URL, paste that public wishlist URL into **Steam wishlist URL** in Settings so QuestShelf can sync from the stable `id/...` wishlist path directly.
 
 - Steam wishlist items are saved locally with Steam App ID, Steam store URL, cover art, release date, price, discount, review summary, and sync timestamps when Steam provides them.
 - Existing Wishlist items with the same Steam App ID are refreshed with sync metadata, but user-owned fields such as notes, tags, and priority are preserved.
@@ -152,7 +152,8 @@ To use the test connection:
 2. Find your SteamID64 from your Steam profile URL or a Steam ID lookup tool.
 3. Open QuestShelf Settings.
 4. Enter the API key and SteamID64.
-5. Click **Test Steam connection**.
+5. Optionally paste your public Steam wishlist URL if Steam redirects your profile to a vanity URL such as `https://store.steampowered.com/wishlist/id/loopak/`.
+6. Click **Test Steam connection**.
 
 Steam profile privacy can prevent owned or recently played game data from being returned.
 

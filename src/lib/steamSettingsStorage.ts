@@ -5,6 +5,7 @@ const STORAGE_KEY = 'questshelf.steamSettings.v1';
 const emptySettings: SteamSettings = {
   apiKey: '',
   steamId64: '',
+  wishlistUrl: '',
 };
 
 const isBrowser = typeof window !== 'undefined';
@@ -26,6 +27,7 @@ export function loadSteamSettings(): SteamSettings {
     return {
       apiKey: parsedSettings.apiKey ?? '',
       steamId64: parsedSettings.steamId64 ?? '',
+      wishlistUrl: parsedSettings.wishlistUrl ?? '',
     };
   } catch {
     return emptySettings;

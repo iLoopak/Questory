@@ -32,6 +32,12 @@ type RecentlyPlayedResponse = {
   games?: SteamRecentlyPlayedGame[];
 };
 
+type PlayerSummaryResponse = {
+  players?: Array<{
+    profileurl?: string;
+  }>;
+};
+
 const steamApiDebugEntries: SteamApiDebugEntry[] = [];
 
 export class SteamApiError extends Error {
@@ -214,7 +220,9 @@ export async function getRecentlyPlayedGames(settings: SteamSettings): Promise<S
   return Array.isArray(response.games) ? response.games : [];
 }
 
-export async function getSteamWishlist(settings: Pick<SteamSettings, 'steamId64'>): Promise<SteamWishlistItem[]> {
+export async function getSteamWishlist(
+  settings: Pick<SteamSettings, 'apiKey' | 'steamId64' | 'wishlistUrl'>,
+): Promise<SteamWishlistItem[]> {
   const steamId64 = settings.steamId64.trim();
 
   if (!steamId64) {
@@ -225,23 +233,98 @@ export async function getSteamWishlist(settings: Pick<SteamSettings, 'steamId64'
     throw new SteamWishlistError('SteamID64 should be a 17-digit numeric ID, usually starting with 7656.', 'invalid-steamid64');
   }
 
-  const url = new URL(`${STEAM_STORE_BASE_URL}/wishlist/profiles/${steamId64}/wishlistdata/`, window.location.origin);
+  const profilePaths = await getSteamWishlistProfilePaths(settings);
+  const wishlistItems: SteamWishlistItem[] = [];
 
-  let response: Response;
+  for (let page = 0; page < 50; page += 1) {
+    const pageItems = await getSteamWishlistPage(profilePaths, page);
 
-  try {
-    response = await fetch(url);
-  } catch {
-    if (import.meta.env.DEV) {
-      throw new SteamWishlistError(
-        'Steam wishlist request failed. Restart the Vite dev server and confirm the /api/steam-store proxy is configured.',
-        'cors-proxy',
-      );
+    if (pageItems.length === 0) {
+      break;
     }
 
+    wishlistItems.push(...pageItems);
+  }
+
+  return wishlistItems;
+}
+
+async function getSteamWishlistProfilePaths(
+  settings: Pick<SteamSettings, 'apiKey' | 'steamId64' | 'wishlistUrl'>,
+): Promise<string[]> {
+  const paths = [`profiles/${settings.steamId64.trim()}`];
+  const profilePathFromUrl = getSteamWishlistProfilePathFromUrl(settings.wishlistUrl);
+  const vanityId = await getSteamVanityId(settings);
+
+  if (profilePathFromUrl) {
+    paths.unshift(profilePathFromUrl);
+  }
+
+  if (vanityId) {
+    paths.unshift(`id/${vanityId}`);
+  }
+
+  return Array.from(new Set(paths));
+}
+
+function getSteamWishlistProfilePathFromUrl(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const match = trimmedValue.match(/(?:^|\/)wishlist\/(id\/[^/?#]+|profiles\/\d{17})(?:[/?#]|$)/i);
+  return match?.[1] ?? null;
+}
+
+async function getSteamVanityId(settings: Pick<SteamSettings, 'apiKey' | 'steamId64'>) {
+  if (!settings.apiKey.trim()) {
+    return null;
+  }
+
+  try {
+    const response = await requestSteamEndpoint<PlayerSummaryResponse>('GetPlayerSummaries', settings as SteamSettings);
+    const profileUrl = response.players?.[0]?.profileurl;
+    const vanityMatch = profileUrl?.match(/\/id\/([^/]+)\/?$/);
+
+    return vanityMatch?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getSteamWishlistPage(profilePaths: string[], page: number): Promise<SteamWishlistItem[]> {
+  let lastError: SteamWishlistError | null = null;
+
+  for (const profilePath of profilePaths) {
+    try {
+      return await getSteamWishlistPageForProfile(profilePath, page);
+    } catch (error) {
+      if (error instanceof SteamWishlistError) {
+        lastError = error;
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError ?? new SteamWishlistError('Steam wishlist is unavailable for this Steam profile.', 'private-wishlist');
+}
+
+async function getSteamWishlistPageForProfile(profilePath: string, page: number): Promise<SteamWishlistItem[]> {
+  const proxyUrl = new URL(`${STEAM_STORE_BASE_URL}/wishlist/${profilePath}/wishlistdata/`, window.location.origin);
+  const directUrl = new URL(`https://store.steampowered.com/wishlist/${profilePath}/wishlistdata/`);
+  proxyUrl.searchParams.set('p', page.toString());
+  directUrl.searchParams.set('p', page.toString());
+
+  const response = await fetchSteamWishlistResponse(proxyUrl, directUrl);
+
+  if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
     throw new SteamWishlistError(
-      'Steam wishlist request failed. A production app will need a safe proxy/backend for reliable wishlist sync.',
-      'endpoint-failure',
+      'Steam redirected the wishlistdata endpoint instead of returning JSON. Open the public Steam wishlist page in a browser to confirm it is available; Steam may require login or may no longer expose this public wishlist endpoint for this profile.',
+      'private-wishlist',
     );
   }
 
@@ -273,6 +356,28 @@ export async function getSteamWishlist(settings: Pick<SteamSettings, 'steamId64'
   }
 
   return parseSteamWishlistPayload(payload);
+}
+
+async function fetchSteamWishlistResponse(proxyUrl: URL, directUrl: URL) {
+  try {
+    return await fetch(proxyUrl, { redirect: 'manual' });
+  } catch (proxyError) {
+    try {
+      return await fetch(directUrl, { redirect: 'manual' });
+    } catch (directError) {
+      if (import.meta.env.DEV) {
+        throw new SteamWishlistError(
+          `Steam wishlist request failed through both the Vite proxy and direct Steam Store URL. Make sure the app is running with npm run dev, not npm run preview, and unregister any old QuestShelf service worker for this localhost origin. Proxy error: ${formatFetchError(proxyError)}. Direct error: ${formatFetchError(directError)}.`,
+          'cors-proxy',
+        );
+      }
+
+      throw new SteamWishlistError(
+        `Steam wishlist request failed. Direct error: ${formatFetchError(directError)}.`,
+        'endpoint-failure',
+      );
+    }
+  }
 }
 
 export function clearSteamApiDebugLog() {
@@ -488,4 +593,12 @@ function getNumber(value: unknown) {
   }
 
   return undefined;
+}
+
+function formatFetchError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }
