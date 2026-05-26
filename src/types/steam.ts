@@ -3,6 +3,7 @@ import type { Game } from './game';
 export type SteamSettings = {
   apiKey: string;
   steamId64: string;
+  wishlistUrl: string;
 };
 
 export type SteamOwnedGame = {

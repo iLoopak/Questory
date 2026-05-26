@@ -42,6 +42,10 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(request.url);
 
+  if (requestUrl.pathname.startsWith('/api/')) {
+    return;
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
     return;
