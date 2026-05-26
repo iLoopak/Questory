@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { getCachedRawgMetadata, saveRawgMetadataCacheEntry } from '../lib/rawgMetadataCache';
+import { getRawgMetadataWithCoverFallback } from '../lib/gameCoverImages';
 import {
   getHighConfidenceThreshold,
   getSuggestedConfidenceThreshold,
@@ -163,7 +164,7 @@ export function MetadataEnrichmentPanel({
 
   async function saveMatch(game: Game, rawgId: number) {
     const details = await getGameDetails(rawgId);
-    const metadata = mapRawgDetailsToMetadata(details);
+    const metadata = getRawgMetadataWithCoverFallback(game, mapRawgDetailsToMetadata(details));
     onMetadataUpdate(game.id, metadata);
     saveRawgMetadataCacheEntry({
       gameTitle: game.title,

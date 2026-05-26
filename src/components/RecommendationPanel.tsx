@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { getGameCoverSources } from '../lib/gameCoverImages';
 import {
   availableTimeOptions,
   getRecommendations,
@@ -292,10 +292,5 @@ function Badge({ children }: { children: ReactNode }) {
 }
 
 function getCoverSources(game: Game) {
-  if (typeof game.steamAppId === 'number') {
-    const artworkUrls = getSteamArtworkUrls(game.steamAppId);
-    return [artworkUrls.library, artworkUrls.header, artworkUrls.capsule];
-  }
-
-  return game.coverImage ? [game.coverImage] : [];
+  return getGameCoverSources(game);
 }

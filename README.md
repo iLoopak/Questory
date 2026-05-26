@@ -141,7 +141,7 @@ To enrich one game:
 
 QuestShelf fetches details for the selected match and stores metadata locally on that game, including RAWG ID, genres, RAWG tags, developers, publishers, release date, Metacritic score, average playtime, background image, metadata source, and update time.
 
-RAWG enrichment does not overwrite manually edited fields such as status, notes, custom tags, or cover image.
+RAWG enrichment does not overwrite manually edited fields such as status, notes, or custom tags. If a non-Steam game has no cover image, an empty cover image, or one of the generated local placeholder covers, QuestShelf can use the RAWG background image as a cover fallback. User-provided cover URLs and Steam artwork are preserved. The game detail view also includes **Use RAWG image as cover** when a RAWG background image is available and the current cover is safe to replace.
 
 ## Game Detail View
 
@@ -151,7 +151,7 @@ Open a game from the Library with **Details** to review one title in a focused v
 - **Steam data** is read-only and shows Steam App ID, store URL, import source, and import time when available.
 - **RAWG metadata** is read-only and shows enriched fields such as genres, tags, developers, publishers, release date, Metacritic, average playtime, background image, and metadata update time when available.
 
-Imported and enriched metadata is not edited directly from this screen.
+Imported and enriched metadata is not edited directly from this screen, except for the explicit **Use RAWG image as cover** action for manual/non-Steam games that still have an empty or generated placeholder cover.
 
 ## Metadata Enrichment Workflow
 
@@ -171,7 +171,7 @@ Matching uses three tiers:
 - `70-89%`: shown as a suggested match that must be accepted or changed manually.
 - Below `70%`: requires manual selection.
 
-RAWG search tries the exact title first, then the normalized title, then the title without subtitle text after a colon or dash. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
+RAWG search tries the exact title first, then the normalized title, then the title without subtitle text after a colon or dash. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and only uses RAWG artwork as a cover fallback when the current cover is missing or generated. It does not overwrite local user-owned fields such as status, tags, notes, or user-provided cover image.
 
 ## Recommendation Engine v1
 
