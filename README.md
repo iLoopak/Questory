@@ -12,8 +12,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Game cards with cover image, playtime, tags, notes, and last played date.
 - Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
 - Separate local Wishlist collection for platform-agnostic future games.
-- Filter by platform, status, and tag.
-- Search by title.
+- Compact Library and Wishlist toolbar with search, source, enrichment, platform, status, tag, quick filters, and sorting.
 - Change game status directly from the library.
 - Steam connector foundation in Settings.
 - Local Steam Web API key and SteamID64 storage.
@@ -24,6 +23,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Metadata enrichment workflow for larger libraries with batch processing and manual match review.
 - Local Recommendation Engine v1 for choosing what to play next.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
+- QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
 
 No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, Steam wishlist fetching, or remote sync are included yet.
 
@@ -51,6 +51,14 @@ QuestShelf has a separate **Wishlist** tab for games that are not owned or activ
 - RAWG enrichment works on Wishlist entries because the metadata workflow reads both collections.
 - Steam wishlist fetching is intentionally only a future integration point and is not implemented yet.
 
+## Library Filtering and Sorting
+
+Library and Wishlist each have their own compact toolbar for browsing larger collections. Filters can be combined across title search, platform, status, source, RAWG enrichment state, tags, and quick chips such as **Playing**, **Paused**, **Missing metadata**, and **Played > 0h**.
+
+Sort options include title, recently played, most or least playtime, recently imported, metadata missing first, and status. QuestShelf stores the last used Library and Wishlist filters locally in browser `localStorage`, so the view is restored on the next launch without sending anything to a server.
+
+The active summary shows how many games are visible out of the full collection. In multi-select mode, **Select all visible** applies only to the currently filtered result set.
+
 ## PWA Install and Offline Behavior
 
 QuestShelf includes a basic Progressive Web App setup so it can be installed from supported desktop and Android browsers.
@@ -66,8 +74,8 @@ The PWA manifest uses:
 - App name and short name: `QuestShelf`
 - Display mode: `standalone`
 - Orientation: landscape-friendly
-- Local placeholder SVG icons
-- Dark theme and background colors
+- SVG app icons generated from the QuestShelf icon direction for favicon, app shell, and PWA manifest usage
+- Dark navy background and neon teal theme color
 
 Offline support is intentionally app-shell focused:
 
@@ -82,6 +90,15 @@ Known limitations:
 - The first offline launch is only reliable after the production app has been loaded at least once.
 - Browser install support varies, especially on iOS and embedded webviews.
 - This PWA layer does not add cloud sync, accounts, or a backend.
+
+## Visual Branding
+
+QuestShelf uses the provided app icon direction as the source brand asset. The icon files live in `public/icons/`:
+
+- `questshelf-icon.svg`: favicon, header logo, and general PWA icon.
+- `questshelf-maskable.svg`: maskable PWA icon using the same artwork with a full safe-area background.
+
+The UI theme follows the icon with a near-black/deep navy background, restrained neon teal accents, blue-gray borders, soft glow focus states, and glassy console-style panels. Neon teal is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens.
 
 ## Steam Integration Foundation
 
@@ -171,7 +188,7 @@ Matching uses three tiers:
 - `70-89%`: shown as a suggested match that must be accepted or changed manually.
 - Below `70%`: requires manual selection.
 
-RAWG search tries the exact title first, then the normalized title, then the title without subtitle text after a colon or dash. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and only uses RAWG artwork as a cover fallback when the current cover is missing or generated. It does not overwrite local user-owned fields such as status, tags, notes, or user-provided cover image.
+RAWG search tries the exact title first, then the normalized title, then the title without subtitle text after a colon or dash. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
 
 ## Recommendation Engine v1
 
