@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import { gameStatuses } from '../types/game';
 
@@ -16,13 +16,8 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
 
   const coverSources = useMemo(() => {
-    if (typeof game.steamAppId === 'number') {
-      const artworkUrls = getSteamArtworkUrls(game.steamAppId);
-      return [artworkUrls.library, artworkUrls.header, artworkUrls.capsule];
-    }
-
-    return game.coverImage ? [game.coverImage] : [];
-  }, [game.coverImage, game.steamAppId]);
+    return getGameCoverSources(game);
+  }, [game]);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -32,6 +27,7 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
 
   const activeCoverSource = coverSources[coverSourceIndex];
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
+  const canApplyRawgCover = canUseRawgImageAsCover(game);
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -39,6 +35,19 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
       status: changes.status ?? game.status,
       tags: changes.tags ?? game.tags,
     });
+  }
+
+  function useRawgImageAsCover() {
+    if (!canApplyRawgCover || !game.backgroundImage) {
+      return;
+    }
+
+    onTrackingChange(game.id, {
+      coverImage: game.backgroundImage,
+      notes: game.notes,
+      status: game.status,
+      tags: game.tags,
+    } as Pick<Game, 'notes' | 'status' | 'tags'>);
   }
 
   return (
@@ -213,6 +222,15 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
 
                     <ChipGroup label="Genres" values={game.genres} accent="mint" />
                     <ChipGroup label="RAWG tags" values={game.rawgTags} />
+                    {canApplyRawgCover ? (
+                      <button
+                        className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+                        onClick={useRawgImageAsCover}
+                        type="button"
+                      >
+                        Use RAWG image as cover
+                      </button>
+                    ) : null}
                   </div>
                 ) : (
                   <EmptyState text="No RAWG metadata is attached to this game yet." />
