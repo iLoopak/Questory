@@ -11,6 +11,12 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/steam/, ''),
       },
+      '/api/steam-store': {
+        target: 'https://store.steampowered.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/steam-store/, ''),
+      },
     },
   },
 });

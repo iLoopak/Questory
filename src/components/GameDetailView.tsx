@@ -190,6 +190,11 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
                     <ReadOnlyField label="Expected playtime" value={formatHours(game.expectedPlaytime)} />
                     <ReadOnlyField label="Price target" value={game.priceTarget || 'n/a'} />
                     <ReadOnlyField label="Release date" value={game.releaseDate || 'n/a'} />
+                    <ReadOnlyField label="Steam price" value={game.steamPriceInfo || 'n/a'} />
+                    <ReadOnlyField label="Steam discount" value={game.steamDiscountInfo || 'n/a'} />
+                    <ReadOnlyField label="Steam reviews" value={game.steamReviewInfo || 'n/a'} />
+                    <ReadOnlyField label="Wishlist imported" value={formatDateTime(game.wishlistImportedAt)} />
+                    <ReadOnlyField label="Wishlist synced" value={formatDateTime(game.wishlistSyncedAt)} />
                     <ReadOnlyLink label="Store URL" value={game.storeUrl} />
                   </div>
                 </DetailSection>

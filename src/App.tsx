@@ -8,6 +8,7 @@ import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
+import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
   addIgnoredSteamGame,
   loadIgnoredSteamGames,
@@ -15,9 +16,11 @@ import {
   saveIgnoredSteamGames,
   type IgnoredSteamGame,
 } from './lib/steamIgnoredGamesStorage';
+import { getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamWishlistError } from './services/steamApi';
 import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from './types/game';
 import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
+import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
 const navItems = ['Library', 'Wishlist', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
@@ -81,6 +84,12 @@ type BulkActionSummary = {
   wishlistedCount?: number;
 };
 
+const initialSteamWishlistSyncState: SteamWishlistSyncState = {
+  status: 'idle',
+  message: 'Steam wishlist sync runs only when you start it.',
+  summary: null,
+};
+
 function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
@@ -95,6 +104,9 @@ function App() {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [metadataSelectionRequest, setMetadataSelectionRequest] = useState<MetadataSelectionRequest | null>(null);
+  const [steamWishlistSyncState, setSteamWishlistSyncState] = useState<SteamWishlistSyncState>(
+    initialSteamWishlistSyncState,
+  );
 
   useEffect(() => {
     saveGames(games);
@@ -192,6 +204,98 @@ function App() {
     });
   }
 
+  async function syncSteamWishlist() {
+    setSteamWishlistSyncState((currentState) => ({
+      status: 'loading',
+      message: 'Syncing Steam wishlist...',
+      summary: currentState.summary,
+    }));
+
+    try {
+      const settings = loadSteamSettings();
+      const wishlistItems = await getSteamWishlist({ steamId64: settings.steamId64 });
+      const summary = importSteamWishlistItems(wishlistItems);
+
+      setSteamWishlistSyncState({
+        status: 'success',
+        message: `Steam wishlist sync complete. Added ${summary.addedCount}, updated ${summary.updatedCount}, skipped ${summary.skippedAlreadyInLibraryCount + summary.skippedIgnoredCount}.`,
+        summary,
+      });
+    } catch (error) {
+      const message =
+        error instanceof SteamWishlistError
+          ? error.message
+          : 'Steam wishlist sync failed. Check profile privacy, SteamID64, and the dev proxy.';
+
+      setSteamWishlistSyncState((currentState) => ({
+        status: 'error',
+        message,
+        summary: currentState.summary,
+      }));
+    }
+  }
+
+  function importSteamWishlistItems(wishlistItems: SteamWishlistItem[]): SteamWishlistSyncSummary {
+    const syncedAt = new Date().toISOString();
+    const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
+    const nextGames = [...games];
+    const librarySteamAppIds = new Set(
+      games
+        .filter((game) => game.collectionType === 'library')
+        .map((game) => game.steamAppId)
+        .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+    );
+    const wishlistIndexBySteamAppId = new Map<number, number>();
+    const summary: SteamWishlistSyncSummary = {
+      addedCount: 0,
+      failedCount: 0,
+      fetchedCount: wishlistItems.length,
+      skippedAlreadyInLibraryCount: 0,
+      skippedIgnoredCount: 0,
+      updatedCount: 0,
+    };
+
+    games.forEach((game, index) => {
+      if (game.collectionType === 'wishlist' && typeof game.steamAppId === 'number') {
+        wishlistIndexBySteamAppId.set(game.steamAppId, index);
+      }
+    });
+
+    wishlistItems.forEach((item) => {
+      if (!item.appid || !item.name) {
+        summary.failedCount += 1;
+        return;
+      }
+
+      if (ignoredSteamAppIds.has(item.appid)) {
+        summary.skippedIgnoredCount += 1;
+        return;
+      }
+
+      if (librarySteamAppIds.has(item.appid)) {
+        summary.skippedAlreadyInLibraryCount += 1;
+        return;
+      }
+
+      const existingWishlistIndex = wishlistIndexBySteamAppId.get(item.appid);
+      const mappedGame = mapSteamWishlistItemToLocalGame(item, syncedAt);
+
+      if (typeof existingWishlistIndex === 'number') {
+        const existingGame = nextGames[existingWishlistIndex];
+        nextGames[existingWishlistIndex] = mergeSteamWishlistSync(existingGame, mappedGame, syncedAt);
+        summary.updatedCount += 1;
+        return;
+      }
+
+      nextGames.push(mappedGame);
+      wishlistIndexBySteamAppId.set(item.appid, nextGames.length - 1);
+      summary.addedCount += 1;
+    });
+
+    setGames(nextGames);
+    return summary;
+  }
+
   function addManualGame(game: Game) {
     setGames((currentGames) => [...currentGames, game]);
   }
@@ -284,8 +388,7 @@ function App() {
               priority: undefined,
               expectedPlaytime: undefined,
               priceTarget: undefined,
-              releaseDate: undefined,
-              storeUrl: undefined,
+              status: 'Want to play',
             }
           : currentGame,
       ),
@@ -502,6 +605,7 @@ function App() {
               filters={wishlistFilters}
               games={filteredWishlistGames}
               platformOptions={platformOptions}
+              steamWishlistSyncState={steamWishlistSyncState}
               tags={tags}
               totalCount={wishlistGames.length}
               onAddGame={() => setIsAddGameOpen(true)}
@@ -519,6 +623,7 @@ function App() {
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}
               onStatusChange={updateGameStatus}
+              onSyncSteamWishlist={syncSteamWishlist}
             />
           ) : activeNavItem === 'Metadata' ? (
             <MetadataEnrichmentPanel
@@ -586,6 +691,7 @@ type CollectionPanelProps = {
   filters: CollectionFilters;
   games: Game[];
   platformOptions: GamePlatform[];
+  steamWishlistSyncState?: SteamWishlistSyncState;
   tags: string[];
   totalCount: number;
   onAddGame: () => void;
@@ -603,6 +709,7 @@ type CollectionPanelProps = {
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
+  onSyncSteamWishlist?: () => void;
 };
 
 function CollectionPanel({
@@ -610,6 +717,7 @@ function CollectionPanel({
   filters,
   games,
   platformOptions,
+  steamWishlistSyncState,
   tags,
   totalCount,
   onAddGame,
@@ -627,6 +735,7 @@ function CollectionPanel({
   onRemove,
   onRemoveAndIgnore,
   onStatusChange,
+  onSyncSteamWishlist,
 }: CollectionPanelProps) {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
@@ -788,6 +897,16 @@ function CollectionPanel({
           >
             Add game
           </button>
+          {collectionType === 'wishlist' && onSyncSteamWishlist ? (
+            <button
+              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
+              disabled={steamWishlistSyncState?.status === 'loading'}
+              onClick={onSyncSteamWishlist}
+              type="button"
+            >
+              {steamWishlistSyncState?.status === 'loading' ? 'Syncing...' : 'Sync Steam Wishlist'}
+            </button>
+          ) : null}
           <button
             className={`h-10 rounded-md border px-3 text-sm font-semibold transition ${
               isMultiSelectMode
@@ -804,6 +923,10 @@ function CollectionPanel({
           </div>
         </div>
       </div>
+
+      {collectionType === 'wishlist' && steamWishlistSyncState ? (
+        <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
+      ) : null}
 
       <div className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(6,minmax(8.5rem,1fr))]">
@@ -984,6 +1107,40 @@ function CollectionPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function SteamWishlistSyncNotice({ syncState }: { syncState: SteamWishlistSyncState }) {
+  const statusStyles = {
+    idle: 'border-skyglass/15 bg-ink-950/70 text-slate-400',
+    loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
+    success: 'border-mint/40 bg-mint/10 text-mint',
+    error: 'border-red-400/40 bg-red-500/10 text-red-200',
+  }[syncState.status];
+
+  return (
+    <div className={`mb-4 rounded-lg border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
+      <div>{syncState.message}</div>
+      {syncState.summary ? (
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-6">
+          <SyncStat label="Fetched" value={syncState.summary.fetchedCount} />
+          <SyncStat label="Added" value={syncState.summary.addedCount} />
+          <SyncStat label="Updated" value={syncState.summary.updatedCount} />
+          <SyncStat label="In library" value={syncState.summary.skippedAlreadyInLibraryCount} />
+          <SyncStat label="Ignored" value={syncState.summary.skippedIgnoredCount} />
+          <SyncStat label="Failed" value={syncState.summary.failedCount} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SyncStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-black/20 px-2 py-2">
+      <div className="text-base font-semibold text-white">{value}</div>
+      <div className="mt-0.5 uppercase tracking-[0.14em] text-slate-500">{label}</div>
+    </div>
   );
 }
 
@@ -1449,13 +1606,32 @@ function formatBulkSummary(summary: BulkActionSummary) {
   return parts.length > 0 ? parts.join(' - ') : 'Bulk action complete';
 }
 
+function mergeSteamWishlistSync(existingGame: Game, syncedGame: Game, syncedAt: string): Game {
+  return {
+    ...existingGame,
+    title: existingGame.title || syncedGame.title,
+    platform: existingGame.platform || syncedGame.platform,
+    coverImage: existingGame.coverImage || syncedGame.coverImage,
+    steamAppId: existingGame.steamAppId ?? syncedGame.steamAppId,
+    externalSource: existingGame.externalSource ?? syncedGame.externalSource,
+    externalUrl: syncedGame.externalUrl,
+    storeUrl: syncedGame.storeUrl,
+    releaseDate: syncedGame.releaseDate ?? existingGame.releaseDate,
+    steamPriceInfo: syncedGame.steamPriceInfo,
+    steamDiscountInfo: syncedGame.steamDiscountInfo,
+    steamReviewInfo: syncedGame.steamReviewInfo,
+    wishlistImportedAt: existingGame.wishlistImportedAt ?? syncedAt,
+    wishlistSyncedAt: syncedAt,
+  };
+}
+
 function matchesSourceFilter(game: Game, source: SourceFilter) {
   if (source === 'All') {
     return true;
   }
 
   if (source === 'Steam') {
-    return game.externalSource === 'steam' || typeof game.steamAppId === 'number';
+    return game.externalSource === 'steam' || game.externalSource === 'steam-wishlist' || typeof game.steamAppId === 'number';
   }
 
   if (source === 'Manual') {

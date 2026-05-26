@@ -20,7 +20,7 @@ export type Game = {
   notes: string;
   collectionType: GameCollectionType;
   steamAppId?: number;
-  externalSource?: 'manual' | 'steam';
+  externalSource?: 'manual' | 'steam' | 'steam-wishlist';
   externalUrl?: string;
   importedAt?: string;
   priority?: WishlistPriority;
@@ -28,6 +28,11 @@ export type Game = {
   priceTarget?: string;
   releaseDate?: string;
   storeUrl?: string;
+  steamPriceInfo?: string;
+  steamDiscountInfo?: string;
+  steamReviewInfo?: string;
+  wishlistImportedAt?: string;
+  wishlistSyncedAt?: string;
   rawgId?: number;
   genres?: string[];
   rawgTags?: string[];

@@ -21,6 +21,18 @@ export type SteamRecentlyPlayedGame = SteamOwnedGame & {
   playtime_2weeks?: number;
 };
 
+export type SteamWishlistItem = {
+  appid: number;
+  name: string;
+  capsule?: string;
+  reviewScore?: number | null;
+  reviewSummary?: string;
+  releaseDate?: string;
+  storeUrl: string;
+  priceInfo?: string;
+  discountInfo?: string;
+};
+
 export type SteamDebugResult = {
   ownedGames: SteamOwnedGame[];
   recentlyPlayedGames: SteamRecentlyPlayedGame[];
@@ -42,3 +54,18 @@ export type SteamConnectionState =
   | { status: 'loading'; message: string; data: SteamDebugResult | null }
   | { status: 'success'; message: string; data: SteamDebugResult }
   | { status: 'error'; message: string; data: SteamDebugResult | null };
+
+export type SteamWishlistSyncSummary = {
+  addedCount: number;
+  failedCount: number;
+  fetchedCount: number;
+  skippedAlreadyInLibraryCount: number;
+  skippedIgnoredCount: number;
+  updatedCount: number;
+};
+
+export type SteamWishlistSyncState =
+  | { status: 'idle'; message: string; summary: SteamWishlistSyncSummary | null }
+  | { status: 'loading'; message: string; summary: SteamWishlistSyncSummary | null }
+  | { status: 'success'; message: string; summary: SteamWishlistSyncSummary }
+  | { status: 'error'; message: string; summary: SteamWishlistSyncSummary | null };
