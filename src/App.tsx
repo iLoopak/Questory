@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Dispatch, FormEvent, SetStateAction } from 'react';
+import type { FormEvent } from 'react';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
@@ -24,10 +24,33 @@ type NavItem = (typeof navItems)[number];
 
 const allOption = 'All';
 const questShelfIcon = '/icons/questshelf-icon.svg';
+const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
+const wishlistFiltersStorageKey = 'questshelf.wishlistFilters.v1';
+const sourceFilterOptions = ['All', 'Steam', 'Manual', 'Wishlist', 'Retro / future-ready'] as const;
+const enrichmentFilterOptions = ['All', 'RAWG enriched', 'Missing metadata', 'Manual metadata'] as const;
+const librarySortOptions = [
+  'Title A-Z',
+  'Recently played',
+  'Most playtime',
+  'Least playtime',
+  'Recently imported',
+  'Metadata missing first',
+  'Status',
+] as const;
+const quickFilterOptions = ['Playing', 'Paused', 'Backlog / Want to play', 'Missing metadata', 'Played > 0h'] as const;
+
+type SourceFilter = (typeof sourceFilterOptions)[number];
+type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
+type LibrarySortOption = (typeof librarySortOptions)[number];
+type QuickFilter = (typeof quickFilterOptions)[number];
 
 type CollectionFilters = {
+  enrichment: EnrichmentFilter;
   platform: GamePlatform | typeof allOption;
+  quickFilters: QuickFilter[];
   searchTerm: string;
+  sortBy: LibrarySortOption;
+  source: SourceFilter;
   status: GameStatus | typeof allOption;
   tag: string;
 };
@@ -35,8 +58,12 @@ type CollectionFilters = {
 type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'coverImage'>>;
 
 const initialCollectionFilters: CollectionFilters = {
+  enrichment: allOption,
   platform: allOption,
+  quickFilters: [],
   searchTerm: '',
+  sortBy: 'Title A-Z',
+  source: allOption,
   status: allOption,
   tag: allOption,
 };
@@ -58,8 +85,12 @@ function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [isAppReady, setIsAppReady] = useState(false);
-  const [libraryFilters, setLibraryFilters] = useState<CollectionFilters>(initialCollectionFilters);
-  const [wishlistFilters, setWishlistFilters] = useState<CollectionFilters>(initialCollectionFilters);
+  const [libraryFilters, setLibraryFilters] = useState<CollectionFilters>(() =>
+    loadCollectionFilters(libraryFiltersStorageKey),
+  );
+  const [wishlistFilters, setWishlistFilters] = useState<CollectionFilters>(() =>
+    loadCollectionFilters(wishlistFiltersStorageKey),
+  );
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
@@ -72,6 +103,14 @@ function App() {
   useEffect(() => {
     saveIgnoredSteamGames(ignoredSteamGames);
   }, [ignoredSteamGames]);
+
+  useEffect(() => {
+    saveCollectionFilters(libraryFiltersStorageKey, libraryFilters);
+  }, [libraryFilters]);
+
+  useEffect(() => {
+    saveCollectionFilters(wishlistFiltersStorageKey, wishlistFilters);
+  }, [wishlistFilters]);
 
   useEffect(() => {
     const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
@@ -422,59 +461,9 @@ function App() {
               <Stat label="Hours" value={totalHours.toString()} />
             </div>
 
-            {activeNavItem === 'Library' || activeNavItem === 'Wishlist' ? (
-              <div className="mt-5 space-y-4">
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                    value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).searchTerm}
-                    onChange={(event) =>
-                      updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, {
-                        searchTerm: event.target.value,
-                      })
-                    }
-                    placeholder="Find by title"
-                    type="search"
-                  />
-                </label>
-
-                <FilterSelect
-                  label="Platform"
-                  value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).platform}
-                  options={[allOption, ...platformOptions]}
-                  onChange={(value) =>
-                    updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, {
-                      platform: value as GamePlatform | typeof allOption,
-                    })
-                  }
-                />
-
-                <FilterSelect
-                  label="Status"
-                  value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).status}
-                  options={[allOption, ...gameStatuses]}
-                  onChange={(value) =>
-                    updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, {
-                      status: value as GameStatus | typeof allOption,
-                    })
-                  }
-                />
-
-                <FilterSelect
-                  label="Tag"
-                  value={getActiveFilters(activeNavItem, libraryFilters, wishlistFilters).tag}
-                  options={[allOption, ...tags]}
-                  onChange={(value) =>
-                    updateActiveFilters(activeNavItem, setLibraryFilters, setWishlistFilters, { tag: value })
-                  }
-                />
-              </div>
-            ) : (
-              <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
-                {getNavDescription(activeNavItem)}
-              </div>
-            )}
+            <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
+              {getNavDescription(activeNavItem)}
+            </div>
           </aside>
 
           {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
@@ -486,7 +475,11 @@ function App() {
           ) : activeNavItem === 'Library' ? (
             <CollectionPanel
               collectionType="library"
+              filters={libraryFilters}
               games={filteredLibraryGames}
+              platformOptions={platformOptions}
+              tags={tags}
+              totalCount={libraryGames.length}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
@@ -494,6 +487,8 @@ function App() {
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
+              onClearFilters={() => setLibraryFilters(initialCollectionFilters)}
+              onFiltersChange={(changes) => setLibraryFilters((currentFilters) => ({ ...currentFilters, ...changes }))}
               onFindMetadata={(game) => startMetadataWorkflow([game.id])}
               onMoveToLibrary={moveToLibrary}
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
@@ -504,7 +499,11 @@ function App() {
           ) : activeNavItem === 'Wishlist' ? (
             <CollectionPanel
               collectionType="wishlist"
+              filters={wishlistFilters}
               games={filteredWishlistGames}
+              platformOptions={platformOptions}
+              tags={tags}
+              totalCount={wishlistGames.length}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
@@ -512,6 +511,8 @@ function App() {
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
+              onClearFilters={() => setWishlistFilters(initialCollectionFilters)}
+              onFiltersChange={(changes) => setWishlistFilters((currentFilters) => ({ ...currentFilters, ...changes }))}
               onFindMetadata={(game) => startMetadataWorkflow([game.id])}
               onMoveToLibrary={moveToLibrary}
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
@@ -582,7 +583,11 @@ type AddGameDialogProps = {
 
 type CollectionPanelProps = {
   collectionType: GameCollectionType;
+  filters: CollectionFilters;
   games: Game[];
+  platformOptions: GamePlatform[];
+  tags: string[];
+  totalCount: number;
   onAddGame: () => void;
   onAddToWishlist: (game: Game) => void;
   onAddManyToWishlist: (games: Game[]) => void;
@@ -590,6 +595,8 @@ type CollectionPanelProps = {
   onBulkRemove: (gameIds: string[]) => void;
   onBulkRemoveAndIgnore: (games: Game[]) => void;
   onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
+  onClearFilters: () => void;
+  onFiltersChange: (changes: Partial<CollectionFilters>) => void;
   onFindMetadata: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
@@ -600,7 +607,11 @@ type CollectionPanelProps = {
 
 function CollectionPanel({
   collectionType,
+  filters,
   games,
+  platformOptions,
+  tags,
+  totalCount,
   onAddGame,
   onAddToWishlist,
   onAddManyToWishlist,
@@ -608,6 +619,8 @@ function CollectionPanel({
   onBulkRemove,
   onBulkRemoveAndIgnore,
   onBulkStatusChange,
+  onClearFilters,
+  onFiltersChange,
   onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
@@ -627,6 +640,7 @@ function CollectionPanel({
   const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
+  const hasActiveFilters = isCollectionFiltered(filters);
 
   useEffect(() => {
     setSelectedGameIds((currentSelection) => {
@@ -688,6 +702,14 @@ function CollectionPanel({
 
   function selectAllVisible() {
     setSelectedGameIds(new Set(games.map((game) => game.id)));
+  }
+
+  function toggleQuickFilter(quickFilter: QuickFilter) {
+    const nextQuickFilters = filters.quickFilters.includes(quickFilter)
+      ? filters.quickFilters.filter((currentFilter) => currentFilter !== quickFilter)
+      : [...filters.quickFilters, quickFilter];
+
+    onFiltersChange({ quickFilters: nextQuickFilters });
   }
 
   function removeSelectedGames() {
@@ -755,7 +777,7 @@ function CollectionPanel({
         <div>
           <h2 className="text-xl font-semibold text-white">{title}</h2>
           <p className="mt-1 text-sm text-slate-400">
-            {games.length} items match the current view{isMultiSelectMode ? ` - ${selectedCount} selected` : ''}
+            {games.length} of {totalCount} games shown{isMultiSelectMode ? ` - ${selectedCount} selected` : ''}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -779,6 +801,100 @@ function CollectionPanel({
           </button>
           <div className="rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
             {collectionType === 'wishlist' ? 'Not owned by default' : 'Local storage enabled'}
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(6,minmax(8.5rem,1fr))]">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
+            <input
+              className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
+              onChange={(event) => onFiltersChange({ searchTerm: event.target.value })}
+              placeholder="Find by title"
+              type="search"
+              value={filters.searchTerm}
+            />
+          </label>
+
+          <FilterSelect
+            label="Platform"
+            value={filters.platform}
+            options={[allOption, ...platformOptions]}
+            onChange={(value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption })}
+          />
+
+          <FilterSelect
+            label="Status"
+            value={filters.status}
+            options={[allOption, ...gameStatuses]}
+            onChange={(value) => onFiltersChange({ status: value as GameStatus | typeof allOption })}
+          />
+
+          <FilterSelect
+            label="Source"
+            value={filters.source}
+            options={[...sourceFilterOptions]}
+            onChange={(value) => onFiltersChange({ source: value as SourceFilter })}
+          />
+
+          <FilterSelect
+            label="Enrichment"
+            value={filters.enrichment}
+            options={[...enrichmentFilterOptions]}
+            onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
+          />
+
+          <FilterSelect
+            label="Tag"
+            value={filters.tag}
+            options={[allOption, ...tags]}
+            onChange={(value) => onFiltersChange({ tag: value })}
+          />
+
+          <FilterSelect
+            label="Sort"
+            value={filters.sortBy}
+            options={[...librarySortOptions]}
+            onChange={(value) => onFiltersChange({ sortBy: value as LibrarySortOption })}
+          />
+        </div>
+
+        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {quickFilterOptions.map((quickFilter) => {
+              const isActive = filters.quickFilters.includes(quickFilter);
+
+              return (
+                <button
+                  key={quickFilter}
+                  className={`h-8 rounded-full border px-3 text-xs font-semibold transition ${
+                    isActive
+                      ? 'border-mint/40 bg-mint/15 text-mint shadow-glow'
+                      : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
+                  }`}
+                  onClick={() => toggleQuickFilter(quickFilter)}
+                  type="button"
+                >
+                  {quickFilter}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-slate-400">
+              {hasActiveFilters ? `${games.length} matches with active filters` : 'No filters active'}
+            </div>
+            <button
+              className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600"
+              disabled={!hasActiveFilters}
+              onClick={onClearFilters}
+              type="button"
+            >
+              Clear filters
+            </button>
           </div>
         </div>
       </div>
@@ -1298,14 +1414,27 @@ function parseTagInput(value: string) {
 function filterGames(games: Game[], filters: CollectionFilters) {
   const normalizedSearch = filters.searchTerm.trim().toLowerCase();
 
-  return games.filter((game) => {
-    const matchesTitle = game.title.toLowerCase().includes(normalizedSearch);
-    const matchesPlatform = filters.platform === allOption || game.platform === filters.platform;
-    const matchesStatus = filters.status === allOption || game.status === filters.status;
-    const matchesTag = filters.tag === allOption || game.tags.includes(filters.tag);
+  return games
+    .filter((game) => {
+      const matchesTitle = game.title.toLowerCase().includes(normalizedSearch);
+      const matchesPlatform = filters.platform === allOption || game.platform === filters.platform;
+      const matchesStatus = filters.status === allOption || game.status === filters.status;
+      const matchesTag = filters.tag === allOption || game.tags.includes(filters.tag);
+      const matchesSource = matchesSourceFilter(game, filters.source);
+      const matchesEnrichment = matchesEnrichmentFilter(game, filters.enrichment);
+      const matchesQuickFilters = filters.quickFilters.every((quickFilter) => matchesQuickFilter(game, quickFilter));
 
-    return matchesTitle && matchesPlatform && matchesStatus && matchesTag;
-  });
+      return (
+        matchesTitle &&
+        matchesPlatform &&
+        matchesStatus &&
+        matchesTag &&
+        matchesSource &&
+        matchesEnrichment &&
+        matchesQuickFilters
+      );
+    })
+    .sort((firstGame, secondGame) => compareGames(firstGame, secondGame, filters.sortBy));
 }
 
 function formatBulkSummary(summary: BulkActionSummary) {
@@ -1320,21 +1449,185 @@ function formatBulkSummary(summary: BulkActionSummary) {
   return parts.length > 0 ? parts.join(' - ') : 'Bulk action complete';
 }
 
-function getActiveFilters(activeNavItem: NavItem, libraryFilters: CollectionFilters, wishlistFilters: CollectionFilters) {
-  return activeNavItem === 'Wishlist' ? wishlistFilters : libraryFilters;
+function matchesSourceFilter(game: Game, source: SourceFilter) {
+  if (source === 'All') {
+    return true;
+  }
+
+  if (source === 'Steam') {
+    return game.externalSource === 'steam' || typeof game.steamAppId === 'number';
+  }
+
+  if (source === 'Manual') {
+    return game.externalSource === 'manual';
+  }
+
+  if (source === 'Wishlist') {
+    return game.collectionType === 'wishlist';
+  }
+
+  return isRetroOrFutureReady(game);
 }
 
-function updateActiveFilters(
-  activeNavItem: NavItem,
-  setLibraryFilters: Dispatch<SetStateAction<CollectionFilters>>,
-  setWishlistFilters: Dispatch<SetStateAction<CollectionFilters>>,
-  changes: Partial<CollectionFilters>,
-) {
-  const setFilters = activeNavItem === 'Wishlist' ? setWishlistFilters : setLibraryFilters;
-  setFilters((currentFilters) => ({
-    ...currentFilters,
-    ...changes,
-  }));
+function matchesEnrichmentFilter(game: Game, enrichment: EnrichmentFilter) {
+  if (enrichment === 'All') {
+    return true;
+  }
+
+  if (enrichment === 'RAWG enriched') {
+    return game.metadataSource === 'rawg';
+  }
+
+  if (enrichment === 'Manual metadata') {
+    return Boolean(game.metadataManualManagedAt);
+  }
+
+  return isMissingRawgMetadata(game);
+}
+
+function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
+  if (quickFilter === 'Playing') {
+    return game.status === 'Playing';
+  }
+
+  if (quickFilter === 'Paused') {
+    return game.status === 'Paused';
+  }
+
+  if (quickFilter === 'Backlog / Want to play') {
+    return game.status === 'Want to play';
+  }
+
+  if (quickFilter === 'Missing metadata') {
+    return isMissingRawgMetadata(game);
+  }
+
+  return game.playtimeHours > 0;
+}
+
+function compareGames(firstGame: Game, secondGame: Game, sortBy: LibrarySortOption) {
+  if (sortBy === 'Recently played') {
+    return compareDateDesc(firstGame.lastPlayedAt, secondGame.lastPlayedAt) || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Most playtime') {
+    return secondGame.playtimeHours - firstGame.playtimeHours || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Least playtime') {
+    return firstGame.playtimeHours - secondGame.playtimeHours || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Recently imported') {
+    return compareDateDesc(firstGame.importedAt, secondGame.importedAt) || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Metadata missing first') {
+    return Number(isMissingRawgMetadata(secondGame)) - Number(isMissingRawgMetadata(firstGame)) || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Status') {
+    return (
+      gameStatuses.indexOf(firstGame.status) - gameStatuses.indexOf(secondGame.status) ||
+      compareTitle(firstGame, secondGame)
+    );
+  }
+
+  return compareTitle(firstGame, secondGame);
+}
+
+function compareTitle(firstGame: Game, secondGame: Game) {
+  return firstGame.title.localeCompare(secondGame.title, undefined, { sensitivity: 'base' });
+}
+
+function compareDateDesc(firstDate: string | null | undefined, secondDate: string | null | undefined) {
+  return getDateTime(secondDate) - getDateTime(firstDate);
+}
+
+function getDateTime(value: string | null | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function isMissingRawgMetadata(game: Game) {
+  return game.metadataSource !== 'rawg' && !game.metadataManualManagedAt;
+}
+
+function isRetroOrFutureReady(game: Game) {
+  const retroPlatforms = new Set(['PSP', 'PS2', 'GBA', 'SNES', 'Other']);
+  const planningTags = new Set(['retro', 'emulated', 'emulation', 'physical', 'future', 'future-ready']);
+
+  return retroPlatforms.has(game.platform) || game.tags.some((tag) => planningTags.has(tag.toLowerCase()));
+}
+
+function isCollectionFiltered(filters: CollectionFilters) {
+  return (
+    filters.enrichment !== allOption ||
+    filters.platform !== allOption ||
+    filters.quickFilters.length > 0 ||
+    filters.searchTerm.trim().length > 0 ||
+    filters.source !== allOption ||
+    filters.status !== allOption ||
+    filters.tag !== allOption ||
+    filters.sortBy !== initialCollectionFilters.sortBy
+  );
+}
+
+function loadCollectionFilters(storageKey: string): CollectionFilters {
+  if (typeof window === 'undefined') {
+    return initialCollectionFilters;
+  }
+
+  try {
+    const storedFilters = window.localStorage.getItem(storageKey);
+
+    if (!storedFilters) {
+      return initialCollectionFilters;
+    }
+
+    return normalizeCollectionFilters(JSON.parse(storedFilters));
+  } catch {
+    return initialCollectionFilters;
+  }
+}
+
+function saveCollectionFilters(storageKey: string, filters: CollectionFilters) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(filters));
+  } catch {
+    // Filter persistence is nice to have; the library itself still works without it.
+  }
+}
+
+function normalizeCollectionFilters(value: unknown): CollectionFilters {
+  if (!value || typeof value !== 'object') {
+    return initialCollectionFilters;
+  }
+
+  const filters = value as Partial<CollectionFilters>;
+
+  return {
+    enrichment: isOption(filters.enrichment, enrichmentFilterOptions) ? filters.enrichment : allOption,
+    platform: typeof filters.platform === 'string' ? filters.platform : allOption,
+    quickFilters: Array.isArray(filters.quickFilters)
+      ? filters.quickFilters.filter((quickFilter): quickFilter is QuickFilter =>
+          isOption(quickFilter, quickFilterOptions),
+        )
+      : [],
+    searchTerm: typeof filters.searchTerm === 'string' ? filters.searchTerm : '',
+    sortBy: isOption(filters.sortBy, librarySortOptions) ? filters.sortBy : 'Title A-Z',
+    source: isOption(filters.source, sourceFilterOptions) ? filters.source : allOption,
+    status: isOption(filters.status, [allOption, ...gameStatuses] as const) ? filters.status : allOption,
+    tag: typeof filters.tag === 'string' ? filters.tag : allOption,
+  };
+}
+
+function isOption<T extends string>(value: unknown, options: readonly T[]): value is T {
+  return typeof value === 'string' && options.includes(value as T);
 }
 
 function createManualGameId(title: string, existingGameIds: Set<string>) {
