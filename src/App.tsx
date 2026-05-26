@@ -23,6 +23,7 @@ const navItems = ['Library', 'Wishlist', 'Metadata', 'Recommendation', 'Stats', 
 type NavItem = (typeof navItems)[number];
 
 const allOption = 'All';
+const questShelfIcon = '/icons/questshelf-icon.svg';
 
 type CollectionFilters = {
   platform: GamePlatform | typeof allOption;
@@ -31,11 +32,26 @@ type CollectionFilters = {
   tag: string;
 };
 
+type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'coverImage'>>;
+
 const initialCollectionFilters: CollectionFilters = {
   platform: allOption,
   searchTerm: '',
   status: allOption,
   tag: allOption,
+};
+
+type MetadataSelectionRequest = {
+  ids: string[];
+  requestId: number;
+};
+
+type BulkActionSummary = {
+  ignoredCount?: number;
+  removedCount?: number;
+  skippedCount?: number;
+  updatedCount?: number;
+  wishlistedCount?: number;
 };
 
 function App() {
@@ -47,6 +63,7 @@ function App() {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
+  const [metadataSelectionRequest, setMetadataSelectionRequest] = useState<MetadataSelectionRequest | null>(null);
 
   useEffect(() => {
     saveGames(games);
@@ -97,6 +114,23 @@ function App() {
               ...game,
               status,
               lastPlayedAt: status === 'Playing' ? new Date().toISOString().slice(0, 10) : game.lastPlayedAt,
+            }
+          : game,
+      ),
+    );
+  }
+
+  function updateManyGameStatuses(gameIds: string[], status: GameStatus) {
+    const targetGameIds = new Set(gameIds);
+    const today = new Date().toISOString().slice(0, 10);
+
+    setGames((currentGames) =>
+      currentGames.map((game) =>
+        targetGameIds.has(game.id)
+          ? {
+              ...game,
+              status,
+              lastPlayedAt: status === 'Playing' && game.status !== 'Playing' ? today : game.lastPlayedAt,
             }
           : game,
       ),
@@ -159,6 +193,48 @@ function App() {
     });
   }
 
+  function addManyToWishlist(targetGames: Game[]) {
+    setGames((currentGames) => {
+      const existingGameIds = new Set(currentGames.map((game) => game.id));
+      const nextGames = [...currentGames];
+      let addedCount = 0;
+
+      targetGames.forEach((game) => {
+        const alreadyWishlisted = nextGames.some((currentGame) => {
+          if (currentGame.collectionType !== 'wishlist') {
+            return false;
+          }
+
+          if (typeof game.steamAppId === 'number') {
+            return currentGame.steamAppId === game.steamAppId;
+          }
+
+          return currentGame.title.toLowerCase() === game.title.toLowerCase() && currentGame.platform === game.platform;
+        });
+
+        if (alreadyWishlisted) {
+          return;
+        }
+
+        const wishlistId = createCollectionCopyId(game, 'wishlist', existingGameIds);
+        existingGameIds.add(wishlistId);
+        addedCount += 1;
+        nextGames.push({
+          ...game,
+          id: wishlistId,
+          collectionType: 'wishlist',
+          status: 'Want to play',
+          playtimeHours: 0,
+          lastPlayedAt: null,
+          priority: game.priority ?? 'medium',
+          importedAt: new Date().toISOString(),
+        });
+      });
+
+      return addedCount > 0 ? nextGames : currentGames;
+    });
+  }
+
   function moveToLibrary(game: Game) {
     setGames((currentGames) =>
       currentGames.map((currentGame) =>
@@ -191,6 +267,39 @@ function App() {
       addIgnoredSteamGame(currentIgnoredGames, game.steamAppId as number, game.title),
     );
     removeGame(game.id);
+  }
+
+  function removeManyGames(gameIds: string[]) {
+    const targetGameIds = new Set(gameIds);
+    setGames((currentGames) => currentGames.filter((game) => !targetGameIds.has(game.id)));
+    setSelectedGameId((currentSelectedGameId) =>
+      currentSelectedGameId && targetGameIds.has(currentSelectedGameId) ? null : currentSelectedGameId,
+    );
+  }
+
+  function removeAndIgnoreManyGames(targetGames: Game[]) {
+    const targetGameIds = new Set(targetGames.map((game) => game.id));
+    const steamGames = targetGames.filter((game) => typeof game.steamAppId === 'number');
+
+    setIgnoredSteamGames((currentIgnoredGames) =>
+      steamGames.reduce(
+        (nextIgnoredGames, game) => addIgnoredSteamGame(nextIgnoredGames, game.steamAppId as number, game.title),
+        currentIgnoredGames,
+      ),
+    );
+    setGames((currentGames) => currentGames.filter((game) => !targetGameIds.has(game.id)));
+    setSelectedGameId((currentSelectedGameId) =>
+      currentSelectedGameId && targetGameIds.has(currentSelectedGameId) ? null : currentSelectedGameId,
+    );
+  }
+
+  function startMetadataWorkflow(gameIds: string[]) {
+    setMetadataSelectionRequest({
+      ids: gameIds,
+      requestId: Date.now(),
+    });
+    setSelectedGameId(null);
+    setActiveNavItem('Metadata');
   }
 
   function unignoreSteamGame(steamAppId: number) {
@@ -241,7 +350,7 @@ function App() {
     );
   }
 
-  function updateGameTracking(gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'>) {
+  function updateGameTracking(gameId: string, tracking: GameTrackingUpdate) {
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
@@ -265,20 +374,26 @@ function App() {
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-5 lg:px-6">
-        <header className="flex flex-col gap-4 border-b border-white/10 pb-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-mint">QuestShelf</p>
-            <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">Local game library</h1>
+        <header className="qs-glass flex flex-col gap-4 rounded-lg border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-mint/30 bg-ink-950 shadow-glow">
+              <img className="qs-logo-glow h-full w-full object-cover" src={questShelfIcon} alt="" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
+              <h1 className="mt-1 truncate text-2xl font-semibold text-white sm:text-3xl">Gaming backlog shelf</h1>
+              <p className="mt-1 text-sm text-slate-400">Your personal gaming backlog shelf</p>
+            </div>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-ink-900 p-1">
+          <nav className="flex gap-2 overflow-x-auto rounded-lg border border-skyglass/15 bg-ink-950/70 p-1 shadow-inner">
             {navItems.map((item) => (
               <button
                 key={item}
                 className={`h-10 shrink-0 rounded-md px-3 text-sm font-medium transition ${
                   item === activeNavItem
-                    ? 'bg-white text-ink-950'
-                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    ? 'bg-mint text-ink-950 shadow-glow'
+                    : 'text-slate-300 hover:bg-mint/10 hover:text-white hover:shadow-glow'
                 }`}
                 onClick={() => {
                   setActiveNavItem(item);
@@ -299,7 +414,7 @@ function App() {
         </div>
 
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="rounded-lg border border-white/10 bg-ink-900 p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
+          <aside className="qs-glass rounded-lg border p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
             <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
               <Stat label="Library" value={libraryGames.length.toString()} />
               <Stat label="Wishlist" value={wishlistGames.length.toString()} />
@@ -356,7 +471,7 @@ function App() {
                 />
               </div>
             ) : (
-              <div className="mt-5 rounded-md border border-white/10 bg-ink-950 p-3 text-sm leading-6 text-slate-400">
+              <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
                 {getNavDescription(activeNavItem)}
               </div>
             )}
@@ -374,6 +489,12 @@ function App() {
               games={filteredLibraryGames}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
+              onAddManyToWishlist={addManyToWishlist}
+              onBulkEnrich={startMetadataWorkflow}
+              onBulkRemove={removeManyGames}
+              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
+              onBulkStatusChange={updateManyGameStatuses}
+              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
               onMoveToLibrary={moveToLibrary}
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
               onRemove={removeGame}
@@ -386,6 +507,12 @@ function App() {
               games={filteredWishlistGames}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
+              onAddManyToWishlist={addManyToWishlist}
+              onBulkEnrich={startMetadataWorkflow}
+              onBulkRemove={removeManyGames}
+              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
+              onBulkStatusChange={updateManyGameStatuses}
+              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
               onMoveToLibrary={moveToLibrary}
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
               onRemove={removeGame}
@@ -395,8 +522,10 @@ function App() {
           ) : activeNavItem === 'Metadata' ? (
             <MetadataEnrichmentPanel
               games={games}
+              initialSelectedGameIds={metadataSelectionRequest?.ids}
               onMetadataManagementChange={updateGameMetadataManagement}
               onMetadataUpdate={updateGameMetadata}
+              selectionRequestId={metadataSelectionRequest?.requestId}
             />
           ) : activeNavItem === 'Recommendation' ? (
             <RecommendationPanel
@@ -456,6 +585,12 @@ type CollectionPanelProps = {
   games: Game[];
   onAddGame: () => void;
   onAddToWishlist: (game: Game) => void;
+  onAddManyToWishlist: (games: Game[]) => void;
+  onBulkEnrich: (gameIds: string[]) => void;
+  onBulkRemove: (gameIds: string[]) => void;
+  onBulkRemoveAndIgnore: (games: Game[]) => void;
+  onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
+  onFindMetadata: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
   onRemove: (gameId: string) => void;
@@ -468,39 +603,242 @@ function CollectionPanel({
   games,
   onAddGame,
   onAddToWishlist,
+  onAddManyToWishlist,
+  onBulkEnrich,
+  onBulkRemove,
+  onBulkRemoveAndIgnore,
+  onBulkStatusChange,
+  onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
   onStatusChange,
 }: CollectionPanelProps) {
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
+  const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
   const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
   const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
   const emptyText =
     collectionType === 'wishlist'
       ? 'Add manual wishlist entries or save library games here for later.'
       : 'Adjust the search or filters to bring titles back into view.';
+  const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
+  const selectedCount = selectedGames.length;
+  const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
+
+  useEffect(() => {
+    setSelectedGameIds((currentSelection) => {
+      const visibleGameIds = new Set(games.map((game) => game.id));
+      const nextSelection = new Set(Array.from(currentSelection).filter((gameId) => visibleGameIds.has(gameId)));
+
+      return nextSelection.size === currentSelection.size ? currentSelection : nextSelection;
+    });
+  }, [games]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || !isMultiSelectMode) {
+        return;
+      }
+
+      if (selectedGameIds.size > 0) {
+        setSelectedGameIds(new Set());
+      } else {
+        setIsMultiSelectMode(false);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMultiSelectMode, selectedGameIds.size]);
+
+  function toggleMultiSelectMode() {
+    setIsMultiSelectMode((currentMode) => {
+      const nextMode = !currentMode;
+
+      if (!nextMode) {
+        setSelectedGameIds(new Set());
+      }
+
+      setBulkSummary(null);
+      return nextMode;
+    });
+  }
+
+  function toggleSelectedGame(gameId: string) {
+    setSelectedGameIds((currentSelection) => {
+      const nextSelection = new Set(currentSelection);
+
+      if (nextSelection.has(gameId)) {
+        nextSelection.delete(gameId);
+      } else {
+        nextSelection.add(gameId);
+      }
+
+      return nextSelection;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedGameIds(new Set());
+  }
+
+  function selectAllVisible() {
+    setSelectedGameIds(new Set(games.map((game) => game.id)));
+  }
+
+  function removeSelectedGames() {
+    if (selectedCount === 0 || !window.confirm(`Remove ${selectedCount} selected games from QuestShelf?`)) {
+      return;
+    }
+
+    onBulkRemove(selectedGames.map((game) => game.id));
+    setBulkSummary({ removedCount: selectedCount, skippedCount: 0 });
+    clearSelection();
+  }
+
+  function removeAndIgnoreSelectedGames() {
+    if (
+      selectedCount === 0 ||
+      !window.confirm(
+        `Remove ${selectedCount} selected games? ${selectedSteamCount} Steam games will also be ignored for future Steam imports.`,
+      )
+    ) {
+      return;
+    }
+
+    onBulkRemoveAndIgnore(selectedGames);
+    setBulkSummary({
+      ignoredCount: selectedSteamCount,
+      removedCount: selectedCount,
+      skippedCount: selectedCount - selectedSteamCount,
+    });
+    clearSelection();
+  }
+
+  function addSelectedToWishlist() {
+    if (selectedCount === 0) {
+      return;
+    }
+
+    onAddManyToWishlist(selectedGames);
+    setBulkSummary({ skippedCount: 0, wishlistedCount: selectedCount });
+    clearSelection();
+  }
+
+  function changeSelectedStatus(status: GameStatus) {
+    if (selectedCount === 0) {
+      return;
+    }
+
+    onBulkStatusChange(
+      selectedGames.map((game) => game.id),
+      status,
+    );
+    setBulkSummary({ updatedCount: selectedCount, skippedCount: 0 });
+  }
+
+  function enrichSelectedGames() {
+    if (selectedCount === 0) {
+      return;
+    }
+
+    onBulkEnrich(selectedGames.map((game) => game.id));
+  }
 
   return (
-    <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
+    <section className="qs-glass min-w-0 rounded-lg border p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{title}</h2>
-          <p className="mt-1 text-sm text-slate-400">{games.length} items match the current view</p>
+          <p className="mt-1 text-sm text-slate-400">
+            {games.length} items match the current view{isMultiSelectMode ? ` - ${selectedCount} selected` : ''}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
             onClick={onAddGame}
             type="button"
           >
             Add game
           </button>
-          <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+          <button
+            className={`h-10 rounded-md border px-3 text-sm font-semibold transition ${
+              isMultiSelectMode
+                ? 'border-mint/40 bg-mint/10 text-mint shadow-glow'
+                : 'border-skyglass/15 text-slate-200 hover:bg-mint/10 hover:text-white'
+            }`}
+            onClick={toggleMultiSelectMode}
+            type="button"
+          >
+            {isMultiSelectMode ? 'Exit select' : 'Select'}
+          </button>
+          <div className="rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
             {collectionType === 'wishlist' ? 'Not owned by default' : 'Local storage enabled'}
           </div>
         </div>
       </div>
+
+      {isMultiSelectMode ? (
+        <div className="mb-4 rounded-lg border border-mint/20 bg-ink-950/80 p-3 shadow-glow">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="text-sm font-semibold text-white">{selectedCount} selected</div>
+            <div className="flex flex-wrap gap-2">
+              <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={selectAllVisible} type="button">
+                Select all visible
+              </button>
+              <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={clearSelection} type="button">
+                Clear selection
+              </button>
+              <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500" disabled={selectedCount === 0} onClick={enrichSelectedGames} type="button">
+                Enrich selected
+              </button>
+              {collectionType === 'library' ? (
+                <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500" disabled={selectedCount === 0} onClick={addSelectedToWishlist} type="button">
+                  Add to Wishlist
+                </button>
+              ) : null}
+              <select
+                aria-label="Change selected status"
+                className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-3 text-sm text-slate-100 outline-none transition focus:border-mint disabled:cursor-not-allowed disabled:text-slate-500"
+                disabled={selectedCount === 0}
+                onChange={(event) => {
+                  if (event.target.value) {
+                    changeSelectedStatus(event.target.value as GameStatus);
+                    event.target.value = '';
+                  }
+                }}
+                value=""
+              >
+                <option value="">Change status</option>
+                {gameStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+              <button className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600" disabled={selectedCount === 0} onClick={removeSelectedGames} type="button">
+                Remove selected
+              </button>
+              {collectionType === 'library' ? (
+                <button className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600" disabled={selectedCount === 0} onClick={removeAndIgnoreSelectedGames} type="button">
+                  Remove + Ignore selected
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkSummary ? (
+        <div className="mb-4 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
+          {formatBulkSummary(bulkSummary)}
+        </div>
+      ) : null}
 
       {games.length > 0 ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
@@ -508,17 +846,21 @@ function CollectionPanel({
             <GameCard
               key={game.id}
               game={game}
+              isMultiSelectMode={isMultiSelectMode}
+              isSelected={selectedGameIds.has(game.id)}
               onAddToWishlist={onAddToWishlist}
+              onFindMetadata={onFindMetadata}
               onMoveToLibrary={onMoveToLibrary}
               onOpenDetails={() => onOpenDetails(game.id)}
               onRemove={onRemove}
               onRemoveAndIgnore={onRemoveAndIgnore}
               onStatusChange={onStatusChange}
+              onToggleSelected={() => toggleSelectedGame(game.id)}
             />
           ))}
         </div>
       ) : (
-        <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
+        <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-8 text-center">
           <div>
             <h3 className="text-lg font-semibold text-white">{emptyTitle}</h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{emptyText}</p>
@@ -599,15 +941,15 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
   }
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/75 p-3">
-      <section className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border border-white/10 bg-ink-900 shadow-panel">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950 p-4">
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/80 p-3 backdrop-blur-sm">
+      <section className="qs-glass max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
+        <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
             <h2 className="text-xl font-semibold text-white">Add game</h2>
             <p className="mt-1 text-sm text-slate-400">Manual entries stay local and can start in Library or Wishlist.</p>
           </div>
           <button
-            className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
             onClick={onClose}
             type="button"
           >
@@ -797,14 +1139,14 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
           <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
             <button
-              className="h-10 rounded-md border border-white/10 px-4 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
               onClick={onClose}
               type="button"
             >
               Cancel
             </button>
             <button
-              className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
               type="submit"
             >
               Save game
@@ -824,7 +1166,7 @@ type DemoDataPanelProps = {
 
 function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: DemoDataPanelProps) {
   return (
-    <section className="rounded-lg border border-white/10 bg-ink-900/70 p-4">
+    <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Library data</h2>
@@ -836,7 +1178,7 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
         <div className="flex flex-wrap gap-2">
           {import.meta.env.DEV ? (
             <button
-              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
               onClick={onLoadDemoData}
               type="button"
             >
@@ -844,7 +1186,7 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
             </button>
           ) : null}
           <button
-            className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+            className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
             disabled={demoGameCount === 0}
             onClick={onRemoveDemoGames}
             type="button"
@@ -854,7 +1196,7 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
         </div>
       </div>
 
-      <div className="mt-3 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
         {demoGameCount} known demo games in this browser.
       </div>
     </section>
@@ -864,9 +1206,14 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
 function AppStartupScreen() {
   return (
     <main className="grid min-h-screen place-items-center bg-ink-950 px-4 text-slate-100">
-      <div className="w-full max-w-md rounded-lg border border-white/10 bg-ink-900 p-5 shadow-panel">
-        <div className="text-sm font-medium uppercase tracking-[0.18em] text-mint">QuestShelf</div>
-        <h1 className="mt-2 text-2xl font-semibold text-white">Loading local library</h1>
+      <div className="qs-glass w-full max-w-md rounded-lg border p-5 shadow-panel">
+        <div className="flex items-center gap-3">
+          <img className="qs-logo-glow h-12 w-12 rounded-lg border border-mint/30" src={questShelfIcon} alt="" />
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
+            <h1 className="mt-1 text-2xl font-semibold text-white">Loading library</h1>
+          </div>
+        </div>
         <div className="mt-5 space-y-3">
           <div className="h-3 w-2/3 animate-pulse rounded bg-white/10" />
           <div className="h-3 w-full animate-pulse rounded bg-white/10" />
@@ -904,7 +1251,7 @@ type StatProps = {
 
 function Stat({ label, value }: StatProps) {
   return (
-    <div className="rounded-md border border-white/10 bg-ink-950 p-3">
+    <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div className="text-xl font-semibold text-white">{value}</div>
       <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
     </div>
@@ -961,6 +1308,18 @@ function filterGames(games: Game[], filters: CollectionFilters) {
   });
 }
 
+function formatBulkSummary(summary: BulkActionSummary) {
+  const parts = [
+    summary.updatedCount ? `${summary.updatedCount} updated` : null,
+    summary.removedCount ? `${summary.removedCount} removed` : null,
+    summary.ignoredCount ? `${summary.ignoredCount} ignored` : null,
+    summary.wishlistedCount ? `${summary.wishlistedCount} sent to Wishlist` : null,
+    typeof summary.skippedCount === 'number' ? `${summary.skippedCount} skipped` : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(' - ') : 'Bulk action complete';
+}
+
 function getActiveFilters(activeNavItem: NavItem, libraryFilters: CollectionFilters, wishlistFilters: CollectionFilters) {
   return activeNavItem === 'Wishlist' ? wishlistFilters : libraryFilters;
 }
@@ -1014,7 +1373,7 @@ type PlaceholderPanelProps = {
 
 function PlaceholderPanel({ title }: PlaceholderPanelProps) {
   return (
-    <section className="grid min-w-0 place-items-center rounded-lg border border-white/10 bg-ink-900/70 p-8 text-center lg:h-[calc(100vh-116px)]">
+    <section className="qs-glass grid min-w-0 place-items-center rounded-lg border p-8 text-center lg:h-[calc(100vh-116px)]">
       <div>
         <h2 className="text-xl font-semibold text-white">{title}</h2>
         <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
