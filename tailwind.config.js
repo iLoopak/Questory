@@ -5,18 +5,19 @@ export default {
     extend: {
       colors: {
         ink: {
-          950: '#08090c',
-          900: '#101219',
-          800: '#171b25',
-          700: '#222838',
-          500: '#586176',
+          950: '#02060d',
+          900: '#07111f',
+          800: '#0c1a2d',
+          700: '#13263d',
+          500: '#53677d',
         },
-        ember: '#f97316',
-        mint: '#2dd4bf',
-        skyglass: '#93c5fd',
+        ember: '#f59e0b',
+        mint: '#22f3df',
+        skyglass: '#8fb4ca',
       },
       boxShadow: {
-        panel: '0 24px 70px rgba(0, 0, 0, 0.32)',
+        panel: '0 22px 70px rgba(0, 0, 0, 0.42), 0 0 32px rgba(34, 243, 223, 0.08)',
+        glow: '0 0 28px rgba(34, 243, 223, 0.22)',
       },
     },
   },

@@ -6,11 +6,17 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape",
-  "theme_color": "#101219",
-  "background_color": "#08090c",
+  "theme_color": "#22f3df",
+  "background_color": "#02060d",
   "icons": [
     {
       "src": "/icons/questshelf-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/questshelf-maskable.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
