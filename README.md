@@ -13,6 +13,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
 - Separate local Wishlist collection for platform-agnostic future games.
 - Compact Library and Wishlist toolbar with search, source, enrichment, platform, status, tag, quick filters, and sorting.
+- Manual Steam wishlist sync into the general local Wishlist collection.
 - Change game status directly from the library.
 - Steam connector foundation in Settings.
 - Local Steam Web API key and SteamID64 storage.
@@ -25,7 +26,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 - QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
 
-No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, Steam wishlist fetching, or remote sync are included yet.
+No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
 ## Local Library Data
 
@@ -49,7 +50,17 @@ QuestShelf has a separate **Wishlist** tab for games that are not owned or activ
 - Library cards can be copied into Wishlist with **Add to Wishlist**.
 - Wishlist cards can be promoted with **Move to Library** or deleted with **Remove Wishlist**.
 - RAWG enrichment works on Wishlist entries because the metadata workflow reads both collections.
-- Steam wishlist fetching is intentionally only a future integration point and is not implemented yet.
+- Steam wishlist sync is manual and feeds the general Wishlist collection without treating those items as owned games.
+
+Steam wishlist sync is available from the Wishlist view with **Sync Steam Wishlist**. It uses the SteamID64 already saved in Steam Settings and imports public Steam wishlist entries into the general QuestShelf Wishlist collection, not the owned Library.
+
+- Steam wishlist items are saved locally with Steam App ID, Steam store URL, cover art, release date, price, discount, review summary, and sync timestamps when Steam provides them.
+- Existing Wishlist items with the same Steam App ID are refreshed with sync metadata, but user-owned fields such as notes, tags, and priority are preserved.
+- Games already present in the Library are shown as skipped and are not duplicated into Wishlist.
+- Ignored Steam App IDs are skipped during wishlist sync.
+- Wishlist items can still be moved to Library, removed, opened on Steam, or enriched with RAWG metadata.
+- Steam wishlist sync requires a public Steam wishlist/profile. The Steam Store wishlist endpoint is less official and less stable than the Steam Web API owned-games endpoint.
+- Local development routes wishlist requests through the Vite `/api/steam-store` proxy when needed for browser/CORS behavior.
 
 ## Library Filtering and Sorting
 
@@ -109,6 +120,8 @@ In local development, Steam API calls go through the Vite dev proxy:
 - Frontend base path: `/api/steam`
 - Proxy target: `https://api.steampowered.com`
 - Example rewrite: `/api/steam/IPlayerService/GetOwnedGames/v0001/` becomes `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/`
+- Steam Store wishlist proxy base path: `/api/steam-store`
+- Steam Store wishlist proxy target: `https://store.steampowered.com`
 
 Run the app with `npm run dev` so Vite can serve that proxy. If the Steam test shows a proxy/CORS error, restart the dev server after checking `vite.config.ts`. The direct Steam API URL is kept only as a production placeholder; a deployed app will still need a safe proxy/backend before real production Steam sync.
 

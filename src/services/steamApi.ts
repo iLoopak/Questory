@@ -1,11 +1,22 @@
 import type { Game } from '../types/game';
-import type { SteamApiDebugEntry, SteamOwnedGame, SteamRecentlyPlayedGame, SteamSettings } from '../types/steam';
+import type {
+  SteamApiDebugEntry,
+  SteamOwnedGame,
+  SteamRecentlyPlayedGame,
+  SteamSettings,
+  SteamWishlistItem,
+} from '../types/steam';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 
 const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
+const DEVELOPMENT_STEAM_STORE_BASE_URL = '/api/steam-store';
 // Production placeholder only. A deployed client will still need a safe proxy/backend before Steam sync is production-ready.
 const PRODUCTION_STEAM_API_BASE_URL = 'https://api.steampowered.com/IPlayerService';
+const PRODUCTION_STEAM_STORE_BASE_URL = 'https://store.steampowered.com';
 const STEAM_API_BASE_URL = import.meta.env.DEV ? DEVELOPMENT_STEAM_API_BASE_URL : PRODUCTION_STEAM_API_BASE_URL;
+const STEAM_STORE_BASE_URL = import.meta.env.DEV
+  ? DEVELOPMENT_STEAM_STORE_BASE_URL
+  : PRODUCTION_STEAM_STORE_BASE_URL;
 
 type SteamApiResponse<T> = {
   response?: T;
@@ -38,6 +49,22 @@ export class SteamApiError extends Error {
   ) {
     super(message);
     this.name = 'SteamApiError';
+  }
+}
+
+export class SteamWishlistError extends Error {
+  constructor(
+    message: string,
+    public code:
+      | 'missing-steamid64'
+      | 'invalid-steamid64'
+      | 'private-wishlist'
+      | 'malformed-response'
+      | 'cors-proxy'
+      | 'endpoint-failure',
+  ) {
+    super(message);
+    this.name = 'SteamWishlistError';
   }
 }
 
@@ -187,6 +214,67 @@ export async function getRecentlyPlayedGames(settings: SteamSettings): Promise<S
   return Array.isArray(response.games) ? response.games : [];
 }
 
+export async function getSteamWishlist(settings: Pick<SteamSettings, 'steamId64'>): Promise<SteamWishlistItem[]> {
+  const steamId64 = settings.steamId64.trim();
+
+  if (!steamId64) {
+    throw new SteamWishlistError('Add a SteamID64 before syncing the Steam wishlist.', 'missing-steamid64');
+  }
+
+  if (!/^\d{17}$/.test(steamId64)) {
+    throw new SteamWishlistError('SteamID64 should be a 17-digit numeric ID, usually starting with 7656.', 'invalid-steamid64');
+  }
+
+  const url = new URL(`${STEAM_STORE_BASE_URL}/wishlist/profiles/${steamId64}/wishlistdata/`, window.location.origin);
+
+  let response: Response;
+
+  try {
+    response = await fetch(url);
+  } catch {
+    if (import.meta.env.DEV) {
+      throw new SteamWishlistError(
+        'Steam wishlist request failed. Restart the Vite dev server and confirm the /api/steam-store proxy is configured.',
+        'cors-proxy',
+      );
+    }
+
+    throw new SteamWishlistError(
+      'Steam wishlist request failed. A production app will need a safe proxy/backend for reliable wishlist sync.',
+      'endpoint-failure',
+    );
+  }
+
+  if (!response.ok) {
+    if (import.meta.env.DEV && response.status === 404) {
+      throw new SteamWishlistError(
+        'Steam wishlist proxy route was not found. Restart the Vite dev server and confirm /api/steam-store is configured.',
+        'cors-proxy',
+      );
+    }
+
+    if (response.status === 400) {
+      throw new SteamWishlistError('Steam rejected this SteamID64. Check the value in Settings.', 'invalid-steamid64');
+    }
+
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      throw new SteamWishlistError('Steam wishlist is private or unavailable for this SteamID64.', 'private-wishlist');
+    }
+
+    throw new SteamWishlistError(`Steam wishlist request failed with status ${response.status}.`, 'endpoint-failure');
+  }
+
+  let payload: unknown;
+
+  try {
+    payload = await response.json();
+  } catch {
+    throw new SteamWishlistError('Steam returned wishlist data that could not be parsed as JSON.', 'malformed-response');
+  }
+
+  return parseSteamWishlistPayload(payload);
+}
+
 export function clearSteamApiDebugLog() {
   steamApiDebugEntries.length = 0;
 }
@@ -230,6 +318,34 @@ export function mapSteamGamesToLocalGames(
   });
 }
 
+export function mapSteamWishlistItemToLocalGame(item: SteamWishlistItem, syncedAt: string): Game {
+  const artworkUrls = getSteamArtworkUrls(item.appid);
+
+  return {
+    id: `steam-wishlist-${item.appid}`,
+    title: item.name,
+    platform: 'Steam',
+    status: 'Want to play',
+    coverImage: artworkUrls.library,
+    playtimeHours: 0,
+    tags: ['wishlist', 'steam'],
+    lastPlayedAt: null,
+    notes: '',
+    collectionType: 'wishlist',
+    steamAppId: item.appid,
+    externalSource: 'steam-wishlist',
+    externalUrl: item.storeUrl,
+    importedAt: syncedAt,
+    storeUrl: item.storeUrl,
+    releaseDate: item.releaseDate,
+    steamPriceInfo: item.priceInfo,
+    steamDiscountInfo: item.discountInfo,
+    steamReviewInfo: item.reviewSummary,
+    wishlistImportedAt: syncedAt,
+    wishlistSyncedAt: syncedAt,
+  };
+}
+
 function recordSteamApiDebug(entry: SteamApiDebugEntry) {
   steamApiDebugEntries.push(entry);
 
@@ -260,4 +376,116 @@ function getParsedGameCount(response: unknown) {
 
   const maybeResponse = response as { games?: unknown };
   return Array.isArray(maybeResponse.games) ? maybeResponse.games.length : null;
+}
+
+function parseSteamWishlistPayload(payload: unknown): SteamWishlistItem[] {
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeSteamWishlistEntry).filter((item): item is SteamWishlistItem => Boolean(item));
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    throw new SteamWishlistError('Steam wishlist response was empty or malformed.', 'malformed-response');
+  }
+
+  const entries = Object.entries(payload);
+  const items = entries
+    .map(([appId, value]) => normalizeSteamWishlistEntry(value, Number(appId)))
+    .filter((item): item is SteamWishlistItem => Boolean(item));
+
+  const success = (payload as Record<string, unknown>).success;
+
+  if (items.length === 0 && typeof success === 'number' && success !== 1) {
+    throw new SteamWishlistError('Steam wishlist is private or unavailable for this SteamID64.', 'private-wishlist');
+  }
+
+  return items;
+}
+
+function normalizeSteamWishlistEntry(value: unknown, fallbackAppId?: number): SteamWishlistItem | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const entry = value as Record<string, unknown>;
+  const appid = getNumber(entry.appid) ?? fallbackAppId;
+  const name = getString(entry.name);
+
+  if (!appid || !name) {
+    return null;
+  }
+
+  return {
+    appid,
+    name,
+    capsule: getString(entry.capsule),
+    discountInfo: formatSteamDiscount(entry),
+    priceInfo: formatSteamPrice(entry),
+    releaseDate: getString(entry.release_string) ?? formatUnixDate(getNumber(entry.release_date)),
+    reviewScore: getNumber(entry.review_score),
+    reviewSummary: formatSteamReviews(entry),
+    storeUrl: `https://store.steampowered.com/app/${appid}`,
+  };
+}
+
+function formatSteamPrice(entry: Record<string, unknown>) {
+  const subs = Array.isArray(entry.subs) ? entry.subs : [];
+  const firstSub = subs.find((sub): sub is Record<string, unknown> => Boolean(sub) && typeof sub === 'object');
+
+  if (!firstSub) {
+    return undefined;
+  }
+
+  const price = getString(firstSub.price);
+  const discountBlock = firstSub.discount_block;
+  const discountFinalPrice =
+    discountBlock && typeof discountBlock === 'object'
+      ? getString((discountBlock as Record<string, unknown>).discount_final_price)
+      : undefined;
+
+  return discountFinalPrice ?? price;
+}
+
+function formatSteamDiscount(entry: Record<string, unknown>) {
+  const subs = Array.isArray(entry.subs) ? entry.subs : [];
+  const firstSub = subs.find((sub): sub is Record<string, unknown> => Boolean(sub) && typeof sub === 'object');
+  const discountPct = firstSub ? getNumber(firstSub.discount_pct) : undefined;
+
+  return discountPct && discountPct > 0 ? `${discountPct}% off` : undefined;
+}
+
+function formatSteamReviews(entry: Record<string, unknown>) {
+  const reviewDesc = getString(entry.review_desc);
+  const reviewsTotal = getNumber(entry.reviews_total);
+  const reviewsPercent = getNumber(entry.reviews_percent);
+
+  if (reviewDesc) {
+    return reviewDesc;
+  }
+
+  if (typeof reviewsPercent === 'number' && typeof reviewsTotal === 'number') {
+    return `${reviewsPercent}% positive from ${reviewsTotal} reviews`;
+  }
+
+  return undefined;
+}
+
+function formatUnixDate(value?: number) {
+  return value ? new Date(value * 1000).toISOString().slice(0, 10) : undefined;
+}
+
+function getString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function getNumber(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) ? parsedValue : undefined;
+  }
+
+  return undefined;
 }

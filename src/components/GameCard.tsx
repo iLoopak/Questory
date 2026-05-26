@@ -231,6 +231,9 @@ export function GameCard({
                       setIsActionMenuOpen(false);
                     }}
                   />
+                  {game.storeUrl || game.externalUrl ? (
+                    <ActionMenuLink label="Open Steam store" url={game.storeUrl ?? game.externalUrl ?? ''} />
+                  ) : null}
                   <ActionMenuButton
                     label={game.collectionType === 'wishlist' ? 'Remove Wishlist' : 'Remove'}
                     onClick={() => {
@@ -257,6 +260,19 @@ export function GameCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function ActionMenuLink({ label, url }: { label: string; url: string }) {
+  return (
+    <a
+      className="block h-10 w-full px-3 py-2.5 text-left text-sm text-slate-200 transition hover:bg-mint/10"
+      href={url}
+      rel="noreferrer"
+      target="_blank"
+    >
+      {label}
+    </a>
   );
 }
 
