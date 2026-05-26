@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import { gameStatuses } from '../types/game';
 
@@ -23,13 +23,8 @@ export function GameCard({
   onStatusChange,
 }: GameCardProps) {
   const coverSources = useMemo(() => {
-    if (typeof game.steamAppId === 'number') {
-      const artworkUrls = getSteamArtworkUrls(game.steamAppId);
-      return [artworkUrls.library, artworkUrls.header, artworkUrls.capsule];
-    }
-
-    return game.coverImage ? [game.coverImage] : [];
-  }, [game.coverImage, game.steamAppId]);
+    return getGameCoverSources(game);
+  }, [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
 
