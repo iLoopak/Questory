@@ -1,8 +1,7 @@
 import type { RawgMetadata } from '../types/rawg';
+import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.rawgMetadataCache.v1';
-
-const isBrowser = typeof window !== 'undefined';
 
 export type RawgMetadataCacheEntry = {
   gameTitle: string;
@@ -24,22 +23,7 @@ export function getRawgMetadataCacheKey(title: string) {
 }
 
 export function loadRawgMetadataCache(): RawgMetadataCache {
-  if (!isBrowser) {
-    return {};
-  }
-
-  const storedCache = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedCache) {
-    return {};
-  }
-
-  try {
-    const parsedCache = JSON.parse(storedCache) as RawgMetadataCache;
-    return parsedCache && typeof parsedCache === 'object' ? parsedCache : {};
-  } catch {
-    return {};
-  }
+  return loadLocalJson(STORAGE_KEY, {}, normalizeRawgMetadataCache);
 }
 
 export function getCachedRawgMetadata(title: string): RawgMetadataCacheEntry | null {
@@ -48,11 +32,11 @@ export function getCachedRawgMetadata(title: string): RawgMetadataCacheEntry | n
 }
 
 export function saveRawgMetadataCacheEntry(entry: RawgMetadataCacheEntry) {
-  if (!isBrowser) {
-    return;
-  }
-
   const cache = loadRawgMetadataCache();
   cache[getRawgMetadataCacheKey(entry.gameTitle)] = entry;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+  savePersistedJson(STORAGE_KEY, cache);
+}
+
+function normalizeRawgMetadataCache(value: unknown): RawgMetadataCache {
+  return value && typeof value === 'object' ? (value as RawgMetadataCache) : {};
 }
