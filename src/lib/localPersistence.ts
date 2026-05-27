@@ -1,6 +1,7 @@
 type PreferencesPlugin = {
   Preferences: {
     get: (options: { key: string }) => Promise<{ value: string | null }>;
+    remove: (options: { key: string }) => Promise<void>;
     set: (options: { key: string; value: string }) => Promise<void>;
   };
 };
@@ -82,6 +83,28 @@ export async function hydrateLocalStorageFromPreferences(keys: string[]) {
         }
       } catch {
         // Best-effort hydration. Corrupted native values fall back to existing localStorage/defaults.
+      }
+    }),
+  );
+}
+
+export async function removePersistedKeys(keys: string[]) {
+  if (isBrowser) {
+    keys.forEach((key) => window.localStorage.removeItem(key));
+  }
+
+  const preferences = await getPreferencesPlugin();
+
+  if (!preferences) {
+    return;
+  }
+
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        await preferences.Preferences.remove({ key });
+      } catch {
+        // Reset is best-effort across browser and native storage.
       }
     }),
   );
