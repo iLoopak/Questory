@@ -9,10 +9,15 @@ import './styles.css';
 
 registerServiceWorker();
 void configureHandheldImmersiveMode();
-await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+void startApp();
+
+async function startApp() {
+  await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
