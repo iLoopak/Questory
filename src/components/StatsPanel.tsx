@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game } from '../types/game';
 import { getQuestShelfStats, statsScopeOptions, type QuestShelfStats, type StatsBarItem, type StatsScope } from '../utils/stats';
 
@@ -213,25 +214,13 @@ function GameListPanel({ emptyText, games, metric, onOpenDetails, title }: GameL
       {games.length > 0 ? (
         <div className="mt-3 divide-y divide-white/10">
           {games.map((game, index) => (
-            <button
+            <DashboardGameRow
               key={game.id}
-              className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-2 text-left transition hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/50"
-              onClick={() => onOpenDetails(game.id)}
-              type="button"
-            >
-              <span className="grid h-7 w-7 place-items-center rounded-md border border-skyglass/15 bg-ink-900 text-xs font-semibold text-slate-400">
-                {index + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-white" title={game.title}>
-                  {game.title}
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-slate-500">
-                  {game.platform} - {game.status}
-                </span>
-              </span>
-              <span className="shrink-0 text-sm text-slate-400">{metric(game)}</span>
-            </button>
+              game={game}
+              metric={metric(game)}
+              rank={index + 1}
+              onOpenDetails={() => onOpenDetails(game.id)}
+            />
           ))}
         </div>
       ) : (
@@ -240,6 +229,79 @@ function GameListPanel({ emptyText, games, metric, onOpenDetails, title }: GameL
         </p>
       )}
     </section>
+  );
+}
+
+type DashboardGameRowProps = {
+  game: Game;
+  metric: string;
+  onOpenDetails: () => void;
+  rank: number;
+};
+
+function DashboardGameRow({ game, metric, onOpenDetails, rank }: DashboardGameRowProps) {
+  return (
+    <button
+      className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-2 text-left transition hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/50"
+      onClick={onOpenDetails}
+      type="button"
+    >
+      <span className="grid h-7 w-7 place-items-center rounded-md border border-skyglass/15 bg-ink-900 text-xs font-semibold text-slate-400">
+        {rank}
+      </span>
+      <GameThumbnail game={game} />
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium text-white" title={game.title}>
+          {game.title}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500">
+          {game.platform} - {game.status}
+        </span>
+      </span>
+      <span className="max-w-[7rem] shrink-0 truncate text-right text-sm text-slate-400" title={metric}>
+        {metric}
+      </span>
+    </button>
+  );
+}
+
+function GameThumbnail({ game }: { game: Game }) {
+  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const activeCoverSource = coverSources[coverSourceIndex];
+
+  useEffect(() => {
+    setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
+  }, [coverSources]);
+
+  return (
+    <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-skyglass/15 bg-ink-900">
+      {activeCoverSource ? (
+        <>
+          {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+          <img
+            alt=""
+            className={`h-full w-full object-cover transition-opacity duration-200 ${
+              isCoverLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            decoding="async"
+            loading="lazy"
+            onError={() => {
+              setIsCoverLoaded(false);
+              setCoverSourceIndex((currentIndex) => currentIndex + 1);
+            }}
+            onLoad={() => setIsCoverLoaded(true)}
+            src={activeCoverSource}
+          />
+        </>
+      ) : (
+        <span className="grid h-full w-full place-items-center text-xs font-semibold text-mint/80">
+          {game.title.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+    </span>
   );
 }
 
