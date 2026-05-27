@@ -26,6 +26,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Local Recommendation Engine v1 for choosing what to play next.
 - Local Stats dashboard for backlog progress, playtime, platform/source breakdowns, and metadata coverage.
 - Settings Data Management for portable JSON backup export/import, validated restore, and local reset.
+- File-based Sync Folder / Auto Backup foundation for user-owned synced folders.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 - Capacitor-ready Android handheld foundation with fullscreen status bar handling and mirrored native Preferences persistence.
 - QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
@@ -41,6 +42,7 @@ QuestShelf shows a compact checklist on first launch to guide initial setup with
 - Items are completed when users add a manual game, configure Steam credentials, test Steam, import Steam games, configure RAWG, enrich metadata, create a Wishlist item, or export a backup.
 - The checklist links to the official Steam API key page, a SteamID64 lookup page, and RAWG API docs.
 - QuestShelf never stores real API keys in README files or source code. Keys are only entered by the user and saved locally in browser/native storage.
+
 ## Data Management and Portable Backup
 
 Open **Settings > Data Management** to export, import, or reset local QuestShelf data.
@@ -62,6 +64,44 @@ Recommended portable sync workflow:
 5. Export a fresh backup after major edits so the synced folder stays current.
 
 This is account-free manual portability. The code keeps backup serialization separate from storage targets so a future provider can write the same validated backup format into a user-owned cloud-synced folder.
+
+## Sync Folder / Auto Backup
+
+QuestShelf can use a file-based backup workflow for simple multi-device use without accounts, backend services, real-time sync, or Google Drive/Dropbox APIs.
+
+Recommended synced-folder workflow:
+
+1. Create or choose a folder that is already synced by Google Drive, OneDrive, Dropbox, Syncthing, iCloud Drive, or a local shared folder.
+2. Open **Settings > Data Management > Sync Folder / Auto Backup**.
+3. Choose a backup JSON file inside that synced folder when the browser supports persistent file handles.
+4. Use **Save backup now** after setup, then enable **Auto-backup**.
+5. On another device, open QuestShelf and use **Load backup from file** or manual import to load the same JSON backup.
+6. Choose **Merge with local data** for normal multi-device use, or **Replace local data** when you intentionally want the backup to overwrite the device.
+
+Auto-backup stays local-first:
+
+- It writes the same QuestShelf JSON backup format to the selected file.
+- It debounces writes after meaningful local data changes to avoid excessive saving.
+- It shows the last backup timestamp.
+- Integration settings and API keys are excluded by default.
+- **Include integration settings in auto-backup** is optional and off by default.
+- If browser permission to the file is lost, QuestShelf disables auto-backup and asks you to reselect the backup file.
+
+Import conflict protection:
+
+- QuestShelf shows the backup `exportedAt`, `schemaVersion`, Library game count, and Wishlist count before import.
+- Replace mode requires typing `REPLACE`.
+- Merge mode requires typing `MERGE`.
+- Merge mode matches games by local ID, Steam App ID, RAWG ID, or ROM path/URI when available.
+- Merge mode avoids duplicates and keeps newer records when `updatedAt` or metadata timestamps are available.
+
+Browser and platform limitations:
+
+- Persistent backup-file selection uses the File System Access API, currently best supported in Chromium-based desktop browsers.
+- Firefox, Safari, many embedded WebViews, and some mobile browsers may not expose persistent file handles.
+- When File System Access is unavailable, manual **Download backup** and JSON import remain available.
+- Android/APK builds may need a later native file picker or Storage Access Framework bridge before auto-backup can write directly to a synced folder.
+- This is portable file sync, not live conflict-free cloud sync. Avoid editing on two devices at the same time before the synced backup file has propagated.
 
 ## Local Library Data
 
