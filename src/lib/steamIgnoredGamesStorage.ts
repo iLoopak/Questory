@@ -1,3 +1,5 @@
+import { loadLocalJson, savePersistedJson } from './localPersistence';
+
 export type IgnoredSteamGame = {
   ignoredAt: string;
   steamAppId: number;
@@ -5,33 +7,13 @@ export type IgnoredSteamGame = {
 };
 
 const STORAGE_KEY = 'questshelf.steamIgnoredGames.v1';
-const isBrowser = typeof window !== 'undefined';
 
 export function loadIgnoredSteamGames(): IgnoredSteamGame[] {
-  if (!isBrowser) {
-    return [];
-  }
-
-  const storedGames = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedGames) {
-    return [];
-  }
-
-  try {
-    const parsedGames = JSON.parse(storedGames) as IgnoredSteamGame[];
-    return Array.isArray(parsedGames) ? parsedGames.filter(isIgnoredSteamGame) : [];
-  } catch {
-    return [];
-  }
+  return loadLocalJson(STORAGE_KEY, [], normalizeIgnoredSteamGames);
 }
 
 export function saveIgnoredSteamGames(ignoredGames: IgnoredSteamGame[]) {
-  if (!isBrowser) {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ignoredGames));
+  savePersistedJson(STORAGE_KEY, ignoredGames);
 }
 
 export function addIgnoredSteamGame(
@@ -73,4 +55,8 @@ function isIgnoredSteamGame(value: unknown): value is IgnoredSteamGame {
 
   const game = value as Partial<IgnoredSteamGame>;
   return typeof game.steamAppId === 'number' && typeof game.ignoredAt === 'string';
+}
+
+function normalizeIgnoredSteamGames(value: unknown): IgnoredSteamGame[] {
+  return Array.isArray(value) ? value.filter(isIgnoredSteamGame) : [];
 }

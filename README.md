@@ -25,9 +25,10 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Local Recommendation Engine v1 for choosing what to play next.
 - Local Stats dashboard for backlog progress, playtime, platform/source breakdowns, and metadata coverage.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
+- Capacitor-ready Android handheld foundation with fullscreen status bar handling and mirrored native Preferences persistence.
 - QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
 
-No PSN, IGDB, achievements, Capacitor, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
 ## Local Library Data
 
@@ -102,6 +103,27 @@ Known limitations:
 - The first offline launch is only reliable after the production app has been loaded at least once.
 - Browser install support varies, especially on iOS and embedded webviews.
 - This PWA layer does not add cloud sync, accounts, or a backend.
+
+## Android Handheld / Capacitor Notes
+
+QuestShelf includes a lightweight Capacitor configuration for Android handheld packaging:
+
+- `capacitor.config.ts` points Capacitor at the Vite production build in `dist`.
+- `@capacitor/status-bar` is used to hide the Android status bar on native Android and re-apply the setting after focus/resume.
+- The app uses safe-area CSS variables so edge-to-edge screens, rounded corners, and display cutouts have padding available when the WebView exposes it.
+- System bar color is set to QuestShelf's dark navy background when Android briefly reveals system UI.
+
+Typical Android build flow:
+
+```bash
+npm run build
+npx cap sync android
+npx cap open android
+```
+
+The app also mirrors local game data into Capacitor Preferences when the native plugin is available. Browser `localStorage` remains the fast startup/cache layer, while native Preferences provides a more durable Android storage layer for the saved library and user-owned game metadata such as status, notes, tags, playtime, ratings, favorites, and completion fields. Existing browser data is migrated into Preferences the first time the native app starts.
+
+Steam and RAWG API calls still require network access. The locally saved library, Wishlist, notes, tags, statuses, Stats, and recommendations remain usable offline after data has been loaded.
 
 ## Visual Branding
 
