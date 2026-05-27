@@ -14,6 +14,10 @@
   --qs-accent: #22f3df;
   --qs-accent-soft: rgba(34, 243, 223, 0.13);
   --qs-muted: #8aa1b5;
+  --qs-safe-top: env(safe-area-inset-top, 0px);
+  --qs-safe-right: env(safe-area-inset-right, 0px);
+  --qs-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --qs-safe-left: env(safe-area-inset-left, 0px);
 }
 
 * {
@@ -24,10 +28,25 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding:
+    var(--qs-safe-top)
+    var(--qs-safe-right)
+    var(--qs-safe-bottom)
+    var(--qs-safe-left);
+  overscroll-behavior: none;
+  touch-action: manipulation;
   background:
     linear-gradient(135deg, rgba(34, 243, 223, 0.08), transparent 34%),
     linear-gradient(315deg, rgba(77, 118, 148, 0.08), transparent 40%),
     #02060d;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 button,
