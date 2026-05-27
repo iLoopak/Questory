@@ -24,11 +24,34 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Metadata enrichment workflow for larger libraries with batch processing and manual match review.
 - Local Recommendation Engine v1 for choosing what to play next.
 - Local Stats dashboard for backlog progress, playtime, platform/source breakdowns, and metadata coverage.
+- Settings Data Management for portable JSON backup export/import, validated restore, and local reset.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 - Capacitor-ready Android handheld foundation with fullscreen status bar handling and mirrored native Preferences persistence.
 - QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
 
 No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+
+## Data Management and Portable Backup
+
+Open **Settings > Data Management** to export, import, or reset local QuestShelf data.
+
+- **Download backup** exports QuestShelf user data to a portable JSON file.
+- Backups include app metadata: `appVersion`, `exportedAt`, and `schemaVersion`.
+- Steam and RAWG integration settings are excluded by default so API keys are not exported accidentally.
+- Enable **Include integration settings** only when you intentionally want Steam/RAWG settings and API keys in the backup.
+- Imported backups are validated before QuestShelf allows restore.
+- Restore requires typing `RESTORE` because it overwrites local Library, Wishlist, filters, RAWG cache, and ignored Steam games.
+- **Reset local data** requires typing `RESET` and removes only known QuestShelf local data from this device.
+
+Recommended portable sync workflow:
+
+1. Export a backup from the device with the newest QuestShelf data.
+2. Store the JSON file in a Google Drive, OneDrive, Dropbox, or similar synced folder.
+3. Open QuestShelf on another device.
+4. Import the backup JSON from that synced folder.
+5. Export a fresh backup after major edits so the synced folder stays current.
+
+This is account-free manual portability. The code keeps backup serialization separate from storage targets so a future provider can write the same validated backup format into a user-owned cloud-synced folder.
 
 ## Local Library Data
 

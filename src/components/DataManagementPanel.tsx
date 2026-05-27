@@ -6,6 +6,11 @@ import {
   restoreQuestShelfBackup,
   type QuestShelfBackup,
 } from '../lib/backupStorage';
+import {
+  createPortableBackupFilename,
+  portableSyncProviders,
+  serializePortableBackup,
+} from '../lib/portableSync';
 
 export function DataManagementPanel() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -21,12 +26,12 @@ export function DataManagementPanel() {
 
   function downloadBackup() {
     const backup = createQuestShelfBackup(includeIntegrationSettings);
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const blob = new Blob([serializePortableBackup(backup)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = `questshelf-backup-${backup.metadata.exportedAt.slice(0, 10)}.json`;
+    link.download = createPortableBackupFilename(backup);
     link.click();
     URL.revokeObjectURL(url);
 
@@ -49,7 +54,7 @@ export function DataManagementPanel() {
 
     setSelectedBackup(result.backup);
     showMessage(
-      `Backup ready: exported ${formatDateTime(result.backup.metadata.exportedAt)}, version ${result.backup.metadata.appVersion}.`,
+      `Backup ready: exported ${formatDateTime(result.backup.metadata.exportedAt)}, version ${result.backup.metadata.appVersion}, schema ${result.backup.metadata.schemaVersion}.`,
       'success',
     );
   }
@@ -60,11 +65,15 @@ export function DataManagementPanel() {
       return;
     }
 
-    const shouldRestore = window.confirm(
-      'Restore this QuestShelf backup? This will overwrite the local library, Wishlist, filters, RAWG cache, and ignored Steam games with the backup contents.',
+    const confirmation = window.prompt(
+      [
+        'This will overwrite local QuestShelf data on this device.',
+        'Type RESTORE to import the selected backup.',
+      ].join('\n\n'),
     );
 
-    if (!shouldRestore) {
+    if (confirmation !== 'RESTORE') {
+      showMessage('Restore cancelled. Local data was not changed.');
       return;
     }
 
@@ -96,7 +105,7 @@ export function DataManagementPanel() {
         <div>
           <h2 className="text-xl font-semibold text-white">Data Management</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-            Export or restore local QuestShelf data before large imports, cleanup, or bulk changes.
+            Export or import portable QuestShelf backups for device moves, synced folders, and safe cleanup.
           </p>
         </div>
         <button
@@ -150,8 +159,16 @@ export function DataManagementPanel() {
             onClick={restoreBackup}
             type="button"
           >
-            Restore from backup
+            Import backup
           </button>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
+        <div className="font-medium text-white">Portable sync foundation</div>
+        <div className="mt-1">
+          QuestShelf currently uses {portableSyncProviders[0].label.toLowerCase()} export/import.{' '}
+          {portableSyncProviders[1].label} support is planned for user-owned cloud folders without accounts.
         </div>
       </div>
 

@@ -25,6 +25,7 @@ export type QuestShelfBackup = {
     appVersion: string;
     exportedAt: string;
     includesIntegrationSettings: boolean;
+    schemaVersion: typeof questShelfBackupVersion;
   };
   schemaVersion: typeof questShelfBackupVersion;
 };
@@ -58,6 +59,7 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
       appVersion: questShelfAppVersion,
       exportedAt: new Date().toISOString(),
       includesIntegrationSettings: includeIntegrationSettings,
+      schemaVersion: questShelfBackupVersion,
     },
     data: keys.reduce<QuestShelfBackup['data']>((backupData, key) => {
       const value = readStorageJson(key);
@@ -121,17 +123,41 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
     };
   }
 
-  if (backup.schemaVersion !== questShelfBackupVersion) {
+  if (!backup.metadata || typeof backup.metadata !== 'object') {
+    return {
+      ok: false,
+      error: 'Backup metadata is missing.',
+    };
+  }
+
+  const metadata = backup.metadata as Partial<QuestShelfBackup['metadata']>;
+  const schemaVersion = metadata.schemaVersion ?? backup.schemaVersion;
+
+  if (schemaVersion !== questShelfBackupVersion) {
     return {
       ok: false,
       error: `Unsupported backup version. Expected version ${questShelfBackupVersion}.`,
     };
   }
 
-  if (!backup.metadata || typeof backup.metadata !== 'object') {
+  if (typeof metadata.appVersion !== 'string' || metadata.appVersion.trim().length === 0) {
     return {
       ok: false,
-      error: 'Backup metadata is missing.',
+      error: 'Backup metadata is missing the QuestShelf app version.',
+    };
+  }
+
+  if (typeof metadata.exportedAt !== 'string' || Number.isNaN(new Date(metadata.exportedAt).getTime())) {
+    return {
+      ok: false,
+      error: 'Backup metadata has an invalid export timestamp.',
+    };
+  }
+
+  if (typeof metadata.includesIntegrationSettings !== 'boolean') {
+    return {
+      ok: false,
+      error: 'Backup metadata is missing the integration settings flag.',
     };
   }
 
@@ -142,7 +168,8 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
     };
   }
 
-  const dataKeys = Object.keys(backup.data);
+  const backupData = backup.data as Partial<Record<(typeof allBackupStorageKeys)[number], unknown>>;
+  const dataKeys = Object.keys(backupData);
   const unknownKey = dataKeys.find((key) => !knownBackupStorageKeys.has(key));
 
   if (unknownKey) {
@@ -152,17 +179,54 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
     };
   }
 
-  if ('questshelf.games.v1' in backup.data && !Array.isArray(backup.data['questshelf.games.v1'])) {
+  const malformedKey = dataKeys.find(
+    (key) =>
+      !isValidBackupDataSection(
+        key as (typeof allBackupStorageKeys)[number],
+        backupData[key as (typeof allBackupStorageKeys)[number]],
+      ),
+  );
+
+  if (malformedKey) {
     return {
       ok: false,
-      error: 'Backup game library section is malformed.',
+      error: `Backup data section is malformed: ${malformedKey}.`,
     };
   }
 
   return {
     ok: true,
-    backup: backup as QuestShelfBackup,
+    backup: {
+      ...(backup as QuestShelfBackup),
+      schemaVersion: questShelfBackupVersion,
+      metadata: {
+        appVersion: metadata.appVersion,
+        exportedAt: metadata.exportedAt,
+        includesIntegrationSettings: metadata.includesIntegrationSettings,
+        schemaVersion: questShelfBackupVersion,
+      },
+    },
   };
+}
+
+function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], value: unknown) {
+  switch (key) {
+    case 'questshelf.games.v1':
+    case 'questshelf.steamIgnoredGames.v1':
+      return Array.isArray(value);
+    case 'questshelf.rawgMetadataCache.v1':
+    case 'questshelf.rawgSettings.v1':
+    case 'questshelf.steamSettings.v1':
+    case 'questshelf.libraryFilters.v1':
+    case 'questshelf.wishlistFilters.v1':
+      return isPlainObject(value);
+  }
+
+  return false;
+}
+
+function isPlainObject(value: unknown) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function readStorageJson(key: string) {
