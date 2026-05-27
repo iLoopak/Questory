@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { configureAndroidGamepadShortcuts } from './lib/androidGamepadShortcuts';
 import { configureHandheldImmersiveMode } from './lib/handheldImmersiveMode';
 import { hydrateLocalStorageFromPreferences } from './lib/localPersistence';
 import { persistentStorageKeys } from './lib/persistentStorageKeys';
@@ -9,6 +10,8 @@ import './styles.css';
 
 registerServiceWorker();
 void configureHandheldImmersiveMode();
+const removeAndroidGamepadShortcuts = configureAndroidGamepadShortcuts();
+window.addEventListener('beforeunload', removeAndroidGamepadShortcuts, { once: true });
 
 void startApp();
 
