@@ -1,4 +1,32 @@
-export const gamePlatforms = ['Steam', 'PS5', 'PS4', 'Switch', 'Switch 2', 'PC', 'Android', 'PSP', 'PS2', 'GBA', 'SNES', 'Other'] as const;
+export const gamePlatforms = [
+  'Steam',
+  'PS5',
+  'PS4',
+  'Switch',
+  'Switch 2',
+  'PC',
+  'Android',
+  'PSP',
+  'PS2',
+  'PS1',
+  'PS Vita',
+  'Game Boy',
+  'Game Boy Color',
+  'Game Boy Advance',
+  'NES',
+  'SNES',
+  'Nintendo 64',
+  'Nintendo DS',
+  'Wii',
+  'Wii U',
+  'GameCube',
+  'Sega Genesis / Mega Drive',
+  'Master System',
+  'Game Gear',
+  'PC Engine',
+  'GBA',
+  'Other',
+] as const;
 export const gameStatuses = ['Want to play', 'Playing', 'Paused', 'Finished', 'Dropped'] as const;
 export const gameCollectionTypes = ['library', 'wishlist'] as const;
 export const wishlistPriorities = ['low', 'medium', 'high'] as const;
@@ -24,9 +52,13 @@ export type Game = {
   notes: string;
   collectionType: GameCollectionType;
   steamAppId?: number;
-  externalSource?: 'manual' | 'steam' | 'steam-wishlist';
+  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
   externalUrl?: string;
   importedAt?: string;
+  romFileName?: string;
+  romPath?: string;
+  romUri?: string;
+  romExtension?: string;
   priority?: WishlistPriority;
   expectedPlaytime?: number | null;
   priceTarget?: string;
