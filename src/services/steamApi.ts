@@ -65,6 +65,7 @@ export class SteamWishlistError extends Error {
       | 'missing-steamid64'
       | 'invalid-steamid64'
       | 'private-wishlist'
+      | 'rate-limited'
       | 'malformed-response'
       | 'cors-proxy'
       | 'endpoint-failure',
@@ -256,12 +257,12 @@ async function getSteamWishlistProfilePaths(
   const profilePathFromUrl = getSteamWishlistProfilePathFromUrl(settings.wishlistUrl);
   const vanityId = await getSteamVanityId(settings);
 
-  if (profilePathFromUrl) {
-    paths.unshift(profilePathFromUrl);
-  }
-
   if (vanityId) {
     paths.unshift(`id/${vanityId}`);
+  }
+
+  if (profilePathFromUrl) {
+    paths.unshift(profilePathFromUrl);
   }
 
   return Array.from(new Set(paths));
@@ -302,6 +303,10 @@ async function getSteamWishlistPage(profilePaths: string[], page: number): Promi
       return await getSteamWishlistPageForProfile(profilePath, page);
     } catch (error) {
       if (error instanceof SteamWishlistError) {
+        if (error.code === 'rate-limited') {
+          throw error;
+        }
+
         lastError = error;
         continue;
       }
@@ -341,6 +346,13 @@ async function getSteamWishlistPageForProfile(profilePath: string, page: number)
       throw new SteamWishlistError('Steam wishlist is private or unavailable for this SteamID64.', 'private-wishlist');
     }
 
+    if (response.status === 429) {
+      throw new SteamWishlistError(
+        'Steam is temporarily rate limiting wishlist requests. Wait a while before syncing again; repeated retries can extend the cooldown.',
+        'rate-limited',
+      );
+    }
+
     throw new SteamWishlistError(`Steam wishlist request failed with status ${response.status}.`, 'endpoint-failure');
   }
 
@@ -365,6 +377,13 @@ async function getSteamWishlistFromPublicPage(profilePath: string, page: number)
   const response = await fetchSteamWishlistResponse(proxyPageUrl, directPageUrl);
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new SteamWishlistError(
+        'Steam is temporarily rate limiting wishlist requests. Wait a while before syncing again; repeated retries can extend the cooldown.',
+        'rate-limited',
+      );
+    }
+
     throw new SteamWishlistError(
       `Steam redirected the wishlistdata endpoint and the public wishlist page failed with status ${response.status}.`,
       response.status === 404 ? 'private-wishlist' : 'endpoint-failure',
