@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { loadGames, saveGames } from '../lib/gameStorage';
 import {
   autoDetectPlatformOption,
   mapDetectedRomToGame,
@@ -11,8 +12,8 @@ import {
 import type { Game } from '../types/game';
 
 type RetroImportPanelProps = {
-  games: Game[];
-  onImportGames: (games: Game[]) => void;
+  games?: Game[];
+  onImportGames?: (games: Game[]) => void;
 };
 
 type ImportSummary = {
@@ -32,6 +33,7 @@ const emptyScanSummary: RetroScanSummary = {
 export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const [localGames, setLocalGames] = useState<Game[]>(() => games ?? loadGames());
   const [platformOverride, setPlatformOverride] = useState<RetroPlatformOverride>(autoDetectPlatformOption);
   const [detectedRoms, setDetectedRoms] = useState<DetectedRom[]>([]);
   const [selectedRomIds, setSelectedRomIds] = useState<Set<string>>(new Set());
@@ -43,13 +45,14 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
     folderInputRef.current?.setAttribute('directory', '');
   }, []);
 
+  const currentGames = games ?? localGames;
   const selectableRoms = detectedRoms.filter((rom) => !rom.isDuplicate);
   const selectedImportableRoms = selectableRoms.filter((rom) => selectedRomIds.has(rom.id));
   const supportsFolderPicker = typeof HTMLInputElement !== 'undefined' && 'webkitdirectory' in HTMLInputElement.prototype;
 
   function scanFiles(fileList: FileList | null) {
     const files = Array.from(fileList ?? []);
-    const result = scanRomFiles(files, games, platformOverride);
+    const result = scanRomFiles(files, currentGames, platformOverride);
 
     setDetectedRoms(result.detectedRoms);
     setSelectedRomIds(new Set(result.detectedRoms.filter((rom) => !rom.isDuplicate).map((rom) => rom.id)));
@@ -95,7 +98,7 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
   }
 
   function importSelectedRoms() {
-    const existingGameIds = new Set(games.map((game) => game.id));
+    const existingGameIds = new Set(currentGames.map((game) => game.id));
     const importedAt = new Date().toISOString();
     const importedGames = selectedImportableRoms.map((rom) => mapDetectedRomToGame(rom, existingGameIds, importedAt));
 
@@ -110,7 +113,14 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
       return;
     }
 
-    onImportGames(importedGames);
+    if (onImportGames) {
+      onImportGames(importedGames);
+    } else {
+      const nextGames = [...currentGames, ...importedGames];
+      setLocalGames(nextGames);
+      saveGames(nextGames);
+    }
+
     setImportSummary({
       detectedGames: scanSummary.detectedGames,
       importedGames: importedGames.length,
