@@ -322,10 +322,7 @@ async function getSteamWishlistPageForProfile(profilePath: string, page: number)
   const response = await fetchSteamWishlistResponse(proxyUrl, directUrl);
 
   if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
-    throw new SteamWishlistError(
-      'Steam redirected the wishlistdata endpoint instead of returning JSON. Open the public Steam wishlist page in a browser to confirm it is available; Steam may require login or may no longer expose this public wishlist endpoint for this profile.',
-      'private-wishlist',
-    );
+    return getSteamWishlistFromPublicPage(profilePath, page);
   }
 
   if (!response.ok) {
@@ -347,15 +344,92 @@ async function getSteamWishlistPageForProfile(profilePath: string, page: number)
     throw new SteamWishlistError(`Steam wishlist request failed with status ${response.status}.`, 'endpoint-failure');
   }
 
-  let payload: unknown;
+  let responseText: string;
 
   try {
-    payload = await response.json();
+    responseText = await response.text();
   } catch {
-    throw new SteamWishlistError('Steam returned wishlist data that could not be parsed as JSON.', 'malformed-response');
+    throw new SteamWishlistError('Steam returned wishlist data that could not be read.', 'malformed-response');
   }
 
+  const payload = await parseSteamWishlistResponseText(responseText, profilePath, page);
   return parseSteamWishlistPayload(payload);
+}
+
+async function getSteamWishlistFromPublicPage(profilePath: string, page: number): Promise<SteamWishlistItem[]> {
+  const proxyPageUrl = new URL(`${STEAM_STORE_BASE_URL}/wishlist/${profilePath}/`, window.location.origin);
+  const directPageUrl = new URL(`https://store.steampowered.com/wishlist/${profilePath}/`);
+  proxyPageUrl.searchParams.set('sort', 'order');
+  directPageUrl.searchParams.set('sort', 'order');
+
+  const response = await fetchSteamWishlistResponse(proxyPageUrl, directPageUrl);
+
+  if (!response.ok) {
+    throw new SteamWishlistError(
+      `Steam redirected the wishlistdata endpoint and the public wishlist page failed with status ${response.status}.`,
+      response.status === 404 ? 'private-wishlist' : 'endpoint-failure',
+    );
+  }
+
+  let html: string;
+
+  try {
+    html = await response.text();
+  } catch {
+    throw new SteamWishlistError('Steam returned a wishlist page that could not be read.', 'malformed-response');
+  }
+
+  const payload = parseSteamWishlistPageHtml(html);
+  const items = parseSteamWishlistPayload(payload);
+
+  if (page > 0) {
+    return [];
+  }
+
+  return items;
+}
+
+async function parseSteamWishlistResponseText(responseText: string, profilePath: string, page: number) {
+  const trimmedText = responseText.trim();
+
+  if (!trimmedText) {
+    throw new SteamWishlistError('Steam returned an empty wishlist response.', 'malformed-response');
+  }
+
+  if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+    try {
+      return JSON.parse(trimmedText) as unknown;
+    } catch {
+      throw new SteamWishlistError('Steam returned wishlist data that could not be parsed as JSON.', 'malformed-response');
+    }
+  }
+
+  if (page > 0) {
+    return [];
+  }
+
+  try {
+    return parseSteamWishlistPageHtml(trimmedText);
+  } catch {
+    return getSteamWishlistFromPublicPage(profilePath, page);
+  }
+}
+
+function parseSteamWishlistPageHtml(html: string) {
+  const wishlistDataMatch = html.match(/var\s+g_rgWishlistData\s*=\s*(\[.*?\]|\{.*?\});/s);
+
+  if (!wishlistDataMatch) {
+    throw new SteamWishlistError(
+      'Steam returned the wishlist page, but QuestShelf could not find wishlist data in the page. The wishlist may be private, rate-limited, or Steam may have changed the page format.',
+      'malformed-response',
+    );
+  }
+
+  try {
+    return JSON.parse(wishlistDataMatch[1]) as unknown;
+  } catch {
+    throw new SteamWishlistError('Steam wishlist page contained data that could not be parsed as JSON.', 'malformed-response');
+  }
 }
 
 async function fetchSteamWishlistResponse(proxyUrl: URL, directUrl: URL) {
