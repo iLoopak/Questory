@@ -6,4 +6,5 @@ export const persistentStorageKeys = [
   'questshelf.steamSettings.v1',
   'questshelf.libraryFilters.v1',
   'questshelf.wishlistFilters.v1',
+  'questshelf.onboarding.v1',
 ] as const;

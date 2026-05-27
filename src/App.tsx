@@ -3,12 +3,21 @@ import type { FormEvent } from 'react';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
+import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
+import {
+  loadOnboardingState,
+  onboardingItemIds,
+  saveOnboardingState,
+  type OnboardingItemId,
+  type OnboardingState,
+} from './lib/onboardingStorage';
+import { loadRawgSettings } from './lib/rawgSettingsStorage';
 import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
   addIgnoredSteamGame,
@@ -104,6 +113,11 @@ function App() {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
+    const initialState = loadOnboardingState();
+    return !initialState.hasSeenChecklist && !initialState.skipped;
+  });
   const [metadataSelectionRequest, setMetadataSelectionRequest] = useState<MetadataSelectionRequest | null>(null);
   const [steamWishlistSyncState, setSteamWishlistSyncState] = useState<SteamWishlistSyncState>(
     initialSteamWishlistSyncState,
@@ -118,6 +132,10 @@ function App() {
   }, [ignoredSteamGames]);
 
   useEffect(() => {
+    saveOnboardingState(onboardingState);
+  }, [onboardingState]);
+
+  useEffect(() => {
     saveCollectionFilters(libraryFiltersStorageKey, libraryFilters);
   }, [libraryFilters]);
 
@@ -130,6 +148,25 @@ function App() {
 
     return () => window.cancelAnimationFrame(readyFrame);
   }, []);
+
+  useEffect(() => {
+    const steamSettings = loadSteamSettings();
+    const rawgSettings = loadRawgSettings();
+
+    markOnboardingItemsComplete([
+      games.some((game) => game.collectionType === 'library' && game.externalSource === 'manual')
+        ? 'manual-game'
+        : null,
+      steamSettings.apiKey.trim() ? 'steam-api-key' : null,
+      steamSettings.steamId64.trim() ? 'steam-id64' : null,
+      games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam')
+        ? 'steam-import'
+        : null,
+      rawgSettings.apiKey.trim() ? 'rawg-api-key' : null,
+      games.some((game) => game.metadataSource === 'rawg') ? 'metadata-enriched' : null,
+      games.some((game) => game.collectionType === 'wishlist') ? 'wishlist-item' : null,
+    ]);
+  }, [games]);
 
   const tags = useMemo(() => {
     return Array.from(new Set(games.flatMap((game) => game.tags))).sort((first, second) =>
@@ -157,6 +194,84 @@ function App() {
   const activeGames = libraryGames.filter((game) => game.status === 'Playing').length;
   const totalHours = libraryGames.reduce((sum, game) => sum + game.playtimeHours, 0);
   const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
+  const completedOnboardingItemIds = useMemo(() => {
+    return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId])));
+  }, [onboardingState.completedAt]);
+  const isOnboardingComplete = completedOnboardingItemIds.size === onboardingItemIds.length;
+
+  function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
+    setOnboardingState((currentState) => updater(currentState));
+  }
+
+  function markOnboardingItemComplete(itemId: OnboardingItemId) {
+    markOnboardingItemsComplete([itemId]);
+  }
+
+  function markOnboardingItemsComplete(itemIds: Array<OnboardingItemId | null>) {
+    const nextItemIds = itemIds.filter((itemId): itemId is OnboardingItemId => Boolean(itemId));
+
+    if (nextItemIds.length === 0) {
+      return;
+    }
+
+    updateOnboardingState((currentState) => {
+      const nextCompletedAt = { ...currentState.completedAt };
+      let changed = false;
+
+      nextItemIds.forEach((itemId) => {
+        if (!nextCompletedAt[itemId]) {
+          nextCompletedAt[itemId] = new Date().toISOString();
+          changed = true;
+        }
+      });
+
+      return changed ? { ...currentState, completedAt: nextCompletedAt } : currentState;
+    });
+  }
+
+  function openOnboarding() {
+    updateOnboardingState((currentState) => ({
+      ...currentState,
+      hasSeenChecklist: true,
+      skipped: false,
+    }));
+    setIsOnboardingOpen(true);
+  }
+
+  function hideOnboarding() {
+    updateOnboardingState((currentState) => ({
+      ...currentState,
+      hasSeenChecklist: true,
+    }));
+    setIsOnboardingOpen(false);
+  }
+
+  function skipOnboarding() {
+    updateOnboardingState((currentState) => ({
+      ...currentState,
+      hasSeenChecklist: true,
+      skipped: true,
+    }));
+    setIsOnboardingOpen(false);
+  }
+
+  function handleOnboardingAction(itemId: OnboardingItemId) {
+    if (itemId === 'manual-game' || itemId === 'wishlist-item') {
+      setActiveNavItem(itemId === 'wishlist-item' ? 'Wishlist' : 'Library');
+      setSelectedGameId(null);
+      setIsAddGameOpen(true);
+      return;
+    }
+
+    if (itemId === 'metadata-enriched') {
+      setActiveNavItem('Metadata');
+      setSelectedGameId(null);
+      return;
+    }
+
+    setActiveNavItem('Settings');
+    setSelectedGameId(null);
+  }
 
   function updateGameStatus(gameId: string, status: GameStatus) {
     setGames((currentGames) =>
@@ -556,6 +671,17 @@ function App() {
           <PwaStatusBanner />
         </div>
 
+        {isOnboardingOpen && !isOnboardingComplete && activeNavItem !== 'Settings' ? (
+          <div className="pt-4">
+            <OnboardingChecklist
+              completedItemIds={completedOnboardingItemIds}
+              onAction={handleOnboardingAction}
+              onClose={hideOnboarding}
+              onSkip={skipOnboarding}
+            />
+          </div>
+        ) : null}
+
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="qs-glass rounded-lg border p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
             <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
@@ -631,6 +757,7 @@ function App() {
               games={games}
               initialSelectedGameIds={metadataSelectionRequest?.ids}
               onMetadataManagementChange={updateGameMetadataManagement}
+              onMetadataEnriched={() => markOnboardingItemComplete('metadata-enriched')}
               onMetadataUpdate={updateGameMetadata}
               selectionRequestId={metadataSelectionRequest?.requestId}
             />
@@ -660,11 +787,27 @@ function App() {
                 onLoadDemoData={loadDemoData}
                 onRemoveDemoGames={removeDemoGames}
               />
-              <RawgSettingsPanel />
+              <OnboardingSettingsPanel onOpenOnboarding={openOnboarding} />
+              {isOnboardingOpen ? (
+                <OnboardingChecklist
+                  completedItemIds={completedOnboardingItemIds}
+                  isSettingsPanel
+                  onAction={handleOnboardingAction}
+                  onClose={hideOnboarding}
+                />
+              ) : null}
+              <RawgSettingsPanel
+                onBackupExported={() => markOnboardingItemComplete('backup-exported')}
+                onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
+              />
               <SteamSettingsPanel
                 games={games}
                 ignoredSteamGames={ignoredSteamGames}
+                onConnectionTested={() => markOnboardingItemComplete('steam-test')}
                 onImportGames={importGames}
+                onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
+                onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
+                onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
                 onUnignoreSteamGame={unignoreSteamGame}
               />
             </section>
@@ -680,6 +823,7 @@ function App() {
           onClose={() => setIsAddGameOpen(false)}
           onSave={(game) => {
             addManualGame(game);
+            markOnboardingItemComplete(game.collectionType === 'wishlist' ? 'wishlist-item' : 'manual-game');
             setIsAddGameOpen(false);
             setSelectedGameId(game.id);
             setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
@@ -1481,6 +1625,29 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
 
       <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
         {demoGameCount} known demo games in this browser.
+      </div>
+    </section>
+  );
+}
+
+function OnboardingSettingsPanel({ onOpenOnboarding }: { onOpenOnboarding: () => void }) {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-white">First-run onboarding</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Reopen the compact setup checklist for credentials, imports, metadata, wishlist, and backup.
+          </p>
+        </div>
+
+        <button
+          className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+          onClick={onOpenOnboarding}
+          type="button"
+        >
+          Open checklist
+        </button>
       </div>
     </section>
   );

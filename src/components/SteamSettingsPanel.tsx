@@ -35,14 +35,22 @@ type ImportSummary = {
 type SteamSettingsPanelProps = {
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
+  onConnectionTested?: () => void;
+  onSteamApiKeyConfigured?: () => void;
+  onSteamIdConfigured?: () => void;
   onImportGames: (games: Game[]) => void;
+  onSteamLibraryImported?: () => void;
   onUnignoreSteamGame: (steamAppId: number) => void;
 };
 
 export function SteamSettingsPanel({
   games,
   ignoredSteamGames,
+  onConnectionTested,
   onImportGames,
+  onSteamApiKeyConfigured,
+  onSteamIdConfigured,
+  onSteamLibraryImported,
   onUnignoreSteamGame,
 }: SteamSettingsPanelProps) {
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
@@ -94,6 +102,14 @@ export function SteamSettingsPanel({
       ...currentSettings,
       [field]: value,
     }));
+
+    if (field === 'apiKey' && value.trim()) {
+      onSteamApiKeyConfigured?.();
+    }
+
+    if (field === 'steamId64' && value.trim()) {
+      onSteamIdConfigured?.();
+    }
   }
 
   async function testConnection() {
@@ -124,6 +140,7 @@ export function SteamSettingsPanel({
           apiDebugEntries: getSteamApiDebugLog(),
         },
       });
+      onConnectionTested?.();
     } catch (error) {
       const message =
         error instanceof SteamApiError
@@ -188,6 +205,9 @@ export function SteamSettingsPanel({
     );
 
     onImportGames(mappedGames);
+    if (mappedGames.length > 0) {
+      onSteamLibraryImported?.();
+    }
     setSelectedAppIds(new Set());
     setImportSummary({
       importedCount: mappedGames.length,

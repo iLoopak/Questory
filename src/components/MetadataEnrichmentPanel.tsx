@@ -21,6 +21,7 @@ type MetadataEnrichmentPanelProps = {
     gameId: string,
     changes: Pick<Game, 'metadataManualManagedAt' | 'metadataSkippedAt'>,
   ) => void;
+  onMetadataEnriched?: () => void;
   onMetadataUpdate: (gameId: string, metadata: RawgMetadata) => void;
   selectionRequestId?: number;
 };
@@ -54,6 +55,7 @@ export function MetadataEnrichmentPanel({
   games,
   initialSelectedGameIds,
   onMetadataManagementChange,
+  onMetadataEnriched,
   onMetadataUpdate,
   selectionRequestId,
 }: MetadataEnrichmentPanelProps) {
@@ -178,6 +180,7 @@ export function MetadataEnrichmentPanel({
     const details = await getGameDetails(rawgId);
     const metadata = getRawgMetadataWithCoverFallback(game, mapRawgDetailsToMetadata(details));
     onMetadataUpdate(game.id, metadata);
+    onMetadataEnriched?.();
     saveRawgMetadataCacheEntry({
       gameTitle: game.title,
       rawgId,

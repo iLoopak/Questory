@@ -8,6 +8,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Typed local `Game` model.
 - Empty library by default for new users.
 - Optional development-only demo games.
+- First-run onboarding checklist for setup essentials.
 - Browser `localStorage` persistence.
 - Game cards with cover image, playtime, tags, notes, and last played date.
 - Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
@@ -29,6 +30,16 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
 
 No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+
+## First-Run Onboarding
+
+QuestShelf shows a compact checklist on first launch to guide initial setup without requiring accounts.
+
+- Users can skip the checklist and reopen it later from Settings.
+- Checklist progress is stored locally with the rest of QuestShelf data.
+- Items are completed when users add a manual game, configure Steam credentials, test Steam, import Steam games, configure RAWG, enrich metadata, create a Wishlist item, or export a backup.
+- The checklist links to the official Steam API key page, a SteamID64 lookup page, and RAWG API docs.
+- QuestShelf never stores real API keys in README files or source code. Keys are only entered by the user and saved locally in browser/native storage.
 
 ## Local Library Data
 
