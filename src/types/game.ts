@@ -15,6 +15,10 @@ export type Game = {
   status: GameStatus;
   coverImage: string;
   playtimeHours: number;
+  playtimeCacheHours?: number;
+  rating?: number | null;
+  favorite?: boolean;
+  completionState?: string;
   tags: string[];
   lastPlayedAt: string | null;
   notes: string;
