@@ -6,6 +6,7 @@ import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
+import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { loadSteamSettings } from './lib/steamSettingsStorage';
@@ -642,6 +643,15 @@ function App() {
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
               onStatusChange={updateGameStatus}
+            />
+          ) : activeNavItem === 'Stats' ? (
+            <StatsPanel
+              games={games}
+              onOpenDetails={(gameId) => {
+                const targetGame = games.find((game) => game.id === gameId);
+                setSelectedGameId(gameId);
+                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+              }}
             />
           ) : activeNavItem === 'Settings' ? (
             <section className="min-w-0 space-y-4 overflow-y-auto lg:h-[calc(100vh-116px)]">
@@ -1512,6 +1522,10 @@ function getNavDescription(activeNavItem: NavItem) {
 
   if (activeNavItem === 'Recommendation') {
     return 'Local picks based on your library.';
+  }
+
+  if (activeNavItem === 'Stats') {
+    return 'Local overview of backlog, progress, and playtime.';
   }
 
   return `${activeNavItem} remains a placeholder for a later feature pass.`;

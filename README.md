@@ -23,6 +23,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
 - Metadata enrichment workflow for larger libraries with batch processing and manual match review.
 - Local Recommendation Engine v1 for choosing what to play next.
+- Local Stats dashboard for backlog progress, playtime, platform/source breakdowns, and metadata coverage.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 - QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
 
@@ -219,6 +220,20 @@ Inputs:
 The recommendation score uses local status, last played date, playtime, RAWG average playtime, genres, RAWG tags, custom tags, and platform. It prefers games already marked `Playing`, games not played recently, mood matches, and games that fit the selected session length. It penalizes completed games unless enabled, dropped games, and missing RAWG metadata without excluding those games entirely.
 
 The main recommendation card shows the selected game, cover, platform, status, playtime, matching reasons, and confidence score. **Reroll** moves to the next best candidate, **Mark as Playing** updates local tracking, and **Open Detail** opens the focused game detail view.
+
+## Stats Dashboard
+
+Open **Stats** to review the local backlog dashboard. Stats use only the games saved in this browser and never call external APIs.
+
+The dashboard supports three scopes:
+
+- **Library only**
+- **Wishlist only**
+- **All**
+
+Stats include Library and Wishlist totals, status counts, total tracked playtime, finished percentage, active backlog count, played-but-unfinished games, never-played games, platform breakdown, source breakdown, and RAWG enrichment coverage.
+
+QuestShelf also shows useful local lists such as top played games, recently played games, longest paused games, recently imported games, and games missing metadata. Charts are intentionally lightweight CSS bars instead of a chart dependency so the dashboard stays fast on handheld screens and large libraries.
 
 ## Install
 
