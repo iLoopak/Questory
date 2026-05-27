@@ -55,6 +55,9 @@ export type Game = {
   externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
   externalUrl?: string;
   importedAt?: string;
+  finishedAt?: string;
+  droppedAt?: string;
+  droppedReason?: string;
   romFileName?: string;
   romPath?: string;
   romUri?: string;
