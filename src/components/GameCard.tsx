@@ -53,6 +53,11 @@ export function GameCard({
   }
 
   function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === 'Escape') {
+      setIsActionMenuOpen(false);
+      return;
+    }
+
     if (!isMultiSelectMode || (event.key !== 'Enter' && event.key !== ' ')) {
       return;
     }
@@ -68,7 +73,7 @@ export function GameCard({
   return (
     <article
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-glass relative flex h-full min-h-[390px] min-w-0 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow ${
+      className={`qs-game-card qs-glass relative flex h-full min-h-[360px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[390px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
@@ -89,7 +94,7 @@ export function GameCard({
         </div>
       ) : null}
 
-      <div className="relative aspect-[16/9] max-h-40 shrink-0 overflow-hidden bg-ink-700">
+      <div className="relative aspect-[16/9] max-h-36 shrink-0 overflow-hidden bg-ink-700 sm:max-h-40">
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
@@ -129,10 +134,13 @@ export function GameCard({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <div className="min-w-0">
-          <h3 className="line-clamp-3 min-h-[5.25rem] text-lg font-semibold leading-7 text-white" title={game.title}>
-              {game.title}
+          <h3
+            className="line-clamp-3 min-h-[4.75rem] text-base font-semibold leading-6 text-white sm:min-h-[5.25rem] sm:text-lg sm:leading-7"
+            title={game.title}
+          >
+            {game.title}
           </h3>
 
           <div className="mt-2 flex flex-wrap gap-2">
@@ -156,7 +164,7 @@ export function GameCard({
 
         {!isMultiSelectMode ? (
           <select
-            className="h-9 w-full rounded-md border border-skyglass/15 bg-ink-950/80 px-2 text-sm font-medium text-slate-100 outline-none transition focus:border-mint"
+            className="h-10 w-full rounded-md border border-skyglass/15 bg-ink-950/80 px-2 text-sm font-medium text-slate-100 outline-none transition focus:border-mint"
             value={game.status}
             aria-label={`Change status for ${game.title}`}
             onChange={(event) => onStatusChange(game.id, event.target.value as GameStatus)}
@@ -186,7 +194,7 @@ export function GameCard({
         <div className="mt-auto border-t border-skyglass/15 pt-3">
           <div className="flex items-center gap-2">
             <button
-              className="h-9 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              className="h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
               onClick={(event) => {
                 stopCardAction(event);
                 onOpenDetails();
@@ -199,7 +207,7 @@ export function GameCard({
               <button
                 aria-expanded={isActionMenuOpen}
                 aria-label={`More actions for ${game.title}`}
-                className="grid h-9 w-10 place-items-center rounded-md border border-skyglass/15 text-lg font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                className="grid h-10 w-11 place-items-center rounded-md border border-skyglass/15 text-lg font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
                 onClick={() => setIsActionMenuOpen((currentValue) => !currentValue)}
                 type="button"
               >
