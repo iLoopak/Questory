@@ -130,6 +130,7 @@ function getSourceBreakdown(games: Game[]) {
   const sourceCounts = new Map<string, number>([
     ['Steam', 0],
     ['Steam Wishlist', 0],
+    ['Retro ROM', 0],
     ['Manual', 0],
     ['Future/Other', 0],
   ]);
@@ -149,6 +150,10 @@ function getSourceLabel(game: Game) {
 
   if (game.externalSource === 'steam' || typeof game.steamAppId === 'number') {
     return 'Steam';
+  }
+
+  if (game.externalSource === 'retro-rom') {
+    return 'Retro ROM';
   }
 
   if (game.externalSource === 'manual') {

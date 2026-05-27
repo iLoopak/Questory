@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DataManagementPanel } from './DataManagementPanel';
+import { RetroImportPanel } from './RetroImportPanel';
 import { loadRawgSettings, saveRawgSettings } from '../lib/rawgSettingsStorage';
 import type { RawgSettings } from '../types/rawg';
 
@@ -13,6 +14,7 @@ export function RawgSettingsPanel() {
   return (
     <>
       <DataManagementPanel />
+      <RetroImportPanel />
 
       <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
