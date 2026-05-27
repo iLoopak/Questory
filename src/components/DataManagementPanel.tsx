@@ -12,7 +12,11 @@ import {
   serializePortableBackup,
 } from '../lib/portableSync';
 
-export function DataManagementPanel() {
+type DataManagementPanelProps = {
+  onBackupExported?: () => void;
+};
+
+export function DataManagementPanel({ onBackupExported }: DataManagementPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [includeIntegrationSettings, setIncludeIntegrationSettings] = useState(false);
   const [message, setMessage] = useState('Download a local backup before testing destructive actions.');
@@ -41,6 +45,7 @@ export function DataManagementPanel() {
         : 'Backup downloaded without API keys or integration settings.',
       'success',
     );
+    onBackupExported?.();
   }
 
   async function readBackupFile(file: File) {

@@ -4,7 +4,12 @@ import { RetroImportPanel } from './RetroImportPanel';
 import { loadRawgSettings, saveRawgSettings } from '../lib/rawgSettingsStorage';
 import type { RawgSettings } from '../types/rawg';
 
-export function RawgSettingsPanel() {
+type RawgSettingsPanelProps = {
+  onBackupExported?: () => void;
+  onRawgApiKeyConfigured?: () => void;
+};
+
+export function RawgSettingsPanel({ onBackupExported, onRawgApiKeyConfigured }: RawgSettingsPanelProps) {
   const [settings, setSettings] = useState<RawgSettings>(() => loadRawgSettings());
 
   useEffect(() => {
@@ -13,7 +18,7 @@ export function RawgSettingsPanel() {
 
   return (
     <>
-      <DataManagementPanel />
+      <DataManagementPanel onBackupExported={onBackupExported} />
       <RetroImportPanel />
 
       <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
@@ -32,7 +37,13 @@ export function RawgSettingsPanel() {
           <input
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
             value={settings.apiKey}
-            onChange={(event) => setSettings({ apiKey: event.target.value })}
+            onChange={(event) => {
+              setSettings({ apiKey: event.target.value });
+
+              if (event.target.value.trim()) {
+                onRawgApiKeyConfigured?.();
+              }
+            }}
             placeholder="Paste RAWG API key"
             spellCheck={false}
             type="password"
