@@ -1,4 +1,5 @@
 import type { SteamSettings } from '../types/steam';
+import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.steamSettings.v1';
 
@@ -8,36 +9,20 @@ const emptySettings: SteamSettings = {
   wishlistUrl: '',
 };
 
-const isBrowser = typeof window !== 'undefined';
-
 export function loadSteamSettings(): SteamSettings {
-  if (!isBrowser) {
-    return emptySettings;
-  }
-
-  const storedSettings = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedSettings) {
-    return emptySettings;
-  }
-
-  try {
-    const parsedSettings = JSON.parse(storedSettings) as Partial<SteamSettings>;
-
-    return {
-      apiKey: parsedSettings.apiKey ?? '',
-      steamId64: parsedSettings.steamId64 ?? '',
-      wishlistUrl: parsedSettings.wishlistUrl ?? '',
-    };
-  } catch {
-    return emptySettings;
-  }
+  return loadLocalJson(STORAGE_KEY, emptySettings, normalizeSteamSettings);
 }
 
 export function saveSteamSettings(settings: SteamSettings) {
-  if (!isBrowser) {
-    return;
-  }
+  savePersistedJson(STORAGE_KEY, settings);
+}
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+function normalizeSteamSettings(value: unknown): SteamSettings {
+  const parsedSettings = value && typeof value === 'object' ? (value as Partial<SteamSettings>) : {};
+
+  return {
+    apiKey: parsedSettings.apiKey ?? '',
+    steamId64: parsedSettings.steamId64 ?? '',
+    wishlistUrl: parsedSettings.wishlistUrl ?? '',
+  };
 }
