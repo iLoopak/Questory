@@ -15,6 +15,7 @@ export const coreBackupStorageKeys = [
 ] as const;
 
 export const integrationBackupStorageKeys = ['questshelf.rawgSettings.v1', 'questshelf.steamSettings.v1'] as const;
+export const deviceBackupStorageKeys = ['questshelf.syncFolderSettings.v1'] as const;
 
 export const allBackupStorageKeys = [...coreBackupStorageKeys, ...integrationBackupStorageKeys] as const;
 
@@ -28,6 +29,13 @@ export type QuestShelfBackup = {
     schemaVersion: typeof questShelfBackupVersion;
   };
   schemaVersion: typeof questShelfBackupVersion;
+};
+
+export type QuestShelfBackupSummary = {
+  exportedAt: string;
+  gameCount: number;
+  schemaVersion: number;
+  wishlistCount: number;
 };
 
 export type RestoredQuestShelfData = {
@@ -84,6 +92,17 @@ export function parseQuestShelfBackupText(text: string): BackupParseResult {
   }
 }
 
+export function getQuestShelfBackupSummary(backup: QuestShelfBackup): QuestShelfBackupSummary {
+  const games = getBackupGames(backup);
+
+  return {
+    exportedAt: backup.metadata.exportedAt,
+    gameCount: games.filter((game) => game.collectionType !== 'wishlist').length,
+    schemaVersion: backup.metadata.schemaVersion ?? backup.schemaVersion,
+    wishlistCount: games.filter((game) => game.collectionType === 'wishlist').length,
+  };
+}
+
 export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
   allBackupStorageKeys.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
@@ -102,8 +121,34 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
   };
 }
 
+export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
+  const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
+  savePersistedJson('questshelf.games.v1', mergedGames);
+
+  coreBackupStorageKeys.forEach((key) => {
+    if (key === 'questshelf.games.v1') {
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
+      savePersistedJson(key, backup.data[key]);
+    }
+  });
+
+  integrationBackupStorageKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
+      savePersistedJson(key, backup.data[key]);
+    }
+  });
+
+  return {
+    games: loadGames(),
+    ignoredSteamGames: loadIgnoredSteamGames(),
+  };
+}
+
 export async function resetQuestShelfLocalData() {
-  await removePersistedKeys([...allBackupStorageKeys]);
+  await removePersistedKeys([...allBackupStorageKeys, ...deviceBackupStorageKeys]);
 }
 
 function validateQuestShelfBackup(value: unknown): BackupParseResult {
@@ -207,6 +252,67 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
       },
     },
   };
+}
+
+function getBackupGames(backup: QuestShelfBackup): Game[] {
+  const games = backup.data['questshelf.games.v1'];
+  return Array.isArray(games) ? games.map((game) => game as Game) : [];
+}
+
+function mergeGames(localGames: Game[], backupGames: Game[]) {
+  const mergedGames = [...localGames];
+
+  backupGames.forEach((backupGame) => {
+    const existingIndex = mergedGames.findIndex((localGame) => areGamesMatching(localGame, backupGame));
+
+    if (existingIndex === -1) {
+      mergedGames.push(backupGame);
+      return;
+    }
+
+    if (isBackupGameNewer(backupGame, mergedGames[existingIndex])) {
+      mergedGames[existingIndex] = {
+        ...mergedGames[existingIndex],
+        ...backupGame,
+      };
+    }
+  });
+
+  return mergedGames;
+}
+
+function areGamesMatching(firstGame: Game, secondGame: Game) {
+  if (firstGame.id === secondGame.id) {
+    return true;
+  }
+
+  if (typeof firstGame.steamAppId === 'number' && firstGame.steamAppId === secondGame.steamAppId) {
+    return true;
+  }
+
+  if (typeof firstGame.rawgId === 'number' && firstGame.rawgId === secondGame.rawgId) {
+    return true;
+  }
+
+  const firstRomPath = (firstGame.romPath ?? firstGame.romUri ?? '').trim().toLowerCase();
+  const secondRomPath = (secondGame.romPath ?? secondGame.romUri ?? '').trim().toLowerCase();
+
+  return Boolean(firstRomPath && secondRomPath && firstRomPath === secondRomPath);
+}
+
+function isBackupGameNewer(backupGame: Game, localGame: Game) {
+  const backupUpdatedAt = getGameUpdatedAt(backupGame);
+  const localUpdatedAt = getGameUpdatedAt(localGame);
+
+  if (!backupUpdatedAt || !localUpdatedAt) {
+    return Boolean(backupUpdatedAt && !localUpdatedAt);
+  }
+
+  return backupUpdatedAt >= localUpdatedAt;
+}
+
+function getGameUpdatedAt(game: Game) {
+  return game.updatedAt ?? game.metadataUpdatedAt ?? game.wishlistSyncedAt ?? game.importedAt ?? game.wishlistImportedAt ?? null;
 }
 
 function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], value: unknown) {

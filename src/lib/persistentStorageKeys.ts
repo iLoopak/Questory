@@ -7,4 +7,5 @@ export const persistentStorageKeys = [
   'questshelf.libraryFilters.v1',
   'questshelf.wishlistFilters.v1',
   'questshelf.onboarding.v1',
+  'questshelf.syncFolderSettings.v1',
 ] as const;

@@ -194,6 +194,22 @@ function App() {
   const activeGames = libraryGames.filter((game) => game.status === 'Playing').length;
   const totalHours = libraryGames.reduce((sum, game) => sum + game.playtimeHours, 0);
   const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
+  const autoBackupSignal = useMemo(
+    () =>
+      JSON.stringify({
+        games: games.map((game) => [
+          game.id,
+          game.collectionType,
+          game.updatedAt,
+          game.importedAt,
+          game.metadataUpdatedAt,
+          game.wishlistSyncedAt,
+          game.status,
+        ]),
+        ignoredSteamGames: ignoredSteamGames.map((game) => [game.steamAppId, game.ignoredAt]),
+      }),
+    [games, ignoredSteamGames],
+  );
   const completedOnboardingItemIds = useMemo(() => {
     return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId])));
   }, [onboardingState.completedAt]);
@@ -277,11 +293,11 @@ function App() {
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
-          ? {
+          ? touchGameRecord({
               ...game,
               status,
               lastPlayedAt: status === 'Playing' ? new Date().toISOString().slice(0, 10) : game.lastPlayedAt,
-            }
+            })
           : game,
       ),
     );
@@ -294,11 +310,11 @@ function App() {
     setGames((currentGames) =>
       currentGames.map((game) =>
         targetGameIds.has(game.id)
-          ? {
+          ? touchGameRecord({
               ...game,
               status,
               lastPlayedAt: status === 'Playing' && game.status !== 'Playing' ? today : game.lastPlayedAt,
-            }
+            })
           : game,
       ),
     );
@@ -316,7 +332,10 @@ function App() {
         return typeof game.steamAppId !== 'number' || !existingSteamAppIds.has(game.steamAppId);
       });
 
-      return [...currentGames, ...newGames.map((game) => ({ ...game, collectionType: 'library' as const }))];
+      return [
+        ...currentGames,
+        ...newGames.map((game) => touchGameRecord({ ...game, collectionType: 'library' as const })),
+      ];
     });
   }
 
@@ -398,12 +417,12 @@ function App() {
 
       if (typeof existingWishlistIndex === 'number') {
         const existingGame = nextGames[existingWishlistIndex];
-        nextGames[existingWishlistIndex] = mergeSteamWishlistSync(existingGame, mappedGame, syncedAt);
+        nextGames[existingWishlistIndex] = touchGameRecord(mergeSteamWishlistSync(existingGame, mappedGame, syncedAt));
         summary.updatedCount += 1;
         return;
       }
 
-      nextGames.push(mappedGame);
+      nextGames.push(touchGameRecord(mappedGame));
       wishlistIndexBySteamAppId.set(item.appid, nextGames.length - 1);
       summary.addedCount += 1;
     });
@@ -413,7 +432,7 @@ function App() {
   }
 
   function addManualGame(game: Game) {
-    setGames((currentGames) => [...currentGames, game]);
+    setGames((currentGames) => [...currentGames, touchGameRecord(game)]);
   }
 
   function addToWishlist(game: Game) {
@@ -439,7 +458,7 @@ function App() {
       return [
         ...currentGames,
         {
-          ...game,
+          ...touchGameRecord(game),
           id: wishlistId,
           collectionType: 'wishlist',
           status: 'Want to play',
@@ -478,7 +497,7 @@ function App() {
         const wishlistId = createCollectionCopyId(game, 'wishlist', existingGameIds);
         existingGameIds.add(wishlistId);
         addedCount += 1;
-        nextGames.push({
+        nextGames.push(touchGameRecord({
           ...game,
           id: wishlistId,
           collectionType: 'wishlist',
@@ -487,7 +506,7 @@ function App() {
           lastPlayedAt: null,
           priority: game.priority ?? 'medium',
           importedAt: new Date().toISOString(),
-        });
+        }));
       });
 
       return addedCount > 0 ? nextGames : currentGames;
@@ -498,14 +517,14 @@ function App() {
     setGames((currentGames) =>
       currentGames.map((currentGame) =>
         currentGame.id === game.id
-          ? {
+          ? touchGameRecord({
               ...currentGame,
               collectionType: 'library',
               priority: undefined,
               expectedPlaytime: undefined,
               priceTarget: undefined,
               status: 'Want to play',
-            }
+            })
           : currentGame,
       ),
     );
@@ -581,12 +600,12 @@ function App() {
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
-          ? {
+          ? touchGameRecord({
               ...game,
               ...metadata,
               metadataSkippedAt: undefined,
               metadataManualManagedAt: undefined,
-            }
+            })
           : game,
       ),
     );
@@ -599,10 +618,10 @@ function App() {
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
-          ? {
+          ? touchGameRecord({
               ...game,
               ...changes,
-            }
+            })
           : game,
       ),
     );
@@ -612,14 +631,14 @@ function App() {
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
-          ? {
+          ? touchGameRecord({
               ...game,
               ...tracking,
               lastPlayedAt:
                 tracking.status === 'Playing' && game.status !== 'Playing'
                   ? new Date().toISOString().slice(0, 10)
                   : game.lastPlayedAt,
-            }
+            })
           : game,
       ),
     );
@@ -797,6 +816,7 @@ function App() {
                 />
               ) : null}
               <RawgSettingsPanel
+                autoBackupSignal={autoBackupSignal}
                 onBackupExported={() => markOnboardingItemComplete('backup-exported')}
                 onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
               />
@@ -1696,6 +1716,13 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   return `${activeNavItem} remains a placeholder for a later feature pass.`;
+}
+
+function touchGameRecord(game: Game): Game {
+  return {
+    ...game,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 type StatProps = {

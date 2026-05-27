@@ -5,11 +5,16 @@ import { loadRawgSettings, saveRawgSettings } from '../lib/rawgSettingsStorage';
 import type { RawgSettings } from '../types/rawg';
 
 type RawgSettingsPanelProps = {
+  autoBackupSignal?: string;
   onBackupExported?: () => void;
   onRawgApiKeyConfigured?: () => void;
 };
 
-export function RawgSettingsPanel({ onBackupExported, onRawgApiKeyConfigured }: RawgSettingsPanelProps) {
+export function RawgSettingsPanel({
+  autoBackupSignal,
+  onBackupExported,
+  onRawgApiKeyConfigured,
+}: RawgSettingsPanelProps) {
   const [settings, setSettings] = useState<RawgSettings>(() => loadRawgSettings());
 
   useEffect(() => {
@@ -18,7 +23,7 @@ export function RawgSettingsPanel({ onBackupExported, onRawgApiKeyConfigured }: 
 
   return (
     <>
-      <DataManagementPanel onBackupExported={onBackupExported} />
+      <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
       <RetroImportPanel />
 
       <section className="rounded-lg border border-white/10 bg-ink-950 p-4">

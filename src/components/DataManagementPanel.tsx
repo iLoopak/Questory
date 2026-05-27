@@ -1,27 +1,86 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createQuestShelfBackup,
+  getQuestShelfBackupSummary,
+  mergeQuestShelfBackup,
   parseQuestShelfBackupText,
   resetQuestShelfLocalData,
   restoreQuestShelfBackup,
   type QuestShelfBackup,
+  type QuestShelfBackupSummary,
 } from '../lib/backupStorage';
 import {
   createPortableBackupFilename,
   portableSyncProviders,
   serializePortableBackup,
 } from '../lib/portableSync';
+import {
+  chooseBackupFileHandle,
+  clearBackupFileHandle,
+  defaultSyncFolderSettings,
+  isFileSystemAccessSupported,
+  loadSyncFolderSettings,
+  openBackupFileWithPicker,
+  saveBackupToSelectedFile,
+  saveSyncFolderSettings,
+  type SyncFolderSettings,
+} from '../lib/syncFolderStorage';
 
 type DataManagementPanelProps = {
+  autoBackupSignal?: string;
   onBackupExported?: () => void;
 };
 
-export function DataManagementPanel({ onBackupExported }: DataManagementPanelProps) {
+type ImportMode = 'merge' | 'replace';
+
+export function DataManagementPanel({ autoBackupSignal, onBackupExported }: DataManagementPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [includeIntegrationSettings, setIncludeIntegrationSettings] = useState(false);
+  const [importMode, setImportMode] = useState<ImportMode>('merge');
   const [message, setMessage] = useState('Download a local backup before testing destructive actions.');
   const [messageTone, setMessageTone] = useState<'error' | 'info' | 'success'>('info');
   const [selectedBackup, setSelectedBackup] = useState<QuestShelfBackup | null>(null);
+  const [syncSettings, setSyncSettings] = useState<SyncFolderSettings>(() =>
+    typeof window === 'undefined' ? defaultSyncFolderSettings : loadSyncFolderSettings(),
+  );
+  const autoBackupTimeoutRef = useRef<number | null>(null);
+  const autoBackupSignalRef = useRef(autoBackupSignal);
+  const supportsFileSystemAccess = useMemo(
+    () => typeof window !== 'undefined' && isFileSystemAccessSupported(),
+    [],
+  );
+  const selectedBackupSummary = selectedBackup ? getQuestShelfBackupSummary(selectedBackup) : null;
+
+  useEffect(() => {
+    saveSyncFolderSettings(syncSettings);
+  }, [syncSettings]);
+
+  useEffect(() => {
+    if (!syncSettings.autoBackupEnabled || !supportsFileSystemAccess || !autoBackupSignal) {
+      autoBackupSignalRef.current = autoBackupSignal;
+      return;
+    }
+
+    if (autoBackupSignalRef.current === autoBackupSignal) {
+      return;
+    }
+
+    autoBackupSignalRef.current = autoBackupSignal;
+
+    if (autoBackupTimeoutRef.current) {
+      window.clearTimeout(autoBackupTimeoutRef.current);
+    }
+
+    autoBackupTimeoutRef.current = window.setTimeout(() => {
+      void saveBackupNow(true);
+    }, 1200);
+
+    return () => {
+      if (autoBackupTimeoutRef.current) {
+        window.clearTimeout(autoBackupTimeoutRef.current);
+      }
+    };
+  }, [autoBackupSignal, supportsFileSystemAccess, syncSettings.autoBackupEnabled, syncSettings.includeIntegrationSettings]);
 
   function showMessage(nextMessage: string, tone: 'error' | 'info' | 'success' = 'info') {
     setMessage(nextMessage);
@@ -48,6 +107,110 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
     onBackupExported?.();
   }
 
+  async function chooseSyncFile() {
+    if (!supportsFileSystemAccess) {
+      showMessage('This browser cannot choose a persistent backup file. Use manual export/import with a synced folder.', 'error');
+      return;
+    }
+
+    try {
+      const handle = await chooseBackupFileHandle();
+
+      if (!handle) {
+        return;
+      }
+
+      setSyncSettings((currentSettings) => ({
+        ...currentSettings,
+        selectedFileName: handle.name,
+      }));
+      showMessage(`Backup file selected: ${handle.name}.`, 'success');
+    } catch {
+      showMessage('Backup file selection was cancelled or unavailable.');
+    }
+  }
+
+  async function saveBackupNow(isAutomatic = false) {
+    if (!supportsFileSystemAccess) {
+      if (!isAutomatic) {
+        downloadBackup();
+      }
+      return;
+    }
+
+    const result = await saveBackupToSelectedFile(syncSettings.includeIntegrationSettings);
+
+    if (!result.ok) {
+      if (result.permissionLost) {
+        setSyncSettings((currentSettings) => ({
+          ...currentSettings,
+          autoBackupEnabled: false,
+          selectedFileName: null,
+        }));
+      }
+
+      showMessage(result.error, 'error');
+      return;
+    }
+
+    setSyncSettings((currentSettings) => ({
+      ...currentSettings,
+      lastBackupAt: result.backup.metadata.exportedAt,
+      selectedFileName: result.fileName,
+    }));
+    showMessage(
+      `${isAutomatic ? 'Auto-backup saved' : 'Backup saved'} to ${result.fileName} at ${formatDateTime(result.backup.metadata.exportedAt)}.`,
+      'success',
+    );
+    onBackupExported?.();
+  }
+
+  async function loadBackupWithPicker() {
+    if (!supportsFileSystemAccess) {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    try {
+      const result = await openBackupFileWithPicker();
+
+      if (!result) {
+        return;
+      }
+
+      if (!result.ok) {
+        showMessage(result.error, 'error');
+        return;
+      }
+
+      setSelectedBackup(result.backup);
+      showBackupReadyMessage(getQuestShelfBackupSummary(result.backup));
+    } catch {
+      showMessage('Backup file loading was cancelled or unavailable.');
+    }
+  }
+
+  function enableAutoBackup() {
+    if (!supportsFileSystemAccess || !syncSettings.selectedFileName) {
+      showMessage('Choose a synced-folder backup file before enabling auto-backup.', 'error');
+      return;
+    }
+
+    setSyncSettings((currentSettings) => ({
+      ...currentSettings,
+      autoBackupEnabled: true,
+    }));
+    showMessage('Auto-backup enabled. QuestShelf will debounce saves after local data changes.', 'success');
+  }
+
+  function disableAutoBackup() {
+    setSyncSettings((currentSettings) => ({
+      ...currentSettings,
+      autoBackupEnabled: false,
+    }));
+    showMessage('Auto-backup disabled.');
+  }
+
   async function readBackupFile(file: File) {
     const result = parseQuestShelfBackupText(await file.text());
 
@@ -58,8 +221,12 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
     }
 
     setSelectedBackup(result.backup);
+    showBackupReadyMessage(getQuestShelfBackupSummary(result.backup));
+  }
+
+  function showBackupReadyMessage(summary: QuestShelfBackupSummary) {
     showMessage(
-      `Backup ready: exported ${formatDateTime(result.backup.metadata.exportedAt)}, version ${result.backup.metadata.appVersion}, schema ${result.backup.metadata.schemaVersion}.`,
+      `Backup ready: exported ${formatDateTime(summary.exportedAt)}, schema ${summary.schemaVersion}, ${summary.gameCount} library games, ${summary.wishlistCount} wishlist items.`,
       'success',
     );
   }
@@ -70,20 +237,30 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
       return;
     }
 
+    const summary = getQuestShelfBackupSummary(selectedBackup);
     const confirmation = window.prompt(
       [
-        'This will overwrite local QuestShelf data on this device.',
-        'Type RESTORE to import the selected backup.',
-      ].join('\n\n'),
+        `${importMode === 'merge' ? 'Merge' : 'Replace'} local QuestShelf data with this backup?`,
+        `Exported: ${formatDateTime(summary.exportedAt)}`,
+        `Schema: ${summary.schemaVersion}`,
+        `Library games: ${summary.gameCount}`,
+        `Wishlist items: ${summary.wishlistCount}`,
+        `Type ${importMode === 'merge' ? 'MERGE' : 'REPLACE'} to continue.`,
+      ].join('\n'),
     );
 
-    if (confirmation !== 'RESTORE') {
-      showMessage('Restore cancelled. Local data was not changed.');
+    if (confirmation !== (importMode === 'merge' ? 'MERGE' : 'REPLACE')) {
+      showMessage('Import cancelled. Local data was not changed.');
       return;
     }
 
-    restoreQuestShelfBackup(selectedBackup);
-    showMessage('Backup restored. QuestShelf will reload so the restored local library is shown.', 'success');
+    if (importMode === 'merge') {
+      mergeQuestShelfBackup(selectedBackup);
+    } else {
+      restoreQuestShelfBackup(selectedBackup);
+    }
+
+    showMessage('Backup imported. QuestShelf will reload so the updated local library is shown.', 'success');
     window.setTimeout(() => window.location.reload(), 600);
   }
 
@@ -96,6 +273,10 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
     }
 
     await resetQuestShelfLocalData();
+    if (supportsFileSystemAccess) {
+      await clearBackupFileHandle();
+    }
+    setSyncSettings(defaultSyncFolderSettings);
     setSelectedBackup(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -164,7 +345,7 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
             onClick={restoreBackup}
             type="button"
           >
-            Import backup
+            {importMode === 'merge' ? 'Merge backup' : 'Replace from backup'}
           </button>
         </div>
       </div>
@@ -176,6 +357,104 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
           {portableSyncProviders[1].label} support is planned for user-owned cloud folders without accounts.
         </div>
       </div>
+
+      {selectedBackupSummary ? (
+        <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <BackupSummaryStat label="Exported" value={formatDateTime(selectedBackupSummary.exportedAt)} />
+            <BackupSummaryStat label="Schema" value={selectedBackupSummary.schemaVersion.toString()} />
+            <BackupSummaryStat label="Library" value={selectedBackupSummary.gameCount.toString()} />
+            <BackupSummaryStat label="Wishlist" value={selectedBackupSummary.wishlistCount.toString()} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className="flex items-center gap-2 rounded-md border border-skyglass/15 px-3 py-2">
+              <input
+                checked={importMode === 'merge'}
+                className="accent-mint"
+                onChange={() => setImportMode('merge')}
+                type="radio"
+              />
+              <span>Merge with local data</span>
+            </label>
+            <label className="flex items-center gap-2 rounded-md border border-skyglass/15 px-3 py-2">
+              <input
+                checked={importMode === 'replace'}
+                className="accent-mint"
+                onChange={() => setImportMode('replace')}
+                type="radio"
+              />
+              <span>Replace local data</span>
+            </label>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Sync Folder / Auto Backup</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+              For simple multi-device sync, choose a backup file inside your Google Drive / OneDrive / Dropbox / Syncthing folder.
+            </p>
+          </div>
+          <span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+            {syncSettings.autoBackupEnabled ? 'Auto-backup on' : 'Auto-backup off'}
+          </span>
+        </div>
+
+        {supportsFileSystemAccess ? (
+          <>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div className="rounded-md border border-skyglass/15 bg-ink-900 p-3 text-sm leading-6 text-slate-300">
+                <div>Selected file: {syncSettings.selectedFileName ?? 'None selected'}</div>
+                <div>Last backup: {syncSettings.lastBackupAt ? formatDateTime(syncSettings.lastBackupAt) : 'Never'}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={chooseSyncFile} type="button">
+                  Choose backup file
+                </button>
+                <button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => void saveBackupNow()} type="button">
+                  Save backup now
+                </button>
+                <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={() => void loadBackupWithPicker()} type="button">
+                  Load backup from file
+                </button>
+                {syncSettings.autoBackupEnabled ? (
+                  <button className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm text-red-200 hover:bg-red-500/20" onClick={disableAutoBackup} type="button">
+                    Disable auto-backup
+                  </button>
+                ) : (
+                  <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint hover:bg-mint/20" onClick={enableAutoBackup} type="button">
+                    Enable auto-backup
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-900 p-3 text-sm text-slate-300">
+              <input
+                checked={syncSettings.includeIntegrationSettings}
+                className="mt-1 h-4 w-4 accent-mint"
+                onChange={(event) =>
+                  setSyncSettings((currentSettings) => ({
+                    ...currentSettings,
+                    includeIntegrationSettings: event.target.checked,
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>
+                <span className="block font-medium text-white">Include integration settings in auto-backup</span>
+                <span className="mt-1 block text-slate-500">Off by default so Steam and RAWG API keys are not written unless you choose it.</span>
+              </span>
+            </label>
+          </>
+        ) : (
+          <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
+            This browser or platform cannot keep a persistent backup file handle. Use Download backup and QuestShelf backup JSON above, then save/load that file from your synced folder manually. Android APK WebViews may need a later native file picker before auto-backup can write directly.
+          </div>
+        )}
+      </section>
 
       <div
         className={`mt-4 rounded-md border px-3 py-2 text-sm ${
@@ -202,6 +481,15 @@ export function DataManagementPanel({ onBackupExported }: DataManagementPanelPro
         </p>
       </div>
     </section>
+  );
+}
+
+function BackupSummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-sm text-white">{value}</div>
+    </div>
   );
 }
 
