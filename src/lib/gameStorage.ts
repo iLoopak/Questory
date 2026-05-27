@@ -1,35 +1,19 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
+import { loadLocalJson, loadPersistedJson, savePersistedJson } from './localPersistence';
 import type { Game, GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
-const isBrowser = typeof window !== 'undefined';
-
 export function loadGames(): Game[] {
-  if (!isBrowser) {
-    return [];
-  }
+  return loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames);
+}
 
-  const storedGames = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedGames) {
-    return [];
-  }
-
-  try {
-    const parsedGames = JSON.parse(storedGames) as Game[];
-    return Array.isArray(parsedGames) ? parsedGames.map(normalizeLoadedGame) : [];
-  } catch {
-    return [];
-  }
+export function loadGamesFromPersistentStorage(): Promise<Game[]> {
+  return loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames);
 }
 
 export function saveGames(games: Game[]) {
-  if (!isBrowser) {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
+  savePersistedJson(STORAGE_KEY, games);
 }
 
 export function getMockGames(): Game[] {
@@ -50,6 +34,10 @@ function normalizeLoadedGame(game: Game): Game {
     collectionType: game.collectionType ?? 'library',
     status: normalizeLoadedStatus(game.status),
   };
+}
+
+function normalizeLoadedGames(value: unknown): Game[] {
+  return Array.isArray(value) ? value.map((game) => normalizeLoadedGame(game as Game)) : [];
 }
 
 function normalizeLoadedStatus(status: string): GameStatus {
