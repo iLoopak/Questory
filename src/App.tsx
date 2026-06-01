@@ -330,6 +330,12 @@ function App() {
 
     setActiveNavItem('Settings');
     setSelectedGameId(null);
+    if (itemId === 'backup-exported') {
+      setActiveSettingsCategory('Data & Backup');
+      return;
+    }
+
+    setActiveSettingsCategory('Integrations');
   }
 
   function updateGameStatus(gameId: string, status: GameStatus) {
@@ -469,7 +475,7 @@ function App() {
       const message =
         error instanceof SteamWishlistError
           ? error.message
-          : 'Steam wishlist sync failed. Check profile privacy, SteamID64, and the dev proxy.';
+          : 'Steam wishlist sync failed. Check profile privacy, SteamID64, and connection.';
 
       setSteamWishlistSyncState((currentState) => ({
         status: 'error',
@@ -799,17 +805,6 @@ function App() {
           <PwaStatusBanner />
         </div>
 
-        {isOnboardingOpen && !isOnboardingComplete && activeNavItem !== 'Settings' ? (
-          <div className="pt-4">
-            <OnboardingChecklist
-              completedItemIds={completedOnboardingItemIds}
-              onAction={handleOnboardingAction}
-              onClose={hideOnboarding}
-              onSkip={skipOnboarding}
-            />
-          </div>
-        ) : null}
-
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="qs-glass rounded-lg border p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
             <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
@@ -918,6 +913,7 @@ function App() {
               ignoredSteamGames={ignoredSteamGames}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               isOnboardingOpen={isOnboardingOpen}
+              isOnboardingComplete={isOnboardingComplete}
               lastRetroImportsHiddenByFilters={areLastRetroImportsHiddenByFilters}
               libraryCount={libraryGames.length}
               runtimeEnvironment={runtimeEnvironment}
@@ -961,6 +957,30 @@ function App() {
             setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
           }}
         />
+      ) : null}
+
+      {!isOnboardingComplete ? (
+        isOnboardingOpen ? (
+          <div className="qs-setup-widget">
+            <OnboardingChecklist
+              completedItemIds={completedOnboardingItemIds}
+              onAction={handleOnboardingAction}
+              onClose={hideOnboarding}
+              onConnectionTested={() => markOnboardingItemComplete('steam-test')}
+              onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
+              onSkip={skipOnboarding}
+              onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
+              onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
+            />
+          </div>
+        ) : (
+          <button className="qs-setup-launcher" onClick={openOnboarding} type="button">
+            <span>Setup</span>
+            <strong>
+              {completedOnboardingItemIds.size}/{onboardingItemIds.length}
+            </strong>
+          </button>
+        )
       ) : null}
     </main>
   );
@@ -1731,6 +1751,7 @@ type SettingsPanelProps = {
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
   isLandscapeLockEnabled: boolean;
+  isOnboardingComplete: boolean;
   isOnboardingOpen: boolean;
   lastRetroImportsHiddenByFilters: boolean;
   libraryCount: number;
@@ -1766,6 +1787,7 @@ function SettingsPanel({
   games,
   ignoredSteamGames,
   isLandscapeLockEnabled,
+  isOnboardingComplete,
   isOnboardingOpen,
   lastRetroImportsHiddenByFilters,
   libraryCount,
@@ -1917,13 +1939,22 @@ function SettingsPanel({
           {activeCategory === 'About' ? (
             <div className="space-y-4">
               <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} />
-              <OnboardingSettingsPanel onOpenOnboarding={onOpenOnboarding} />
+              <OnboardingSettingsPanel
+                completedCount={completedOnboardingItemIds.size}
+                isComplete={isOnboardingComplete}
+                onOpenOnboarding={onOpenOnboarding}
+                totalCount={onboardingItemIds.length}
+              />
               {isOnboardingOpen ? (
                 <OnboardingChecklist
                   completedItemIds={completedOnboardingItemIds}
                   isSettingsPanel
                   onAction={onOnboardingAction}
                   onClose={onOnboardingClose}
+                  onConnectionTested={onConnectionTested}
+                  onRawgApiKeyConfigured={onRawgApiKeyConfigured}
+                  onSteamApiKeyConfigured={onSteamApiKeyConfigured}
+                  onSteamIdConfigured={onSteamIdConfigured}
                 />
               ) : null}
             </div>
@@ -2272,14 +2303,26 @@ function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: Return
   );
 }
 
-function OnboardingSettingsPanel({ onOpenOnboarding }: { onOpenOnboarding: () => void }) {
+function OnboardingSettingsPanel({
+  completedCount,
+  isComplete,
+  onOpenOnboarding,
+  totalCount,
+}: {
+  completedCount: number;
+  isComplete: boolean;
+  onOpenOnboarding: () => void;
+  totalCount: number;
+}) {
   return (
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">First-run onboarding</h2>
+          <h2 className="text-xl font-semibold text-white">{isComplete ? 'Setup complete' : 'Setup assistant'}</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Reopen the compact setup checklist for credentials, imports, metadata, wishlist, and backup.
+            {isComplete
+              ? 'QuestShelf is ready. You can reopen setup later without changing existing data.'
+              : `${completedCount}/${totalCount} setup steps complete. Reopen the compact assistant anytime.`}
           </p>
         </div>
 
@@ -2288,7 +2331,7 @@ function OnboardingSettingsPanel({ onOpenOnboarding }: { onOpenOnboarding: () =>
           onClick={onOpenOnboarding}
           type="button"
         >
-          Open checklist
+          Reopen setup
         </button>
       </div>
     </section>

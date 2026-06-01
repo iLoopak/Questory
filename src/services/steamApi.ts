@@ -118,16 +118,10 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
     });
 
     if (import.meta.env.DEV) {
-      throw new SteamApiError(
-        'Steam API request failed. Make sure the Vite dev server is running with the /api/steam proxy configured.',
-        'cors-proxy',
-      );
+      throw new SteamApiError('Steam sync is not available from this device right now. Try again later.', 'cors-proxy');
     }
 
-    throw new SteamApiError(
-      'Steam API request failed. Direct Steam sync may need a trusted proxy in production before every device can reach Steam reliably.',
-      'api-failure',
-    );
+    throw new SteamApiError('Steam sync is unavailable right now. Check your connection and try again.', 'api-failure');
   }
 
   if (!response.ok) {
@@ -141,10 +135,7 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
     });
 
     if (import.meta.env.DEV && response.status === 404) {
-      throw new SteamApiError(
-        'Steam proxy route was not found. Restart the Vite dev server and confirm /api/steam is configured in vite.config.ts.',
-        'cors-proxy',
-      );
+      throw new SteamApiError('Steam sync is not available in this build right now. Try again later.', 'cors-proxy');
     }
 
     if (response.status === 400) {
@@ -332,10 +323,7 @@ async function getSteamWishlistPageForProfile(profilePath: string, page: number)
 
   if (!response.ok) {
     if (import.meta.env.DEV && response.status === 404) {
-      throw new SteamWishlistError(
-        'Steam wishlist proxy route was not found. Restart the Vite dev server and confirm /api/steam-store is configured.',
-        'cors-proxy',
-      );
+      throw new SteamWishlistError('Steam wishlist sync is not available in this build right now.', 'cors-proxy');
     }
 
     if (response.status === 400) {
@@ -459,10 +447,7 @@ async function fetchSteamWishlistResponse(proxyUrl: URL, directUrl: URL) {
       return await fetch(directUrl, { redirect: 'manual' });
     } catch (directError) {
       if (import.meta.env.DEV) {
-        throw new SteamWishlistError(
-          `Steam wishlist request failed through both the Vite proxy and direct Steam Store URL. Make sure the app is running with npm run dev, not npm run preview, and unregister any old QuestShelf service worker for this localhost origin. Proxy error: ${formatFetchError(proxyError)}. Direct error: ${formatFetchError(directError)}.`,
-          'cors-proxy',
-        );
+        throw new SteamWishlistError('Steam wishlist sync is unavailable right now. Check your connection and try again.', 'cors-proxy');
       }
 
       throw new SteamWishlistError(
