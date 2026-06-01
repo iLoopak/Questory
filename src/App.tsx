@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
+import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
@@ -58,7 +59,7 @@ import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
-const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
+const navItems = ['Home', 'Library', 'Wishlist', 'Queue', 'Review Mode', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
 const settingsCategories = [
   'Integrations',
@@ -147,7 +148,7 @@ function App() {
   const [wishlistFilters, setWishlistFilters] = useState<CollectionFilters>(() =>
     loadCollectionFilters(wishlistFiltersStorageKey),
   );
-  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
+  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Home');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
@@ -158,6 +159,7 @@ function App() {
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
+  const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
     const initialState = loadOnboardingState();
     return !initialState.hasSeenChecklist && !initialState.skipped;
@@ -990,6 +992,17 @@ function App() {
     );
   }
 
+  function openGameFromHome(game: Game) {
+    setSelectedGameId(game.id);
+    setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+  }
+
+  function openQueue(platform?: GamePlatform) {
+    setTargetQueuePlatform(platform);
+    setSelectedGameId(null);
+    setActiveNavItem('Queue');
+  }
+
   if (!isAppReady) {
     return <AppStartupScreen />;
   }
@@ -1041,6 +1054,23 @@ function App() {
               game={selectedGame}
               onBack={() => setSelectedGameId(null)}
               onTrackingChange={updateGameTracking}
+            />
+          ) : activeNavItem === 'Home' ? (
+            <HomePanel
+              games={games}
+              ignoredReviewGameIds={reviewIgnoredGameIds}
+              queueEntries={platformQueueState.entries}
+              onOpenDetails={openGameFromHome}
+              onOpenLibrary={() => {
+                setSelectedGameId(null);
+                setActiveNavItem('Library');
+              }}
+              onOpenQueue={openQueue}
+              onOpenReviewMode={startReviewMode}
+              onOpenWishlist={() => {
+                setSelectedGameId(null);
+                setActiveNavItem('Wishlist');
+              }}
             />
           ) : activeNavItem === 'Library' ? (
             <CollectionPanel
@@ -1097,6 +1127,7 @@ function App() {
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
               games={games}
+              initialPlatform={targetQueuePlatform}
               queueState={platformQueueState}
               onAddGameToQueue={addGameToQueue}
               onLimitChange={updateQueueLimit}
