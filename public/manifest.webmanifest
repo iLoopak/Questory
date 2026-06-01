@@ -26,6 +26,12 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    },
+    {
+      "src": "/brand/questshelf-splash.svg",
+      "sizes": "1024x1024",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "categories": ["games", "utilities", "entertainment"]

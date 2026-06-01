@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isNativeAndroidRuntime } from '../lib/capacitorEnvironment';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -9,6 +10,7 @@ const installDismissedKey = 'questshelf.installHintDismissed.v1';
 
 export function PwaStatusBanner() {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  const [isNativeAndroid] = useState(() => isNativeAndroidRuntime());
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(() => isStandaloneMode());
   const [isInstallDismissed, setIsInstallDismissed] = useState(() => {
@@ -79,13 +81,13 @@ export function PwaStatusBanner() {
     );
   }
 
-  if (isInstalled || isInstallDismissed) {
+  if (isNativeAndroid || isInstalled || isInstallDismissed) {
     return null;
   }
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-      <span>Install QuestShelf for a standalone library experience.</span>
+      <span>Add QuestShelf to your device for a standalone library experience.</span>
       <div className="flex gap-2">
         <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint" onClick={installApp} type="button">
           Install QuestShelf

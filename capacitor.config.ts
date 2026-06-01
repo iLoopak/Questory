@@ -5,11 +5,18 @@ const config: CapacitorConfig = {
   appName: 'QuestShelf',
   webDir: 'dist',
   backgroundColor: '#050a12',
+  android: {
+    backgroundColor: '#050a12',
+  },
   plugins: {
     SplashScreen: {
       backgroundColor: '#050a12',
       launchAutoHide: true,
+      launchShowDuration: 900,
       launchFadeOutDuration: 220,
+      androidScaleType: 'CENTER_CROP',
+      splashFullScreen: true,
+      splashImmersive: true,
       showSpinner: false,
     },
     StatusBar: {

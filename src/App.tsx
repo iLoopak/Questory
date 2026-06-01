@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
@@ -7,9 +8,12 @@ import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
+import { RetroImportPanel } from './components/RetroImportPanel';
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
+import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
+import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
   loadOnboardingState,
   onboardingItemIds,
@@ -34,6 +38,8 @@ import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummar
 
 const navItems = ['Library', 'Wishlist', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
+const settingsCategories = ['Integrations', 'Library', 'Retro', 'Data', 'Appearance', 'About'] as const;
+type SettingsCategory = (typeof settingsCategories)[number];
 
 const allOption = 'All';
 const questShelfIcon = '/icons/questshelf-icon.svg';
@@ -111,6 +117,8 @@ function App() {
     loadCollectionFilters(wishlistFiltersStorageKey),
   );
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
+  const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>('Integrations');
+  const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
@@ -214,6 +222,12 @@ function App() {
     return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId])));
   }, [onboardingState.completedAt]);
   const isOnboardingComplete = completedOnboardingItemIds.size === onboardingItemIds.length;
+  const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
+
+  useEffect(() => {
+    saveLandscapeLockPreference(isLandscapeLockEnabled);
+    window.dispatchEvent(new CustomEvent('questshelf:landscape-lock-change', { detail: isLandscapeLockEnabled }));
+  }, [isLandscapeLockEnabled]);
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
@@ -663,7 +677,7 @@ function App() {
             </div>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto rounded-lg border border-skyglass/15 bg-ink-950/70 p-1 shadow-inner">
+          <nav className="qs-top-nav flex gap-2 overflow-x-auto rounded-lg border border-skyglass/15 bg-ink-950/70 p-1 shadow-inner">
             {navItems.map((item) => (
               <button
                 key={item}
@@ -800,37 +814,32 @@ function App() {
               }}
             />
           ) : activeNavItem === 'Settings' ? (
-            <section className="min-w-0 space-y-4 overflow-y-auto lg:h-[calc(100vh-116px)]">
-              <DemoDataPanel
-                demoGameCount={games.filter(isMockGame).length}
-                onLoadDemoData={loadDemoData}
-                onRemoveDemoGames={removeDemoGames}
-              />
-              <OnboardingSettingsPanel onOpenOnboarding={openOnboarding} />
-              {isOnboardingOpen ? (
-                <OnboardingChecklist
-                  completedItemIds={completedOnboardingItemIds}
-                  isSettingsPanel
-                  onAction={handleOnboardingAction}
-                  onClose={hideOnboarding}
-                />
-              ) : null}
-              <RawgSettingsPanel
-                autoBackupSignal={autoBackupSignal}
-                onBackupExported={() => markOnboardingItemComplete('backup-exported')}
-                onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
-              />
-              <SteamSettingsPanel
-                games={games}
-                ignoredSteamGames={ignoredSteamGames}
-                onConnectionTested={() => markOnboardingItemComplete('steam-test')}
-                onImportGames={importGames}
-                onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
-                onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
-                onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
-                onUnignoreSteamGame={unignoreSteamGame}
-              />
-            </section>
+            <SettingsPanel
+              activeCategory={activeSettingsCategory}
+              autoBackupSignal={autoBackupSignal}
+              completedOnboardingItemIds={completedOnboardingItemIds}
+              demoGameCount={games.filter(isMockGame).length}
+              games={games}
+              ignoredSteamGames={ignoredSteamGames}
+              isLandscapeLockEnabled={isLandscapeLockEnabled}
+              isOnboardingOpen={isOnboardingOpen}
+              runtimeEnvironment={runtimeEnvironment}
+              onBackupExported={() => markOnboardingItemComplete('backup-exported')}
+              onCategoryChange={setActiveSettingsCategory}
+              onConnectionTested={() => markOnboardingItemComplete('steam-test')}
+              onImportGames={importGames}
+              onLandscapeLockChange={setIsLandscapeLockEnabled}
+              onLoadDemoData={loadDemoData}
+              onOnboardingAction={handleOnboardingAction}
+              onOnboardingClose={hideOnboarding}
+              onOpenOnboarding={openOnboarding}
+              onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
+              onRemoveDemoGames={removeDemoGames}
+              onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
+              onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
+              onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+              onUnignoreSteamGame={unignoreSteamGame}
+            />
           ) : (
             <PlaceholderPanel title={activeNavItem} />
           )}
@@ -1389,7 +1398,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/80 p-3 backdrop-blur-sm">
-      <section className="qs-glass max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
+      <section className="qs-modal-panel qs-glass max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
         <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
             <h2 className="text-xl font-semibold text-white">Add game</h2>
@@ -1404,7 +1413,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
           </button>
         </div>
 
-        <form className="max-h-[calc(92vh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
+        <form className="max-h-[calc(92dvh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block md:col-span-2">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add to</span>
@@ -1611,6 +1620,142 @@ type DemoDataPanelProps = {
   onRemoveDemoGames: () => void;
 };
 
+type SettingsPanelProps = {
+  activeCategory: SettingsCategory;
+  autoBackupSignal: string;
+  completedOnboardingItemIds: Set<OnboardingItemId>;
+  demoGameCount: number;
+  games: Game[];
+  ignoredSteamGames: IgnoredSteamGame[];
+  isLandscapeLockEnabled: boolean;
+  isOnboardingOpen: boolean;
+  runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  onBackupExported: () => void;
+  onCategoryChange: (category: SettingsCategory) => void;
+  onConnectionTested: () => void;
+  onImportGames: (games: Game[]) => void;
+  onLandscapeLockChange: (isEnabled: boolean) => void;
+  onLoadDemoData: () => void;
+  onOnboardingAction: (itemId: OnboardingItemId) => void;
+  onOnboardingClose: () => void;
+  onOpenOnboarding: () => void;
+  onRawgApiKeyConfigured: () => void;
+  onRemoveDemoGames: () => void;
+  onSteamApiKeyConfigured: () => void;
+  onSteamIdConfigured: () => void;
+  onSteamLibraryImported: () => void;
+  onUnignoreSteamGame: (steamAppId: number) => void;
+};
+
+function SettingsPanel({
+  activeCategory,
+  autoBackupSignal,
+  completedOnboardingItemIds,
+  demoGameCount,
+  games,
+  ignoredSteamGames,
+  isLandscapeLockEnabled,
+  isOnboardingOpen,
+  runtimeEnvironment,
+  onBackupExported,
+  onCategoryChange,
+  onConnectionTested,
+  onImportGames,
+  onLandscapeLockChange,
+  onLoadDemoData,
+  onOnboardingAction,
+  onOnboardingClose,
+  onOpenOnboarding,
+  onRawgApiKeyConfigured,
+  onRemoveDemoGames,
+  onSteamApiKeyConfigured,
+  onSteamIdConfigured,
+  onSteamLibraryImported,
+  onUnignoreSteamGame,
+}: SettingsPanelProps) {
+  return (
+    <section className="qs-settings-shell min-w-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900/45 lg:h-[calc(100vh-116px)]">
+      <div className="grid h-full min-h-0 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="border-b border-skyglass/15 bg-ink-950/70 p-3 lg:border-b-0 lg:border-r">
+          <div className="mb-3 px-1">
+            <h2 className="text-lg font-semibold text-white">Settings</h2>
+            <p className="mt-1 text-sm text-slate-400">Grouped for quick handheld setup.</p>
+          </div>
+          <nav className="qs-settings-tabs flex gap-2 overflow-x-auto lg:grid lg:overflow-visible">
+            {settingsCategories.map((category) => (
+              <button
+                key={category}
+                className={`min-h-11 shrink-0 rounded-md border px-3 text-left text-sm font-semibold transition ${
+                  category === activeCategory
+                    ? 'border-mint/40 bg-mint text-ink-950 shadow-glow'
+                    : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
+                }`}
+                onClick={() => onCategoryChange(category)}
+                type="button"
+              >
+                {category}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="qs-settings-detail min-h-0 overflow-y-auto p-3 sm:p-4">
+          {activeCategory === 'Integrations' ? (
+            <div className="space-y-4">
+              <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
+              <SteamSettingsPanel
+                games={games}
+                ignoredSteamGames={ignoredSteamGames}
+                onConnectionTested={onConnectionTested}
+                onImportGames={onImportGames}
+                onSteamApiKeyConfigured={onSteamApiKeyConfigured}
+                onSteamIdConfigured={onSteamIdConfigured}
+                onSteamLibraryImported={onSteamLibraryImported}
+                onUnignoreSteamGame={onUnignoreSteamGame}
+              />
+            </div>
+          ) : null}
+
+          {activeCategory === 'Library' ? (
+            <div className="space-y-4">
+              <DemoDataPanel
+                demoGameCount={demoGameCount}
+                onLoadDemoData={onLoadDemoData}
+                onRemoveDemoGames={onRemoveDemoGames}
+              />
+              <OnboardingSettingsPanel onOpenOnboarding={onOpenOnboarding} />
+              {isOnboardingOpen ? (
+                <OnboardingChecklist
+                  completedItemIds={completedOnboardingItemIds}
+                  isSettingsPanel
+                  onAction={onOnboardingAction}
+                  onClose={onOnboardingClose}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {activeCategory === 'Retro' ? <RetroImportPanel games={games} onImportGames={onImportGames} /> : null}
+
+          {activeCategory === 'Data' ? (
+            <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
+          ) : null}
+
+          {activeCategory === 'Appearance' ? (
+            <AppearanceSettingsPanel
+              isLandscapeLockEnabled={isLandscapeLockEnabled}
+              runtimeEnvironment={runtimeEnvironment}
+              onLandscapeLockChange={onLandscapeLockChange}
+            />
+          ) : null}
+
+          {activeCategory === 'About' ? <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} /> : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: DemoDataPanelProps) {
   return (
     <section className="qs-glass rounded-lg border p-4">
@@ -1644,8 +1789,67 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
       </div>
 
       <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
-        {demoGameCount} known demo games in this browser.
+        {demoGameCount} known demo games on this device.
       </div>
+    </section>
+  );
+}
+
+function AppearanceSettingsPanel({
+  isLandscapeLockEnabled,
+  runtimeEnvironment,
+  onLandscapeLockChange,
+}: {
+  isLandscapeLockEnabled: boolean;
+  runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  onLandscapeLockChange: (isEnabled: boolean) => void;
+}) {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-white">Appearance</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+            QuestShelf uses a dark handheld theme with mint focus states, safe-area padding, and compact landscape layouts.
+          </p>
+        </div>
+        <span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-medium text-mint">
+          {runtimeEnvironment.isAndroid ? 'Android handheld' : 'Device preview'}
+        </span>
+      </div>
+
+      <label className="mt-4 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
+        <input
+          checked={isLandscapeLockEnabled}
+          className="mt-1 h-5 w-5 accent-mint"
+          onChange={(event) => onLandscapeLockChange(event.target.checked)}
+          type="checkbox"
+        />
+        <span>
+          <span className="block font-semibold text-white">Prefer landscape orientation</span>
+          <span className="mt-1 block leading-6 text-slate-500">
+            Enabled by default for Retroid-style handhelds. On Android APK builds, QuestShelf will request landscape when
+            the runtime supports orientation locking.
+          </span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
+function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment> }) {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <h2 className="text-xl font-semibold text-white">About QuestShelf</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Stat label="Runtime" value={runtimeEnvironment.isNative ? 'Native' : 'Web'} />
+        <Stat label="Platform" value={runtimeEnvironment.platform} />
+        <Stat label="Storage" value="Local" />
+      </div>
+      <p className="mt-4 text-sm leading-6 text-slate-400">
+        QuestShelf is a local-first game shelf for library tracking, wishlist planning, metadata enrichment, and portable
+        backups. No backend or account is required.
+      </p>
     </section>
   );
 }
@@ -1696,7 +1900,7 @@ function AppStartupScreen() {
 
 function getNavDescription(activeNavItem: NavItem) {
   if (activeNavItem === 'Settings') {
-    return 'Integration settings are local to this browser.';
+    return 'Settings are grouped for handheld use.';
   }
 
   if (activeNavItem === 'Metadata') {

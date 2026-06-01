@@ -82,6 +82,12 @@ textarea:focus-visible {
     0 0 28px rgba(34, 243, 223, 0.24);
 }
 
+button:focus-visible,
+a:focus-visible,
+label:focus-within {
+  transform: translateY(-1px);
+}
+
 img {
   display: block;
 }
@@ -104,6 +110,18 @@ img {
 .qs-handheld-panel {
   scroll-padding: 1rem;
   overscroll-behavior: contain;
+}
+
+.qs-settings-tabs {
+  scrollbar-width: none;
+}
+
+.qs-settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.qs-settings-detail {
+  scrollbar-gutter: stable;
 }
 
 .qs-modal-panel {
@@ -152,7 +170,13 @@ img {
   input,
   select,
   textarea {
-    min-height: 44px;
+    min-height: 46px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-height: 22px;
+    min-width: 22px;
   }
 
   .qs-gamepad-hints {
@@ -180,6 +204,19 @@ img {
 
   .qs-game-card {
     min-height: 330px;
+  }
+
+  .qs-modal-panel {
+    max-height: calc(100dvh - max(0.5rem, var(--qs-safe-top)) - max(0.5rem, var(--qs-safe-bottom)));
+  }
+
+  .qs-settings-shell {
+    height: auto;
+    max-height: none;
+  }
+
+  .qs-settings-detail {
+    max-height: none;
   }
 }
 

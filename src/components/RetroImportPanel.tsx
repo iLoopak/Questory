@@ -191,8 +191,8 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
 
         <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-300">
           {supportsFolderPicker
-            ? 'Folder selection is available in this browser. Android APK folder access may need a later Storage Access Framework plugin.'
-            : 'Folder selection is not supported here. Select multiple ROM files instead.'}
+            ? 'Folder selection is available on this device. Android APK folder access may need a later Storage Access Framework plugin.'
+            : 'Folder selection is not supported on this device. Select multiple ROM files instead.'}
         </div>
       </div>
 
