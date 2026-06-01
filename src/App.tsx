@@ -241,8 +241,6 @@ function App() {
     return filterGames(wishlistGames, wishlistFilters);
   }, [wishlistFilters, wishlistGames]);
 
-  const activeGames = libraryGames.filter((game) => game.status === 'Playing').length;
-  const totalHours = libraryGames.reduce((sum, game) => sum + game.playtimeHours, 0);
   const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
   const autoBackupSignal = useMemo(
     () =>
@@ -997,15 +995,9 @@ function App() {
 
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="qs-glass rounded-lg border p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
-              <Stat label="Library" value={libraryGames.length.toString()} />
-              <Stat label="Wishlist" value={wishlistGames.length.toString()} />
-              <Stat label="Playing" value={activeGames.toString()} />
-              <Stat label="Hours" value={totalHours.toString()} />
-            </div>
-
-            <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
-              {getNavDescription(activeNavItem)}
+            <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Screen focus</div>
+              <p className="mt-2">{getNavDescription(activeNavItem)}</p>
             </div>
           </aside>
 
@@ -1138,9 +1130,7 @@ function App() {
               isOnboardingOpen={isOnboardingOpen}
               isOnboardingComplete={isOnboardingComplete}
               lastRetroImportsHiddenByFilters={areLastRetroImportsHiddenByFilters}
-              libraryCount={libraryGames.length}
               runtimeEnvironment={runtimeEnvironment}
-              wishlistCount={wishlistGames.length}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -1987,9 +1977,7 @@ type SettingsPanelProps = {
   isOnboardingComplete: boolean;
   isOnboardingOpen: boolean;
   lastRetroImportsHiddenByFilters: boolean;
-  libraryCount: number;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
-  wishlistCount: number;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -2024,9 +2012,7 @@ function SettingsPanel({
   isOnboardingComplete,
   isOnboardingOpen,
   lastRetroImportsHiddenByFilters,
-  libraryCount,
   runtimeEnvironment,
-  wishlistCount,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -2133,7 +2119,7 @@ function SettingsPanel({
 
           {activeCategory === 'Library' ? (
             <div className="space-y-4">
-              <LibrarySettingsSummary libraryCount={libraryCount} />
+              <LibrarySettingsSummary />
               <DemoDataPanel
                 demoGameCount={demoGameCount}
                 onLoadDemoData={onLoadDemoData}
@@ -2142,7 +2128,7 @@ function SettingsPanel({
             </div>
           ) : null}
 
-          {activeCategory === 'Wishlist' ? <WishlistSettingsPanel wishlistCount={wishlistCount} /> : null}
+          {activeCategory === 'Wishlist' ? <WishlistSettingsPanel /> : null}
 
           {activeCategory === 'Retro' ? (
             <div className="space-y-4">
@@ -2380,27 +2366,29 @@ function FutureProvidersPanel() {
   );
 }
 
-function LibrarySettingsSummary({ libraryCount }: { libraryCount: number }) {
+function LibrarySettingsSummary() {
   return (
     <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Library</h2>
+      <h2 className="text-xl font-semibold text-white">Library settings</h2>
+      <p className="mt-1 text-sm leading-6 text-slate-400">
+        Manage local data behavior here. Library totals and backlog analytics live in Stats.
+      </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <SettingsMiniCard title="Local library" value={`${libraryCount} games`} />
         <SettingsMiniCard title="Default collection" value="Library" />
+        <SettingsMiniCard title="Analytics" value="Open Stats" />
       </div>
     </section>
   );
 }
 
-function WishlistSettingsPanel({ wishlistCount }: { wishlistCount: number }) {
+function WishlistSettingsPanel() {
   return (
     <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Wishlist</h2>
+      <h2 className="text-xl font-semibold text-white">Wishlist settings</h2>
       <p className="mt-1 text-sm leading-6 text-slate-400">
-        Wishlist entries stay separate from owned Library games and are tuned for lightweight planning on handhelds.
+        Tune wishlist planning defaults and integrations here. Wishlist counts and trends belong in Stats.
       </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <SettingsMiniCard title="Wishlist items" value={wishlistCount.toString()} />
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <SettingsMiniCard title="Priority levels" value="Low / Medium / High" />
         <SettingsMiniCard title="Steam wishlist" value="Available from Wishlist" />
       </div>
@@ -2522,10 +2510,10 @@ function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: Return
     <section className="qs-glass rounded-lg border p-4">
       <h2 className="text-xl font-semibold text-white">About QuestShelf</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        <Stat label="Version" value="0.1.0" />
-        <Stat label="Runtime" value={runtimeEnvironment.isNative ? 'Native' : 'Web'} />
-        <Stat label="Platform" value={runtimeEnvironment.platform} />
-        <Stat label="Storage" value="Local" />
+        <SettingsMiniCard title="Version" value="0.1.0" />
+        <SettingsMiniCard title="Runtime" value={runtimeEnvironment.isNative ? 'Native' : 'Web'} />
+        <SettingsMiniCard title="Platform" value={runtimeEnvironment.platform} />
+        <SettingsMiniCard title="Storage" value="Local" />
       </div>
       <p className="mt-4 text-sm leading-6 text-slate-400">
         QuestShelf is a local-first game shelf for library tracking, wishlist planning, metadata enrichment, and portable
@@ -2657,20 +2645,6 @@ function appendReviewNote(existingNotes: string, note: string) {
   const reviewNote = `[Review ${timestamp}] ${note}`;
 
   return existingNotes.trim() ? `${existingNotes.trim()}\n\n${reviewNote}` : reviewNote;
-}
-
-type StatProps = {
-  label: string;
-  value: string;
-};
-
-function Stat({ label, value }: StatProps) {
-  return (
-    <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="text-xl font-semibold text-white">{value}</div>
-      <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
-    </div>
-  );
 }
 
 type FilterSelectProps = {

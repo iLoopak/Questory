@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource, type ReviewStats } from '../lib/reviewModeStorage';
+import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 
 export type ReviewModeAction =
@@ -50,17 +50,6 @@ const secondaryActions: Array<{ action: ReviewModeAction; label: string }> = [
   { action: 'note', label: 'Add Note' },
 ];
 
-const emptySessionStats: ReviewStats = {
-  dropped: 0,
-  enriched: 0,
-  ignored: 0,
-  playing: 0,
-  queueCandidates: 0,
-  reviewed: 0,
-  skipped: 0,
-  wishlisted: 0,
-};
-
 export function ReviewModePanel({
   games,
   ignoredGameIds,
@@ -79,7 +68,6 @@ export function ReviewModePanel({
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
-  const [sessionStats, setSessionStats] = useState<ReviewStats>(() => ({ ...emptySessionStats }));
 
   const platformOptions = useMemo(() => {
     return Array.from(new Set(games.map((game) => game.platform))).sort((first, second) =>
@@ -112,7 +100,6 @@ export function ReviewModePanel({
     setIsMoreOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
-    setSessionStats({ ...emptySessionStats });
   }, [selectedPlatform, source]);
 
   useEffect(() => {
@@ -179,7 +166,6 @@ export function ReviewModePanel({
     setIsMoreOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
-    setSessionStats((currentStats) => updateReviewStats(currentStats, action));
   }
 
   function performAction(game: Game, action: ReviewModeAction) {
@@ -301,7 +287,6 @@ export function ReviewModePanel({
           ) : (
             <ReviewComplete
               sourceLabel={sourceLabel}
-              stats={sessionStats}
               onOpenQueue={onOpenQueue}
               onReturnToLibrary={onReturnToLibrary}
               onReviewAnother={() => onSourceChange('backlog')}
@@ -395,14 +380,6 @@ function FocusedReviewCard({
             <span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-1.5 text-sm font-semibold text-mint">
               {game.platform}
             </span>
-            <span className="rounded-md border border-white/10 bg-ink-900 px-3 py-1.5 text-sm text-slate-300">
-              {game.status}
-            </span>
-            {game.playtimeHours > 0 ? (
-              <span className="rounded-md border border-white/10 bg-ink-900 px-3 py-1.5 text-sm text-slate-300">
-                {game.playtimeHours}h
-              </span>
-            ) : null}
           </div>
           <h3 className="mt-3 text-3xl font-semibold leading-tight text-white sm:text-4xl">{game.title}</h3>
         </header>
@@ -505,13 +482,11 @@ function FocusedReviewCard({
 
 function ReviewComplete({
   sourceLabel,
-  stats,
   onOpenQueue,
   onReturnToLibrary,
   onReviewAnother,
 }: {
   sourceLabel: string;
-  stats: ReviewStats;
   onOpenQueue: () => void;
   onReturnToLibrary: () => void;
   onReviewAnother: () => void;
@@ -521,15 +496,9 @@ function ReviewComplete({
       <div className="max-w-2xl">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <ReviewStat label="Reviewed" value={stats.reviewed} />
-          <ReviewStat label="Added to Queue" value={stats.queueCandidates} />
-          <ReviewStat label="Playing" value={stats.playing} />
-          <ReviewStat label="Wishlist" value={stats.wishlisted} />
-          <ReviewStat label="Dropped" value={stats.dropped} />
-          <ReviewStat label="Ignored" value={stats.ignored} />
-          <ReviewStat label="Skipped" value={stats.skipped} />
-        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          This batch has no more games to review. Choose another batch or jump back to planning.
+        </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
@@ -598,40 +567,6 @@ function getGameTime(value: string | null | undefined) {
   return value ? new Date(value).getTime() || 0 : 0;
 }
 
-function updateReviewStats(stats: ReviewStats, action: ReviewModeAction): ReviewStats {
-  const nextStats = { ...stats, reviewed: stats.reviewed + 1 };
-
-  if (action === 'skip') {
-    nextStats.skipped += 1;
-  }
-
-  if (action === 'queue') {
-    nextStats.queueCandidates += 1;
-  }
-
-  if (action === 'wishlist') {
-    nextStats.wishlisted += 1;
-  }
-
-  if (action === 'playing') {
-    nextStats.playing += 1;
-  }
-
-  if (action === 'dropped') {
-    nextStats.dropped += 1;
-  }
-
-  if (action === 'ignore') {
-    nextStats.ignored += 1;
-  }
-
-  if (action === 'enrich') {
-    nextStats.enriched += 1;
-  }
-
-  return nextStats;
-}
-
 function getActionClassName(tone: 'accent' | 'neutral' | 'danger' | 'quiet', isHighlighted: boolean) {
   if (isHighlighted) {
     return 'border-mint/70 bg-mint text-ink-950 shadow-glow';
@@ -650,13 +585,4 @@ function getActionClassName(tone: 'accent' | 'neutral' | 'danger' | 'quiet', isH
   }
 
   return 'border-skyglass/15 bg-ink-950/70 text-slate-200 hover:bg-mint/10 hover:text-white';
-}
-
-function ReviewStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2">
-      <div className="text-xl font-semibold text-white">{value}</div>
-      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
-    </div>
-  );
 }
