@@ -1,4 +1,4 @@
-import { loadIgnoredSteamGames } from './steamIgnoredGamesStorage';
+import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
 import { loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
@@ -6,9 +6,12 @@ import { normalizePlatformQueueState } from './platformQueueStorage';
 import { normalizeRawgMetadataCache } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
 import { normalizeReviewModeState } from './reviewModeStorage';
-import { coreBackupStorageKeys, deviceOnlyStorageKeys, integrationBackupStorageKeys } from './storageRegistry';
+import {
+  coreBackupStorageKeys,
+  deviceOnlyStorageKeys,
+  integrationBackupStorageKeys,
+} from './storageRegistry';
 import { normalizeSteamSettings } from './steamSettingsStorage';
-import { normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
 import type { Game } from '../types/game';
 
 export const questShelfBackupVersion = 1;
