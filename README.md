@@ -65,6 +65,49 @@ Recommended portable sync workflow:
 
 This is account-free manual portability. The code keeps backup serialization separate from storage targets so a future provider can write the same validated backup format into a user-owned cloud-synced folder.
 
+## Local Data Storage, Migration, and Recovery
+
+QuestShelf is local-first. Browser `localStorage` is the fast startup layer and Capacitor Preferences mirrors known persistent keys on Android when available. Stored data is normalized on read and write so older installs can keep working after new features are added.
+
+Known storage keys:
+
+- `questshelf.games.v1`: Library and Wishlist game records.
+- `questshelf.rawgMetadataCache.v1`: Local RAWG metadata cache.
+- `questshelf.steamIgnoredGames.v1`: Steam App IDs skipped by import/sync.
+- `questshelf.libraryFilters.v1`: Library filters and sorting.
+- `questshelf.wishlistFilters.v1`: Wishlist filters and sorting.
+- `questshelf.onboarding.v1`: setup assistant progress.
+- `questshelf.platformQueues.v1`: platform queue entries, positions, priorities, notes, and active-game limits.
+- `questshelf.reviewMode.v1`: Review Mode ignored games, last source, schema version, and stats.
+- `questshelf.rawgSettings.v1`: RAWG API key, excluded from normal backups.
+- `questshelf.steamSettings.v1`: Steam API key, SteamID64, and wishlist URL, excluded from normal backups.
+- `questshelf.syncFolderSettings.v1`: device-specific auto-backup settings.
+- `questshelf.installHintDismissed.v1`, `questshelf.landscapeLock.v1`, `questshelf.settingsCategory.v1`: UI/device preferences.
+- `questshelf.storageIssues.v1`: recovery warnings for unreadable local data.
+
+Backup behavior:
+
+- Normal backups include core user data and exclude Steam/RAWG API keys by default.
+- Integration settings are included only when the user enables the option explicitly.
+- Device-only preferences and recovery warnings are not part of normal backup files.
+- Restore and merge validate backup sections before writing them to local storage.
+- Merge import avoids duplicates by ID, Steam App ID, RAWG ID, ROM path/URI, and normalized title plus platform fallback.
+
+Migration behavior:
+
+- Missing `collectionType` safely defaults to `library`.
+- Older statuses such as `Completed` and `Backlog` migrate to current status values.
+- Missing notes, tags, playtime, cover art, wishlist fields, retro fields, queue fields, dropped/finished fields, and source fields receive safe defaults.
+- Valid user notes, tags, status, metadata, and tracking fields are preserved during migration.
+- Platform Queue and Review Mode states include a local schema version and tolerate older objects without one.
+
+Recovery behavior:
+
+- Corrupted JSON or failed storage normalization falls back to safe defaults and records a warning instead of crashing the app.
+- QuestShelf never silently wipes unreadable local data.
+- Settings > Data & Backup shows recovery warnings and offers raw local data export before reset.
+- Reset local data removes only known QuestShelf keys from this device after explicit confirmation.
+
 ## Sync Folder / Auto Backup
 
 QuestShelf can use a file-based backup workflow for simple multi-device use without accounts, backend services, real-time sync, or Google Drive/Dropbox APIs.

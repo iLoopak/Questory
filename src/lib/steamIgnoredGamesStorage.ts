@@ -13,7 +13,7 @@ export function loadIgnoredSteamGames(): IgnoredSteamGame[] {
 }
 
 export function saveIgnoredSteamGames(ignoredGames: IgnoredSteamGame[]) {
-  savePersistedJson(STORAGE_KEY, ignoredGames);
+  savePersistedJson(STORAGE_KEY, normalizeIgnoredSteamGames(ignoredGames));
 }
 
 export function addIgnoredSteamGame(
@@ -57,6 +57,6 @@ function isIgnoredSteamGame(value: unknown): value is IgnoredSteamGame {
   return typeof game.steamAppId === 'number' && typeof game.ignoredAt === 'string';
 }
 
-function normalizeIgnoredSteamGames(value: unknown): IgnoredSteamGame[] {
+export function normalizeIgnoredSteamGames(value: unknown): IgnoredSteamGame[] {
   return Array.isArray(value) ? value.filter(isIgnoredSteamGame) : [];
 }

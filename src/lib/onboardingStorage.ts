@@ -33,10 +33,10 @@ export function loadOnboardingState(): OnboardingState {
 }
 
 export function saveOnboardingState(state: OnboardingState) {
-  savePersistedJson(STORAGE_KEY, state);
+  savePersistedJson(STORAGE_KEY, normalizeOnboardingState(state));
 }
 
-function normalizeOnboardingState(value: unknown): OnboardingState {
+export function normalizeOnboardingState(value: unknown): OnboardingState {
   const parsedState = value && typeof value === 'object' ? (value as Partial<OnboardingState>) : {};
   const completedAt =
     parsedState.completedAt && typeof parsedState.completedAt === 'object'

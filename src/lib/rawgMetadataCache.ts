@@ -34,9 +34,9 @@ export function getCachedRawgMetadata(title: string): RawgMetadataCacheEntry | n
 export function saveRawgMetadataCacheEntry(entry: RawgMetadataCacheEntry) {
   const cache = loadRawgMetadataCache();
   cache[getRawgMetadataCacheKey(entry.gameTitle)] = entry;
-  savePersistedJson(STORAGE_KEY, cache);
+  savePersistedJson(STORAGE_KEY, normalizeRawgMetadataCache(cache));
 }
 
-function normalizeRawgMetadataCache(value: unknown): RawgMetadataCache {
+export function normalizeRawgMetadataCache(value: unknown): RawgMetadataCache {
   return value && typeof value === 'object' ? (value as RawgMetadataCache) : {};
 }

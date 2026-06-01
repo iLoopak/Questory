@@ -12,13 +12,13 @@ export function loadRawgSettings(): RawgSettings {
 }
 
 export function saveRawgSettings(settings: RawgSettings) {
-  savePersistedJson(STORAGE_KEY, settings);
+  savePersistedJson(STORAGE_KEY, normalizeRawgSettings(settings));
 }
 
-function normalizeRawgSettings(value: unknown): RawgSettings {
+export function normalizeRawgSettings(value: unknown): RawgSettings {
   const parsedSettings = value && typeof value === 'object' ? (value as Partial<RawgSettings>) : {};
 
   return {
-    apiKey: parsedSettings.apiKey ?? '',
+    apiKey: typeof parsedSettings.apiKey === 'string' ? parsedSettings.apiKey : '',
   };
 }

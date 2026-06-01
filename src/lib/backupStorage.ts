@@ -1,20 +1,20 @@
 import { loadIgnoredSteamGames } from './steamIgnoredGamesStorage';
-import { loadGames } from './gameStorage';
+import { loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
+import { normalizeOnboardingState } from './onboardingStorage';
+import { normalizePlatformQueueState } from './platformQueueStorage';
+import { normalizeRawgMetadataCache } from './rawgMetadataCache';
+import { normalizeRawgSettings } from './rawgSettingsStorage';
+import { normalizeReviewModeState } from './reviewModeStorage';
+import { coreBackupStorageKeys, deviceOnlyStorageKeys, integrationBackupStorageKeys } from './storageRegistry';
+import { normalizeSteamSettings } from './steamSettingsStorage';
+import { normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
 import type { Game } from '../types/game';
 
 export const questShelfBackupVersion = 1;
 export const questShelfAppVersion = '0.1.0';
 
-export const coreBackupStorageKeys = [
-  'questshelf.games.v1',
-  'questshelf.rawgMetadataCache.v1',
-  'questshelf.steamIgnoredGames.v1',
-  'questshelf.libraryFilters.v1',
-  'questshelf.wishlistFilters.v1',
-] as const;
-
-export const integrationBackupStorageKeys = ['questshelf.rawgSettings.v1', 'questshelf.steamSettings.v1'] as const;
+export { coreBackupStorageKeys, integrationBackupStorageKeys };
 export const deviceBackupStorageKeys = ['questshelf.syncFolderSettings.v1'] as const;
 
 export const allBackupStorageKeys = [...coreBackupStorageKeys, ...integrationBackupStorageKeys] as const;
@@ -106,7 +106,7 @@ export function getQuestShelfBackupSummary(backup: QuestShelfBackup): QuestShelf
 export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
   allBackupStorageKeys.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
-      savePersistedJson(key, backup.data[key]);
+      savePersistedJson(key, normalizeBackupDataSection(key, backup.data[key]));
       return;
     }
 
@@ -131,13 +131,13 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
     }
 
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
-      savePersistedJson(key, backup.data[key]);
+      savePersistedJson(key, normalizeBackupDataSection(key, backup.data[key]));
     }
   });
 
   integrationBackupStorageKeys.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
-      savePersistedJson(key, backup.data[key]);
+      savePersistedJson(key, normalizeBackupDataSection(key, backup.data[key]));
     }
   });
 
@@ -148,7 +148,7 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 }
 
 export async function resetQuestShelfLocalData() {
-  await removePersistedKeys([...allBackupStorageKeys, ...deviceBackupStorageKeys]);
+  await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys]);
 }
 
 function validateQuestShelfBackup(value: unknown): BackupParseResult {
@@ -255,8 +255,7 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
 }
 
 function getBackupGames(backup: QuestShelfBackup): Game[] {
-  const games = backup.data['questshelf.games.v1'];
-  return Array.isArray(games) ? games.map((game) => game as Game) : [];
+  return normalizeLoadedGames(backup.data['questshelf.games.v1']);
 }
 
 function mergeGames(localGames: Game[], backupGames: Game[]) {
@@ -297,7 +296,11 @@ function areGamesMatching(firstGame: Game, secondGame: Game) {
   const firstRomPath = (firstGame.romPath ?? firstGame.romUri ?? '').trim().toLowerCase();
   const secondRomPath = (secondGame.romPath ?? secondGame.romUri ?? '').trim().toLowerCase();
 
-  return Boolean(firstRomPath && secondRomPath && firstRomPath === secondRomPath);
+  if (firstRomPath && secondRomPath && firstRomPath === secondRomPath) {
+    return true;
+  }
+
+  return getTitlePlatformKey(firstGame) === getTitlePlatformKey(secondGame);
 }
 
 function isBackupGameNewer(backupGame: Game, localGame: Game) {
@@ -325,10 +328,43 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
     case 'questshelf.steamSettings.v1':
     case 'questshelf.libraryFilters.v1':
     case 'questshelf.wishlistFilters.v1':
+    case 'questshelf.onboarding.v1':
+    case 'questshelf.platformQueues.v1':
+    case 'questshelf.reviewMode.v1':
       return isPlainObject(value);
   }
 
   return false;
+}
+
+function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], value: unknown) {
+  // Backups are user-editable JSON. Normalize every section before writing so restore/merge
+  // cannot persist malformed data that later crashes startup.
+  switch (key) {
+    case 'questshelf.games.v1':
+      return normalizeLoadedGames(value);
+    case 'questshelf.steamIgnoredGames.v1':
+      return normalizeIgnoredSteamGames(value);
+    case 'questshelf.rawgMetadataCache.v1':
+      return normalizeRawgMetadataCache(value);
+    case 'questshelf.rawgSettings.v1':
+      return normalizeRawgSettings(value);
+    case 'questshelf.steamSettings.v1':
+      return normalizeSteamSettings(value);
+    case 'questshelf.onboarding.v1':
+      return normalizeOnboardingState(value);
+    case 'questshelf.platformQueues.v1':
+      return normalizePlatformQueueState(value);
+    case 'questshelf.reviewMode.v1':
+      return normalizeReviewModeState(value);
+    case 'questshelf.libraryFilters.v1':
+    case 'questshelf.wishlistFilters.v1':
+      return isPlainObject(value) ? value : {};
+  }
+}
+
+function getTitlePlatformKey(game: Game) {
+  return `${game.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ')}|${String(game.platform).trim().toLowerCase()}`;
 }
 
 function isPlainObject(value: unknown) {

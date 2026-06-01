@@ -1,6 +1,7 @@
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.reviewMode.v1';
+const reviewModeSchemaVersion = 1;
 
 export const reviewSourceOptions = [
   'backlog',
@@ -29,6 +30,7 @@ export type ReviewStats = {
 export type ReviewModeState = {
   ignoredGameIds: string[];
   lastSource: ReviewSource;
+  schemaVersion: typeof reviewModeSchemaVersion;
   stats: ReviewStats;
 };
 
@@ -48,6 +50,7 @@ const emptyStats: ReviewStats = {
 const emptyReviewModeState: ReviewModeState = {
   ignoredGameIds: [],
   lastSource: 'backlog',
+  schemaVersion: reviewModeSchemaVersion,
   stats: emptyStats,
 };
 
@@ -56,7 +59,7 @@ export function loadReviewModeState(): ReviewModeState {
 }
 
 export function saveReviewModeState(state: ReviewModeState) {
-  savePersistedJson(STORAGE_KEY, state);
+  savePersistedJson(STORAGE_KEY, normalizeReviewModeState(state));
 }
 
 export function createReviewStats(): ReviewStats {
@@ -78,7 +81,7 @@ export function getReviewSourceLabel(source: ReviewSource) {
   return labels[source];
 }
 
-function normalizeReviewModeState(value: unknown): ReviewModeState {
+export function normalizeReviewModeState(value: unknown): ReviewModeState {
   const parsedState = value && typeof value === 'object' ? (value as Partial<ReviewModeState>) : {};
   const stats =
     parsedState.stats && typeof parsedState.stats === 'object'
@@ -90,6 +93,7 @@ function normalizeReviewModeState(value: unknown): ReviewModeState {
       ? parsedState.ignoredGameIds.filter((gameId): gameId is string => typeof gameId === 'string')
       : [],
     lastSource: isReviewSource(parsedState.lastSource) ? parsedState.lastSource : 'backlog',
+    schemaVersion: reviewModeSchemaVersion,
     stats: {
       dropped: getNumber(stats.dropped),
       enriched: getNumber(stats.enriched),

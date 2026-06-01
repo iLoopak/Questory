@@ -10,6 +10,12 @@ import {
   type QuestShelfBackupSummary,
 } from '../lib/backupStorage';
 import {
+  clearLocalStorageIssues,
+  exportRawQuestShelfLocalData,
+  getLocalStorageIssues,
+  type LocalStorageIssue,
+} from '../lib/localPersistence';
+import {
   createPortableBackupFilename,
   portableSyncProviders,
   serializePortableBackup,
@@ -39,6 +45,9 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   const [importMode, setImportMode] = useState<ImportMode>('merge');
   const [message, setMessage] = useState('Export a local backup before testing destructive actions.');
   const [messageTone, setMessageTone] = useState<'error' | 'info' | 'success'>('info');
+  const [storageIssues, setStorageIssues] = useState<LocalStorageIssue[]>(() =>
+    typeof window === 'undefined' ? [] : getLocalStorageIssues(),
+  );
   const [selectedBackup, setSelectedBackup] = useState<QuestShelfBackup | null>(null);
   const [syncSettings, setSyncSettings] = useState<SyncFolderSettings>(() =>
     typeof window === 'undefined' ? defaultSyncFolderSettings : loadSyncFolderSettings(),
@@ -85,6 +94,27 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   function showMessage(nextMessage: string, tone: 'error' | 'info' | 'success' = 'info') {
     setMessage(nextMessage);
     setMessageTone(tone);
+  }
+
+  function downloadRawLocalData() {
+    const blob = new Blob(
+      [JSON.stringify({ exportedAt: new Date().toISOString(), rawData: exportRawQuestShelfLocalData() }, null, 2)],
+      { type: 'application/json' },
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `questshelf-raw-local-data-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showMessage('Raw local data exported for recovery.', 'success');
+  }
+
+  function clearRecoveryWarnings() {
+    clearLocalStorageIssues();
+    setStorageIssues([]);
+    showMessage('Storage recovery warnings cleared.');
   }
 
   function downloadBackup() {
@@ -303,6 +333,12 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
         </button>
       </div>
 
+      <StorageRecoveryPanel
+        issues={storageIssues}
+        onClearWarnings={clearRecoveryWarnings}
+        onExportRawData={downloadRawLocalData}
+      />
+
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <label className="flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
           <input
@@ -490,6 +526,58 @@ function BackupSummaryStat({ label, value }: { label: string; value: string }) {
       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
       <div className="mt-1 truncate text-sm text-white">{value}</div>
     </div>
+  );
+}
+
+function StorageRecoveryPanel({
+  issues,
+  onClearWarnings,
+  onExportRawData,
+}: {
+  issues: LocalStorageIssue[];
+  onClearWarnings: () => void;
+  onExportRawData: () => void;
+}) {
+  if (issues.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-4 text-amber-100">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Storage recovery available</h3>
+          <p className="mt-1 max-w-2xl text-sm leading-6">
+            QuestShelf found local data it could not read safely. The app used fallback defaults and did not delete the
+            original raw values.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="h-10 rounded-md border border-amber-200/40 px-3 text-sm font-medium text-amber-50 transition hover:bg-amber-200/10"
+            onClick={onExportRawData}
+            type="button"
+          >
+            Export raw data
+          </button>
+          <button
+            className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-amber-50 transition hover:bg-white/10"
+            onClick={onClearWarnings}
+            type="button"
+          >
+            Clear warning
+          </button>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {issues.map((issue) => (
+          <div key={`${issue.key}-${issue.recordedAt}`} className="rounded-md border border-amber-200/20 bg-ink-950/70 px-3 py-2 text-sm">
+            <div className="font-semibold">{issue.key}</div>
+            <div className="mt-1 text-amber-100/80">{issue.message}</div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
