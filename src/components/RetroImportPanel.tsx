@@ -19,6 +19,7 @@ type RetroImportPanelProps = {
   onClearLibraryFilters?: () => void;
   onEnrichImportedGames?: (gameIds: string[]) => void;
   onImportGames?: (games: Game[]) => Game[];
+  onReviewImportedGames?: (gameIds: string[]) => void;
   onViewImportedGames?: (gameIds: string[]) => void;
 };
 
@@ -46,6 +47,7 @@ export function RetroImportPanel({
   onClearLibraryFilters,
   onEnrichImportedGames,
   onImportGames,
+  onReviewImportedGames,
   onViewImportedGames,
 }: RetroImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -449,6 +451,7 @@ export function RetroImportPanel({
           onAddImportedToQueue={onAddImportedToQueue}
           onClearLibraryFilters={onClearLibraryFilters}
           onEnrichImportedGames={onEnrichImportedGames}
+          onReviewImportedGames={onReviewImportedGames}
           onViewImportedGames={onViewImportedGames}
         />
       ) : null}
@@ -463,6 +466,7 @@ function ImportResultPanel({
   onAddImportedToQueue,
   onClearLibraryFilters,
   onEnrichImportedGames,
+  onReviewImportedGames,
   onViewImportedGames,
 }: {
   importedGames: Game[];
@@ -471,6 +475,7 @@ function ImportResultPanel({
   onAddImportedToQueue?: (gameIds: string[]) => void;
   onClearLibraryFilters?: () => void;
   onEnrichImportedGames?: (gameIds: string[]) => void;
+  onReviewImportedGames?: (gameIds: string[]) => void;
   onViewImportedGames?: (gameIds: string[]) => void;
 }) {
   const importedGameIds = importedGames.map((game) => game.id);
@@ -521,10 +526,17 @@ function ImportResultPanel({
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-              onClick={() => onViewImportedGames?.(importedGameIds)}
+              onClick={() => onReviewImportedGames?.(importedGameIds)}
               type="button"
             >
               Review imported games
+            </button>
+            <button
+              className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+              onClick={() => onViewImportedGames?.(importedGameIds)}
+              type="button"
+            >
+              View in Library
             </button>
             <button
               className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"

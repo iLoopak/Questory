@@ -9,6 +9,7 @@ import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { RetroImportPanel } from './components/RetroImportPanel';
+import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModePanel';
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
@@ -22,6 +23,13 @@ import {
   type OnboardingState,
 } from './lib/onboardingStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
+import {
+  loadReviewModeState,
+  saveReviewModeState,
+  type ReviewDecision,
+  type ReviewModeState,
+  type ReviewSource,
+} from './lib/reviewModeStorage';
 import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
   addIgnoredSteamGame,
@@ -36,7 +44,7 @@ import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
-const navItems = ['Library', 'Wishlist', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
+const navItems = ['Library', 'Wishlist', 'Review Mode', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
 const settingsCategories = [
   'Integrations',
@@ -132,6 +140,8 @@ function App() {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
+  const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
+  const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
     const initialState = loadOnboardingState();
     return !initialState.hasSeenChecklist && !initialState.skipped;
@@ -152,6 +162,10 @@ function App() {
   useEffect(() => {
     saveOnboardingState(onboardingState);
   }, [onboardingState]);
+
+  useEffect(() => {
+    saveReviewModeState(reviewModeState);
+  }, [reviewModeState]);
 
   useEffect(() => {
     saveCollectionFilters(libraryFiltersStorageKey, libraryFilters);
@@ -232,6 +246,7 @@ function App() {
     return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId])));
   }, [onboardingState.completedAt]);
   const isOnboardingComplete = completedOnboardingItemIds.size === onboardingItemIds.length;
+  const reviewIgnoredGameIds = useMemo(() => new Set(reviewModeState.ignoredGameIds), [reviewModeState.ignoredGameIds]);
   const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
   const lastRetroImportedGames = useMemo(
     () =>
@@ -694,6 +709,141 @@ function App() {
     setActiveNavItem('Metadata');
   }
 
+  function startReviewMode(source: ReviewSource) {
+    setActiveReviewSource(source);
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      lastSource: source,
+    }));
+    setSelectedGameId(null);
+    setActiveNavItem('Review Mode');
+  }
+
+  function setReviewSource(source: ReviewSource) {
+    setActiveReviewSource(source);
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      lastSource: source,
+    }));
+  }
+
+  function recordReviewDecision(decision: ReviewDecision) {
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      stats: {
+        ...currentState.stats,
+        [decision]: currentState.stats[decision] + 1,
+      },
+    }));
+  }
+
+  function handleReviewAction(game: Game, action: ReviewModeAction, note?: string) {
+    if (action === 'skip') {
+      return;
+    }
+
+    if (action === 'open-details') {
+      setSelectedGameId(game.id);
+      setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+      return;
+    }
+
+    if (action === 'enrich') {
+      recordReviewDecision('enriched');
+      startMetadataWorkflow([game.id]);
+      return;
+    }
+
+    if (action === 'wishlist') {
+      addToWishlist(game);
+      recordReviewDecision('wishlisted');
+      recordReviewDecision('reviewed');
+      return;
+    }
+
+    if (action === 'ignore') {
+      setReviewModeState((currentState) => ({
+        ...currentState,
+        ignoredGameIds: Array.from(new Set([...currentState.ignoredGameIds, game.id])),
+      }));
+
+      if (typeof game.steamAppId === 'number') {
+        setIgnoredSteamGames((currentIgnoredGames) => addIgnoredSteamGame(currentIgnoredGames, game.steamAppId as number, game.title));
+      }
+
+      recordReviewDecision('ignored');
+      recordReviewDecision('reviewed');
+      return;
+    }
+
+    if (action === 'note' && note) {
+      updateGameReviewFields(game.id, {
+        notes: appendReviewNote(game.notes, note),
+      });
+      recordReviewDecision('reviewed');
+      return;
+    }
+
+    if (action === 'queue') {
+      updateGameReviewFields(game.id, {
+        tags: Array.from(new Set([...game.tags, 'queue'])),
+      });
+      recordReviewDecision('queueCandidates');
+      recordReviewDecision('reviewed');
+      return;
+    }
+
+    if (action === 'playing') {
+      updateGameReviewFields(game.id, {
+        status: 'Playing',
+      });
+      recordReviewDecision('reviewed');
+      return;
+    }
+
+    if (action === 'finished') {
+      updateGameReviewFields(game.id, {
+        finishedAt: new Date().toISOString(),
+        status: 'Finished',
+      });
+      recordReviewDecision('reviewed');
+      return;
+    }
+
+    if (action === 'dropped') {
+      updateGameReviewFields(game.id, {
+        droppedAt: new Date().toISOString(),
+        status: 'Dropped',
+      });
+      recordReviewDecision('dropped');
+      recordReviewDecision('reviewed');
+    }
+  }
+
+  function updateGameReviewFields(gameId: string, changes: Partial<Game>) {
+    setGames((currentGames) =>
+      currentGames.map((game) =>
+        game.id === gameId
+          ? touchGameRecord({
+              ...game,
+              ...changes,
+              lastPlayedAt:
+                changes.status === 'Playing' && game.status !== 'Playing'
+                  ? new Date().toISOString().slice(0, 10)
+                  : game.lastPlayedAt,
+            })
+          : game,
+      ),
+    );
+  }
+
+  function restoreReviewIgnoredGames() {
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      ignoredGameIds: [],
+    }));
+  }
+
   function unignoreSteamGame(steamAppId: number) {
     setIgnoredSteamGames((currentIgnoredGames) => removeIgnoredSteamGame(currentIgnoredGames, steamAppId));
   }
@@ -847,6 +997,7 @@ function App() {
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
             />
           ) : activeNavItem === 'Wishlist' ? (
@@ -872,8 +1023,20 @@ function App() {
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
               onSyncSteamWishlist={syncSteamWishlist}
+            />
+          ) : activeNavItem === 'Review Mode' ? (
+            <ReviewModePanel
+              games={games}
+              ignoredGameIds={reviewIgnoredGameIds}
+              source={activeReviewSource}
+              stats={reviewModeState.stats}
+              onAction={handleReviewAction}
+              onRestoreIgnored={restoreReviewIgnoredGames}
+              onReturnToLibrary={() => setActiveNavItem('Library')}
+              onSourceChange={setReviewSource}
             />
           ) : activeNavItem === 'Metadata' ? (
             <MetadataEnrichmentPanel
@@ -892,6 +1055,7 @@ function App() {
                 setSelectedGameId(gameId);
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
+              onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
             />
           ) : activeNavItem === 'Stats' ? (
@@ -936,6 +1100,7 @@ function App() {
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+              onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
             />
@@ -1014,6 +1179,7 @@ type CollectionPanelProps = {
   onOpenDetails: (gameId: string) => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
+  onStartReview: (source: ReviewSource) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncSteamWishlist?: () => void;
 };
@@ -1040,6 +1206,7 @@ function CollectionPanel({
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
+  onStartReview,
   onStatusChange,
   onSyncSteamWishlist,
 }: CollectionPanelProps) {
@@ -1196,6 +1363,13 @@ function CollectionPanel({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+            onClick={() => onStartReview(collectionType === 'wishlist' ? 'wishlist' : 'backlog')}
+            type="button"
+          >
+            Review {collectionType === 'wishlist' ? 'wishlist' : 'backlog'}
+          </button>
           <button
             className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
             onClick={onAddGame}
@@ -1772,6 +1946,7 @@ type SettingsPanelProps = {
   onOpenOnboarding: () => void;
   onRawgApiKeyConfigured: () => void;
   onRemoveDemoGames: () => void;
+  onReviewRetroImportedGames: () => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
@@ -1808,6 +1983,7 @@ function SettingsPanel({
   onOpenOnboarding,
   onRawgApiKeyConfigured,
   onRemoveDemoGames,
+  onReviewRetroImportedGames,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
@@ -1919,6 +2095,7 @@ function SettingsPanel({
                 onClearLibraryFilters={onClearLibraryFilters}
                 onEnrichImportedGames={onEnrichRetroImportedGames}
                 onImportGames={onImportRetroGames}
+                onReviewImportedGames={onReviewRetroImportedGames}
                 onViewImportedGames={onViewRetroImportedGames}
               />
             </div>
@@ -2376,11 +2553,15 @@ function getNavDescription(activeNavItem: NavItem) {
     return 'Local picks based on your library.';
   }
 
+  if (activeNavItem === 'Review Mode') {
+    return 'Process one game at a time with fast queue, wishlist, status, and ignore actions.';
+  }
+
   if (activeNavItem === 'Stats') {
     return 'Local overview of backlog, progress, and playtime.';
   }
 
-  return `${activeNavItem} remains a placeholder for a later feature pass.`;
+  return 'Local library and wishlist data stays on this device.';
 }
 
 function touchGameRecord(game: Game): Game {
@@ -2406,6 +2587,13 @@ function getRetroDuplicateKey(game: Game) {
   }
 
   return `fallback:${game.platform}:${game.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}:${extension}`;
+}
+
+function appendReviewNote(existingNotes: string, note: string) {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const reviewNote = `[Review ${timestamp}] ${note}`;
+
+  return existingNotes.trim() ? `${existingNotes.trim()}\n\n${reviewNote}` : reviewNote;
 }
 
 type StatProps = {
