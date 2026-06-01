@@ -39,6 +39,23 @@ import {
 } from './lib/platformQueueStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
 import {
+  getBulkWishlistToastMessage,
+  getMoveQueueToastMessage,
+  getOpenQueueAction,
+  getQueueToastMessage,
+  getRemoveQueueToastMessage,
+  getStatusToastMessage,
+  getToastDedupeKey,
+  getUndoAction,
+  getViewGameAction,
+  getWishlistToastMessage,
+  maxVisibleToastCount,
+  mergeToastNotifications,
+  type NotificationDraft,
+  type ToastAction,
+  type ToastCategory,
+} from './lib/notifications';
+import {
   loadReviewModeState,
   saveReviewModeState,
   type ReviewDecision,
@@ -436,22 +453,26 @@ function App() {
     message: string,
     historyEntry: Omit<UndoActionHistoryEntry, 'createdAt'>,
     snapshot = createUndoSnapshot(),
+    notification: Partial<NotificationDraft> = {},
   ) {
     const createdAt = Date.now();
     const action: PendingUndoAction = {
+      actions: notification.actions ?? [getUndoAction()],
+      category: notification.category ?? 'success',
       createdAt,
+      dedupeKey: notification.dedupeKey ?? getToastDedupeKey(historyEntry.actionType, historyEntry.affectedGameIds),
       expiresAt: createdAt + undoActionTimeoutMs,
       historyEntry: {
         ...historyEntry,
         createdAt: new Date(createdAt).toISOString(),
       },
       id: createUndoActionId(),
-      message,
+      message: notification.message ?? message,
       snapshot,
     };
 
     setPendingUndoActions((currentActions) => {
-      const nextActions = [...currentActions, action];
+      const nextActions = mergeToastNotifications(currentActions, action);
       pendingUndoActionsRef.current = nextActions;
       return nextActions;
     });
@@ -510,11 +531,11 @@ function App() {
   function updateGameStatus(gameId: string, status: GameStatus) {
     const game = games.find((currentGame) => currentGame.id === gameId);
     if (game && (status === 'Finished' || status === 'Dropped')) {
-      addUndoAction(`${game.title} marked ${status.toLowerCase()}`, {
+      addUndoAction(getStatusToastMessage(game, status), {
         actionType: `mark-${status.toLowerCase()}`,
         affectedGameIds: [gameId],
         description: `Restore ${game.title} to ${game.status}`,
-      });
+      }, undefined, { actions: [getUndoAction(), getViewGameAction(gameId)] });
     }
 
     setGames((currentGames) =>
@@ -534,7 +555,7 @@ function App() {
     const targetGameIds = new Set(gameIds);
     const updatedGames = games.filter((game) => targetGameIds.has(game.id));
     if (updatedGames.length > 0 && (status === 'Finished' || status === 'Dropped')) {
-      addUndoAction(`${updatedGames.length} games marked ${status.toLowerCase()}`, {
+      addUndoAction(`${updatedGames.length} games marked as ${status}`, {
         actionType: `bulk-mark-${status.toLowerCase()}`,
         affectedGameIds: updatedGames.map((game) => game.id),
         description: `Restore statuses for ${updatedGames.length} games`,
@@ -733,6 +754,12 @@ function App() {
   }
 
   function addManualGame(game: Game) {
+    const collectionName = game.collectionType === 'wishlist' ? 'Wishlist' : 'Library';
+    addUndoAction(`${game.title} added to ${collectionName}`, {
+      actionType: 'add-manual-game',
+      affectedGameIds: [game.id],
+      description: `Remove ${game.title} from ${collectionName}`,
+    }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
     setGames((currentGames) => [...currentGames, touchGameRecord(game)]);
   }
 
@@ -751,11 +778,11 @@ function App() {
     });
 
     if (!alreadyWishlisted) {
-      addUndoAction(`${game.title} added to Wishlist`, {
+      addUndoAction(getWishlistToastMessage(game), {
         actionType: 'add-to-wishlist',
         affectedGameIds: [game.id],
         description: `Remove ${game.title} from Wishlist`,
-      });
+      }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
     }
 
     setGames((currentGames) => {
@@ -793,7 +820,7 @@ function App() {
 
   function addManyToWishlist(targetGames: Game[]) {
     if (targetGames.length > 0) {
-      addUndoAction(`${targetGames.length} games added to Wishlist`, {
+      addUndoAction(getBulkWishlistToastMessage(targetGames.length), {
         actionType: 'bulk-add-to-wishlist',
         affectedGameIds: targetGames.map((game) => game.id),
         description: `Remove ${targetGames.length} wishlist copies`,
@@ -846,7 +873,7 @@ function App() {
       actionType: 'move-to-library',
       affectedGameIds: [game.id],
       description: `Restore ${game.title} to Wishlist`,
-    });
+    }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
 
     setGames((currentGames) =>
       currentGames.map((currentGame) =>
@@ -867,7 +894,7 @@ function App() {
   function removeGame(gameId: string) {
     const game = games.find((currentGame) => currentGame.id === gameId);
     if (game) {
-      addUndoAction(`${game.title} deleted`, {
+      addUndoAction(`${game.title} removed from ${game.collectionType === 'wishlist' ? 'Wishlist' : 'Library'}`, {
         actionType: game.collectionType === 'wishlist' ? 'remove-wishlist-item' : 'delete-game',
         affectedGameIds: [gameId],
         description: `Restore ${game.title}`,
@@ -883,7 +910,7 @@ function App() {
       return;
     }
 
-    addUndoAction(`${game.title} ignored and removed`, {
+    addUndoAction(`${game.title} hidden from Steam imports`, {
       actionType: 'ignore-game',
       affectedGameIds: [game.id],
       description: `Restore ${game.title} and remove it from ignored Steam imports`,
@@ -900,7 +927,7 @@ function App() {
     const targetGameIds = new Set(gameIds);
     const removedGames = games.filter((game) => targetGameIds.has(game.id));
     if (removedGames.length > 0) {
-      addUndoAction(`${removedGames.length} games removed`, {
+      addUndoAction(`${removedGames.length} games removed from Library`, {
         actionType: 'bulk-remove-games',
         affectedGameIds: removedGames.map((game) => game.id),
         description: `Restore ${removedGames.length} removed games`,
@@ -914,7 +941,7 @@ function App() {
 
   function removeAndIgnoreManyGames(targetGames: Game[]) {
     if (targetGames.length > 0) {
-      addUndoAction(`${targetGames.length} games removed and ignored`, {
+      addUndoAction(`${targetGames.length} games hidden from Steam imports`, {
         actionType: 'bulk-remove-and-ignore-games',
         affectedGameIds: targetGames.map((game) => game.id),
         description: `Restore ${targetGames.length} removed games and ignored imports`,
@@ -974,11 +1001,11 @@ function App() {
   }
 
   function addGameToQueue(game: Game, platform: GamePlatform) {
-    addUndoAction(`${game.title} added to ${platform} Queue`, {
+    addUndoAction(getQueueToastMessage(game, platform), {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
       description: `Remove ${game.title} from ${platform} Queue and restore queue positions`,
-    });
+    }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(game.id)] });
 
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
   }
@@ -1009,7 +1036,7 @@ function App() {
     }
 
     if (action === 'ignore') {
-      addUndoAction(`${game.title} ignored`, {
+      addUndoAction(`${game.title} hidden from Review Mode`, {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
         description: `Restore ${game.title} to Review Mode`,
@@ -1075,11 +1102,11 @@ function App() {
   function updateGameReviewFields(gameId: string, changes: Partial<Game>) {
     const game = games.find((currentGame) => currentGame.id === gameId);
     if (game && (changes.status === 'Finished' || changes.status === 'Dropped')) {
-      addUndoAction(`${game.title} marked ${changes.status.toLowerCase()}`, {
+      addUndoAction(getStatusToastMessage(game, changes.status), {
         actionType: `mark-${changes.status.toLowerCase()}`,
         affectedGameIds: [gameId],
         description: `Restore ${game.title} to ${game.status}`,
-      });
+      }, undefined, { actions: [getUndoAction(), getViewGameAction(gameId)] });
     }
 
     setGames((currentGames) =>
@@ -1113,11 +1140,11 @@ function App() {
     const game = games.find((currentGame) => currentGame.id === gameId);
     const currentEntry = platformQueueState.entries.find((entry) => entry.gameId === gameId);
     if (game && currentEntry && currentEntry.targetPlatform !== platform) {
-      addUndoAction(`${game.title} moved to ${platform} Queue`, {
+      addUndoAction(getMoveQueueToastMessage(game, platform), {
         actionType: 'move-between-collections',
         affectedGameIds: [gameId],
         description: `Restore ${game.title} to ${currentEntry.targetPlatform} Queue`,
-      });
+      }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
     setPlatformQueueState((currentState) => moveQueueEntryToPlatform(currentState, gameId, platform));
@@ -1127,11 +1154,11 @@ function App() {
     const game = games.find((currentGame) => currentGame.id === gameId);
     const entry = platformQueueState.entries.find((queueEntry) => queueEntry.gameId === gameId);
     if (game && entry) {
-      addUndoAction(`${game.title} removed from ${entry.targetPlatform} Queue`, {
+      addUndoAction(getRemoveQueueToastMessage(game, entry.targetPlatform), {
         actionType: 'remove-from-queue',
         affectedGameIds: [gameId],
         description: `Restore ${game.title} to queue position ${entry.queuePosition}`,
-      });
+      }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
     setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId));
@@ -1139,6 +1166,17 @@ function App() {
 
   function updateQueueLimit(platform: GamePlatform, maxActiveGames: number) {
     setPlatformQueueState((currentState) => updatePlatformQueueSetting(currentState, platform, maxActiveGames));
+  }
+
+  function openQueueFromToast() {
+    setSelectedGameId(null);
+    setActiveNavItem('Queue');
+  }
+
+  function viewGameFromToast(gameId: string) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    setSelectedGameId(gameId);
+    setActiveNavItem(game?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
 
   function unignoreSteamGame(steamAppId: number) {
@@ -1444,7 +1482,9 @@ function App() {
       <UndoToastStack
         actions={pendingUndoActions}
         onDismiss={dismissUndoAction}
+        onOpenQueue={openQueueFromToast}
         onUndo={undoAction}
+        onViewGame={viewGameFromToast}
       />
 
       {isAddGameOpen ? (
@@ -1491,50 +1531,157 @@ function App() {
 type UndoToastStackProps = {
   actions: PendingUndoAction[];
   onDismiss: (actionId: string) => void;
+  onOpenQueue: () => void;
   onUndo: (actionId: string) => void;
+  onViewGame: (gameId: string) => void;
 };
 
-function UndoToastStack({ actions, onDismiss, onUndo }: UndoToastStackProps) {
+function UndoToastStack({ actions, onDismiss, onOpenQueue, onUndo, onViewGame }: UndoToastStackProps) {
   if (actions.length === 0) {
     return null;
   }
 
+  const visibleActions = actions.slice(-maxVisibleToastCount).reverse();
+  const hiddenActionCount = Math.max(0, actions.length - visibleActions.length);
+
+  function runToastAction(actionId: string, toastAction: ToastAction) {
+    if (toastAction.kind === 'undo') {
+      onUndo(actionId);
+      return;
+    }
+
+    if (toastAction.kind === 'open-queue') {
+      onOpenQueue();
+      return;
+    }
+
+    if (toastAction.kind === 'view-game' && toastAction.gameId) {
+      onViewGame(toastAction.gameId);
+    }
+  }
+
   return (
     <aside
-      aria-label="Pending undo actions"
-      aria-live="polite"
-      className="fixed bottom-4 left-3 right-3 z-40 grid gap-2 sm:left-auto sm:right-5 sm:w-full sm:max-w-md"
+      aria-label="QuestShelf notifications"
+      aria-live="assertive"
+      className="fixed bottom-4 left-3 right-3 z-40 grid gap-2 pb-[max(0px,var(--qs-safe-bottom))] sm:left-auto sm:right-5 sm:w-full sm:max-w-md"
+      role="status"
     >
-      {actions.map((action) => (
-        <div
-          key={action.id}
-          className="qs-glass rounded-lg border border-mint/25 bg-ink-950/95 p-3 shadow-panel"
-        >
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">{action.message}</p>
-              <p className="mt-1 text-xs text-slate-400">Undo is available for a few seconds.</p>
-            </div>
-            <button
-              aria-label={`Dismiss undo for ${action.message}`}
-              className="h-8 w-8 shrink-0 rounded-md border border-white/10 text-sm text-slate-400 transition hover:bg-white/10 hover:text-white"
-              onClick={() => onDismiss(action.id)}
-              type="button"
-            >
-              ×
-            </button>
-          </div>
-          <button
-            className="mt-3 h-10 w-full rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
-            onClick={() => onUndo(action.id)}
-            type="button"
-          >
-            Undo
-          </button>
+      {hiddenActionCount > 0 ? (
+        <div className="rounded-full border border-skyglass/20 bg-ink-950/95 px-3 py-2 text-center text-xs font-semibold text-slate-300 shadow-panel">
+          {hiddenActionCount} more recent {hiddenActionCount === 1 ? 'message' : 'messages'} merged
         </div>
-      ))}
+      ) : null}
+      {visibleActions.map((action) => {
+        const category = action.category ?? 'success';
+        const categoryStyles = getToastCategoryStyles(category);
+        const actionButtons = action.actions && action.actions.length > 0 ? action.actions : [getUndoAction()];
+
+        return (
+          <div
+            key={action.id}
+            className={`qs-toast qs-glass rounded-xl border bg-ink-950/95 p-3 shadow-panel ${categoryStyles.container}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${categoryStyles.dot}`} aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`text-[0.65rem] font-bold uppercase tracking-[0.18em] ${categoryStyles.label}`}>
+                    {getToastCategoryLabel(category)}
+                  </span>
+                  {action.repeatCount && action.repeatCount > 1 ? (
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-300">
+                      ×{action.repeatCount}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm font-semibold leading-5 text-white">{action.message}</p>
+                <p className="mt-1 text-xs text-slate-400">Undo stays available for a few seconds.</p>
+              </div>
+              <button
+                aria-label={`Dismiss notification: ${action.message}`}
+                className="h-9 w-9 shrink-0 rounded-md border border-white/10 text-lg leading-none text-slate-300 transition hover:bg-white/10 hover:text-white"
+                onClick={() => onDismiss(action.id)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              {actionButtons.map((toastAction) => (
+                <button
+                  className={getToastButtonClass(toastAction.kind)}
+                  key={`${action.id}-${toastAction.kind}-${toastAction.gameId ?? 'global'}`}
+                  onClick={() => runToastAction(action.id, toastAction)}
+                  type="button"
+                >
+                  {toastAction.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </aside>
   );
+}
+
+function getToastCategoryLabel(category: ToastCategory) {
+  if (category === 'success') {
+    return 'Success';
+  }
+
+  if (category === 'warning') {
+    return 'Warning';
+  }
+
+  if (category === 'error') {
+    return 'Error';
+  }
+
+  return 'Info';
+}
+
+function getToastCategoryStyles(category: ToastCategory) {
+  if (category === 'warning') {
+    return {
+      container: 'border-amber-300/40 ring-1 ring-amber-300/15',
+      dot: 'bg-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.75)]',
+      label: 'text-amber-200',
+    };
+  }
+
+  if (category === 'error') {
+    return {
+      container: 'border-red-400/45 ring-1 ring-red-400/15',
+      dot: 'bg-red-300 shadow-[0_0_18px_rgba(252,165,165,0.75)]',
+      label: 'text-red-200',
+    };
+  }
+
+  if (category === 'info') {
+    return {
+      container: 'border-skyglass/35 ring-1 ring-skyglass/10',
+      dot: 'bg-sky-300 shadow-[0_0_18px_rgba(125,211,252,0.65)]',
+      label: 'text-sky-200',
+    };
+  }
+
+  return {
+    container: 'border-mint/35 ring-1 ring-mint/15',
+    dot: 'bg-mint shadow-[0_0_18px_rgba(34,243,223,0.75)]',
+    label: 'text-mint',
+  };
+}
+
+function getToastButtonClass(kind: ToastAction['kind']) {
+  const baseClass = 'min-h-11 rounded-md px-3 text-sm font-semibold transition focus-visible:translate-y-0';
+
+  if (kind === 'undo') {
+    return `${baseClass} bg-mint text-ink-950 shadow-glow hover:bg-mint/90`;
+  }
+
+  return `${baseClass} border border-skyglass/20 bg-white/5 text-slate-100 hover:border-mint/40 hover:bg-mint/10 hover:text-white`;
 }
 
 type AddGameDialogProps = {

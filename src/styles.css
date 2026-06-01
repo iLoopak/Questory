@@ -506,3 +506,33 @@ body.qs-controller-active .qs-game-card:focus {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.qs-toast {
+  backdrop-filter: blur(18px);
+}
+
+body.qs-controller-active .qs-toast {
+  border-width: 2px;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.08),
+    0 20px 70px rgba(34, 243, 223, 0.22),
+    0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .qs-toast {
+    animation: qs-toast-enter 220ms ease-out both;
+  }
+}
+
+@keyframes qs-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
