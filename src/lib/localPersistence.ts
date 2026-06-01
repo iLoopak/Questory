@@ -8,6 +8,13 @@ type PreferencesPlugin = {
 
 const isBrowser = typeof window !== 'undefined';
 const preferenceModuleName = '@capacitor/preferences';
+const storageIssueKey = 'questshelf.storageIssues.v1';
+
+export type LocalStorageIssue = {
+  key: string;
+  message: string;
+  recordedAt: string;
+};
 
 export async function loadPersistedJson<T>(key: string, fallback: T, normalize: (value: unknown) => T): Promise<T> {
   const localValue = loadLocalJson(key, fallback, normalize);
@@ -45,8 +52,10 @@ export function loadLocalJson<T>(key: string, fallback: T, normalize: (value: un
   }
 
   try {
-    return normalize(JSON.parse(storedValue));
-  } catch {
+    const parsedValue = JSON.parse(storedValue);
+    return normalize(parsedValue);
+  } catch (error) {
+    recordStorageIssue(key, error instanceof Error ? error.message : 'Stored JSON could not be read.');
     return fallback;
   }
 }
@@ -110,6 +119,32 @@ export async function removePersistedKeys(keys: string[]) {
   );
 }
 
+export function getLocalStorageIssues(): LocalStorageIssue[] {
+  return loadLocalJson(storageIssueKey, [], normalizeStorageIssues);
+}
+
+export function clearLocalStorageIssues() {
+  if (!isBrowser) {
+    return;
+  }
+
+  window.localStorage.removeItem(storageIssueKey);
+}
+
+export function exportRawQuestShelfLocalData() {
+  if (!isBrowser) {
+    return {};
+  }
+
+  return Object.keys(window.localStorage)
+    .filter((key) => key.startsWith('questshelf.'))
+    .sort()
+    .reduce<Record<string, string>>((rawData, key) => {
+      rawData[key] = window.localStorage.getItem(key) ?? '';
+      return rawData;
+    }, {});
+}
+
 export function saveLocalJson<T>(key: string, value: T) {
   if (!isBrowser) {
     return;
@@ -117,9 +152,49 @@ export function saveLocalJson<T>(key: string, value: T) {
 
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
+  } catch (error) {
+    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     // Local persistence should never block the UI if the browser storage quota is unavailable.
   }
+}
+
+function recordStorageIssue(key: string, message: string) {
+  if (!isBrowser || key === storageIssueKey) {
+    return;
+  }
+
+  const issues = getLocalStorageIssues();
+  const nextIssues = [
+    ...issues.filter((issue) => issue.key !== key),
+    {
+      key,
+      message,
+      recordedAt: new Date().toISOString(),
+    },
+  ].slice(-12);
+
+  try {
+    window.localStorage.setItem(storageIssueKey, JSON.stringify(nextIssues));
+  } catch {
+    // If even issue tracking cannot be written, keep the app usable and rely on safe defaults.
+  }
+}
+
+function normalizeStorageIssues(value: unknown): LocalStorageIssue[] {
+  return Array.isArray(value)
+    ? value.filter((issue): issue is LocalStorageIssue => {
+        if (!issue || typeof issue !== 'object') {
+          return false;
+        }
+
+        const parsedIssue = issue as Partial<LocalStorageIssue>;
+        return (
+          typeof parsedIssue.key === 'string' &&
+          typeof parsedIssue.message === 'string' &&
+          typeof parsedIssue.recordedAt === 'string'
+        );
+      })
+    : [];
 }
 
 async function savePreferenceJson<T>(key: string, value: T) {

@@ -13,7 +13,7 @@ export function loadGamesFromPersistentStorage(): Promise<Game[]> {
 }
 
 export function saveGames(games: Game[]) {
-  savePersistedJson(STORAGE_KEY, games);
+  savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games));
 }
 
 export function getMockGames(): Game[] {
@@ -28,7 +28,7 @@ export function removeMockGames(games: Game[]) {
   return games.filter((game) => !isMockGame(game));
 }
 
-function normalizeLoadedGame(value: unknown): Game | null {
+export function normalizeLoadedGame(value: unknown): Game | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
@@ -39,22 +39,29 @@ function normalizeLoadedGame(value: unknown): Game | null {
     return null;
   }
 
+  // Migration guard: preserve user-owned optional fields via spread, then repair only the fields
+  // that QuestShelf needs to render safely. Do not overwrite valid notes, tags, or status.
   return {
     ...(game as Game),
     collectionType: normalizeLoadedCollectionType(game.collectionType),
     coverImage: typeof game.coverImage === 'string' ? game.coverImage : '',
+    droppedAt: typeof game.droppedAt === 'string' ? game.droppedAt : undefined,
+    droppedReason: typeof game.droppedReason === 'string' ? game.droppedReason : undefined,
+    externalSource: normalizeExternalSource(game.externalSource),
+    finishedAt: typeof game.finishedAt === 'string' ? game.finishedAt : undefined,
     id: game.id,
     lastPlayedAt: typeof game.lastPlayedAt === 'string' ? game.lastPlayedAt : null,
     notes: typeof game.notes === 'string' ? game.notes : '',
     platform: normalizeLoadedPlatform(game.platform),
     playtimeHours: getNonNegativeNumber(game.playtimeHours),
+    priority: normalizeWishlistPriority(game.priority),
     status: normalizeLoadedStatus(game.status),
     tags: Array.isArray(game.tags) ? game.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     title: game.title,
   };
 }
 
-function normalizeLoadedGames(value: unknown): Game[] {
+export function normalizeLoadedGames(value: unknown): Game[] {
   return Array.isArray(value)
     ? value.map(normalizeLoadedGame).filter((game): game is Game => Boolean(game))
     : [];
@@ -68,10 +75,24 @@ function normalizeLoadedPlatform(platform: unknown): GamePlatform {
   return typeof platform === 'string' && platform.trim() ? platform : 'Other';
 }
 
+function normalizeExternalSource(externalSource: unknown): Game['externalSource'] {
+  return externalSource === 'manual' ||
+    externalSource === 'steam' ||
+    externalSource === 'steam-wishlist' ||
+    externalSource === 'retro-rom'
+    ? externalSource
+    : undefined;
+}
+
+function normalizeWishlistPriority(priority: unknown): Game['priority'] {
+  return priority === 'low' || priority === 'medium' || priority === 'high' ? priority : undefined;
+}
+
 function normalizeLoadedStatus(status: unknown): GameStatus {
   if (typeof status !== 'string') {
     return 'Want to play';
   }
+
   if (status === 'Completed') {
     return 'Finished';
   }

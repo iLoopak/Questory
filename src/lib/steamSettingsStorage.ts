@@ -14,10 +14,10 @@ export function loadSteamSettings(): SteamSettings {
 }
 
 export function saveSteamSettings(settings: SteamSettings) {
-  savePersistedJson(STORAGE_KEY, settings);
+  savePersistedJson(STORAGE_KEY, normalizeSteamSettings(settings));
 }
 
-function normalizeSteamSettings(value: unknown): SteamSettings {
+export function normalizeSteamSettings(value: unknown): SteamSettings {
   const parsedSettings = value && typeof value === 'object' ? (value as Partial<SteamSettings>) : {};
 
   return {

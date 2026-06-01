@@ -71,7 +71,7 @@ export function loadSyncFolderSettings(): SyncFolderSettings {
 }
 
 export function saveSyncFolderSettings(settings: SyncFolderSettings) {
-  window.localStorage.setItem(settingsKey, JSON.stringify(settings));
+  window.localStorage.setItem(settingsKey, JSON.stringify(normalizeSyncFolderSettings(settings)));
 }
 
 export async function chooseBackupFileHandle() {
@@ -239,7 +239,7 @@ function runStoreRequest<T = unknown>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
-function normalizeSyncFolderSettings(value: unknown): SyncFolderSettings {
+export function normalizeSyncFolderSettings(value: unknown): SyncFolderSettings {
   const settings = value && typeof value === 'object' ? (value as Partial<SyncFolderSettings>) : {};
 
   return {

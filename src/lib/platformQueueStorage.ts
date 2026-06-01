@@ -2,6 +2,7 @@ import type { Game, GamePlatform } from '../types/game';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.platformQueues.v1';
+const platformQueueSchemaVersion = 1;
 
 export const queuePriorityOptions = ['low', 'normal', 'high'] as const;
 export type QueuePriority = (typeof queuePriorityOptions)[number];
@@ -24,6 +25,7 @@ export type PlatformQueueSettings = {
 
 export type PlatformQueueState = {
   entries: PlatformQueueEntry[];
+  schemaVersion: typeof platformQueueSchemaVersion;
   settings: PlatformQueueSettings[];
 };
 
@@ -81,6 +83,7 @@ const defaultActiveLimits = new Map<GamePlatform, number>([
 
 const emptyQueueState: PlatformQueueState = {
   entries: [],
+  schemaVersion: platformQueueSchemaVersion,
   settings: [],
 };
 
@@ -89,7 +92,7 @@ export function loadPlatformQueueState(): PlatformQueueState {
 }
 
 export function savePlatformQueueState(state: PlatformQueueState) {
-  savePersistedJson(STORAGE_KEY, normalizeQueuePositions(state));
+  savePersistedJson(STORAGE_KEY, normalizePlatformQueueState(state));
 }
 
 export function getQueuePlatforms(games: Game[], state: PlatformQueueState): GamePlatform[] {
@@ -205,6 +208,7 @@ export function updatePlatformQueueSetting(
 
   return {
     ...state,
+    schemaVersion: platformQueueSchemaVersion,
     settings: [...settings, { maxActiveGames: boundedLimit, platform }],
   };
 }
@@ -236,11 +240,12 @@ export function compareQueueEntries(first: PlatformQueueEntry, second: PlatformQ
   return first.queuePosition - second.queuePosition || first.queuedAt.localeCompare(second.queuedAt);
 }
 
-function normalizePlatformQueueState(value: unknown): PlatformQueueState {
+export function normalizePlatformQueueState(value: unknown): PlatformQueueState {
   const parsedState = value && typeof value === 'object' ? (value as Partial<PlatformQueueState>) : {};
 
   return normalizeQueuePositions({
     entries: Array.isArray(parsedState.entries) ? parsedState.entries.filter(isQueueEntry) : [],
+    schemaVersion: platformQueueSchemaVersion,
     settings: Array.isArray(parsedState.settings) ? parsedState.settings.filter(isQueueSetting) : [],
   });
 }
@@ -256,6 +261,7 @@ function normalizeQueuePositions(state: PlatformQueueState): PlatformQueueState 
 
   return {
     ...state,
+    schemaVersion: platformQueueSchemaVersion,
     entries: Array.from(groupedEntries.entries()).flatMap(([, entries]) =>
       entries.sort(compareQueueEntries).map((entry, index) => ({
         ...entry,
