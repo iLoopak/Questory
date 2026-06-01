@@ -19,8 +19,10 @@ export type ReviewStats = {
   dropped: number;
   enriched: number;
   ignored: number;
+  playing: number;
   queueCandidates: number;
   reviewed: number;
+  skipped: number;
   wishlisted: number;
 };
 
@@ -36,8 +38,10 @@ const emptyStats: ReviewStats = {
   dropped: 0,
   enriched: 0,
   ignored: 0,
+  playing: 0,
   queueCandidates: 0,
   reviewed: 0,
+  skipped: 0,
   wishlisted: 0,
 };
 
@@ -90,8 +94,10 @@ function normalizeReviewModeState(value: unknown): ReviewModeState {
       dropped: getNumber(stats.dropped),
       enriched: getNumber(stats.enriched),
       ignored: getNumber(stats.ignored),
+      playing: getNumber(stats.playing),
       queueCandidates: getNumber(stats.queueCandidates),
       reviewed: getNumber(stats.reviewed),
+      skipped: getNumber(stats.skipped),
       wishlisted: getNumber(stats.wishlisted),
     },
   };

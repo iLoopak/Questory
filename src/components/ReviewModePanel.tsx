@@ -24,9 +24,10 @@ export type ReviewModeAction =
 type ReviewModePanelProps = {
   games: Game[];
   ignoredGameIds: Set<string>;
+  queuePlatforms: GamePlatform[];
   source: ReviewSource;
   stats: ReviewStats;
-  onAction: (game: Game, action: ReviewModeAction, note?: string) => void;
+  onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) => void;
   onReturnToLibrary: () => void;
   onRestoreIgnored: () => void;
   onSourceChange: (source: ReviewSource) => void;
@@ -38,8 +39,8 @@ const primaryActions: Array<{
   label: string;
   tone: 'accent' | 'neutral' | 'danger';
 }> = [
-  { action: 'queue', hint: 'Y', label: 'Add to Queue', tone: 'accent' },
-  { action: 'playing', hint: 'A', label: 'Playing', tone: 'accent' },
+  { action: 'queue', hint: 'Y', label: 'Add to Platform Queue', tone: 'accent' },
+  { action: 'playing', hint: 'A', label: 'Playing Now', tone: 'accent' },
   { action: 'wishlist', hint: 'X', label: 'Wishlist', tone: 'neutral' },
   { action: 'finished', hint: 'F', label: 'Finished', tone: 'neutral' },
   { action: 'dropped', hint: 'D', label: 'Dropped', tone: 'danger' },
@@ -58,6 +59,7 @@ const anyPlatform = 'Any platform';
 export function ReviewModePanel({
   games,
   ignoredGameIds,
+  queuePlatforms,
   source,
   stats,
   onAction,
@@ -68,14 +70,17 @@ export function ReviewModePanel({
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(0);
   const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
+  const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform>('Steam');
   const [noteDraft, setNoteDraft] = useState('');
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [sessionStats, setSessionStats] = useState<ReviewStats>(() => ({
     dropped: 0,
     enriched: 0,
     ignored: 0,
+    playing: 0,
     queueCandidates: 0,
     reviewed: 0,
+    skipped: 0,
     wishlisted: 0,
   }));
 
@@ -172,7 +177,8 @@ export function ReviewModePanel({
       return;
     }
 
-    onAction(game, action, note);
+    const targetPlatform = action === 'queue' ? targetQueuePlatform : undefined;
+    onAction(game, action, note, targetPlatform);
     setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
     setIsNoteOpen(false);
     setNoteDraft('');
@@ -249,7 +255,7 @@ export function ReviewModePanel({
           <div className="mt-4 grid grid-cols-2 gap-2">
             <ReviewStat label="Reviewed" value={stats.reviewed} />
             <ReviewStat label="Queued" value={stats.queueCandidates} />
-            <ReviewStat label="Wishlist" value={stats.wishlisted} />
+            <ReviewStat label="Playing" value={stats.playing} />
             <ReviewStat label="Dropped" value={stats.dropped} />
           </div>
 
@@ -274,7 +280,10 @@ export function ReviewModePanel({
               onAction={(action) => performAction(activeGame, action)}
               onHighlight={setHighlightedActionIndex}
               onNoteDraftChange={setNoteDraft}
+              onTargetQueuePlatformChange={setTargetQueuePlatform}
               onSubmitNote={submitNote}
+              queuePlatforms={queuePlatforms}
+              targetQueuePlatform={targetQueuePlatform}
             />
           ) : (
             <ReviewComplete
@@ -298,7 +307,10 @@ function ReviewCard({
   onAction,
   onHighlight,
   onNoteDraftChange,
+  onTargetQueuePlatformChange,
   onSubmitNote,
+  queuePlatforms,
+  targetQueuePlatform,
 }: {
   game: Game;
   highlightedActionIndex: number;
@@ -307,7 +319,10 @@ function ReviewCard({
   onAction: (action: ReviewModeAction) => void;
   onHighlight: (index: number) => void;
   onNoteDraftChange: (value: string) => void;
+  onTargetQueuePlatformChange: (platform: GamePlatform) => void;
   onSubmitNote: () => void;
+  queuePlatforms: GamePlatform[];
+  targetQueuePlatform: GamePlatform;
 }) {
   const coverSources = getGameCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -388,6 +403,20 @@ function ReviewCard({
         </section>
 
         <section className="rounded-lg border border-white/10 bg-ink-900/80 p-4">
+          <label className="mb-3 block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add to Platform Queue</span>
+            <select
+              className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
+              value={targetQueuePlatform}
+              onChange={(event) => onTargetQueuePlatformChange(event.target.value as GamePlatform)}
+            >
+              {queuePlatforms.map((platform) => (
+                <option key={platform} value={platform}>
+                  {platform}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {primaryActions.map((action, index) => (
               <button
@@ -465,9 +494,11 @@ function ReviewComplete({
         <p className="mt-2 text-sm leading-6 text-slate-400">Nice. This review pass has no more games waiting.</p>
         <div className="mt-5 grid gap-2 sm:grid-cols-5">
           <ReviewStat label="Queued" value={stats.queueCandidates} />
+          <ReviewStat label="Playing" value={stats.playing} />
           <ReviewStat label="Wishlist" value={stats.wishlisted} />
           <ReviewStat label="Dropped" value={stats.dropped} />
           <ReviewStat label="Ignored" value={stats.ignored} />
+          <ReviewStat label="Skipped" value={stats.skipped} />
           <ReviewStat label="Enriched" value={stats.enriched} />
         </div>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -538,12 +569,20 @@ function updateReviewStats(stats: ReviewStats, action: ReviewModeAction): Review
     nextStats.reviewed += 1;
   }
 
+  if (action === 'skip') {
+    nextStats.skipped += 1;
+  }
+
   if (action === 'queue') {
     nextStats.queueCandidates += 1;
   }
 
   if (action === 'wishlist') {
     nextStats.wishlisted += 1;
+  }
+
+  if (action === 'playing') {
+    nextStats.playing += 1;
   }
 
   if (action === 'dropped') {

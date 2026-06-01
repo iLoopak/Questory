@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
+import type { PlatformQueueEntry } from '../lib/platformQueueStorage';
 import {
   availableTimeOptions,
   getRecommendations,
@@ -15,6 +16,7 @@ import { gamePlatforms } from '../types/game';
 
 type RecommendationPanelProps = {
   games: Game[];
+  queueEntries: PlatformQueueEntry[];
   onOpenDetails: (gameId: string) => void;
   onStartReview: (source: ReviewSource) => void;
   onStatusChange: (gameId: string, status: 'Playing') => void;
@@ -22,13 +24,16 @@ type RecommendationPanelProps = {
 
 const anyPlatform = 'Any';
 
-export function RecommendationPanel({ games, onOpenDetails, onStartReview, onStatusChange }: RecommendationPanelProps) {
+export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStartReview, onStatusChange }: RecommendationPanelProps) {
   const [availableTime, setAvailableTime] = useState<AvailableTime>('30 min');
   const [mood, setMood] = useState<RecommendationMood>('comfort');
   const [preferredPlatform, setPreferredPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
   const [includeFinishedGames, setIncludeFinishedGames] = useState(false);
   const [includeWishlist, setIncludeWishlist] = useState(false);
+  const [recommendFromQueueOnly, setRecommendFromQueueOnly] = useState(false);
+  const [recommendNextGame, setRecommendNextGame] = useState(false);
   const [rerollIndex, setRerollIndex] = useState(0);
+  const queuedGameIds = useMemo(() => new Set(queueEntries.map((entry) => entry.gameId)), [queueEntries]);
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
       first.localeCompare(second),
@@ -43,7 +48,17 @@ export function RecommendationPanel({ games, onOpenDetails, onStartReview, onSta
     preferredPlatform,
   };
 
-  const recommendations = useMemo(() => getRecommendations(games, preferences), [games, preferences]);
+  const recommendationGames = useMemo(() => {
+    if (recommendNextGame) {
+      const nextEntry = [...queueEntries].sort((first, second) => first.queuePosition - second.queuePosition)[0];
+      const nextGame = nextEntry ? games.find((game) => game.id === nextEntry.gameId) : null;
+      return nextGame ? [nextGame] : [];
+    }
+
+    return recommendFromQueueOnly ? games.filter((game) => queuedGameIds.has(game.id)) : games;
+  }, [games, queueEntries, queuedGameIds, recommendFromQueueOnly, recommendNextGame]);
+
+  const recommendations = useMemo(() => getRecommendations(recommendationGames, preferences), [recommendationGames, preferences]);
   const recommendation = recommendations.length > 0 ? recommendations[rerollIndex % recommendations.length] : null;
 
   function updatePreference(update: () => void) {
@@ -65,7 +80,7 @@ export function RecommendationPanel({ games, onOpenDetails, onStartReview, onSta
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_auto_auto]">
+          <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_auto_auto_auto_auto]">
             <SegmentedControl
               label="Available time"
               options={availableTimeOptions}
@@ -111,6 +126,24 @@ export function RecommendationPanel({ games, onOpenDetails, onStartReview, onSta
                 type="checkbox"
               />
               Include Wishlist
+            </label>
+            <label className="flex items-end gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+              <input
+                checked={recommendFromQueueOnly}
+                className="mb-1 h-4 w-4 accent-mint"
+                onChange={(event) => updatePreference(() => setRecommendFromQueueOnly(event.target.checked))}
+                type="checkbox"
+              />
+              Queue only
+            </label>
+            <label className="flex items-end gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+              <input
+                checked={recommendNextGame}
+                className="mb-1 h-4 w-4 accent-mint"
+                onChange={(event) => updatePreference(() => setRecommendNextGame(event.target.checked))}
+                type="checkbox"
+              />
+              Next queued
             </label>
           </div>
         </div>

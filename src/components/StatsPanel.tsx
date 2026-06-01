@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
+import type { PlatformQueueSummary } from '../lib/platformQueueStorage';
 import type { Game } from '../types/game';
 import { getQuestShelfStats, statsScopeOptions, type QuestShelfStats, type StatsBarItem, type StatsScope } from '../utils/stats';
 
 type StatsPanelProps = {
   games: Game[];
+  queueSummary: PlatformQueueSummary;
   onOpenDetails: (gameId: string) => void;
 };
 
-export function StatsPanel({ games, onOpenDetails }: StatsPanelProps) {
+export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelProps) {
   const [scope, setScope] = useState<StatsScope>('library');
   const stats = useMemo(() => getQuestShelfStats(games, scope), [games, scope]);
 
@@ -45,6 +47,7 @@ export function StatsPanel({ games, onOpenDetails }: StatsPanelProps) {
           {stats.scopedGames.length > 0 ? (
             <div className="space-y-4">
               <SummaryGrid stats={stats} />
+              <QueueStatsPanel queueSummary={queueSummary} />
               <ProgressGrid stats={stats} />
 
               <div className="grid gap-4 xl:grid-cols-2">
@@ -108,6 +111,32 @@ export function StatsPanel({ games, onOpenDetails }: StatsPanelProps) {
             </div>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function QueueStatsPanel({ queueSummary }: { queueSummary: PlatformQueueSummary }) {
+  return (
+    <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-white">Queue planning</h3>
+          <p className="mt-1 text-sm text-slate-400">Queue is the focused layer above the full Library.</p>
+        </div>
+        <span className="rounded-md border border-mint/30 bg-mint/10 px-2.5 py-1 text-sm font-semibold text-mint">
+          {queueSummary.queuedCount} queued
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <MetricCard label="Total queued games" value={queueSummary.queuedCount.toString()} compact />
+        <MetricCard label="Estimated queue hours" value={`${queueSummary.estimatedBacklogHours}h`} compact />
+        <MetricCard label="Average queue age" value={`${queueSummary.averageQueueAgeDays}d`} compact />
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {queueSummary.platformSizes.slice(0, 8).map((item) => (
+          <MetricCard key={item.platform} label={item.platform} value={item.count.toString()} compact />
+        ))}
       </div>
     </section>
   );
