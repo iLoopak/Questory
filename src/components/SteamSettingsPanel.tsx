@@ -228,10 +228,7 @@ export function SteamSettingsPanel({
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Steam integration</h2>
-          <p className="mt-1 text-sm text-slate-400">Foundation only. Import is local and never overwrites games.</p>
-        </div>
-        <div className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-          Local credentials
+
         </div>
       </div>
 
@@ -287,7 +284,7 @@ export function SteamSettingsPanel({
               onClick={testConnection}
               type="button"
             >
-              {connectionState.status === 'loading' ? 'Testing...' : 'Test Steam connection'}
+              {connectionState.status === 'loading' ? 'Testing...' : 'Test connection'}
             </button>
 
             <div className={`rounded-md border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
@@ -303,32 +300,20 @@ export function SteamSettingsPanel({
           </div>
         </section>
 
-        <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
-          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="font-semibold text-white">Debug results</h3>
-            <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-              Raw import preview
-            </span>
+        <details className="rounded-lg border border-white/10 bg-ink-950 p-4">
+          <summary className="cursor-pointer font-semibold text-white">Connection details</summary>
+          <div className="mt-3">
+            <SteamApiDebugSummary
+              entries={apiDebugEntries}
+              latestEntry={latestApiDebugEntry}
+              steamId64={settings.steamId64}
+            />
+
+            <pre className="max-h-[320px] overflow-auto rounded-md border border-white/10 bg-black/30 p-3 text-xs leading-5 text-slate-300">
+              {debugOutput}
+            </pre>
           </div>
-
-          {connectionState.data ? (
-            <div className="mb-4 grid gap-2 sm:grid-cols-3">
-              <DebugStat label="Owned" value={connectionState.data.ownedGames.length.toString()} />
-              <DebugStat label="Recent" value={connectionState.data.recentlyPlayedGames.length.toString()} />
-              <DebugStat label="Mapped" value={connectionState.data.mappedGames.length.toString()} />
-            </div>
-          ) : null}
-
-          <SteamApiDebugSummary
-            entries={apiDebugEntries}
-            latestEntry={latestApiDebugEntry}
-            steamId64={settings.steamId64}
-          />
-
-          <pre className="max-h-[360px] overflow-auto rounded-md border border-white/10 bg-black/30 p-3 text-xs leading-5 text-slate-300">
-            {debugOutput}
-          </pre>
-        </section>
+        </details>
       </div>
 
       <IgnoredSteamGamesSection ignoredSteamGames={ignoredSteamGames} onUnignoreSteamGame={onUnignoreSteamGame} />
@@ -421,9 +406,6 @@ function SteamImportSection({
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-white">Steam import</h3>
-          <p className="mt-1 text-sm text-slate-400">
-            Select games to add to the local library. Existing and ignored Steam App IDs are skipped.
-          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -442,13 +424,6 @@ function SteamImportSection({
             Import selected
           </button>
         </div>
-      </div>
-
-      <div className="mb-3 grid gap-2 sm:grid-cols-4">
-        <DebugStat label="Importable" value={importableGamesCount.toString()} />
-        <DebugStat label="Selected" value={selectedAppIds.size.toString()} />
-        <DebugStat label="Duplicates" value={ownedGames.filter((game) => existingSteamAppIds.has(game.appid)).length.toString()} />
-        <DebugStat label="Ignored" value={ownedGames.filter((game) => ignoredSteamAppIds.has(game.appid)).length.toString()} />
       </div>
 
       {ownedGames.length > 0 ? (
@@ -520,7 +495,7 @@ function SteamImportRow({ game, isDuplicate, isIgnored, isSelected, recentGame, 
 
       <div className="min-w-0">
         <div className="truncate font-medium text-white">{game.name ?? `Steam app ${game.appid}`}</div>
-        <div className="mt-1 text-sm text-slate-400">Steam App ID: {game.appid}</div>
+        <div className="mt-1 text-sm text-slate-400">Steam</div>
         <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
           <span className="rounded-full bg-white/10 px-2.5 py-1">Total {formatSteamPlaytime(game.playtime_forever)}</span>
           <span className="rounded-full bg-white/10 px-2.5 py-1">
@@ -553,12 +528,6 @@ function IgnoredSteamGamesSection({ ignoredSteamGames, onUnignoreSteamGame }: Ig
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-white">Ignored Steam games</h3>
-          <p className="mt-1 text-sm text-slate-400">
-            Ignored Steam App IDs stay local and are skipped during future imports.
-          </p>
-        </div>
-        <div className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
-          {ignoredSteamGames.length} ignored
         </div>
       </div>
 
@@ -573,7 +542,7 @@ function IgnoredSteamGamesSection({ ignoredSteamGames, onUnignoreSteamGame }: Ig
                 <div className="truncate text-sm font-semibold text-white">
                   {game.title || `Steam app ${game.steamAppId}`}
                 </div>
-                <div className="mt-1 text-xs text-slate-400">Steam App ID: {game.steamAppId}</div>
+                <div className="mt-1 text-xs text-slate-400">Steam</div>
               </div>
               <button
                 className="h-9 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"

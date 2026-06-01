@@ -54,19 +54,16 @@ export function QueuePanel({
     <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Platform Queue</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Queue</div>
           <h2 className="mt-1 text-xl font-semibold text-white">What to play next</h2>
-          <p className="mt-1 text-sm text-slate-400">Queue turns the full library into a realistic platform plan.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            className="min-h-11 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
-            onClick={onStartReview}
-            type="button"
-          >
-            Build Queue in Review Mode
-          </button>
-        </div>
+        <button
+          className="min-h-11 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
+          onClick={onStartReview}
+          type="button"
+        >
+          Build in Review Mode
+        </button>
       </div>
 
       <div className="mb-4 grid gap-3 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3 lg:grid-cols-[minmax(0,1fr)_220px_140px]">
@@ -87,7 +84,7 @@ export function QueuePanel({
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Target platform</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
           <select
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
             value={selectedPlatform}
@@ -107,11 +104,11 @@ export function QueuePanel({
           onClick={addSelectedGame}
           type="button"
         >
-          Add to Queue
+          Add
         </button>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         {queuePlatforms.map((platform) => (
           <PlatformQueueColumn
             key={platform}
@@ -162,70 +159,62 @@ function PlatformQueueColumn({
 
   return (
     <section className="rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-white">{platform}</h3>
-          <p className="mt-1 text-sm text-slate-400">
-            {currentlyPlaying.length} playing, {queueEntries.length} queued
-          </p>
-        </div>
-        <label className="w-24">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Max active</span>
-          <input
-            className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-            min={1}
-            max={10}
-            type="number"
-            value={maxActiveGames}
-            onChange={(event) => onLimitChange(platform, Number(event.target.value))}
-          />
-        </label>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold text-white">{platform}</h3>
+        <details className="relative">
+          <summary className="cursor-pointer rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10">
+            Options
+          </summary>
+          <div className="absolute right-0 z-20 mt-2 w-44 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Active limit</span>
+              <input
+                className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+                min={1}
+                max={10}
+                type="number"
+                value={maxActiveGames}
+                onChange={(event) => onLimitChange(platform, Number(event.target.value))}
+              />
+            </label>
+          </div>
+        </details>
       </div>
 
-      <div className="rounded-md border border-white/10 bg-ink-900/70 p-3">
-        <h4 className="text-sm font-semibold text-white">Currently Playing</h4>
-        <div className="mt-2 grid gap-2">
-          {currentlyPlaying.length > 0 ? (
-            currentlyPlaying.map((game) => (
-              <QueueGameRow key={game.id} game={game} onOpenDetails={onOpenDetails} />
-            ))
-          ) : (
-            <div className="rounded-md border border-dashed border-white/10 px-3 py-2 text-sm text-slate-500">
-              No active games for this platform.
-            </div>
-          )}
+      {currentlyPlaying.length > 0 ? (
+        <div className="mb-3 grid gap-2">
+          {currentlyPlaying.map((game) => (
+            <QueueGameRow key={game.id} game={game} onOpenDetails={onOpenDetails} />
+          ))}
         </div>
-      </div>
+      ) : null}
 
-      <div className="mt-3 rounded-md border border-white/10 bg-ink-900/70 p-3">
-        <h4 className="text-sm font-semibold text-white">Queue</h4>
-        <div className="mt-2 grid gap-2">
-          {queueEntries.length > 0 ? (
-            queueEntries.map((entry) => {
-              const game = gamesById.get(entry.gameId);
-              if (!game) {
-                return null;
-              }
+      <div className="grid gap-2">
+        {queueEntries.length > 0 ? (
+          queueEntries.map((entry) => {
+            const game = gamesById.get(entry.gameId);
+            if (!game) {
+              return null;
+            }
 
-              return (
-                <QueueEntryRow
-                  key={entry.gameId}
-                  entry={entry}
-                  game={game}
-                  platformOptions={platformOptions}
-                  onMoveEntry={onMoveEntry}
-                  onMoveEntryToPlatform={onMoveEntryToPlatform}
-                  onOpenDetails={onOpenDetails}
-                  onRemoveEntry={onRemoveEntry}
-                />
-              );
-            })
-          ) : (
-            <div className="rounded-md border border-dashed border-white/10 px-3 py-2 text-sm text-slate-500">
-              Queue is empty.
-            </div>
-          )}
-        </div>
+            return (
+              <QueueEntryRow
+                key={entry.gameId}
+                entry={entry}
+                game={game}
+                platformOptions={platformOptions}
+                onMoveEntry={onMoveEntry}
+                onMoveEntryToPlatform={onMoveEntryToPlatform}
+                onOpenDetails={onOpenDetails}
+                onRemoveEntry={onRemoveEntry}
+              />
+            );
+          })
+        ) : (
+          <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
+            No queued games. Add one above or use Review Mode.
+          </div>
+        )}
       </div>
     </section>
   );
@@ -258,11 +247,7 @@ function QueueEntryRow({
           <button className="truncate text-left font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
             {game.title}
           </button>
-          <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
-            <span>{game.platform}</span>
-            <span>{entry.queuePriority} priority</span>
-            {entry.estimatedPlaytime ? <span>{entry.estimatedPlaytime}h est.</span> : null}
-          </div>
+          <div className="mt-1 text-xs text-slate-500">{game.platform}</div>
         </div>
         <div className="flex flex-wrap gap-1">
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">
@@ -279,10 +264,10 @@ function QueueEntryRow({
           </button>
         </div>
       </div>
-      <label className="mt-2 block">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Move to platform</span>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Move platform</summary>
         <select
-          className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+          className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
           value={entry.targetPlatform}
           onChange={(event) => onMoveEntryToPlatform(game.id, event.target.value as GamePlatform)}
         >
@@ -292,7 +277,7 @@ function QueueEntryRow({
             </option>
           ))}
         </select>
-      </label>
+      </details>
     </article>
   );
 }
@@ -304,8 +289,7 @@ function QueueGameRow({ game, onOpenDetails }: { game: Game; onOpenDetails: (gam
       onClick={() => onOpenDetails(game.id)}
       type="button"
     >
-      <span className="block truncate font-semibold">{game.title}</span>
-      <span className="mt-1 block text-xs opacity-80">{game.playtimeHours}h played</span>
+      <span className="block truncate font-semibold">Playing: {game.title}</span>
     </button>
   );
 }

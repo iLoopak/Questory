@@ -76,17 +76,17 @@ const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
 const settingsCategoryStorageKey = 'questshelf.settingsCategory.v1';
 const wishlistFiltersStorageKey = 'questshelf.wishlistFilters.v1';
 const sourceFilterOptions = ['All', 'Steam', 'Manual', 'Wishlist', 'Retro / future-ready'] as const;
-const enrichmentFilterOptions = ['All', 'RAWG enriched', 'Missing metadata', 'Manual metadata'] as const;
+const enrichmentFilterOptions = ['All', 'Enriched', 'Missing info', 'Manual metadata'] as const;
 const librarySortOptions = [
   'Title A-Z',
   'Recently played',
   'Most playtime',
   'Least playtime',
   'Recently imported',
-  'Metadata missing first',
+  'Missing info first',
   'Status',
 ] as const;
-const quickFilterOptions = ['Playing', 'Paused', 'Backlog / Want to play', 'Missing metadata', 'Played > 0h'] as const;
+const quickFilterOptions = ['Playing', 'Paused', 'Backlog / Want to play', 'Missing info', 'Played > 0h'] as const;
 
 type SourceFilter = (typeof sourceFilterOptions)[number];
 type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
@@ -501,7 +501,7 @@ function App() {
 
       setSteamWishlistSyncState({
         status: 'success',
-        message: `Steam wishlist sync complete. Added ${summary.addedCount}, updated ${summary.updatedCount}, skipped ${summary.skippedAlreadyInLibraryCount + summary.skippedIgnoredCount}.`,
+        message: `Steam sync complete. Added ${summary.addedCount}, updated ${summary.updatedCount}, skipped ${summary.skippedAlreadyInLibraryCount + summary.skippedIgnoredCount}.`,
         summary,
       });
     } catch (error) {
@@ -961,8 +961,7 @@ function App() {
             </div>
             <div className="min-w-0">
               <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
-              <h1 className="mt-1 truncate text-2xl font-semibold text-white sm:text-3xl">Gaming backlog shelf</h1>
-              <p className="mt-1 text-sm text-slate-400">Your personal gaming backlog shelf</p>
+              <h1 className="mt-1 truncate text-2xl font-semibold text-white sm:text-3xl">Gaming backlog</h1>
             </div>
           </div>
 
@@ -993,14 +992,7 @@ function App() {
           <PwaStatusBanner />
         </div>
 
-        <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="qs-glass rounded-lg border p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-            <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Screen focus</div>
-              <p className="mt-2">{getNavDescription(activeNavItem)}</p>
-            </div>
-          </aside>
-
+        <section className="flex-1 py-4">
           {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
             <GameDetailView
               game={selectedGame}
@@ -1407,9 +1399,11 @@ function CollectionPanel({
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{title}</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            {games.length} of {totalCount} games shown{isMultiSelectMode ? ` - ${selectedCount} selected` : ''}
-          </p>
+          {hasActiveFilters || isMultiSelectMode ? (
+            <p className="mt-1 text-sm text-slate-400">
+              {hasActiveFilters ? `${games.length} shown` : null}{isMultiSelectMode ? `${hasActiveFilters ? ' - ' : ''}${selectedCount} selected` : null}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -1433,7 +1427,7 @@ function CollectionPanel({
               onClick={onSyncSteamWishlist}
               type="button"
             >
-              {steamWishlistSyncState?.status === 'loading' ? 'Syncing...' : 'Sync Steam Wishlist'}
+              {steamWishlistSyncState?.status === 'loading' ? 'Syncing...' : 'Sync Steam'}
             </button>
           ) : null}
           <button
@@ -1447,9 +1441,6 @@ function CollectionPanel({
           >
             {isMultiSelectMode ? 'Exit select' : 'Select'}
           </button>
-          <div className="rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
-            {collectionType === 'wishlist' ? 'Not owned by default' : 'Local storage enabled'}
-          </div>
         </div>
       </div>
 
@@ -1458,7 +1449,7 @@ function CollectionPanel({
       ) : null}
 
       <div className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(6,minmax(8.5rem,1fr))]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(3,minmax(8.5rem,1fr))]">
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
             <input
@@ -1485,27 +1476,6 @@ function CollectionPanel({
           />
 
           <FilterSelect
-            label="Source"
-            value={filters.source}
-            options={[...sourceFilterOptions]}
-            onChange={(value) => onFiltersChange({ source: value as SourceFilter })}
-          />
-
-          <FilterSelect
-            label="Enrichment"
-            value={filters.enrichment}
-            options={[...enrichmentFilterOptions]}
-            onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
-          />
-
-          <FilterSelect
-            label="Tag"
-            value={filters.tag}
-            options={[allOption, ...tags]}
-            onChange={(value) => onFiltersChange({ tag: value })}
-          />
-
-          <FilterSelect
             label="Sort"
             value={filters.sortBy}
             options={[...librarySortOptions]}
@@ -1513,8 +1483,36 @@ function CollectionPanel({
           />
         </div>
 
+        <details className="mt-3 rounded-md border border-skyglass/10 bg-ink-900/50 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-300">More filters</summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <FilterSelect
+              label="Source"
+              value={filters.source}
+              options={[...sourceFilterOptions]}
+              onChange={(value) => onFiltersChange({ source: value as SourceFilter })}
+            />
+
+            <FilterSelect
+              label="Info"
+              value={filters.enrichment}
+              options={[...enrichmentFilterOptions]}
+              onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
+            />
+
+            <FilterSelect
+              label="Tag"
+              value={filters.tag}
+              options={[allOption, ...tags]}
+              onChange={(value) => onFiltersChange({ tag: value })}
+            />
+          </div>
+        </details>
+
         <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2">
+          <details className="min-w-0">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-300">Quick filters</summary>
+            <div className="mt-2 flex flex-wrap gap-2">
             {quickFilterOptions.map((quickFilter) => {
               const isActive = filters.quickFilters.includes(quickFilter);
 
@@ -1533,12 +1531,10 @@ function CollectionPanel({
                 </button>
               );
             })}
-          </div>
+            </div>
+          </details>
 
           <div className="flex items-center gap-3">
-            <div className="text-sm text-slate-400">
-              {hasActiveFilters ? `${games.length} matches with active filters` : 'No filters active'}
-            </div>
             <button
               className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600"
               disabled={!hasActiveFilters}
@@ -1628,7 +1624,7 @@ function CollectionPanel({
           ))}
         </div>
       ) : (
-        <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-8 text-center">
+        <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
           <div>
             <h3 className="text-lg font-semibold text-white">{emptyTitle}</h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{emptyText}</p>
@@ -2071,10 +2067,6 @@ function SettingsPanel({
             isCategoryListOpen ? 'block' : 'hidden'
           }`}
         >
-          <div className="mb-3 px-1">
-            <h2 className="text-lg font-semibold text-white">Settings</h2>
-            <p className="mt-1 text-sm text-slate-400">Pick a section, adjust, return fast.</p>
-          </div>
           <nav className="qs-settings-tabs grid gap-2">
             {settingsCategories.map((category) => (
               <SettingsCategoryButton
@@ -2095,14 +2087,12 @@ function SettingsPanel({
               </div>
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold text-white">{activeCategoryMeta.label}</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-400">{activeCategoryMeta.description}</p>
               </div>
             </div>
           </header>
 
           {activeCategory === 'Integrations' ? (
             <div className="space-y-4">
-              <FutureProvidersPanel />
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
               <SteamSettingsPanel
                 games={games}
@@ -2119,7 +2109,6 @@ function SettingsPanel({
 
           {activeCategory === 'Library' ? (
             <div className="space-y-4">
-              <LibrarySettingsSummary />
               <DemoDataPanel
                 demoGameCount={demoGameCount}
                 onLoadDemoData={onLoadDemoData}
@@ -2132,7 +2121,6 @@ function SettingsPanel({
 
           {activeCategory === 'Retro' ? (
             <div className="space-y-4">
-              <RetroSettingsPlaceholders />
               <RetroImportPanel
                 games={games}
                 importedGamesHiddenByFilters={lastRetroImportsHiddenByFilters}
@@ -2201,7 +2189,7 @@ function SettingsCategoryButton({
   return (
     <button
       aria-current={isActive ? 'page' : undefined}
-      className={`grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-2 text-left transition ${
+      className={`grid min-h-12 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border px-3 py-2 text-left transition ${
         isActive
           ? 'border-mint/50 bg-mint/15 text-white shadow-glow'
           : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
@@ -2218,9 +2206,7 @@ function SettingsCategoryButton({
       </span>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold">{meta.label}</span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500">{meta.shortDescription}</span>
       </span>
-      <span className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-mint shadow-glow' : 'bg-slate-700'}`} />
     </button>
   );
 }
@@ -2354,59 +2340,24 @@ function getSettingsCategoryMeta(category: SettingsCategory) {
 }
 
 function FutureProvidersPanel() {
-  return (
-    <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Providers</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <SettingsMiniCard title="Steam" value="Configured locally" />
-        <SettingsMiniCard title="RAWG" value="Metadata only" />
-        <SettingsMiniCard title="Future" value="Ready for providers" />
-      </div>
-    </section>
-  );
+  return null;
 }
 
 function LibrarySettingsSummary() {
-  return (
-    <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Library settings</h2>
-      <p className="mt-1 text-sm leading-6 text-slate-400">
-        Manage local data behavior here. Library totals and backlog analytics live in Stats.
-      </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <SettingsMiniCard title="Default collection" value="Library" />
-        <SettingsMiniCard title="Analytics" value="Open Stats" />
-      </div>
-    </section>
-  );
+  return null;
 }
 
 function WishlistSettingsPanel() {
   return (
     <section className="qs-glass rounded-lg border p-4">
       <h2 className="text-xl font-semibold text-white">Wishlist settings</h2>
-      <p className="mt-1 text-sm leading-6 text-slate-400">
-        Tune wishlist planning defaults and integrations here. Wishlist counts and trends belong in Stats.
-      </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <SettingsMiniCard title="Priority levels" value="Low / Medium / High" />
-        <SettingsMiniCard title="Steam wishlist" value="Available from Wishlist" />
-      </div>
+      <p className="mt-1 text-sm text-slate-400">Wishlist sync lives on the Wishlist screen.</p>
     </section>
   );
 }
 
 function RetroSettingsPlaceholders() {
-  return (
-    <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Retro preferences</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <SettingsMiniCard title="ROM import" value="Local files" />
-        <SettingsMiniCard title="Emulators" value="Placeholder" />
-        <SettingsMiniCard title="Platforms" value="Auto-detect ready" />
-      </div>
-    </section>
-  );
+  return null;
 }
 
 function SettingsMiniCard({ title, value }: { title: string; value: string }) {
@@ -2424,9 +2375,6 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Library data</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            New installs start empty. Demo games are optional and never overwrite imported Steam games.
-          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -2449,10 +2397,6 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
           </button>
         </div>
       </div>
-
-      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2 text-sm text-slate-300">
-        {demoGameCount} known demo games on this device.
-      </div>
     </section>
   );
 }
@@ -2471,13 +2415,7 @@ function AppearanceSettingsPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Appearance</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-            QuestShelf uses a dark handheld theme with mint focus states, safe-area padding, and compact landscape layouts.
-          </p>
         </div>
-        <span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-medium text-mint">
-          {runtimeEnvironment.isAndroid ? 'Android handheld' : 'Device preview'}
-        </span>
       </div>
 
       <label className="mt-4 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
@@ -2489,18 +2427,8 @@ function AppearanceSettingsPanel({
         />
         <span>
           <span className="block font-semibold text-white">Prefer landscape orientation</span>
-          <span className="mt-1 block leading-6 text-slate-500">
-            Enabled by default for Retroid-style handhelds. On Android APK builds, QuestShelf will request landscape when
-            the runtime supports orientation locking.
-          </span>
         </span>
       </label>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <SettingsMiniCard title="Theme" value="QuestShelf dark" />
-        <SettingsMiniCard title="Language" value="System default" />
-        <SettingsMiniCard title="Focus style" value="Gamepad visible" />
-      </div>
     </section>
   );
 }
@@ -2509,20 +2437,9 @@ function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: Return
   return (
     <section className="qs-glass rounded-lg border p-4">
       <h2 className="text-xl font-semibold text-white">About QuestShelf</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        <SettingsMiniCard title="Version" value="0.1.0" />
-        <SettingsMiniCard title="Runtime" value={runtimeEnvironment.isNative ? 'Native' : 'Web'} />
-        <SettingsMiniCard title="Platform" value={runtimeEnvironment.platform} />
-        <SettingsMiniCard title="Storage" value="Local" />
-      </div>
-      <p className="mt-4 text-sm leading-6 text-slate-400">
-        QuestShelf is a local-first game shelf for library tracking, wishlist planning, metadata enrichment, and portable
-        backups. No backend or account is required.
+      <p className="mt-2 text-sm text-slate-400">
+        Version 0.1.0 · {runtimeEnvironment.isNative ? 'Native' : 'Web'} · {runtimeEnvironment.platform}
       </p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <SettingsMiniCard title="Credits" value="Built for handheld libraries" />
-        <SettingsMiniCard title="Debug info" value="Local runtime only" />
-      </div>
     </section>
   );
 }
@@ -2543,11 +2460,6 @@ function OnboardingSettingsPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{isComplete ? 'Setup complete' : 'Setup assistant'}</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            {isComplete
-              ? 'QuestShelf is ready. You can reopen setup later without changing existing data.'
-              : `${completedCount}/${totalCount} setup steps complete. Reopen the compact assistant anytime.`}
-          </p>
         </div>
 
         <button
@@ -2589,7 +2501,7 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Metadata') {
-    return 'RAWG enrichment runs only when you start it.';
+    return 'Metadata runs only when you start it.';
   }
 
   if (activeNavItem === 'Wishlist') {
@@ -2766,7 +2678,7 @@ function matchesEnrichmentFilter(game: Game, enrichment: EnrichmentFilter) {
     return true;
   }
 
-  if (enrichment === 'RAWG enriched') {
+  if (enrichment === 'Enriched') {
     return game.metadataSource === 'rawg';
   }
 
@@ -2790,7 +2702,7 @@ function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
     return game.status === 'Want to play';
   }
 
-  if (quickFilter === 'Missing metadata') {
+  if (quickFilter === 'Missing info') {
     return isMissingRawgMetadata(game);
   }
 
@@ -2814,7 +2726,7 @@ function compareGames(firstGame: Game, secondGame: Game, sortBy: LibrarySortOpti
     return compareDateDesc(firstGame.importedAt, secondGame.importedAt) || compareTitle(firstGame, secondGame);
   }
 
-  if (sortBy === 'Metadata missing first') {
+  if (sortBy === 'Missing info first') {
     return Number(isMissingRawgMetadata(secondGame)) - Number(isMissingRawgMetadata(firstGame)) || compareTitle(firstGame, secondGame);
   }
 
