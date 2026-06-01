@@ -2,6 +2,7 @@ import type { PlatformQueueState } from './platformQueueStorage';
 import type { ReviewModeState } from './reviewModeStorage';
 import type { IgnoredSteamGame } from './steamIgnoredGamesStorage';
 import type { Game } from '../types/game';
+import type { ToastAction, ToastCategory } from './notifications';
 
 const STORAGE_KEY = 'questshelf.pendingUndoActions.v1';
 export const undoActionTimeoutMs = 8000;
@@ -22,11 +23,15 @@ export type UndoActionHistoryEntry = {
 };
 
 export type PendingUndoAction = {
+  actions?: ToastAction[];
+  category: ToastCategory;
   createdAt: number;
   expiresAt: number;
+  dedupeKey?: string;
   historyEntry: UndoActionHistoryEntry;
   id: string;
   message: string;
+  repeatCount?: number;
   snapshot: UndoActionSnapshot;
 };
 
@@ -46,7 +51,10 @@ export function loadPendingUndoActions(now = Date.now()): PendingUndoAction[] {
       return [];
     }
 
-    return parsedValue.filter(isPendingUndoAction).filter((action) => action.expiresAt > now);
+    return parsedValue
+      .filter(isPendingUndoAction)
+      .filter((action) => action.expiresAt > now)
+      .map(normalizePendingUndoAction);
   } catch (error) {
     console.warn('QuestShelf could not load pending undo actions.', error);
     return [];
@@ -73,6 +81,14 @@ export function createUndoActionId() {
   return `undo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function normalizePendingUndoAction(action: PendingUndoAction): PendingUndoAction {
+  return {
+    ...action,
+    actions: action.actions ?? [{ kind: 'undo', label: 'Undo' }],
+    category: action.category ?? 'success',
+  };
+}
+
 function isPendingUndoAction(value: unknown): value is PendingUndoAction {
   if (!value || typeof value !== 'object') {
     return false;
@@ -84,6 +100,8 @@ function isPendingUndoAction(value: unknown): value is PendingUndoAction {
     typeof candidate.message === 'string' &&
     typeof candidate.createdAt === 'number' &&
     typeof candidate.expiresAt === 'number' &&
+    (!candidate.category || isToastCategory(candidate.category)) &&
+    (!candidate.actions || Array.isArray(candidate.actions)) &&
     Boolean(candidate.snapshot) &&
     Array.isArray(candidate.snapshot.games) &&
     Array.isArray(candidate.snapshot.ignoredSteamGames) &&
@@ -93,4 +111,8 @@ function isPendingUndoAction(value: unknown): value is PendingUndoAction {
     Boolean(candidate.snapshot.reviewModeState) &&
     Array.isArray(candidate.historyEntry?.affectedGameIds)
   );
+}
+
+function isToastCategory(value: unknown): value is ToastCategory {
+  return value === 'success' || value === 'warning' || value === 'error' || value === 'info';
 }
