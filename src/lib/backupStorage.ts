@@ -1,6 +1,7 @@
 import { loadIgnoredSteamGames } from './steamIgnoredGamesStorage';
 import { loadGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
+import { persistentStorageKeys } from './persistentStorageKeys';
 import type { Game } from '../types/game';
 
 export const questShelfBackupVersion = 1;
@@ -12,10 +13,18 @@ export const coreBackupStorageKeys = [
   'questshelf.steamIgnoredGames.v1',
   'questshelf.libraryFilters.v1',
   'questshelf.wishlistFilters.v1',
+  'questshelf.onboarding.v1',
+  'questshelf.platformQueues.v1',
+  'questshelf.reviewMode.v1',
 ] as const;
 
 export const integrationBackupStorageKeys = ['questshelf.rawgSettings.v1', 'questshelf.steamSettings.v1'] as const;
 export const deviceBackupStorageKeys = ['questshelf.syncFolderSettings.v1'] as const;
+const resetOnlyStorageKeys = [
+  'questshelf.installHintDismissed.v1',
+  'questshelf.landscapeLock.v1',
+  'questshelf.settingsCategory.v1',
+] as const;
 
 export const allBackupStorageKeys = [...coreBackupStorageKeys, ...integrationBackupStorageKeys] as const;
 
@@ -148,7 +157,7 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 }
 
 export async function resetQuestShelfLocalData() {
-  await removePersistedKeys([...allBackupStorageKeys, ...deviceBackupStorageKeys]);
+  await removePersistedKeys([...persistentStorageKeys, ...resetOnlyStorageKeys]);
 }
 
 function validateQuestShelfBackup(value: unknown): BackupParseResult {
@@ -325,6 +334,9 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
     case 'questshelf.steamSettings.v1':
     case 'questshelf.libraryFilters.v1':
     case 'questshelf.wishlistFilters.v1':
+    case 'questshelf.onboarding.v1':
+    case 'questshelf.platformQueues.v1':
+    case 'questshelf.reviewMode.v1':
       return isPlainObject(value);
   }
 

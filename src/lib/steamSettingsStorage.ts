@@ -21,8 +21,8 @@ function normalizeSteamSettings(value: unknown): SteamSettings {
   const parsedSettings = value && typeof value === 'object' ? (value as Partial<SteamSettings>) : {};
 
   return {
-    apiKey: parsedSettings.apiKey ?? '',
-    steamId64: parsedSettings.steamId64 ?? '',
-    wishlistUrl: parsedSettings.wishlistUrl ?? '',
+    apiKey: typeof parsedSettings.apiKey === 'string' ? parsedSettings.apiKey : '',
+    steamId64: typeof parsedSettings.steamId64 === 'string' ? parsedSettings.steamId64 : '',
+    wishlistUrl: typeof parsedSettings.wishlistUrl === 'string' ? parsedSettings.wishlistUrl : '',
   };
 }
