@@ -9,18 +9,20 @@ import {
   type RecommendationMood,
   type RecommendationPreferences,
 } from '../lib/recommendationEngine';
+import type { ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { gamePlatforms } from '../types/game';
 
 type RecommendationPanelProps = {
   games: Game[];
   onOpenDetails: (gameId: string) => void;
+  onStartReview: (source: ReviewSource) => void;
   onStatusChange: (gameId: string, status: 'Playing') => void;
 };
 
 const anyPlatform = 'Any';
 
-export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: RecommendationPanelProps) {
+export function RecommendationPanel({ games, onOpenDetails, onStartReview, onStatusChange }: RecommendationPanelProps) {
   const [availableTime, setAvailableTime] = useState<AvailableTime>('30 min');
   const [mood, setMood] = useState<RecommendationMood>('comfort');
   const [preferredPlatform, setPreferredPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
@@ -114,6 +116,22 @@ export function RecommendationPanel({ games, onOpenDetails, onStatusChange }: Re
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
+              onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
+              type="button"
+            >
+              Review this pool
+            </button>
+            <button
+              className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              onClick={() => onStartReview('missing-metadata')}
+              type="button"
+            >
+              Review unenriched
+            </button>
+          </div>
           {recommendation ? (
             <RecommendationCard
               key={recommendation.game.id}
