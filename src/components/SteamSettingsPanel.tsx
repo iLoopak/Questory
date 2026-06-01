@@ -22,7 +22,7 @@ import type {
 
 const initialConnectionState: SteamConnectionState = {
   status: 'idle',
-  message: 'Steam credentials are stored locally in this browser.',
+  message: 'Steam credentials are stored locally on this device.',
   data: null,
 };
 
@@ -224,7 +224,7 @@ export function SteamSettingsPanel({
   }[connectionState.status];
 
   return (
-    <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
+    <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-4">
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Steam integration</h2>

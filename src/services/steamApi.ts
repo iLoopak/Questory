@@ -125,7 +125,7 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
     }
 
     throw new SteamApiError(
-      'Steam API request failed. The production client needs a Steam proxy/backend before direct browser sync is reliable.',
+      'Steam API request failed. Direct Steam sync may need a trusted proxy in production before every device can reach Steam reliably.',
       'api-failure',
     );
   }

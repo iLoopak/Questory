@@ -37,7 +37,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [includeIntegrationSettings, setIncludeIntegrationSettings] = useState(false);
   const [importMode, setImportMode] = useState<ImportMode>('merge');
-  const [message, setMessage] = useState('Download a local backup before testing destructive actions.');
+  const [message, setMessage] = useState('Export a local backup before testing destructive actions.');
   const [messageTone, setMessageTone] = useState<'error' | 'info' | 'success'>('info');
   const [selectedBackup, setSelectedBackup] = useState<QuestShelfBackup | null>(null);
   const [syncSettings, setSyncSettings] = useState<SyncFolderSettings>(() =>
@@ -100,8 +100,8 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
 
     showMessage(
       includeIntegrationSettings
-        ? 'Backup downloaded with integration settings included.'
-        : 'Backup downloaded without API keys or integration settings.',
+        ? 'Backup exported with integration settings included.'
+        : 'Backup exported without API keys or integration settings.',
       'success',
     );
     onBackupExported?.();
@@ -109,7 +109,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
 
   async function chooseSyncFile() {
     if (!supportsFileSystemAccess) {
-      showMessage('This browser cannot choose a persistent backup file. Use manual export/import with a synced folder.', 'error');
+      showMessage('This device cannot choose a persistent backup file yet. Use manual export/import with a synced folder.', 'error');
       return;
     }
 
@@ -289,7 +289,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Data Management</h2>
+          <h2 className="text-xl font-semibold text-white">Data management</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
             Export or import portable QuestShelf backups for device moves, synced folders, and safe cleanup.
           </p>
@@ -299,7 +299,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
           onClick={downloadBackup}
           type="button"
         >
-          Download backup
+          Export backup
         </button>
       </div>
 
@@ -451,7 +451,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
           </>
         ) : (
           <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
-            This browser or platform cannot keep a persistent backup file handle. Use Download backup and QuestShelf backup JSON above, then save/load that file from your synced folder manually. Android APK WebViews may need a later native file picker before auto-backup can write directly.
+            This device cannot keep a persistent backup file handle yet. Use Export backup and QuestShelf backup JSON above, then save/load that file from your synced folder manually. Android APK builds can add a native file picker later for direct auto-backup writes.
           </div>
         )}
       </section>
@@ -477,7 +477,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
           Reset local data
         </button>
         <p className="mt-2 text-xs leading-5 text-slate-500">
-          Reset removes only known QuestShelf local data from this device. It does not touch browser data from other apps.
+          Reset removes only known QuestShelf local data from this device. It does not touch data from other apps.
         </p>
       </div>
     </section>

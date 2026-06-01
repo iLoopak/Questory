@@ -20,7 +20,7 @@ export function StatsPanel({ games, onOpenDetails }: StatsPanelProps) {
             <div>
               <h2 className="text-xl font-semibold text-white">Stats</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Local backlog, progress, and playtime overview from this browser only.
+                Local backlog, progress, and playtime overview from this device only.
               </p>
             </div>
 

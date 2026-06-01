@@ -219,7 +219,7 @@ function RecommendationCard({
           <h4 className="text-sm font-semibold text-white">Why this?</h4>
           <p className="mt-2 text-sm leading-6 text-slate-300">
             QuestShelf scored this against your current time, mood, platform, status, recency, playtime, tags, and
-            metadata. It is a local-only recommendation, so no library data leaves this browser.
+            metadata. It is a local-only recommendation, so no library data leaves this device.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {reasons.map((reason) => (

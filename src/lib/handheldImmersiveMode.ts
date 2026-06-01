@@ -29,7 +29,9 @@ type AppModule = {
 const capacitorCoreModuleName = '@capacitor/core';
 const statusBarModuleName = '@capacitor/status-bar';
 const appModuleName = '@capacitor/app';
+const screenOrientationModuleName = '@capacitor/screen-orientation';
 const systemBarColor = '#050a12';
+const landscapeLockPreferenceKey = 'questshelf.landscapeLock.v1';
 
 export async function configureHandheldImmersiveMode() {
   if (!(await isNativeAndroid())) {
@@ -37,18 +39,25 @@ export async function configureHandheldImmersiveMode() {
   }
 
   await applyFullscreenStatusBar();
+  await applyLandscapePreference();
   window.addEventListener('focus', applyFullscreenStatusBar);
+  window.addEventListener('questshelf:landscape-lock-change', () => void applyLandscapePreference());
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       void applyFullscreenStatusBar();
+      void applyLandscapePreference();
     }
   });
 
   const app = await getAppPlugin();
-  await app?.App.addListener('resume', () => void applyFullscreenStatusBar());
+  await app?.App.addListener('resume', () => {
+    void applyFullscreenStatusBar();
+    void applyLandscapePreference();
+  });
   await app?.App.addListener('appStateChange', (state) => {
     if (state?.isActive) {
       void applyFullscreenStatusBar();
+      void applyLandscapePreference();
     }
   });
 }
@@ -67,6 +76,31 @@ async function applyFullscreenStatusBar() {
     await statusBar.StatusBar.hide();
   } catch {
     // Immersive mode is a progressive Android enhancement; the app shell remains usable if a device denies it.
+  }
+}
+
+async function applyLandscapePreference() {
+  if (window.localStorage.getItem(landscapeLockPreferenceKey) === 'false') {
+    return;
+  }
+
+  try {
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: 'landscape') => Promise<void>;
+    };
+    await orientation.lock?.('landscape');
+    return;
+  } catch {
+    // Some WebViews require a native plugin or user gesture for orientation locks.
+  }
+
+  try {
+    const orientation = (await import(/* @vite-ignore */ screenOrientationModuleName)) as {
+      ScreenOrientation?: { lock: (options: { orientation: 'landscape' }) => Promise<void> };
+    };
+    await orientation.ScreenOrientation?.lock({ orientation: 'landscape' });
+  } catch {
+    // Optional plugin support: the manifest/config still prefer landscape when the plugin is absent.
   }
 }
 
