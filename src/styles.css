@@ -200,6 +200,15 @@ img {
     0 28px 80px rgba(0, 0, 0, 0.42);
 }
 
+.qs-review-stage {
+  align-items: center;
+}
+
+.qs-review-cover {
+  justify-self: center;
+  width: min(100%, 42vh);
+}
+
 .qs-queue-shell {
   scrollbar-gutter: stable;
 }
@@ -310,6 +319,14 @@ img {
   .qs-review-shell {
     height: auto;
     max-height: none;
+  }
+
+  .qs-review-stage {
+    grid-template-columns: minmax(180px, 34vw) minmax(0, 1fr);
+  }
+
+  .qs-review-cover {
+    width: min(100%, 34vw);
   }
 
   .qs-queue-shell {

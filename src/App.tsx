@@ -1089,8 +1089,8 @@ function App() {
               ignoredGameIds={reviewIgnoredGameIds}
               queuePlatforms={queuePlatforms}
               source={activeReviewSource}
-              stats={reviewModeState.stats}
               onAction={handleReviewAction}
+              onOpenQueue={() => setActiveNavItem('Queue')}
               onRestoreIgnored={restoreReviewIgnoredGames}
               onReturnToLibrary={() => setActiveNavItem('Library')}
               onSourceChange={setReviewSource}
