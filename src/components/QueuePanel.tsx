@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import {
   compareQueueEntries,
@@ -11,6 +11,7 @@ import type { Game, GamePlatform } from '../types/game';
 
 type QueuePanelProps = {
   games: Game[];
+  initialPlatform?: GamePlatform;
   queueState: PlatformQueueState;
   onAddGameToQueue: (game: Game, platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
@@ -23,6 +24,7 @@ type QueuePanelProps = {
 
 export function QueuePanel({
   games,
+  initialPlatform,
   queueState,
   onAddGameToQueue,
   onLimitChange,
@@ -32,14 +34,34 @@ export function QueuePanel({
   onRemoveEntry,
   onStartReview,
 }: QueuePanelProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform>('Steam');
+  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform>(initialPlatform ?? 'Steam');
+  const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
   const [selectedGameId, setSelectedGameId] = useState('');
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
+  const displayedQueuePlatforms = useMemo(() => {
+    if (!initialPlatform) {
+      return queuePlatforms;
+    }
+
+    return [initialPlatform, ...queuePlatforms.filter((platform) => platform !== initialPlatform)];
+  }, [initialPlatform, queuePlatforms]);
+
   const addableGames = games
     .filter((game) => game.collectionType === 'library' && !queueGameIds.has(game.id))
     .sort((first, second) => first.title.localeCompare(second.title));
+
+  useEffect(() => {
+    if (!initialPlatform) {
+      return;
+    }
+
+    setSelectedPlatform(initialPlatform);
+    window.requestAnimationFrame(() => {
+      platformRefs.current.get(initialPlatform)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  }, [initialPlatform]);
 
   function addSelectedGame() {
     const game = gamesById.get(selectedGameId);
@@ -110,14 +132,22 @@ export function QueuePanel({
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
-        {queuePlatforms.map((platform) => (
+        {displayedQueuePlatforms.map((platform) => (
           <PlatformQueueColumn
             key={platform}
             games={games}
             gamesById={gamesById}
             maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
+            isHighlighted={platform === initialPlatform}
             platform={platform}
             platformOptions={queuePlatforms}
+            setPlatformRef={(element) => {
+              if (element) {
+                platformRefs.current.set(platform, element);
+              } else {
+                platformRefs.current.delete(platform);
+              }
+            }}
             queueEntries={queueState.entries.filter((entry) => entry.targetPlatform === platform).sort(compareQueueEntries)}
             onLimitChange={onLimitChange}
             onMoveEntry={onMoveEntry}
@@ -135,8 +165,10 @@ function PlatformQueueColumn({
   games,
   gamesById,
   maxActiveGames,
+  isHighlighted,
   platform,
   platformOptions,
+  setPlatformRef,
   queueEntries,
   onLimitChange,
   onMoveEntry,
@@ -147,8 +179,10 @@ function PlatformQueueColumn({
   games: Game[];
   gamesById: Map<string, Game>;
   maxActiveGames: number;
+  isHighlighted: boolean;
   platform: GamePlatform;
   platformOptions: GamePlatform[];
+  setPlatformRef: (element: HTMLElement | null) => void;
   queueEntries: PlatformQueueEntry[];
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
@@ -159,7 +193,7 @@ function PlatformQueueColumn({
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
 
   return (
-    <section className="rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+    <section ref={setPlatformRef} className={`rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'border-mint/50 shadow-glow' : 'border-skyglass/15'}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold text-white">{platform}</h3>
         <details className="relative">
