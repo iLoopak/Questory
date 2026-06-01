@@ -119,6 +119,7 @@ function App() {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>('Integrations');
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
+  const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
@@ -223,6 +224,21 @@ function App() {
   }, [onboardingState.completedAt]);
   const isOnboardingComplete = completedOnboardingItemIds.size === onboardingItemIds.length;
   const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
+  const lastRetroImportedGames = useMemo(
+    () =>
+      lastRetroImportGameIds
+        .map((gameId) => games.find((game) => game.id === gameId))
+        .filter((game): game is Game => Boolean(game)),
+    [games, lastRetroImportGameIds],
+  );
+  const areLastRetroImportsHiddenByFilters = useMemo(() => {
+    if (lastRetroImportedGames.length === 0) {
+      return false;
+    }
+
+    const visibleImportedGameIds = new Set(filterGames(lastRetroImportedGames, libraryFilters).map((game) => game.id));
+    return lastRetroImportedGames.some((game) => !visibleImportedGameIds.has(game.id));
+  }, [lastRetroImportedGames, libraryFilters]);
 
   useEffect(() => {
     saveLandscapeLockPreference(isLandscapeLockEnabled);
@@ -335,22 +351,88 @@ function App() {
   }
 
   function importGames(importedGames: Game[]) {
+    let createdGames: Game[] = [];
+
     setGames((currentGames) => {
       const existingSteamAppIds = new Set(
         currentGames
           .map((game) => game.steamAppId)
           .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
       );
+      const existingRetroKeys = new Set(
+        currentGames
+          .filter((game) => game.externalSource === 'retro-rom')
+          .map(getRetroDuplicateKey)
+          .filter((key): key is string => Boolean(key)),
+      );
 
       const newGames = importedGames.filter((game) => {
-        return typeof game.steamAppId !== 'number' || !existingSteamAppIds.has(game.steamAppId);
+        if (typeof game.steamAppId === 'number' && existingSteamAppIds.has(game.steamAppId)) {
+          return false;
+        }
+
+        const retroKey = getRetroDuplicateKey(game);
+        if (retroKey && existingRetroKeys.has(retroKey)) {
+          return false;
+        }
+
+        if (retroKey) {
+          existingRetroKeys.add(retroKey);
+        }
+
+        return true;
       });
 
-      return [
-        ...currentGames,
-        ...newGames.map((game) => touchGameRecord({ ...game, collectionType: 'library' as const })),
-      ];
+      createdGames = newGames.map((game) =>
+        touchGameRecord({
+          ...game,
+          collectionType: 'library' as const,
+        }),
+      );
+
+      return createdGames.length > 0 ? [...currentGames, ...createdGames] : currentGames;
     });
+
+    return createdGames;
+  }
+
+  function handleRetroImportGames(importedGames: Game[]) {
+    const createdGames = importGames(importedGames);
+    setLastRetroImportGameIds(createdGames.map((game) => game.id));
+    return createdGames;
+  }
+
+  function viewRetroImportedGames(gameIds: string[]) {
+    setLibraryFilters(initialCollectionFilters);
+    setSelectedGameId(gameIds[0] ?? null);
+    setActiveNavItem('Library');
+  }
+
+  function enrichRetroImportedGames(gameIds: string[]) {
+    if (gameIds.length > 0) {
+      startMetadataWorkflow(gameIds);
+    }
+  }
+
+  function addRetroImportedGamesToQueue(gameIds: string[]) {
+    const targetGameIds = new Set(gameIds);
+
+    setGames((currentGames) =>
+      currentGames.map((game) => {
+        if (!targetGameIds.has(game.id)) {
+          return game;
+        }
+
+        const tags = new Set(game.tags);
+        tags.add('queue');
+
+        return touchGameRecord({
+          ...game,
+          status: game.status === 'Want to play' ? 'Playing' : game.status,
+          tags: Array.from(tags),
+        });
+      }),
+    );
   }
 
   async function syncSteamWishlist() {
@@ -823,11 +905,16 @@ function App() {
               ignoredSteamGames={ignoredSteamGames}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               isOnboardingOpen={isOnboardingOpen}
+              lastRetroImportsHiddenByFilters={areLastRetroImportsHiddenByFilters}
               runtimeEnvironment={runtimeEnvironment}
+              onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
               onConnectionTested={() => markOnboardingItemComplete('steam-test')}
+              onClearLibraryFilters={() => setLibraryFilters(initialCollectionFilters)}
+              onEnrichRetroImportedGames={enrichRetroImportedGames}
               onImportGames={importGames}
+              onImportRetroGames={handleRetroImportGames}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
               onLoadDemoData={loadDemoData}
               onOnboardingAction={handleOnboardingAction}
@@ -839,6 +926,7 @@ function App() {
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onUnignoreSteamGame={unignoreSteamGame}
+              onViewRetroImportedGames={viewRetroImportedGames}
             />
           ) : (
             <PlaceholderPanel title={activeNavItem} />
@@ -1629,11 +1717,16 @@ type SettingsPanelProps = {
   ignoredSteamGames: IgnoredSteamGame[];
   isLandscapeLockEnabled: boolean;
   isOnboardingOpen: boolean;
+  lastRetroImportsHiddenByFilters: boolean;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
+  onClearLibraryFilters: () => void;
   onConnectionTested: () => void;
+  onEnrichRetroImportedGames: (gameIds: string[]) => void;
   onImportGames: (games: Game[]) => void;
+  onImportRetroGames: (games: Game[]) => Game[];
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onLoadDemoData: () => void;
   onOnboardingAction: (itemId: OnboardingItemId) => void;
@@ -1645,6 +1738,7 @@ type SettingsPanelProps = {
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
   onUnignoreSteamGame: (steamAppId: number) => void;
+  onViewRetroImportedGames: (gameIds: string[]) => void;
 };
 
 function SettingsPanel({
@@ -1656,11 +1750,16 @@ function SettingsPanel({
   ignoredSteamGames,
   isLandscapeLockEnabled,
   isOnboardingOpen,
+  lastRetroImportsHiddenByFilters,
   runtimeEnvironment,
+  onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
+  onClearLibraryFilters,
   onConnectionTested,
+  onEnrichRetroImportedGames,
   onImportGames,
+  onImportRetroGames,
   onLandscapeLockChange,
   onLoadDemoData,
   onOnboardingAction,
@@ -1672,6 +1771,7 @@ function SettingsPanel({
   onSteamIdConfigured,
   onSteamLibraryImported,
   onUnignoreSteamGame,
+  onViewRetroImportedGames,
 }: SettingsPanelProps) {
   return (
     <section className="qs-settings-shell min-w-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900/45 lg:h-[calc(100vh-116px)]">
@@ -1735,7 +1835,17 @@ function SettingsPanel({
             </div>
           ) : null}
 
-          {activeCategory === 'Retro' ? <RetroImportPanel games={games} onImportGames={onImportGames} /> : null}
+          {activeCategory === 'Retro' ? (
+            <RetroImportPanel
+              games={games}
+              importedGamesHiddenByFilters={lastRetroImportsHiddenByFilters}
+              onAddImportedToQueue={onAddRetroImportedToQueue}
+              onClearLibraryFilters={onClearLibraryFilters}
+              onEnrichImportedGames={onEnrichRetroImportedGames}
+              onImportGames={onImportRetroGames}
+              onViewImportedGames={onViewRetroImportedGames}
+            />
+          ) : null}
 
           {activeCategory === 'Data' ? (
             <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
@@ -1927,6 +2037,24 @@ function touchGameRecord(game: Game): Game {
     ...game,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function getRetroDuplicateKey(game: Game) {
+  if (game.externalSource !== 'retro-rom') {
+    return null;
+  }
+
+  const path = (game.romPath ?? game.romUri ?? '').trim().toLowerCase();
+  if (path) {
+    return `path:${path}`;
+  }
+
+  const extension = game.romExtension?.trim().toLowerCase();
+  if (!extension) {
+    return null;
+  }
+
+  return `fallback:${game.platform}:${game.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}:${extension}`;
 }
 
 type StatProps = {

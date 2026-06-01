@@ -9,36 +9,62 @@ import {
   type RetroPlatformOverride,
   type RetroScanSummary,
 } from '../lib/retroRomImport';
+import { getRuntimeEnvironment } from '../lib/capacitorEnvironment';
 import type { Game } from '../types/game';
 
 type RetroImportPanelProps = {
   games?: Game[];
-  onImportGames?: (games: Game[]) => void;
+  importedGamesHiddenByFilters?: boolean;
+  onAddImportedToQueue?: (gameIds: string[]) => void;
+  onClearLibraryFilters?: () => void;
+  onEnrichImportedGames?: (gameIds: string[]) => void;
+  onImportGames?: (games: Game[]) => Game[];
+  onViewImportedGames?: (gameIds: string[]) => void;
 };
 
 type ImportSummary = {
   detectedGames: number;
+  failures: string[];
   importedGames: number;
   scannedFiles: number;
   skippedDuplicates: number;
   unsupportedFiles: number;
+  warning: string | null;
 };
 
 const emptyScanSummary: RetroScanSummary = {
   detectedGames: 0,
+  scanIssues: [],
   scannedFiles: 0,
   unsupportedFiles: 0,
 };
 
-export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps) {
+export function RetroImportPanel({
+  games,
+  importedGamesHiddenByFilters = false,
+  onAddImportedToQueue,
+  onClearLibraryFilters,
+  onEnrichImportedGames,
+  onImportGames,
+  onViewImportedGames,
+}: RetroImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const runtimeEnvironment = getRuntimeEnvironment();
   const [localGames, setLocalGames] = useState<Game[]>(() => games ?? loadGames());
   const [platformOverride, setPlatformOverride] = useState<RetroPlatformOverride>(autoDetectPlatformOption);
   const [detectedRoms, setDetectedRoms] = useState<DetectedRom[]>([]);
+  const [importedGames, setImportedGames] = useState<Game[]>([]);
   const [selectedRomIds, setSelectedRomIds] = useState<Set<string>>(new Set());
   const [scanSummary, setScanSummary] = useState<RetroScanSummary>(emptyScanSummary);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    message: string;
+    tone: 'error' | 'info' | 'success' | 'warning';
+  }>({
+    message: 'Select ROM files to validate them before importing.',
+    tone: 'info',
+  });
 
   useEffect(() => {
     folderInputRef.current?.setAttribute('webkitdirectory', '');
@@ -48,23 +74,61 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
   const currentGames = games ?? localGames;
   const selectableRoms = detectedRoms.filter((rom) => !rom.isDuplicate);
   const selectedImportableRoms = selectableRoms.filter((rom) => selectedRomIds.has(rom.id));
-  const supportsFolderPicker = typeof HTMLInputElement !== 'undefined' && 'webkitdirectory' in HTMLInputElement.prototype;
+  const supportsFolderPicker =
+    !runtimeEnvironment.isAndroid &&
+    typeof HTMLInputElement !== 'undefined' &&
+    'webkitdirectory' in HTMLInputElement.prototype;
 
   function scanFiles(fileList: FileList | null) {
     const files = Array.from(fileList ?? []);
+    console.debug('[QuestShelf Retro Import] scan started', {
+      fileCount: files.length,
+      platformOverride,
+      runtime: runtimeEnvironment,
+    });
+
+    if (files.length === 0) {
+      setDetectedRoms([]);
+      setSelectedRomIds(new Set());
+      setScanSummary(emptyScanSummary);
+      setImportSummary({
+        detectedGames: 0,
+        failures: ['No files were selected.'],
+        importedGames: 0,
+        scannedFiles: 0,
+        skippedDuplicates: 0,
+        unsupportedFiles: 0,
+        warning: 'No files were selected. Choose one or more ROM files and try again.',
+      });
+      setImportedGames([]);
+      setStatusMessage({
+        message: 'No files were selected. Choose one or more ROM files and try again.',
+        tone: 'warning',
+      });
+      return;
+    }
+
     const result = scanRomFiles(files, currentGames, platformOverride);
 
+    console.debug('[QuestShelf Retro Import] scan finished', result.summary);
     setDetectedRoms(result.detectedRoms);
     setSelectedRomIds(new Set(result.detectedRoms.filter((rom) => !rom.isDuplicate).map((rom) => rom.id)));
     setScanSummary(result.summary);
     setImportSummary(null);
+    setImportedGames([]);
+    setStatusMessage(getScanStatusMessage(result.summary));
   }
 
   function clearScanResults() {
     setDetectedRoms([]);
+    setImportedGames([]);
     setSelectedRomIds(new Set());
     setScanSummary(emptyScanSummary);
     setImportSummary(null);
+    setStatusMessage({
+      message: 'Scan cleared. Select ROM files to start again.',
+      tone: 'info',
+    });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -100,33 +164,104 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
   function importSelectedRoms() {
     const existingGameIds = new Set(currentGames.map((game) => game.id));
     const importedAt = new Date().toISOString();
-    const importedGames = selectedImportableRoms.map((rom) => mapDetectedRomToGame(rom, existingGameIds, importedAt));
+    const candidateGames = selectedImportableRoms.map((rom) => mapDetectedRomToGame(rom, existingGameIds, importedAt));
+    const duplicateCount = detectedRoms.filter((rom) => rom.isDuplicate).length;
+    const failures = getImportFailures(candidateGames);
 
-    if (importedGames.length === 0) {
+    console.debug('[QuestShelf Retro Import] import requested', {
+      candidates: candidateGames.length,
+      selected: selectedImportableRoms.length,
+      summary: scanSummary,
+    });
+
+    if (candidateGames.length === 0 || failures.length > 0) {
+      const warning = createZeroImportWarning({
+        candidateCount: candidateGames.length,
+        duplicateCount,
+        failures,
+        scanSummary,
+      });
       setImportSummary({
         detectedGames: scanSummary.detectedGames,
+        failures,
         importedGames: 0,
         scannedFiles: scanSummary.scannedFiles,
-        skippedDuplicates: detectedRoms.filter((rom) => rom.isDuplicate).length,
+        skippedDuplicates: duplicateCount,
         unsupportedFiles: scanSummary.unsupportedFiles,
+        warning,
       });
+      setImportedGames([]);
+      setStatusMessage({ message: warning, tone: 'warning' });
+      console.warn('[QuestShelf Retro Import] import blocked', { failures, scanSummary });
       return;
     }
 
-    if (onImportGames) {
-      onImportGames(importedGames);
-    } else {
-      const nextGames = [...currentGames, ...importedGames];
-      setLocalGames(nextGames);
-      saveGames(nextGames);
+    let createdGames: Game[] = [];
+
+    try {
+      if (onImportGames) {
+        createdGames = onImportGames(candidateGames);
+      } else {
+        const nextGames = [...currentGames, ...candidateGames];
+        saveGames(nextGames);
+        setLocalGames(nextGames);
+        createdGames = candidateGames;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Storage failed while importing retro games.';
+      setImportSummary({
+        detectedGames: scanSummary.detectedGames,
+        failures: [message],
+        importedGames: 0,
+        scannedFiles: scanSummary.scannedFiles,
+        skippedDuplicates: duplicateCount,
+        unsupportedFiles: scanSummary.unsupportedFiles,
+        warning: 'QuestShelf could not save the imported games. Local data was not changed.',
+      });
+      setImportedGames([]);
+      setStatusMessage({
+        message: 'QuestShelf could not save the imported games. Local data was not changed.',
+        tone: 'error',
+      });
+      console.error('[QuestShelf Retro Import] storage failure', error);
+      return;
+    }
+
+    if (createdGames.length === 0) {
+      const warning = createZeroImportWarning({
+        candidateCount: candidateGames.length,
+        duplicateCount,
+        failures: ['All selected games were rejected as duplicates or invalid records.'],
+        scanSummary,
+      });
+      setImportSummary({
+        detectedGames: scanSummary.detectedGames,
+        failures: ['All selected games were rejected as duplicates or invalid records.'],
+        importedGames: 0,
+        scannedFiles: scanSummary.scannedFiles,
+        skippedDuplicates: duplicateCount,
+        unsupportedFiles: scanSummary.unsupportedFiles,
+        warning,
+      });
+      setImportedGames([]);
+      setStatusMessage({ message: warning, tone: 'warning' });
+      console.warn('[QuestShelf Retro Import] no records created', { candidateGames });
+      return;
     }
 
     setImportSummary({
       detectedGames: scanSummary.detectedGames,
-      importedGames: importedGames.length,
+      failures: [],
+      importedGames: createdGames.length,
       scannedFiles: scanSummary.scannedFiles,
-      skippedDuplicates: detectedRoms.filter((rom) => rom.isDuplicate).length,
+      skippedDuplicates: duplicateCount,
       unsupportedFiles: scanSummary.unsupportedFiles,
+      warning: null,
+    });
+    setImportedGames(createdGames);
+    setStatusMessage({
+      message: `Imported ${createdGames.length} retro ${createdGames.length === 1 ? 'game' : 'games'} into Library.`,
+      tone: 'success',
     });
     setDetectedRoms((currentRoms) =>
       currentRoms.map((rom) =>
@@ -140,6 +275,10 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
       ),
     );
     setSelectedRomIds(new Set());
+    console.info('[QuestShelf Retro Import] import complete', {
+      importedIds: createdGames.map((game) => game.id),
+      importedCount: createdGames.length,
+    });
   }
 
   return (
@@ -160,11 +299,12 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
             Select ROM files
           </button>
           <button
-            className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+            className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+            disabled={!supportsFolderPicker}
             onClick={() => folderInputRef.current?.click()}
             type="button"
           >
-            Select ROM folder
+            {runtimeEnvironment.isAndroid ? 'Folder import pending SAF' : 'Select ROM folder'}
           </button>
         </div>
       </div>
@@ -190,18 +330,41 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
         </label>
 
         <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-300">
-          {supportsFolderPicker
-            ? 'Folder selection is available on this device. Android APK folder access may need a later Storage Access Framework plugin.'
-            : 'Folder selection is not supported on this device. Select multiple ROM files instead.'}
+          {runtimeEnvironment.isAndroid
+            ? 'Android APK folder import needs a later Storage Access Framework bridge. Select one or more ROM files for the current local-first workflow.'
+            : supportsFolderPicker
+              ? 'Folder selection is available on this device. QuestShelf still validates every file before import.'
+              : 'Folder selection is not supported on this device. Select multiple ROM files instead.'}
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-4">
+      <div className={`mt-4 rounded-md border px-3 py-2 text-sm ${getStatusClassName(statusMessage.tone)}`}>
+        {statusMessage.message}
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-5">
         <RetroStat label="Scanned" value={scanSummary.scannedFiles.toString()} />
         <RetroStat label="Detected" value={scanSummary.detectedGames.toString()} />
         <RetroStat label="Selected" value={selectedImportableRoms.length.toString()} />
+        <RetroStat label="Duplicates" value={detectedRoms.filter((rom) => rom.isDuplicate).length.toString()} />
         <RetroStat label="Unsupported" value={scanSummary.unsupportedFiles.toString()} />
       </div>
+
+      {scanSummary.scanIssues.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+          <div className="font-semibold">Scan notes</div>
+          <ul className="mt-2 space-y-1">
+            {scanSummary.scanIssues.slice(0, 6).map((issue) => (
+              <li key={`${issue.type}-${issue.fileName}-${issue.reason}`}>
+                {issue.fileName}: {issue.reason}
+              </li>
+            ))}
+          </ul>
+          {scanSummary.scanIssues.length > 6 ? (
+            <div className="mt-2 text-amber-100/80">+{scanSummary.scanIssues.length - 6} more notes</div>
+          ) : null}
+        </div>
+      ) : null}
 
       {detectedRoms.length > 0 ? (
         <>
@@ -279,13 +442,143 @@ export function RetroImportPanel({ games, onImportGames }: RetroImportPanelProps
       )}
 
       {importSummary ? (
-        <div className="mt-4 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
-          Imported {importSummary.importedGames} of {importSummary.detectedGames} detected games. Skipped{' '}
-          {importSummary.skippedDuplicates} duplicates and {importSummary.unsupportedFiles} unsupported files from{' '}
-          {importSummary.scannedFiles} scanned files.
-        </div>
+        <ImportResultPanel
+          importedGames={importedGames}
+          importedGamesHiddenByFilters={importedGamesHiddenByFilters}
+          summary={importSummary}
+          onAddImportedToQueue={onAddImportedToQueue}
+          onClearLibraryFilters={onClearLibraryFilters}
+          onEnrichImportedGames={onEnrichImportedGames}
+          onViewImportedGames={onViewImportedGames}
+        />
       ) : null}
     </section>
+  );
+}
+
+function ImportResultPanel({
+  importedGames,
+  importedGamesHiddenByFilters,
+  summary,
+  onAddImportedToQueue,
+  onClearLibraryFilters,
+  onEnrichImportedGames,
+  onViewImportedGames,
+}: {
+  importedGames: Game[];
+  importedGamesHiddenByFilters: boolean;
+  summary: ImportSummary;
+  onAddImportedToQueue?: (gameIds: string[]) => void;
+  onClearLibraryFilters?: () => void;
+  onEnrichImportedGames?: (gameIds: string[]) => void;
+  onViewImportedGames?: (gameIds: string[]) => void;
+}) {
+  const importedGameIds = importedGames.map((game) => game.id);
+  const isSuccess = summary.importedGames > 0;
+
+  return (
+    <section
+      className={`mt-4 rounded-lg border p-4 ${
+        isSuccess ? 'border-mint/30 bg-mint/10 text-mint' : 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+      }`}
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            {isSuccess ? 'Retro import complete' : 'Retro import needs attention'}
+          </h3>
+          <p className="mt-1 text-sm leading-6">
+            {summary.warning ??
+              `Imported ${summary.importedGames} of ${summary.detectedGames} detected games into Library.`}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+          <RetroResultStat label="Scanned" value={summary.scannedFiles} />
+          <RetroResultStat label="Detected" value={summary.detectedGames} />
+          <RetroResultStat label="Imported" value={summary.importedGames} />
+          <RetroResultStat label="Duplicates" value={summary.skippedDuplicates} />
+          <RetroResultStat label="Unsupported" value={summary.unsupportedFiles} />
+          <RetroResultStat label="Failures" value={summary.failures.length} />
+        </div>
+      </div>
+
+      {summary.failures.length > 0 ? (
+        <ul className="mt-3 space-y-1 text-sm">
+          {summary.failures.map((failure) => (
+            <li key={failure}>{failure}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {isSuccess ? (
+        <>
+          {importedGamesHiddenByFilters ? (
+            <div className="mt-3 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+              Library filters may hide these imported games.
+            </div>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+              onClick={() => onViewImportedGames?.(importedGameIds)}
+              type="button"
+            >
+              Review imported games
+            </button>
+            <button
+              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+              onClick={() => onEnrichImportedGames?.(importedGameIds)}
+              type="button"
+            >
+              Enrich imported games
+            </button>
+            <button
+              className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+              onClick={() => onAddImportedToQueue?.(importedGameIds)}
+              type="button"
+            >
+              Add to queue
+            </button>
+            {importedGamesHiddenByFilters ? (
+              <button
+                className="h-10 rounded-md border border-amber-300/30 px-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/10"
+                onClick={onClearLibraryFilters}
+                type="button"
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {importedGames.map((game) => (
+              <article key={game.id} className="rounded-md border border-mint/20 bg-ink-950/80 p-3 text-slate-200">
+                <div className="truncate font-semibold text-white">{game.title}</div>
+                <div className="mt-1 text-sm text-slate-400">{game.platform}</div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-mint/20 bg-mint/10 px-2 py-1 text-mint">
+                    {game.externalSource}
+                  </span>
+                  <span className="rounded-full border border-skyglass/15 bg-ink-900 px-2 py-1 text-slate-300">
+                    .{game.romExtension}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function RetroResultStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-black/20 px-2 py-2">
+      <div className="text-base font-semibold text-white">{value}</div>
+      <div className="mt-0.5 uppercase tracking-[0.14em] text-slate-400">{label}</div>
+    </div>
   );
 }
 
@@ -296,4 +589,106 @@ function RetroStat({ label, value }: { label: string; value: string }) {
       <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
     </div>
   );
+}
+
+function getImportFailures(games: Game[]) {
+  return games.flatMap((game) => {
+    const failures: string[] = [];
+
+    if (!game.id.trim()) {
+      failures.push('A generated game record was missing an ID.');
+    }
+
+    if (!game.title.trim()) {
+      failures.push('A generated game record was missing a title.');
+    }
+
+    if (game.collectionType !== 'library') {
+      failures.push(`${game.title || game.id} was not created as a Library game.`);
+    }
+
+    if (game.externalSource !== 'retro-rom') {
+      failures.push(`${game.title || game.id} was not marked as a retro ROM import.`);
+    }
+
+    if (!game.romPath && !game.romUri) {
+      failures.push(`${game.title || game.id} did not keep a ROM path or URI reference.`);
+    }
+
+    return failures;
+  });
+}
+
+function getScanStatusMessage(summary: RetroScanSummary) {
+  if (summary.scannedFiles === 0) {
+    return {
+      message: 'No files were selected. Choose one or more ROM files and try again.',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (summary.detectedGames === 0) {
+    return {
+      message: 'No supported ROMs were detected. Check the file type or select a different platform folder.',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (summary.detectedGames === summary.scanIssues.filter((issue) => issue.type === 'duplicate').length) {
+    return {
+      message: 'All detected ROMs already exist in your Library.',
+      tone: 'warning' as const,
+    };
+  }
+
+  return {
+    message: `${summary.detectedGames} supported ROM ${summary.detectedGames === 1 ? 'entry is' : 'entries are'} ready to review.`,
+    tone: 'success' as const,
+  };
+}
+
+function createZeroImportWarning({
+  candidateCount,
+  duplicateCount,
+  failures,
+  scanSummary,
+}: {
+  candidateCount: number;
+  duplicateCount: number;
+  failures: string[];
+  scanSummary: RetroScanSummary;
+}) {
+  if (scanSummary.scannedFiles === 0) {
+    return 'No files were selected. Choose one or more ROM files and try again.';
+  }
+
+  if (scanSummary.detectedGames === 0) {
+    return 'No supported ROM formats were detected, so no Library games were created.';
+  }
+
+  if (candidateCount === 0 && duplicateCount > 0) {
+    return 'Every detected ROM is already in your Library, so no new games were created.';
+  }
+
+  if (failures.length > 0) {
+    return 'QuestShelf found validation issues and did not create any Library games.';
+  }
+
+  return 'No games were created. Review the scan notes and try again.';
+}
+
+function getStatusClassName(tone: 'error' | 'info' | 'success' | 'warning') {
+  if (tone === 'error') {
+    return 'border-red-400/40 bg-red-500/10 text-red-200';
+  }
+
+  if (tone === 'success') {
+    return 'border-mint/30 bg-mint/10 text-mint';
+  }
+
+  if (tone === 'warning') {
+    return 'border-amber-300/30 bg-amber-300/10 text-amber-100';
+  }
+
+  return 'border-skyglass/15 bg-ink-950/80 text-slate-300';
 }

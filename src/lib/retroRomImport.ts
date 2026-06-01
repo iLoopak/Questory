@@ -32,6 +32,7 @@ export type DetectedRom = {
   duplicateReason: string | null;
   extension: string;
   fileName: string;
+  fileUri: string | null;
   id: string;
   isDuplicate: boolean;
   platform: GamePlatform;
@@ -41,8 +42,15 @@ export type DetectedRom = {
 
 export type RetroScanSummary = {
   detectedGames: number;
+  scanIssues: RetroScanIssue[];
   scannedFiles: number;
   unsupportedFiles: number;
+};
+
+export type RetroScanIssue = {
+  fileName: string;
+  reason: string;
+  type: 'duplicate' | 'empty-title' | 'unsupported-format';
 };
 
 const supportedRomExtensions = new Set([
@@ -51,6 +59,10 @@ const supportedRomExtensions = new Set([
   'cso',
   'cue',
   'bin',
+  'rvz',
+  'wua',
+  'wux',
+  'wad',
   'gba',
   'gbc',
   'gb',
@@ -97,6 +109,10 @@ const extensionPlatformMap = new Map<string, GamePlatform>([
   ['nsp', 'Switch'],
   ['wbfs', 'Wii'],
   ['gcm', 'GameCube'],
+  ['rvz', 'GameCube'],
+  ['wua', 'Wii U'],
+  ['wux', 'Wii U'],
+  ['wad', 'Wii'],
 ]);
 
 const folderPlatformHints: Array<[RegExp, GamePlatform]> = [
@@ -113,6 +129,7 @@ const folderPlatformHints: Array<[RegExp, GamePlatform]> = [
   [/(^|[^a-z0-9])n64([^a-z0-9]|$)/, 'Nintendo 64'],
   [/(^|[^a-z0-9])nds([^a-z0-9]|$)/, 'Nintendo DS'],
   [/(^|[^a-z0-9])wiiu([^a-z0-9]|$)/, 'Wii U'],
+  [/(^|[^a-z0-9])wii\s*u([^a-z0-9]|$)/, 'Wii U'],
   [/(^|[^a-z0-9])wii([^a-z0-9]|$)/, 'Wii'],
   [/(^|[^a-z0-9])(gamecube|gc)([^a-z0-9]|$)/, 'GameCube'],
   [/(^|[^a-z0-9])(genesis|megadrive)([^a-z0-9]|$)/, 'Sega Genesis / Mega Drive'],
@@ -125,29 +142,54 @@ export function scanRomFiles(
   existingGames: Game[],
   platformOverride: RetroPlatformOverride,
 ): { detectedRoms: DetectedRom[]; summary: RetroScanSummary } {
+  const scanIssues: RetroScanIssue[] = [];
   let unsupportedFiles = 0;
 
   const detectedRoms = files.flatMap((file, index) => {
     const sourcePath = getFileSourcePath(file);
+    const fileUri = getFileUri(file);
     const extension = getFileExtension(file.name);
 
     if (!supportedRomExtensions.has(extension)) {
       unsupportedFiles += 1;
+      scanIssues.push({
+        fileName: file.name || sourcePath || `File ${index + 1}`,
+        reason: extension ? `.${extension} is not a supported ROM format yet.` : 'No file extension was found.',
+        type: 'unsupported-format',
+      });
       return [];
     }
 
-    const title = cleanupRomTitle(file.name);
+    const title = cleanupRomTitle(file.name || sourcePath);
+    if (!title) {
+      scanIssues.push({
+        fileName: file.name || sourcePath || `File ${index + 1}`,
+        reason: 'QuestShelf could not create a readable game title from this file name.',
+        type: 'empty-title',
+      });
+      return [];
+    }
+
     const platform =
       platformOverride === autoDetectPlatformOption
         ? inferPlatform(sourcePath, extension)
         : (platformOverride as GamePlatform);
     const duplicateReason = getDuplicateReason({ extension, platform, sourcePath, title }, existingGames);
 
+    if (duplicateReason) {
+      scanIssues.push({
+        fileName: file.name || sourcePath || title,
+        reason: duplicateReason,
+        type: 'duplicate',
+      });
+    }
+
     return [
       {
         duplicateReason,
         extension,
         fileName: file.name,
+        fileUri,
         id: `${index}-${sourcePath}`,
         isDuplicate: Boolean(duplicateReason),
         platform,
@@ -161,6 +203,7 @@ export function scanRomFiles(
     detectedRoms,
     summary: {
       detectedGames: detectedRoms.length,
+      scanIssues,
       scannedFiles: files.length,
       unsupportedFiles,
     },
@@ -183,7 +226,7 @@ export function mapDetectedRomToGame(rom: DetectedRom, existingGameIds: Set<stri
     importedAt,
     romFileName: rom.fileName,
     romPath: rom.sourcePath,
-    romUri: rom.sourcePath,
+    romUri: rom.fileUri ?? rom.sourcePath,
     romExtension: rom.extension,
   };
 }
@@ -248,10 +291,12 @@ function cleanupRomTitle(fileName: string) {
   return fileName
     .replace(/\.[^.]+$/, '')
     .replace(/[_\.]+/g, ' ')
+    .replace(/\s*\{[^}]*\}/g, '')
     .replace(/\((usa|europe|japan|world|korea|france|germany|italy|spain|australia|en|fr|de|es|it|jp)[^)]*\)/gi, '')
     .replace(/\((rev(?:ision)?\s*\d+|v\d+(?:\.\d+)*)\)/gi, '')
-    .replace(/\[(?:!|b|h|f|o|t[+\-][^\]]+|[a-z]\d*)\]/gi, '')
+    .replace(/\[(?:!|b|h|f|o|t[+\-][^\]]+|[a-z]\d*|trimmed|xci|nsp|rvz|wua|wux)\]/gi, '')
     .replace(/\b(?:disc|disk)\s*\d+\b/gi, '')
+    .replace(/\b(?:side)\s*[ab]\b/gi, '')
     .replace(/\s+-\s+$/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
@@ -280,7 +325,13 @@ function normalizeTitle(title: string) {
 }
 
 function getFileSourcePath(file: File) {
-  return (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+  const extendedFile = file as File & { path?: string; webkitRelativePath?: string };
+  return extendedFile.webkitRelativePath || extendedFile.path || file.name;
+}
+
+function getFileUri(file: File) {
+  const extendedFile = file as File & { uri?: string };
+  return typeof extendedFile.uri === 'string' && extendedFile.uri.trim() ? extendedFile.uri.trim() : null;
 }
 
 function getFileExtension(fileName: string) {
