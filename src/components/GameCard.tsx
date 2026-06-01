@@ -57,12 +57,36 @@ export function GameCard({
       return;
     }
 
-    if (!isMultiSelectMode || (event.key !== 'Enter' && event.key !== ' ')) {
+    if (event.key === 'a' || event.key === 'A') {
+      event.preventDefault();
+      if (isMultiSelectMode) {
+        onToggleSelected?.();
+      } else {
+        onOpenDetails();
+      }
+      return;
+    }
+
+    if (event.key === 'x' || event.key === 'X' || event.key === 'y' || event.key === 'Y') {
+      event.preventDefault();
+      if (isMultiSelectMode) {
+        onToggleSelected?.();
+      } else {
+        setIsActionMenuOpen((currentValue) => !currentValue);
+      }
+      return;
+    }
+
+    if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }
 
     event.preventDefault();
-    onToggleSelected?.();
+    if (isMultiSelectMode) {
+      onToggleSelected?.();
+    } else {
+      onOpenDetails();
+    }
   }
 
   function stopCardAction(event: MouseEvent<HTMLElement>) {
@@ -77,8 +101,8 @@ export function GameCard({
       } ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
-      role={isMultiSelectMode ? 'button' : undefined}
-      tabIndex={isMultiSelectMode ? 0 : undefined}
+      role="button"
+      tabIndex={0}
     >
       {isMultiSelectMode ? (
         <div className="absolute left-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full border border-mint/40 bg-ink-950/90 shadow-glow">
@@ -177,6 +201,7 @@ export function GameCard({
               <button
                 aria-expanded={isActionMenuOpen}
                 aria-label={`More actions for ${game.title}`}
+                data-controller-action="context-menu"
                 className="grid h-10 w-11 place-items-center rounded-md border border-skyglass/15 text-lg font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
                 onClick={() => setIsActionMenuOpen((currentValue) => !currentValue)}
                 type="button"

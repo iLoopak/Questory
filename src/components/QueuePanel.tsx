@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import {
   compareQueueEntries,
   getPlatformMaxActiveGames,
@@ -237,8 +238,38 @@ function QueueEntryRow({
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
+  function handleQueueEntryKeyDown(event: KeyboardEvent<HTMLElement>) {
+    const target = event.target;
+    if (target instanceof HTMLButtonElement || target instanceof HTMLSelectElement) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === 'a' || event.key === 'A') {
+      event.preventDefault();
+      onOpenDetails(game.id);
+      return;
+    }
+
+    if (event.key === 'x' || event.key === 'X') {
+      event.preventDefault();
+      onMoveEntry(game.id, 'up');
+      return;
+    }
+
+    if (event.key === 'y' || event.key === 'Y') {
+      event.preventDefault();
+      onMoveEntry(game.id, 'down');
+    }
+  }
+
   return (
-    <article className="rounded-md border border-skyglass/15 bg-ink-950 p-3">
+    <article
+      aria-label={`${game.title} queue entry. A opens details, X moves up, Y moves down.`}
+      className="rounded-md border border-skyglass/15 bg-ink-950 p-3"
+      onKeyDown={handleQueueEntryKeyDown}
+      role="group"
+      tabIndex={0}
+    >
       <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
         <div className="grid h-9 w-9 place-items-center rounded-md border border-mint/25 bg-mint/10 text-sm font-semibold text-mint">
           {entry.queuePosition}

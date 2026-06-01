@@ -148,6 +148,20 @@ export function ReviewModePanel({
         return;
       }
 
+      if (isQueuePickerOpen) {
+        if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
+          event.preventDefault();
+          setIsQueuePickerOpen(false);
+        }
+        return;
+      }
+
+      if (isNoteOpen && (event.key === 'Escape' || event.key.toLowerCase() === 'b')) {
+        event.preventDefault();
+        setIsNoteOpen(false);
+        return;
+      }
+
       if (event.key === 'ArrowRight') {
         event.preventDefault();
         setHighlightedActionIndex((currentIndex) =>
@@ -189,11 +203,11 @@ export function ReviewModePanel({
 
       if (event.key.toLowerCase() === 'a') {
         event.preventDefault();
-        performAction(activeGame, 'playing');
+        performAction(activeGame, 'queue');
         return;
       }
 
-      if (event.key.toLowerCase() === 'b') {
+      if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
         event.preventDefault();
         performAction(activeGame, 'skip');
         return;
@@ -207,7 +221,7 @@ export function ReviewModePanel({
 
       if (event.key.toLowerCase() === 'y') {
         event.preventDefault();
-        performAction(activeGame, 'queue');
+        performAction(activeGame, 'playing');
         return;
       }
 
@@ -226,7 +240,7 @@ export function ReviewModePanel({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeGame, highlightedActionIndex, reviewHistory]);
+  }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, reviewHistory]);
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     onAction(game, action, note, targetPlatform);
