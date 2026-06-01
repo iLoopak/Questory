@@ -19,6 +19,6 @@ function normalizeRawgSettings(value: unknown): RawgSettings {
   const parsedSettings = value && typeof value === 'object' ? (value as Partial<RawgSettings>) : {};
 
   return {
-    apiKey: parsedSettings.apiKey ?? '',
+    apiKey: typeof parsedSettings.apiKey === 'string' ? parsedSettings.apiKey : '',
   };
 }
