@@ -6,6 +6,7 @@ import { GameCard } from './components/GameCard';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
+import { QueuePanel } from './components/QueuePanel';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { RetroImportPanel } from './components/RetroImportPanel';
@@ -22,6 +23,18 @@ import {
   type OnboardingItemId,
   type OnboardingState,
 } from './lib/onboardingStorage';
+import {
+  addGameToPlatformQueue,
+  getQueuePlatforms,
+  getQueueSummary,
+  loadPlatformQueueState,
+  moveQueueEntry,
+  moveQueueEntryToPlatform,
+  removeGameFromPlatformQueue,
+  savePlatformQueueState,
+  updatePlatformQueueSetting,
+  type PlatformQueueState,
+} from './lib/platformQueueStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
 import {
   loadReviewModeState,
@@ -44,7 +57,7 @@ import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
-const navItems = ['Library', 'Wishlist', 'Review Mode', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
+const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
 const settingsCategories = [
   'Integrations',
@@ -142,6 +155,7 @@ function App() {
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
+  const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
     const initialState = loadOnboardingState();
     return !initialState.hasSeenChecklist && !initialState.skipped;
@@ -166,6 +180,10 @@ function App() {
   useEffect(() => {
     saveReviewModeState(reviewModeState);
   }, [reviewModeState]);
+
+  useEffect(() => {
+    savePlatformQueueState(platformQueueState);
+  }, [platformQueueState]);
 
   useEffect(() => {
     saveCollectionFilters(libraryFiltersStorageKey, libraryFilters);
@@ -247,6 +265,8 @@ function App() {
   }, [onboardingState.completedAt]);
   const isOnboardingComplete = completedOnboardingItemIds.size === onboardingItemIds.length;
   const reviewIgnoredGameIds = useMemo(() => new Set(reviewModeState.ignoredGameIds), [reviewModeState.ignoredGameIds]);
+  const queueSummary = useMemo(() => getQueueSummary(platformQueueState, games), [games, platformQueueState]);
+  const queuePlatforms = useMemo(() => getQueuePlatforms(games, platformQueueState), [games, platformQueueState]);
   const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
   const lastRetroImportedGames = useMemo(
     () =>
@@ -737,8 +757,13 @@ function App() {
     }));
   }
 
-  function handleReviewAction(game: Game, action: ReviewModeAction, note?: string) {
+  function addGameToQueue(game: Game, platform: GamePlatform) {
+    setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
+  }
+
+  function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     if (action === 'skip') {
+      recordReviewDecision('skipped');
       return;
     }
 
@@ -785,9 +810,7 @@ function App() {
     }
 
     if (action === 'queue') {
-      updateGameReviewFields(game.id, {
-        tags: Array.from(new Set([...game.tags, 'queue'])),
-      });
+      addGameToQueue(game, targetPlatform ?? game.platform);
       recordReviewDecision('queueCandidates');
       recordReviewDecision('reviewed');
       return;
@@ -797,6 +820,7 @@ function App() {
       updateGameReviewFields(game.id, {
         status: 'Playing',
       });
+      recordReviewDecision('playing');
       recordReviewDecision('reviewed');
       return;
     }
@@ -842,6 +866,22 @@ function App() {
       ...currentState,
       ignoredGameIds: [],
     }));
+  }
+
+  function moveQueueGame(gameId: string, direction: 'top' | 'up' | 'down') {
+    setPlatformQueueState((currentState) => moveQueueEntry(currentState, gameId, direction));
+  }
+
+  function moveQueueGameToPlatform(gameId: string, platform: GamePlatform) {
+    setPlatformQueueState((currentState) => moveQueueEntryToPlatform(currentState, gameId, platform));
+  }
+
+  function removeQueueGame(gameId: string) {
+    setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId));
+  }
+
+  function updateQueueLimit(platform: GamePlatform, maxActiveGames: number) {
+    setPlatformQueueState((currentState) => updatePlatformQueueSetting(currentState, platform, maxActiveGames));
   }
 
   function unignoreSteamGame(steamAppId: number) {
@@ -1027,10 +1067,27 @@ function App() {
               onStatusChange={updateGameStatus}
               onSyncSteamWishlist={syncSteamWishlist}
             />
+          ) : activeNavItem === 'Queue' ? (
+            <QueuePanel
+              games={games}
+              queueState={platformQueueState}
+              onAddGameToQueue={addGameToQueue}
+              onLimitChange={updateQueueLimit}
+              onMoveEntry={moveQueueGame}
+              onMoveEntryToPlatform={moveQueueGameToPlatform}
+              onOpenDetails={(gameId) => {
+                const targetGame = games.find((game) => game.id === gameId);
+                setSelectedGameId(gameId);
+                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+              }}
+              onRemoveEntry={removeQueueGame}
+              onStartReview={() => startReviewMode('backlog')}
+            />
           ) : activeNavItem === 'Review Mode' ? (
             <ReviewModePanel
               games={games}
               ignoredGameIds={reviewIgnoredGameIds}
+              queuePlatforms={queuePlatforms}
               source={activeReviewSource}
               stats={reviewModeState.stats}
               onAction={handleReviewAction}
@@ -1050,6 +1107,7 @@ function App() {
           ) : activeNavItem === 'Recommendation' ? (
             <RecommendationPanel
               games={games}
+              queueEntries={platformQueueState.entries}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -1061,6 +1119,7 @@ function App() {
           ) : activeNavItem === 'Stats' ? (
             <StatsPanel
               games={games}
+              queueSummary={queueSummary}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -2551,6 +2610,10 @@ function getNavDescription(activeNavItem: NavItem) {
 
   if (activeNavItem === 'Recommendation') {
     return 'Local picks based on your library.';
+  }
+
+  if (activeNavItem === 'Queue') {
+    return 'Queue is the focused plan for what to play next by platform.';
   }
 
   if (activeNavItem === 'Review Mode') {
