@@ -39,8 +39,6 @@ export function QueuePanel({
   const addableGames = games
     .filter((game) => game.collectionType === 'library' && !queueGameIds.has(game.id))
     .sort((first, second) => first.title.localeCompare(second.title));
-  const queuedCount = queueState.entries.length;
-  const playingCount = games.filter((game) => game.status === 'Playing').length;
 
   function addSelectedGame() {
     const game = gamesById.get(selectedGameId);
@@ -61,8 +59,6 @@ export function QueuePanel({
           <p className="mt-1 text-sm text-slate-400">Queue turns the full library into a realistic platform plan.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <QueueStat label="Playing" value={playingCount} />
-          <QueueStat label="Queued" value={queuedCount} />
           <button
             className="min-h-11 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
             onClick={onStartReview}
@@ -311,14 +307,5 @@ function QueueGameRow({ game, onOpenDetails }: { game: Game; onOpenDetails: (gam
       <span className="block truncate font-semibold">{game.title}</span>
       <span className="mt-1 block text-xs opacity-80">{game.playtimeHours}h played</span>
     </button>
-  );
-}
-
-function QueueStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-skyglass/15 bg-ink-950/80 px-3 py-2">
-      <div className="text-lg font-semibold text-white">{value}</div>
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
-    </div>
   );
 }

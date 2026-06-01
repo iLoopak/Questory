@@ -33,6 +33,19 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 
 No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
+## Screen Responsibility Rule
+
+QuestShelf keeps analytics concentrated in the **Stats** section so handheld screens stay focused:
+
+- **Stats** → analytics, trends, backlog progress, completion, playtime, platform/source breakdowns, and metadata coverage.
+- **Library** → collection management, filters, edits, status changes, and bulk actions.
+- **Queue** → planning what to play next, active games, queue order, and platform limits.
+- **Review Mode** → one-game-at-a-time decisions with artwork, title, platform, actions, and a lightweight progress indicator.
+- **Wishlist** → discovery and future-game planning.
+- **Settings** → app configuration, integrations, backups, appearance, and onboarding controls.
+
+Avoid adding persistent dashboard cards, global library totals, completion percentages, or repeated playtime summaries outside Stats unless the information directly supports the current action.
+
 ## First-Run Onboarding
 
 QuestShelf shows a compact checklist on first launch to guide initial setup without requiring accounts.
