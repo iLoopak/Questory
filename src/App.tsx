@@ -14,6 +14,7 @@ import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModeP
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
+import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
@@ -149,6 +150,7 @@ function App() {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
+  const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
@@ -283,6 +285,10 @@ function App() {
   }, [lastRetroImportedGames, libraryFilters]);
 
   useEffect(() => {
+    saveControllerDebugEnabled(isControllerDebugEnabled);
+  }, [isControllerDebugEnabled]);
+
+  useEffect(() => {
     saveLandscapeLockPreference(isLandscapeLockEnabled);
     window.dispatchEvent(new CustomEvent('questshelf:landscape-lock-change', { detail: isLandscapeLockEnabled }));
   }, [isLandscapeLockEnabled]);
@@ -290,6 +296,43 @@ function App() {
   useEffect(() => {
     saveSettingsCategory(activeSettingsCategory);
   }, [activeSettingsCategory]);
+
+  useEffect(() => {
+    function handleControllerNavigation(event: KeyboardEvent) {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if (event.key === 'm') {
+        event.preventDefault();
+        setActiveNavItem('Settings');
+        setSelectedGameId(null);
+        return;
+      }
+
+      if (activeNavItem === 'Review Mode' || (event.key !== 'PageUp' && event.key !== 'PageDown')) {
+        return;
+      }
+
+      event.preventDefault();
+      setActiveNavItem((currentItem) => {
+        const currentIndex = navItems.indexOf(currentItem);
+        const direction = event.key === 'PageDown' ? 1 : -1;
+        return navItems[(currentIndex + direction + navItems.length) % navItems.length];
+      });
+      setSelectedGameId(null);
+    }
+
+    window.addEventListener('keydown', handleControllerNavigation);
+
+    return () => window.removeEventListener('keydown', handleControllerNavigation);
+  }, [activeNavItem]);
+
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
@@ -1118,6 +1161,7 @@ function App() {
               demoGameCount={games.filter(isMockGame).length}
               games={games}
               ignoredSteamGames={ignoredSteamGames}
+              isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               isOnboardingOpen={isOnboardingOpen}
               isOnboardingComplete={isOnboardingComplete}
@@ -1131,6 +1175,7 @@ function App() {
               onEnrichRetroImportedGames={enrichRetroImportedGames}
               onImportGames={importGames}
               onImportRetroGames={handleRetroImportGames}
+              onControllerDebugChange={setIsControllerDebugEnabled}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
               onLoadDemoData={loadDemoData}
               onOnboardingAction={handleOnboardingAction}
@@ -1686,6 +1731,19 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
   const [storeUrl, setStoreUrl] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1740,7 +1798,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/80 p-3 backdrop-blur-sm">
-      <section className="qs-modal-panel qs-glass max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
+      <section aria-modal="true" className="qs-modal-panel qs-glass max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel" role="dialog">
         <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
             <h2 className="text-xl font-semibold text-white">Add game</h2>
@@ -1969,6 +2027,7 @@ type SettingsPanelProps = {
   demoGameCount: number;
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
+  isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
   isOnboardingComplete: boolean;
   isOnboardingOpen: boolean;
@@ -1982,6 +2041,7 @@ type SettingsPanelProps = {
   onEnrichRetroImportedGames: (gameIds: string[]) => void;
   onImportGames: (games: Game[]) => void;
   onImportRetroGames: (games: Game[]) => Game[];
+  onControllerDebugChange: (isEnabled: boolean) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onLoadDemoData: () => void;
   onOnboardingAction: (itemId: OnboardingItemId) => void;
@@ -2004,6 +2064,7 @@ function SettingsPanel({
   demoGameCount,
   games,
   ignoredSteamGames,
+  isControllerDebugEnabled,
   isLandscapeLockEnabled,
   isOnboardingComplete,
   isOnboardingOpen,
@@ -2017,6 +2078,7 @@ function SettingsPanel({
   onEnrichRetroImportedGames,
   onImportGames,
   onImportRetroGames,
+  onControllerDebugChange,
   onLandscapeLockChange,
   onLoadDemoData,
   onOnboardingAction,
@@ -2140,8 +2202,10 @@ function SettingsPanel({
 
           {activeCategory === 'Appearance' ? (
             <AppearanceSettingsPanel
+              isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               runtimeEnvironment={runtimeEnvironment}
+              onControllerDebugChange={onControllerDebugChange}
               onLandscapeLockChange={onLandscapeLockChange}
             />
           ) : null}
@@ -2402,12 +2466,16 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
 }
 
 function AppearanceSettingsPanel({
+  isControllerDebugEnabled,
   isLandscapeLockEnabled,
   runtimeEnvironment,
+  onControllerDebugChange,
   onLandscapeLockChange,
 }: {
+  isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  onControllerDebugChange: (isEnabled: boolean) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
 }) {
   return (
@@ -2427,6 +2495,19 @@ function AppearanceSettingsPanel({
         />
         <span>
           <span className="block font-semibold text-white">Prefer landscape orientation</span>
+        </span>
+      </label>
+
+      <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
+        <input
+          checked={isControllerDebugEnabled}
+          className="mt-1 h-5 w-5 accent-mint"
+          onChange={(event) => onControllerDebugChange(event.target.checked)}
+          type="checkbox"
+        />
+        <span>
+          <span className="block font-semibold text-white">Developer controller debug overlay</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Shows detected buttons, axes, and the currently focused element while a controller is connected.</span>
         </span>
       </label>
     </section>
