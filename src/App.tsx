@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
@@ -46,6 +46,14 @@ import {
   type ReviewSource,
 } from './lib/reviewModeStorage';
 import { loadSteamSettings } from './lib/steamSettingsStorage';
+import {
+  createUndoActionId,
+  loadPendingUndoActions,
+  savePendingUndoActions,
+  undoActionTimeoutMs,
+  type PendingUndoAction,
+  type UndoActionHistoryEntry,
+} from './lib/undoHistoryStorage';
 import {
   addIgnoredSteamGame,
   loadIgnoredSteamGames,
@@ -168,6 +176,8 @@ function App() {
   const [steamWishlistSyncState, setSteamWishlistSyncState] = useState<SteamWishlistSyncState>(
     initialSteamWishlistSyncState,
   );
+  const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
+  const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
 
   useEffect(() => {
     saveGames(games);
@@ -188,6 +198,26 @@ function App() {
   useEffect(() => {
     savePlatformQueueState(platformQueueState);
   }, [platformQueueState]);
+
+  useEffect(() => {
+    pendingUndoActionsRef.current = pendingUndoActions;
+    savePendingUndoActions(pendingUndoActions);
+  }, [pendingUndoActions]);
+
+  useEffect(() => {
+    if (pendingUndoActions.length === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const nextExpiry = Math.max(0, Math.min(...pendingUndoActions.map((action) => action.expiresAt)) - now);
+    const expiryTimer = window.setTimeout(() => {
+      const currentTime = Date.now();
+      setPendingUndoActions((currentActions) => currentActions.filter((action) => action.expiresAt > currentTime));
+    }, nextExpiry + 50);
+
+    return () => window.clearTimeout(expiryTimer);
+  }, [pendingUndoActions]);
 
   useEffect(() => {
     saveCollectionFilters(libraryFiltersStorageKey, libraryFilters);
@@ -392,6 +422,67 @@ function App() {
     setIsOnboardingOpen(false);
   }
 
+  function createUndoSnapshot() {
+    return {
+      games,
+      ignoredSteamGames,
+      platformQueueState,
+      reviewModeState,
+      selectedGameId,
+    };
+  }
+
+  function addUndoAction(
+    message: string,
+    historyEntry: Omit<UndoActionHistoryEntry, 'createdAt'>,
+    snapshot = createUndoSnapshot(),
+  ) {
+    const createdAt = Date.now();
+    const action: PendingUndoAction = {
+      createdAt,
+      expiresAt: createdAt + undoActionTimeoutMs,
+      historyEntry: {
+        ...historyEntry,
+        createdAt: new Date(createdAt).toISOString(),
+      },
+      id: createUndoActionId(),
+      message,
+      snapshot,
+    };
+
+    setPendingUndoActions((currentActions) => {
+      const nextActions = [...currentActions, action];
+      pendingUndoActionsRef.current = nextActions;
+      return nextActions;
+    });
+  }
+
+  function undoAction(actionId: string) {
+    const action = pendingUndoActionsRef.current.find((currentAction) => currentAction.id === actionId);
+    if (!action) {
+      return;
+    }
+
+    setGames(action.snapshot.games);
+    setIgnoredSteamGames(action.snapshot.ignoredSteamGames);
+    setPlatformQueueState(action.snapshot.platformQueueState);
+    setReviewModeState(action.snapshot.reviewModeState);
+    setSelectedGameId(action.snapshot.selectedGameId);
+    setPendingUndoActions((currentActions) => {
+      const nextActions = currentActions.filter((currentAction) => currentAction.id !== actionId);
+      pendingUndoActionsRef.current = nextActions;
+      return nextActions;
+    });
+  }
+
+  function dismissUndoAction(actionId: string) {
+    setPendingUndoActions((currentActions) => {
+      const nextActions = currentActions.filter((currentAction) => currentAction.id !== actionId);
+      pendingUndoActionsRef.current = nextActions;
+      return nextActions;
+    });
+  }
+
   function handleOnboardingAction(itemId: OnboardingItemId) {
     if (itemId === 'manual-game' || itemId === 'wishlist-item') {
       setActiveNavItem(itemId === 'wishlist-item' ? 'Wishlist' : 'Library');
@@ -417,6 +508,15 @@ function App() {
   }
 
   function updateGameStatus(gameId: string, status: GameStatus) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    if (game && (status === 'Finished' || status === 'Dropped')) {
+      addUndoAction(`${game.title} marked ${status.toLowerCase()}`, {
+        actionType: `mark-${status.toLowerCase()}`,
+        affectedGameIds: [gameId],
+        description: `Restore ${game.title} to ${game.status}`,
+      });
+    }
+
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
@@ -432,6 +532,14 @@ function App() {
 
   function updateManyGameStatuses(gameIds: string[], status: GameStatus) {
     const targetGameIds = new Set(gameIds);
+    const updatedGames = games.filter((game) => targetGameIds.has(game.id));
+    if (updatedGames.length > 0 && (status === 'Finished' || status === 'Dropped')) {
+      addUndoAction(`${updatedGames.length} games marked ${status.toLowerCase()}`, {
+        actionType: `bulk-mark-${status.toLowerCase()}`,
+        affectedGameIds: updatedGames.map((game) => game.id),
+        description: `Restore statuses for ${updatedGames.length} games`,
+      });
+    }
     const today = new Date().toISOString().slice(0, 10);
 
     setGames((currentGames) =>
@@ -630,6 +738,25 @@ function App() {
 
   function addToWishlist(game: Game) {
     const wishlistId = createCollectionCopyId(game, 'wishlist', new Set(games.map((currentGame) => currentGame.id)));
+    const alreadyWishlisted = games.some((currentGame) => {
+      if (currentGame.collectionType !== 'wishlist') {
+        return false;
+      }
+
+      if (typeof game.steamAppId === 'number') {
+        return currentGame.steamAppId === game.steamAppId;
+      }
+
+      return currentGame.title.toLowerCase() === game.title.toLowerCase() && currentGame.platform === game.platform;
+    });
+
+    if (!alreadyWishlisted) {
+      addUndoAction(`${game.title} added to Wishlist`, {
+        actionType: 'add-to-wishlist',
+        affectedGameIds: [game.id],
+        description: `Remove ${game.title} from Wishlist`,
+      });
+    }
 
     setGames((currentGames) => {
       const alreadyWishlisted = currentGames.some((currentGame) => {
@@ -665,6 +792,14 @@ function App() {
   }
 
   function addManyToWishlist(targetGames: Game[]) {
+    if (targetGames.length > 0) {
+      addUndoAction(`${targetGames.length} games added to Wishlist`, {
+        actionType: 'bulk-add-to-wishlist',
+        affectedGameIds: targetGames.map((game) => game.id),
+        description: `Remove ${targetGames.length} wishlist copies`,
+      });
+    }
+
     setGames((currentGames) => {
       const existingGameIds = new Set(currentGames.map((game) => game.id));
       const nextGames = [...currentGames];
@@ -707,6 +842,12 @@ function App() {
   }
 
   function moveToLibrary(game: Game) {
+    addUndoAction(`${game.title} moved to Library`, {
+      actionType: 'move-to-library',
+      affectedGameIds: [game.id],
+      description: `Restore ${game.title} to Wishlist`,
+    });
+
     setGames((currentGames) =>
       currentGames.map((currentGame) =>
         currentGame.id === game.id
@@ -724,6 +865,15 @@ function App() {
   }
 
   function removeGame(gameId: string) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    if (game) {
+      addUndoAction(`${game.title} deleted`, {
+        actionType: game.collectionType === 'wishlist' ? 'remove-wishlist-item' : 'delete-game',
+        affectedGameIds: [gameId],
+        description: `Restore ${game.title}`,
+      });
+    }
+
     setGames((currentGames) => currentGames.filter((game) => game.id !== gameId));
     setSelectedGameId((currentSelectedGameId) => (currentSelectedGameId === gameId ? null : currentSelectedGameId));
   }
@@ -733,14 +883,29 @@ function App() {
       return;
     }
 
+    addUndoAction(`${game.title} ignored and removed`, {
+      actionType: 'ignore-game',
+      affectedGameIds: [game.id],
+      description: `Restore ${game.title} and remove it from ignored Steam imports`,
+    });
+
     setIgnoredSteamGames((currentIgnoredGames) =>
       addIgnoredSteamGame(currentIgnoredGames, game.steamAppId as number, game.title),
     );
-    removeGame(game.id);
+    setGames((currentGames) => currentGames.filter((currentGame) => currentGame.id !== game.id));
+    setSelectedGameId((currentSelectedGameId) => (currentSelectedGameId === game.id ? null : currentSelectedGameId));
   }
 
   function removeManyGames(gameIds: string[]) {
     const targetGameIds = new Set(gameIds);
+    const removedGames = games.filter((game) => targetGameIds.has(game.id));
+    if (removedGames.length > 0) {
+      addUndoAction(`${removedGames.length} games removed`, {
+        actionType: 'bulk-remove-games',
+        affectedGameIds: removedGames.map((game) => game.id),
+        description: `Restore ${removedGames.length} removed games`,
+      });
+    }
     setGames((currentGames) => currentGames.filter((game) => !targetGameIds.has(game.id)));
     setSelectedGameId((currentSelectedGameId) =>
       currentSelectedGameId && targetGameIds.has(currentSelectedGameId) ? null : currentSelectedGameId,
@@ -748,6 +913,14 @@ function App() {
   }
 
   function removeAndIgnoreManyGames(targetGames: Game[]) {
+    if (targetGames.length > 0) {
+      addUndoAction(`${targetGames.length} games removed and ignored`, {
+        actionType: 'bulk-remove-and-ignore-games',
+        affectedGameIds: targetGames.map((game) => game.id),
+        description: `Restore ${targetGames.length} removed games and ignored imports`,
+      });
+    }
+
     const targetGameIds = new Set(targetGames.map((game) => game.id));
     const steamGames = targetGames.filter((game) => typeof game.steamAppId === 'number');
 
@@ -801,6 +974,12 @@ function App() {
   }
 
   function addGameToQueue(game: Game, platform: GamePlatform) {
+    addUndoAction(`${game.title} added to ${platform} Queue`, {
+      actionType: 'add-to-queue',
+      affectedGameIds: [game.id],
+      description: `Remove ${game.title} from ${platform} Queue and restore queue positions`,
+    });
+
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
   }
 
@@ -830,6 +1009,12 @@ function App() {
     }
 
     if (action === 'ignore') {
+      addUndoAction(`${game.title} ignored`, {
+        actionType: 'ignore-game',
+        affectedGameIds: [game.id],
+        description: `Restore ${game.title} to Review Mode`,
+      });
+
       setReviewModeState((currentState) => ({
         ...currentState,
         ignoredGameIds: Array.from(new Set([...currentState.ignoredGameIds, game.id])),
@@ -888,6 +1073,15 @@ function App() {
   }
 
   function updateGameReviewFields(gameId: string, changes: Partial<Game>) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    if (game && (changes.status === 'Finished' || changes.status === 'Dropped')) {
+      addUndoAction(`${game.title} marked ${changes.status.toLowerCase()}`, {
+        actionType: `mark-${changes.status.toLowerCase()}`,
+        affectedGameIds: [gameId],
+        description: `Restore ${game.title} to ${game.status}`,
+      });
+    }
+
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
@@ -916,10 +1110,30 @@ function App() {
   }
 
   function moveQueueGameToPlatform(gameId: string, platform: GamePlatform) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    const currentEntry = platformQueueState.entries.find((entry) => entry.gameId === gameId);
+    if (game && currentEntry && currentEntry.targetPlatform !== platform) {
+      addUndoAction(`${game.title} moved to ${platform} Queue`, {
+        actionType: 'move-between-collections',
+        affectedGameIds: [gameId],
+        description: `Restore ${game.title} to ${currentEntry.targetPlatform} Queue`,
+      });
+    }
+
     setPlatformQueueState((currentState) => moveQueueEntryToPlatform(currentState, gameId, platform));
   }
 
   function removeQueueGame(gameId: string) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    const entry = platformQueueState.entries.find((queueEntry) => queueEntry.gameId === gameId);
+    if (game && entry) {
+      addUndoAction(`${game.title} removed from ${entry.targetPlatform} Queue`, {
+        actionType: 'remove-from-queue',
+        affectedGameIds: [gameId],
+        description: `Restore ${game.title} to queue position ${entry.queuePosition}`,
+      });
+    }
+
     setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId));
   }
 
@@ -1227,6 +1441,12 @@ function App() {
         </section>
       </div>
 
+      <UndoToastStack
+        actions={pendingUndoActions}
+        onDismiss={dismissUndoAction}
+        onUndo={undoAction}
+      />
+
       {isAddGameOpen ? (
         <AddGameDialog
           existingGameIds={new Set(games.map((game) => game.id))}
@@ -1265,6 +1485,55 @@ function App() {
         )
       ) : null}
     </main>
+  );
+}
+
+type UndoToastStackProps = {
+  actions: PendingUndoAction[];
+  onDismiss: (actionId: string) => void;
+  onUndo: (actionId: string) => void;
+};
+
+function UndoToastStack({ actions, onDismiss, onUndo }: UndoToastStackProps) {
+  if (actions.length === 0) {
+    return null;
+  }
+
+  return (
+    <aside
+      aria-label="Pending undo actions"
+      aria-live="polite"
+      className="fixed bottom-4 left-3 right-3 z-40 grid gap-2 sm:left-auto sm:right-5 sm:w-full sm:max-w-md"
+    >
+      {actions.map((action) => (
+        <div
+          key={action.id}
+          className="qs-glass rounded-lg border border-mint/25 bg-ink-950/95 p-3 shadow-panel"
+        >
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">{action.message}</p>
+              <p className="mt-1 text-xs text-slate-400">Undo is available for a few seconds.</p>
+            </div>
+            <button
+              aria-label={`Dismiss undo for ${action.message}`}
+              className="h-8 w-8 shrink-0 rounded-md border border-white/10 text-sm text-slate-400 transition hover:bg-white/10 hover:text-white"
+              onClick={() => onDismiss(action.id)}
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+          <button
+            className="mt-3 h-10 w-full rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
+            onClick={() => onUndo(action.id)}
+            type="button"
+          >
+            Undo
+          </button>
+        </div>
+      ))}
+    </aside>
   );
 }
 
