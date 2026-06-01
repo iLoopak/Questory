@@ -344,13 +344,11 @@ export function RetroImportPanel({
         {statusMessage.message}
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-5">
-        <RetroStat label="Scanned" value={scanSummary.scannedFiles.toString()} />
-        <RetroStat label="Detected" value={scanSummary.detectedGames.toString()} />
-        <RetroStat label="Selected" value={selectedImportableRoms.length.toString()} />
-        <RetroStat label="Duplicates" value={detectedRoms.filter((rom) => rom.isDuplicate).length.toString()} />
-        <RetroStat label="Unsupported" value={scanSummary.unsupportedFiles.toString()} />
-      </div>
+      <p className="mt-3 text-sm text-slate-400">
+        Scan: {scanSummary.scannedFiles} files, {scanSummary.detectedGames} detected, {selectedImportableRoms.length}
+        selected, {detectedRoms.filter((rom) => rom.isDuplicate).length} duplicates, {scanSummary.unsupportedFiles}
+        unsupported.
+      </p>
 
       {scanSummary.scanIssues.length > 0 ? (
         <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
@@ -497,14 +495,10 @@ function ImportResultPanel({
               `Imported ${summary.importedGames} of ${summary.detectedGames} detected games into Library.`}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-          <RetroResultStat label="Scanned" value={summary.scannedFiles} />
-          <RetroResultStat label="Detected" value={summary.detectedGames} />
-          <RetroResultStat label="Imported" value={summary.importedGames} />
-          <RetroResultStat label="Duplicates" value={summary.skippedDuplicates} />
-          <RetroResultStat label="Unsupported" value={summary.unsupportedFiles} />
-          <RetroResultStat label="Failures" value={summary.failures.length} />
-        </div>
+        <p className="rounded-md border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-slate-300">
+          {summary.scannedFiles} scanned / {summary.detectedGames} detected / {summary.importedGames} imported /{' '}
+          {summary.skippedDuplicates} duplicates / {summary.unsupportedFiles} unsupported / {summary.failures.length} failures
+        </p>
       </div>
 
       {summary.failures.length > 0 ? (
@@ -585,23 +579,6 @@ function ImportResultPanel({
   );
 }
 
-function RetroResultStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-white/10 bg-black/20 px-2 py-2">
-      <div className="text-base font-semibold text-white">{value}</div>
-      <div className="mt-0.5 uppercase tracking-[0.14em] text-slate-400">{label}</div>
-    </div>
-  );
-}
-
-function RetroStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3">
-      <div className="text-lg font-semibold text-white">{value}</div>
-      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
-    </div>
-  );
-}
 
 function getImportFailures(games: Game[]) {
   return games.flatMap((game) => {

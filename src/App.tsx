@@ -241,8 +241,6 @@ function App() {
     return filterGames(wishlistGames, wishlistFilters);
   }, [wishlistFilters, wishlistGames]);
 
-  const activeGames = libraryGames.filter((game) => game.status === 'Playing').length;
-  const totalHours = libraryGames.reduce((sum, game) => sum + game.playtimeHours, 0);
   const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
   const autoBackupSignal = useMemo(
     () =>
@@ -997,15 +995,12 @@ function App() {
 
         <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="qs-glass rounded-lg border p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
-              <Stat label="Library" value={libraryGames.length.toString()} />
-              <Stat label="Wishlist" value={wishlistGames.length.toString()} />
-              <Stat label="Playing" value={activeGames.toString()} />
-              <Stat label="Hours" value={totalHours.toString()} />
-            </div>
-
-            <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
+            <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
               {getNavDescription(activeNavItem)}
+            </div>
+            <div className="mt-3 rounded-md border border-mint/20 bg-mint/10 p-3 text-xs leading-5 text-mint">
+              <div className="font-semibold uppercase tracking-[0.14em]">Screen rule</div>
+              <p className="mt-1 text-mint/80">Stats are reserved for analytics. Each other section stays focused on its task.</p>
             </div>
           </aside>
 
@@ -1138,9 +1133,7 @@ function App() {
               isOnboardingOpen={isOnboardingOpen}
               isOnboardingComplete={isOnboardingComplete}
               lastRetroImportsHiddenByFilters={areLastRetroImportsHiddenByFilters}
-              libraryCount={libraryGames.length}
               runtimeEnvironment={runtimeEnvironment}
-              wishlistCount={wishlistGames.length}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -1987,9 +1980,7 @@ type SettingsPanelProps = {
   isOnboardingComplete: boolean;
   isOnboardingOpen: boolean;
   lastRetroImportsHiddenByFilters: boolean;
-  libraryCount: number;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
-  wishlistCount: number;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -2024,9 +2015,7 @@ function SettingsPanel({
   isOnboardingComplete,
   isOnboardingOpen,
   lastRetroImportsHiddenByFilters,
-  libraryCount,
   runtimeEnvironment,
-  wishlistCount,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -2133,7 +2122,7 @@ function SettingsPanel({
 
           {activeCategory === 'Library' ? (
             <div className="space-y-4">
-              <LibrarySettingsSummary libraryCount={libraryCount} />
+              <LibrarySettingsSummary />
               <DemoDataPanel
                 demoGameCount={demoGameCount}
                 onLoadDemoData={onLoadDemoData}
@@ -2142,7 +2131,7 @@ function SettingsPanel({
             </div>
           ) : null}
 
-          {activeCategory === 'Wishlist' ? <WishlistSettingsPanel wishlistCount={wishlistCount} /> : null}
+          {activeCategory === 'Wishlist' ? <WishlistSettingsPanel /> : null}
 
           {activeCategory === 'Retro' ? (
             <div className="space-y-4">
@@ -2380,27 +2369,26 @@ function FutureProvidersPanel() {
   );
 }
 
-function LibrarySettingsSummary({ libraryCount }: { libraryCount: number }) {
+function LibrarySettingsSummary() {
   return (
     <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Library</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <SettingsMiniCard title="Local library" value={`${libraryCount} games`} />
-        <SettingsMiniCard title="Default collection" value="Library" />
-      </div>
+      <h2 className="text-xl font-semibold text-white">Library controls</h2>
+      <p className="mt-1 text-sm leading-6 text-slate-400">
+        Manage local data helpers here. Library counts and completion analytics live in Stats.
+      </p>
     </section>
   );
 }
 
-function WishlistSettingsPanel({ wishlistCount }: { wishlistCount: number }) {
+function WishlistSettingsPanel() {
   return (
     <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Wishlist</h2>
+      <h2 className="text-xl font-semibold text-white">Wishlist behavior</h2>
       <p className="mt-1 text-sm leading-6 text-slate-400">
         Wishlist entries stay separate from owned Library games and are tuned for lightweight planning on handhelds.
+        Item counts and discovery analytics live in Stats.
       </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <SettingsMiniCard title="Wishlist items" value={wishlistCount.toString()} />
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <SettingsMiniCard title="Priority levels" value="Low / Medium / High" />
         <SettingsMiniCard title="Steam wishlist" value="Available from Wishlist" />
       </div>
@@ -2597,7 +2585,7 @@ function AppStartupScreen() {
 
 function getNavDescription(activeNavItem: NavItem) {
   if (activeNavItem === 'Settings') {
-    return 'Settings are grouped for handheld use.';
+    return 'Settings configure the app; analytics stay in Stats.';
   }
 
   if (activeNavItem === 'Metadata') {
@@ -2605,26 +2593,26 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Wishlist') {
-    return 'Wishlist items are separate from owned library games.';
+    return 'Wishlist focuses on discovery and future picks.';
   }
 
   if (activeNavItem === 'Recommendation') {
-    return 'Local picks based on your library.';
+    return 'Recommendations suggest local picks without becoming a dashboard.';
   }
 
   if (activeNavItem === 'Queue') {
-    return 'Queue is the focused plan for what to play next by platform.';
+    return 'Queue is planning: currently playing, queue entries, and order.';
   }
 
   if (activeNavItem === 'Review Mode') {
-    return 'Process one game at a time with fast queue, wishlist, status, and ignore actions.';
+    return 'Review Mode is for focused decisions, one game at a time.';
   }
 
   if (activeNavItem === 'Stats') {
-    return 'Local overview of backlog, progress, and playtime.';
+    return 'Stats is the analytics home for backlog, progress, and playtime.';
   }
 
-  return 'Local library and wishlist data stays on this device.';
+  return 'Library is management: browse, edit, filter, and organize games.';
 }
 
 function touchGameRecord(game: Game): Game {
