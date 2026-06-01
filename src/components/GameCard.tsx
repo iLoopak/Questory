@@ -44,7 +44,6 @@ export function GameCard({
   }, [coverSources]);
 
   const activeCoverSource = coverSources[coverSourceIndex];
-  const enrichmentStatus = getEnrichmentStatus(game);
 
   function handleCardClick() {
     if (isMultiSelectMode) {
@@ -73,7 +72,7 @@ export function GameCard({
   return (
     <article
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-game-card qs-glass relative flex h-full min-h-[360px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[390px] ${
+      className={`qs-game-card qs-glass relative flex h-full min-h-[290px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[320px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
@@ -94,7 +93,7 @@ export function GameCard({
         </div>
       ) : null}
 
-      <div className="relative aspect-[16/9] max-h-36 shrink-0 overflow-hidden bg-ink-700 sm:max-h-40">
+      <div className="relative aspect-[16/9] max-h-32 shrink-0 overflow-hidden bg-ink-700 sm:max-h-36">
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
@@ -137,29 +136,13 @@ export function GameCard({
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <div className="min-w-0">
           <h3
-            className="line-clamp-3 min-h-[4.75rem] text-base font-semibold leading-6 text-white sm:min-h-[5.25rem] sm:text-lg sm:leading-7"
+            className="line-clamp-2 text-base font-semibold leading-6 text-white sm:text-lg"
             title={game.title}
           >
             {game.title}
           </h3>
 
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className="rounded-full border border-skyglass/15 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-slate-300">
-              {game.playtimeHours}h played
-            </span>
-            <span className="rounded-full border border-skyglass/15 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-slate-300">
-              {game.status}
-            </span>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                game.metadataSource === 'rawg'
-                  ? 'border-mint/25 bg-mint/10 text-mint'
-                  : 'border-skyglass/15 bg-ink-950/80 text-slate-400'
-              }`}
-            >
-              {enrichmentStatus}
-            </span>
-          </div>
+          <div className="mt-2 text-sm text-slate-400">{game.status}</div>
         </div>
 
         {!isMultiSelectMode ? (
@@ -177,19 +160,6 @@ export function GameCard({
             ))}
           </select>
         ) : null}
-
-        <div className="flex min-h-[1.8rem] flex-wrap gap-2">
-          {game.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="rounded-full border border-skyglass/10 bg-skyglass/10 px-2.5 py-1 text-xs font-medium text-slate-300">
-              {tag}
-            </span>
-          ))}
-          {game.tags.length > 3 ? (
-            <span className="rounded-full bg-skyglass/5 px-2.5 py-1 text-xs font-medium text-slate-500">
-              +{game.tags.length - 3}
-            </span>
-          ) : null}
-        </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-3">
           <div className="flex items-center gap-2">
@@ -233,7 +203,7 @@ export function GameCard({
                     />
                   )}
                   <ActionMenuButton
-                    label="Find metadata"
+                    label="Find info"
                     onClick={() => {
                       onFindMetadata(game);
                       setIsActionMenuOpen(false);
@@ -253,7 +223,7 @@ export function GameCard({
                   {game.collectionType === 'library' ? (
                     <ActionMenuButton
                       disabled={typeof game.steamAppId !== 'number'}
-                      label="Remove + Ignore"
+                      label="Remove and ignore"
                       onClick={() => {
                         onRemoveAndIgnore(game);
                         setIsActionMenuOpen(false);
@@ -304,20 +274,4 @@ function ActionMenuButton({ disabled = false, label, onClick, tone }: ActionMenu
       {label}
     </button>
   );
-}
-
-function getEnrichmentStatus(game: Game) {
-  if (game.metadataSource === 'rawg') {
-    return 'RAWG enriched';
-  }
-
-  if (game.metadataManualManagedAt) {
-    return 'Manual';
-  }
-
-  if (game.metadataSkippedAt) {
-    return 'Skipped';
-  }
-
-  return 'Missing RAWG';
 }

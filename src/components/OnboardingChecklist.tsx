@@ -38,13 +38,13 @@ const onboardingItems: OnboardingChecklistItem[] = [
   {
     id: 'manual-game',
     title: 'Add first game',
-    description: 'Create one local entry so your shelf has something to show.',
+    description: 'Start your shelf with one game.',
     actionLabel: 'Add game',
   },
   {
     id: 'steam-api-key',
     title: 'Connect Steam key',
-    description: 'Save your Steam Web API key locally on this device.',
+    description: 'Save your Steam key on this device.',
     helpHref: 'https://steamcommunity.com/dev/apikey',
     helpLabel: 'Get key',
     setup: 'steam',
@@ -52,7 +52,7 @@ const onboardingItems: OnboardingChecklistItem[] = [
   {
     id: 'steam-id64',
     title: 'Add SteamID64',
-    description: 'Save the numeric Steam profile ID you want to import from.',
+    description: 'Choose the Steam profile to import.',
     helpHref: 'https://www.steamidfinder.com/',
     helpLabel: 'Find ID',
     setup: 'steam',
@@ -60,39 +60,39 @@ const onboardingItems: OnboardingChecklistItem[] = [
   {
     id: 'steam-test',
     title: 'Test Steam',
-    description: 'Confirm QuestShelf can read your Steam library.',
+    description: 'Check that Steam sync works.',
     setup: 'steam',
   },
   {
     id: 'steam-import',
     title: 'Import Steam library',
-    description: 'Review Steam games and add the ones you want to Library.',
+    description: 'Add selected Steam games to Library.',
     actionLabel: 'Open import',
   },
   {
     id: 'rawg-api-key',
-    title: 'Connect RAWG',
-    description: 'Save a RAWG key for optional metadata enrichment.',
+    title: 'Connect game info',
+    description: 'Enable optional game info lookup.',
     helpHref: 'https://rawg.io/apidocs',
     helpLabel: 'Get key',
     setup: 'rawg',
   },
   {
     id: 'metadata-enriched',
-    title: 'Enrich metadata',
-    description: 'Attach RAWG details to at least one Library or Wishlist item.',
-    actionLabel: 'Open metadata',
+    title: 'Add game info',
+    description: 'Add game info to one title.',
+    actionLabel: 'Open info',
   },
   {
     id: 'wishlist-item',
     title: 'Create wishlist item',
-    description: 'Add one future game to Wishlist.',
+    description: 'Add one game you want.',
     actionLabel: 'Add wishlist',
   },
   {
     id: 'backup-exported',
     title: 'Export backup',
-    description: 'Save a local backup before moving between devices.',
+    description: 'Save a local backup.',
     actionLabel: 'Open backup',
   },
 ];
@@ -128,7 +128,7 @@ export function OnboardingChecklist({
   });
   const [rawgStatus, setRawgStatus] = useState<SetupStatus>({
     tone: 'idle',
-    message: 'RAWG settings are saved only on this device.',
+    message: 'Game info lookup is saved on this device.',
   });
 
   useEffect(() => {
@@ -141,7 +141,6 @@ export function OnboardingChecklist({
 
   const completedCount = onboardingItems.filter((item) => completedItemIds.has(item.id)).length;
   const remainingCount = onboardingItems.length - completedCount;
-  const progressPercent = Math.round((completedCount / onboardingItems.length) * 100);
   const remainingItems = useMemo(
     () => onboardingItems.filter((item) => !completedItemIds.has(item.id)),
     [completedItemIds],
@@ -205,15 +204,15 @@ export function OnboardingChecklist({
 
   async function testRawgConnection() {
     if (!rawgSettings.apiKey.trim()) {
-      setRawgStatus({ tone: 'error', message: 'Add your RAWG API key first.' });
+      setRawgStatus({ tone: 'error', message: 'Add your game info API key first.' });
       return;
     }
 
-    setRawgStatus({ tone: 'loading', message: 'Checking RAWG...' });
+    setRawgStatus({ tone: 'loading', message: 'Checking game info...' });
 
     try {
       await searchGameByName('Hades');
-      setRawgStatus({ tone: 'success', message: 'RAWG connected. Metadata search is ready.' });
+      setRawgStatus({ tone: 'success', message: 'Game info lookup is ready.' });
       onRawgApiKeyConfigured?.();
     } catch (error) {
       setRawgStatus({ tone: 'error', message: getFriendlyRawgError(error) });
@@ -226,17 +225,9 @@ export function OnboardingChecklist({
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Setup assistant</div>
           <h2 className="mt-1 text-lg font-semibold text-white">Set up QuestShelf</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-400">
-            {remainingCount === 0
-              ? 'Setup is complete. You can reopen this anytime.'
-              : `${remainingCount} steps left. Configure essentials here without leaving the app.`}
-          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <span className="grid h-10 place-items-center rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm text-slate-300">
-            {completedCount}/{onboardingItems.length}
-          </span>
           {onClose ? (
             <button
               className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
@@ -255,16 +246,6 @@ export function OnboardingChecklist({
               Skip
             </button>
           ) : null}
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-          <span>{progressPercent}% complete</span>
-          <span>{remainingCount} remaining</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink-950">
-          <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
 
@@ -299,7 +280,7 @@ export function OnboardingChecklist({
             onClick={() => setShowCompleted((currentValue) => !currentValue)}
             type="button"
           >
-            <span>Completed ({completedItems.length})</span>
+            <span>Completed</span>
             <span className="text-xs font-medium text-mint">{showCompleted ? 'Hide completed' : 'Show completed'}</span>
           </button>
 
@@ -437,12 +418,12 @@ function InlineRawgSetup({
   return (
     <section className="mt-4 rounded-md border border-mint/25 bg-mint/10 p-3">
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">RAWG API key</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Game info API key</span>
         <input
           className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
           value={settings.apiKey}
           onChange={(event) => onKeyChange(event.target.value)}
-          placeholder="Paste RAWG API key"
+          placeholder="Paste Game info API key"
           spellCheck={false}
           type="password"
         />
@@ -499,17 +480,17 @@ function getFriendlySteamError(error: unknown) {
 function getFriendlyRawgError(error: unknown) {
   if (error instanceof RawgApiError) {
     if (error.code === 'missing-api-key') {
-      return 'Add your RAWG API key first.';
+      return 'Add your game info API key first.';
     }
 
     if (error.code === 'rate-limit') {
-      return 'RAWG is busy right now. Try again later.';
+      return 'Game info lookup is busy. Try again later.';
     }
 
     if (error.code === 'invalid-api-key') {
-      return 'RAWG did not accept this API key.';
+      return 'Game info lookup did not accept this API key.';
     }
   }
 
-  return 'RAWG could not be reached. Check the key and connection.';
+  return 'Game info lookup could not be reached. Check the key and connection.';
 }

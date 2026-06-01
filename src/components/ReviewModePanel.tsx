@@ -46,7 +46,7 @@ const primaryActions: Array<{
 
 const secondaryActions: Array<{ action: ReviewModeAction; label: string }> = [
   { action: 'open-details', label: 'View Details' },
-  { action: 'enrich', label: 'Enrich Metadata' },
+  { action: 'enrich', label: 'Find info' },
   { action: 'note', label: 'Add Note' },
 ];
 
@@ -215,9 +215,6 @@ export function ReviewModePanel({
               <span className="rounded-md border border-mint/25 bg-mint/10 px-2.5 py-1 text-sm font-semibold text-mint">
                 {progressLabel}
               </span>
-              {reviewQueue.length > 0 ? (
-                <span className="text-sm text-slate-500">{reviewQueue.length} remaining</span>
-              ) : null}
             </div>
           </div>
 
@@ -342,7 +339,7 @@ function FocusedReviewCard({
   return (
     <article className="qs-review-stage grid min-h-full gap-4 xl:grid-cols-[minmax(260px,42vh)_minmax(0,1fr)]">
       <div className="qs-review-cover overflow-hidden rounded-lg border border-white/10 bg-ink-900 shadow-panel">
-        <div className="aspect-[2/3] h-full max-h-[min(72dvh,680px)] min-h-[360px]">
+        <div className="aspect-[2/3] h-full max-h-[min(58dvh,560px)] min-h-[260px]">
           {activeCoverSource ? (
             <div className="relative h-full">
               {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
@@ -405,7 +402,7 @@ function FocusedReviewCard({
         {isQueuePickerOpen ? (
           <section className="rounded-lg border border-mint/25 bg-mint/10 p-3">
             <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold text-white">Choose Platform Queue</h4>
+              <h4 className="text-sm font-semibold text-white">Choose queue</h4>
               <button
                 className="min-h-10 rounded-md border border-white/10 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
                 onClick={onQueuePickerClose}
@@ -435,7 +432,7 @@ function FocusedReviewCard({
             onClick={onMoreToggle}
             type="button"
           >
-            More / Details
+            More
           </button>
 
           {isMoreOpen ? (
@@ -492,13 +489,10 @@ function ReviewComplete({
   onReviewAnother: () => void;
 }) {
   return (
-    <div className="grid min-h-full place-items-center rounded-lg border border-dashed border-white/15 bg-ink-900/70 p-6 text-center">
+    <div className="grid min-h-40 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-900/70 p-4 text-center">
       <div className="max-w-2xl">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
-        <p className="mt-3 text-sm leading-6 text-slate-400">
-          This batch has no more games to review. Choose another batch or jump back to planning.
-        </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"

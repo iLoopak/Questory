@@ -112,7 +112,7 @@ export function MetadataEnrichmentPanel({
   async function enrichGame(game: Game, openManualPickerForLowConfidence: boolean) {
     setGameState(game.id, {
       status: 'searching',
-      message: 'Searching RAWG...',
+      message: 'Searching...',
     });
 
     const cachedMetadata = getCachedRawgMetadata(game.title);
@@ -121,7 +121,7 @@ export function MetadataEnrichmentPanel({
       onMetadataUpdate(game.id, cachedMetadata.metadata);
       setGameState(game.id, {
         status: 'cached',
-        message: `Used cached RAWG match #${cachedMetadata.rawgId}.`,
+        message: `Used cached match #${cachedMetadata.rawgId}.`,
       });
       return 'enriched';
     }
@@ -151,7 +151,7 @@ export function MetadataEnrichmentPanel({
 
       setGameState(game.id, {
         status: 'needs-review',
-        message: matches.length > 0 ? 'Needs manual match selection.' : 'No RAWG matches found.',
+        message: matches.length > 0 ? 'Needs manual match selection.' : 'No matches found.',
         matches,
       });
 
@@ -164,7 +164,7 @@ export function MetadataEnrichmentPanel({
       const message =
         error instanceof RawgApiError
           ? error.message
-          : 'RAWG enrichment failed. Check the API key and network access.';
+          : 'Game info lookup failed. Check the API key and network access.';
       const status = error instanceof RawgApiError && error.code === 'rate-limit' ? 'rate-limited' : 'error';
 
       setGameState(game.id, {
@@ -285,10 +285,7 @@ export function MetadataEnrichmentPanel({
         <div className="border-b border-skyglass/15 bg-ink-950/70 p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-white">Metadata Enrichment</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {missingMetadataGames.length} games are missing RAWG metadata. {enrichedCount} already enriched.
-              </p>
+              <h2 className="text-xl font-semibold text-white">Game info</h2>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -298,7 +295,7 @@ export function MetadataEnrichmentPanel({
                 onClick={() => void runQueue(queueableGames)}
                 type="button"
               >
-                Enrich all
+                Find all
               </button>
               <button
                 className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
@@ -306,7 +303,7 @@ export function MetadataEnrichmentPanel({
                 onClick={() => void runQueue(selectedQueueableGames)}
                 type="button"
               >
-                Enrich selected
+                Find selected
               </button>
               <button
                 className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
@@ -316,7 +313,7 @@ export function MetadataEnrichmentPanel({
                 }}
                 type="button"
               >
-                Stop enrichment
+                Stop
               </button>
             </div>
           </div>
@@ -340,7 +337,7 @@ export function MetadataEnrichmentPanel({
 
           {!isQueueRunning && reviewGames.length > 0 ? (
             <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
-              {reviewGames.length} games need review. Suggested matches can be accepted below or opened for a different match.
+              {reviewGames.length} need review.
             </div>
           ) : null}
         </div>
@@ -366,11 +363,11 @@ export function MetadataEnrichmentPanel({
               ))}
             </div>
           ) : (
-            <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-8 text-center">
+            <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
               <div>
-                <h3 className="text-lg font-semibold text-white">Metadata is complete</h3>
+                <h3 className="text-lg font-semibold text-white">Game info is complete</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-                  Every local game currently has RAWG metadata attached.
+                  Every local game has info attached.
                 </p>
               </div>
             </div>
@@ -621,7 +618,7 @@ function getDisplayStatus(game: Game, state?: EnrichmentState) {
     return { label: 'skipped' };
   }
 
-  return { label: 'missing RAWG metadata' };
+  return { label: 'missing info' };
 }
 
 function getYearLabel(value: string | null) {
