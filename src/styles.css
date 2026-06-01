@@ -201,12 +201,53 @@ img {
 }
 
 .qs-review-stage {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.42fr) minmax(18rem, 1.15fr) minmax(8rem, 0.42fr);
   align-items: center;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.qs-review-hero {
+  justify-self: center;
+  width: min(100%, 54vh, 34rem);
 }
 
 .qs-review-cover {
-  justify-self: center;
-  width: min(100%, 42vh);
+  width: 100%;
+  max-height: min(68dvh, 680px);
+}
+
+.qs-review-zone {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  border: 1px solid rgba(143, 180, 202, 0.1);
+  border-radius: 1.25rem;
+  padding: clamp(0.75rem, 1.6vw, 1rem);
+}
+
+.qs-review-zone-negative {
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.12), rgba(248, 113, 113, 0.03) 58%, transparent);
+}
+
+.qs-review-zone-positive {
+  background: linear-gradient(270deg, rgba(34, 243, 223, 0.14), rgba(34, 243, 223, 0.04) 58%, transparent);
+}
+
+.qs-review-zone-label {
+  margin-bottom: 0.75rem;
+  color: #8aa1b5;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.qs-review-action-side {
+  min-width: 0;
 }
 
 .qs-queue-shell {
@@ -256,6 +297,21 @@ img {
 
 .qs-logo-glow {
   filter: drop-shadow(0 0 12px rgba(34, 243, 223, 0.34));
+}
+
+@media (max-width: 760px) {
+  .qs-review-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .qs-review-hero {
+    order: -1;
+    width: min(100%, 24rem);
+  }
+
+  .qs-review-zone {
+    justify-content: stretch;
+  }
 }
 
 @media (pointer: coarse) {
@@ -322,11 +378,32 @@ img {
   }
 
   .qs-review-stage {
-    grid-template-columns: minmax(180px, 34vw) minmax(0, 1fr);
+    grid-template-columns: minmax(7.5rem, 0.48fr) minmax(15rem, 1fr) minmax(7.5rem, 0.48fr);
+    gap: 0.6rem;
+  }
+
+  .qs-review-hero {
+    width: min(100%, 44vw, 21rem);
   }
 
   .qs-review-cover {
-    width: min(100%, 34vw);
+    max-height: calc(100dvh - 8.5rem);
+  }
+
+  .qs-review-zone {
+    padding: 0.6rem;
+  }
+
+  .qs-review-action-side {
+    min-height: 3.15rem;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.88rem;
+  }
+
+  .qs-review-zone-label,
+  .qs-gamepad-hints,
+  .qs-review-action-side span span:nth-child(2) {
+    display: none;
   }
 
   .qs-queue-shell {
