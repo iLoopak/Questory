@@ -10,7 +10,7 @@ type RawgSearchResponse = {
 export class RawgApiError extends Error {
   constructor(
     message: string,
-    public code: 'missing-api-key' | 'no-match' | 'api-failure' | 'rate-limit',
+    public code: 'missing-api-key' | 'invalid-api-key' | 'no-match' | 'api-failure' | 'rate-limit',
   ) {
     super(message);
     this.name = 'RawgApiError';
@@ -48,8 +48,12 @@ async function requestRawg<T>(path: string, params: Record<string, string> = {})
     throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
   }
 
+  if (response.status === 401 || response.status === 403) {
+    throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
+  }
+
   if (!response.ok) {
-    throw new RawgApiError(`RAWG request failed with status ${response.status}.`, 'api-failure');
+    throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
   }
 
   return (await response.json()) as T;
