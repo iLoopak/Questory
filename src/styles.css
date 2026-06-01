@@ -124,6 +124,19 @@ img {
   scrollbar-gutter: stable;
 }
 
+.qs-settings-shell {
+  min-height: min(680px, calc(100dvh - 116px));
+}
+
+.qs-settings-list {
+  max-height: min(420px, calc(100dvh - 190px));
+  overflow-y: auto;
+}
+
+.qs-settings-back {
+  align-self: stretch;
+}
+
 .qs-modal-panel {
   margin:
     max(0px, var(--qs-safe-top))
@@ -215,6 +228,17 @@ img {
     max-height: none;
   }
 
+  .qs-settings-list {
+    max-height: none;
+  }
+
+  .qs-settings-detail {
+    max-height: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .qs-settings-list,
   .qs-settings-detail {
     max-height: none;
   }

@@ -38,12 +38,21 @@ import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummar
 
 const navItems = ['Library', 'Wishlist', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
 type NavItem = (typeof navItems)[number];
-const settingsCategories = ['Integrations', 'Library', 'Retro', 'Data', 'Appearance', 'About'] as const;
+const settingsCategories = [
+  'Integrations',
+  'Library',
+  'Wishlist',
+  'Retro',
+  'Appearance',
+  'Data & Backup',
+  'About',
+] as const;
 type SettingsCategory = (typeof settingsCategories)[number];
 
 const allOption = 'All';
 const questShelfIcon = '/icons/questshelf-icon.svg';
 const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
+const settingsCategoryStorageKey = 'questshelf.settingsCategory.v1';
 const wishlistFiltersStorageKey = 'questshelf.wishlistFilters.v1';
 const sourceFilterOptions = ['All', 'Steam', 'Manual', 'Wishlist', 'Retro / future-ready'] as const;
 const enrichmentFilterOptions = ['All', 'RAWG enriched', 'Missing metadata', 'Manual metadata'] as const;
@@ -117,7 +126,7 @@ function App() {
     loadCollectionFilters(wishlistFiltersStorageKey),
   );
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
-  const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>('Integrations');
+  const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -244,6 +253,10 @@ function App() {
     saveLandscapeLockPreference(isLandscapeLockEnabled);
     window.dispatchEvent(new CustomEvent('questshelf:landscape-lock-change', { detail: isLandscapeLockEnabled }));
   }, [isLandscapeLockEnabled]);
+
+  useEffect(() => {
+    saveSettingsCategory(activeSettingsCategory);
+  }, [activeSettingsCategory]);
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
@@ -906,7 +919,9 @@ function App() {
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               isOnboardingOpen={isOnboardingOpen}
               lastRetroImportsHiddenByFilters={areLastRetroImportsHiddenByFilters}
+              libraryCount={libraryGames.length}
               runtimeEnvironment={runtimeEnvironment}
+              wishlistCount={wishlistGames.length}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -1718,7 +1733,9 @@ type SettingsPanelProps = {
   isLandscapeLockEnabled: boolean;
   isOnboardingOpen: boolean;
   lastRetroImportsHiddenByFilters: boolean;
+  libraryCount: number;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  wishlistCount: number;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -1751,7 +1768,9 @@ function SettingsPanel({
   isLandscapeLockEnabled,
   isOnboardingOpen,
   lastRetroImportsHiddenByFilters,
+  libraryCount,
   runtimeEnvironment,
+  wishlistCount,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -1773,35 +1792,74 @@ function SettingsPanel({
   onUnignoreSteamGame,
   onViewRetroImportedGames,
 }: SettingsPanelProps) {
+  const [isCategoryListOpen, setIsCategoryListOpen] = useState(false);
+  const activeCategoryMeta = getSettingsCategoryMeta(activeCategory);
+
+  function selectCategory(category: SettingsCategory) {
+    onCategoryChange(category);
+    setIsCategoryListOpen(false);
+  }
+
   return (
     <section className="qs-settings-shell min-w-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900/45 lg:h-[calc(100vh-116px)]">
-      <div className="grid h-full min-h-0 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="border-b border-skyglass/15 bg-ink-950/70 p-3 lg:border-b-0 lg:border-r">
+      <div className="border-b border-skyglass/15 bg-ink-950/80 px-3 py-3 sm:px-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Settings</div>
+            <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-slate-400">
+              <span>Settings</span>
+              <span className="text-slate-600">/</span>
+              <span className="truncate font-semibold text-white">{activeCategoryMeta.label}</span>
+            </div>
+          </div>
+          <button
+            className="qs-settings-back h-11 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white lg:hidden"
+            onClick={() => setIsCategoryListOpen((currentValue) => !currentValue)}
+            type="button"
+          >
+            {isCategoryListOpen ? 'Show detail' : 'Back to categories'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid h-full min-h-0 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside
+          className={`qs-settings-list border-b border-skyglass/15 bg-ink-950/70 p-3 lg:block lg:border-b-0 lg:border-r ${
+            isCategoryListOpen ? 'block' : 'hidden'
+          }`}
+        >
           <div className="mb-3 px-1">
             <h2 className="text-lg font-semibold text-white">Settings</h2>
-            <p className="mt-1 text-sm text-slate-400">Grouped for quick handheld setup.</p>
+            <p className="mt-1 text-sm text-slate-400">Pick a section, adjust, return fast.</p>
           </div>
-          <nav className="qs-settings-tabs flex gap-2 overflow-x-auto lg:grid lg:overflow-visible">
+          <nav className="qs-settings-tabs grid gap-2">
             {settingsCategories.map((category) => (
-              <button
+              <SettingsCategoryButton
                 key={category}
-                className={`min-h-11 shrink-0 rounded-md border px-3 text-left text-sm font-semibold transition ${
-                  category === activeCategory
-                    ? 'border-mint/40 bg-mint text-ink-950 shadow-glow'
-                    : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
-                }`}
-                onClick={() => onCategoryChange(category)}
-                type="button"
-              >
-                {category}
-              </button>
+                category={category}
+                isActive={category === activeCategory}
+                onSelect={selectCategory}
+              />
             ))}
           </nav>
         </aside>
 
-        <div className="qs-settings-detail min-h-0 overflow-y-auto p-3 sm:p-4">
+        <div className={`qs-settings-detail min-h-0 overflow-y-auto p-3 sm:p-4 ${isCategoryListOpen ? 'hidden lg:block' : 'block'}`}>
+          <header className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-mint/25 bg-mint/10 text-mint">
+                <SettingsCategoryIcon category={activeCategory} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold text-white">{activeCategoryMeta.label}</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-400">{activeCategoryMeta.description}</p>
+              </div>
+            </div>
+          </header>
+
           {activeCategory === 'Integrations' ? (
             <div className="space-y-4">
+              <FutureProvidersPanel />
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
               <SteamSettingsPanel
                 games={games}
@@ -1818,36 +1876,33 @@ function SettingsPanel({
 
           {activeCategory === 'Library' ? (
             <div className="space-y-4">
+              <LibrarySettingsSummary libraryCount={libraryCount} />
               <DemoDataPanel
                 demoGameCount={demoGameCount}
                 onLoadDemoData={onLoadDemoData}
                 onRemoveDemoGames={onRemoveDemoGames}
               />
-              <OnboardingSettingsPanel onOpenOnboarding={onOpenOnboarding} />
-              {isOnboardingOpen ? (
-                <OnboardingChecklist
-                  completedItemIds={completedOnboardingItemIds}
-                  isSettingsPanel
-                  onAction={onOnboardingAction}
-                  onClose={onOnboardingClose}
-                />
-              ) : null}
             </div>
           ) : null}
 
+          {activeCategory === 'Wishlist' ? <WishlistSettingsPanel wishlistCount={wishlistCount} /> : null}
+
           {activeCategory === 'Retro' ? (
-            <RetroImportPanel
-              games={games}
-              importedGamesHiddenByFilters={lastRetroImportsHiddenByFilters}
-              onAddImportedToQueue={onAddRetroImportedToQueue}
-              onClearLibraryFilters={onClearLibraryFilters}
-              onEnrichImportedGames={onEnrichRetroImportedGames}
-              onImportGames={onImportRetroGames}
-              onViewImportedGames={onViewRetroImportedGames}
-            />
+            <div className="space-y-4">
+              <RetroSettingsPlaceholders />
+              <RetroImportPanel
+                games={games}
+                importedGamesHiddenByFilters={lastRetroImportsHiddenByFilters}
+                onAddImportedToQueue={onAddRetroImportedToQueue}
+                onClearLibraryFilters={onClearLibraryFilters}
+                onEnrichImportedGames={onEnrichRetroImportedGames}
+                onImportGames={onImportRetroGames}
+                onViewImportedGames={onViewRetroImportedGames}
+              />
+            </div>
           ) : null}
 
-          {activeCategory === 'Data' ? (
+          {activeCategory === 'Data & Backup' ? (
             <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
           ) : null}
 
@@ -1859,10 +1914,252 @@ function SettingsPanel({
             />
           ) : null}
 
-          {activeCategory === 'About' ? <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} /> : null}
+          {activeCategory === 'About' ? (
+            <div className="space-y-4">
+              <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} />
+              <OnboardingSettingsPanel onOpenOnboarding={onOpenOnboarding} />
+              {isOnboardingOpen ? (
+                <OnboardingChecklist
+                  completedItemIds={completedOnboardingItemIds}
+                  isSettingsPanel
+                  onAction={onOnboardingAction}
+                  onClose={onOnboardingClose}
+                />
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
+  );
+}
+
+function SettingsCategoryButton({
+  category,
+  isActive,
+  onSelect,
+}: {
+  category: SettingsCategory;
+  isActive: boolean;
+  onSelect: (category: SettingsCategory) => void;
+}) {
+  const meta = getSettingsCategoryMeta(category);
+
+  return (
+    <button
+      aria-current={isActive ? 'page' : undefined}
+      className={`grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-2 text-left transition ${
+        isActive
+          ? 'border-mint/50 bg-mint/15 text-white shadow-glow'
+          : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
+      }`}
+      onClick={() => onSelect(category)}
+      type="button"
+    >
+      <span
+        className={`grid h-10 w-10 place-items-center rounded-md border ${
+          isActive ? 'border-mint/40 bg-mint text-ink-950' : 'border-skyglass/15 bg-ink-950 text-mint'
+        }`}
+      >
+        <SettingsCategoryIcon category={category} />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{meta.label}</span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500">{meta.shortDescription}</span>
+      </span>
+      <span className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-mint shadow-glow' : 'bg-slate-700'}`} />
+    </button>
+  );
+}
+
+function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
+  const commonProps = {
+    className: 'h-5 w-5',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 2,
+    viewBox: '0 0 24 24',
+  };
+
+  if (category === 'Integrations') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M7 7h4v4H7z" />
+        <path d="M13 13h4v4h-4z" />
+        <path d="M11 9h4a2 2 0 0 1 2 2v2" />
+        <path d="M13 15H9a2 2 0 0 1-2-2v-2" />
+      </svg>
+    );
+  }
+
+  if (category === 'Library') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M5 4h4v16H5z" />
+        <path d="M10 4h4v16h-4z" />
+        <path d="M15 5l4 1v14l-4-1z" />
+      </svg>
+    );
+  }
+
+  if (category === 'Wishlist') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
+      </svg>
+    );
+  }
+
+  if (category === 'Retro') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M7 9h10a4 4 0 0 1 4 4v2a3 3 0 0 1-5.4 1.8L14 15h-4l-1.6 1.8A3 3 0 0 1 3 15v-2a4 4 0 0 1 4-4z" />
+        <path d="M8 12v3" />
+        <path d="M6.5 13.5h3" />
+        <path d="M16.5 13h.01" />
+        <path d="M18.5 15h.01" />
+      </svg>
+    );
+  }
+
+  if (category === 'Appearance') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M12 3a9 9 0 1 0 9 9 4.5 4.5 0 0 1-9-9z" />
+      </svg>
+    );
+  }
+
+  if (category === 'Data & Backup') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z" />
+        <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+        <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 17v-5" />
+      <path d="M12 8h.01" />
+    </svg>
+  );
+}
+
+function getSettingsCategoryMeta(category: SettingsCategory) {
+  const meta: Record<
+    SettingsCategory,
+    {
+      description: string;
+      label: string;
+      shortDescription: string;
+    }
+  > = {
+    Integrations: {
+      description: 'Connect local credentials and import helpers for Steam, RAWG, and future providers.',
+      label: 'Integrations',
+      shortDescription: 'Steam, RAWG, providers',
+    },
+    Library: {
+      description: 'Manage local library data, demo content, and library-specific defaults.',
+      label: 'Library',
+      shortDescription: 'Owned games and demos',
+    },
+    Wishlist: {
+      description: 'Tune wishlist behavior, planning defaults, and future wishlist integrations.',
+      label: 'Wishlist',
+      shortDescription: 'Planning and priorities',
+    },
+    Retro: {
+      description: 'Import ROM entries, review platform preferences, and prepare emulator settings.',
+      label: 'Retro',
+      shortDescription: 'ROM import and platforms',
+    },
+    Appearance: {
+      description: 'Adjust handheld presentation, landscape preference, theme, language, and UI behavior.',
+      label: 'Appearance',
+      shortDescription: 'Theme and UI feel',
+    },
+    'Data & Backup': {
+      description: 'Export, restore, import, reset, and sync QuestShelf data without a backend.',
+      label: 'Data & Backup',
+      shortDescription: 'Backup, restore, sync',
+    },
+    About: {
+      description: 'View version, credits, debug information, and onboarding controls.',
+      label: 'About',
+      shortDescription: 'Version and debug',
+    },
+  };
+
+  return meta[category];
+}
+
+function FutureProvidersPanel() {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <h2 className="text-xl font-semibold text-white">Providers</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <SettingsMiniCard title="Steam" value="Configured locally" />
+        <SettingsMiniCard title="RAWG" value="Metadata only" />
+        <SettingsMiniCard title="Future" value="Ready for providers" />
+      </div>
+    </section>
+  );
+}
+
+function LibrarySettingsSummary({ libraryCount }: { libraryCount: number }) {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <h2 className="text-xl font-semibold text-white">Library</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <SettingsMiniCard title="Local library" value={`${libraryCount} games`} />
+        <SettingsMiniCard title="Default collection" value="Library" />
+      </div>
+    </section>
+  );
+}
+
+function WishlistSettingsPanel({ wishlistCount }: { wishlistCount: number }) {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <h2 className="text-xl font-semibold text-white">Wishlist</h2>
+      <p className="mt-1 text-sm leading-6 text-slate-400">
+        Wishlist entries stay separate from owned Library games and are tuned for lightweight planning on handhelds.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <SettingsMiniCard title="Wishlist items" value={wishlistCount.toString()} />
+        <SettingsMiniCard title="Priority levels" value="Low / Medium / High" />
+        <SettingsMiniCard title="Steam wishlist" value="Available from Wishlist" />
+      </div>
+    </section>
+  );
+}
+
+function RetroSettingsPlaceholders() {
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <h2 className="text-xl font-semibold text-white">Retro preferences</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <SettingsMiniCard title="ROM import" value="Local files" />
+        <SettingsMiniCard title="Emulators" value="Placeholder" />
+        <SettingsMiniCard title="Platforms" value="Auto-detect ready" />
+      </div>
+    </section>
+  );
+}
+
+function SettingsMiniCard({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-skyglass/15 bg-ink-950/80 p-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-white">{value}</div>
+    </div>
   );
 }
 
@@ -1943,6 +2240,12 @@ function AppearanceSettingsPanel({
           </span>
         </span>
       </label>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <SettingsMiniCard title="Theme" value="QuestShelf dark" />
+        <SettingsMiniCard title="Language" value="System default" />
+        <SettingsMiniCard title="Focus style" value="Gamepad visible" />
+      </div>
     </section>
   );
 }
@@ -1951,7 +2254,8 @@ function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: Return
   return (
     <section className="qs-glass rounded-lg border p-4">
       <h2 className="text-xl font-semibold text-white">About QuestShelf</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        <Stat label="Version" value="0.1.0" />
         <Stat label="Runtime" value={runtimeEnvironment.isNative ? 'Native' : 'Web'} />
         <Stat label="Platform" value={runtimeEnvironment.platform} />
         <Stat label="Storage" value="Local" />
@@ -1960,6 +2264,10 @@ function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: Return
         QuestShelf is a local-first game shelf for library tracking, wishlist planning, metadata enrichment, and portable
         backups. No backend or account is required.
       </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <SettingsMiniCard title="Credits" value="Built for handheld libraries" />
+        <SettingsMiniCard title="Debug info" value="Local runtime only" />
+      </div>
     </section>
   );
 }
@@ -2316,6 +2624,32 @@ function saveCollectionFilters(storageKey: string, filters: CollectionFilters) {
     window.localStorage.setItem(storageKey, JSON.stringify(filters));
   } catch {
     // Filter persistence is nice to have; the library itself still works without it.
+  }
+}
+
+function loadSettingsCategory(): SettingsCategory {
+  if (typeof window === 'undefined') {
+    return 'Integrations';
+  }
+
+  try {
+    const storedCategory = window.localStorage.getItem(settingsCategoryStorageKey);
+
+    if (storedCategory === 'Data') {
+      return 'Data & Backup';
+    }
+
+    return isOption(storedCategory, settingsCategories) ? storedCategory : 'Integrations';
+  } catch {
+    return 'Integrations';
+  }
+}
+
+function saveSettingsCategory(category: SettingsCategory) {
+  try {
+    window.localStorage.setItem(settingsCategoryStorageKey, category);
+  } catch {
+    // Settings navigation should stay usable even when preference persistence is unavailable.
   }
 }
 
