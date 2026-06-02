@@ -6,10 +6,12 @@ import { gameStatuses } from '../types/game';
 
 type GameCardProps = {
   game: Game;
+  highlightLabel?: string;
   isMultiSelectMode?: boolean;
+  onAddToQueue?: (game: Game) => void;
   isSelected?: boolean;
   onAddToWishlist?: (game: Game) => void;
-  onFindMetadata: (game: Game) => void;
+  onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
   onRemove: (gameId: string) => void;
@@ -20,8 +22,10 @@ type GameCardProps = {
 
 export function GameCard({
   game,
+  highlightLabel,
   isMultiSelectMode = false,
   isSelected = false,
+  onAddToQueue,
   onAddToWishlist,
   onFindMetadata,
   onMoveToLibrary,
@@ -98,12 +102,18 @@ export function GameCard({
       aria-selected={isMultiSelectMode ? isSelected : undefined}
       className={`qs-game-card qs-glass relative flex h-full min-h-[290px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[320px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
-      } ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
+      } ${highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : ''} ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
       role="button"
       tabIndex={0}
     >
+      {highlightLabel ? (
+        <div className="absolute right-3 top-3 z-10 rounded-full border border-amber-300/40 bg-amber-300 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-glow">
+          {highlightLabel}
+        </div>
+      ) : null}
+
       {isMultiSelectMode ? (
         <div className="absolute left-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full border border-mint/40 bg-ink-950/90 shadow-glow">
           <input
@@ -210,6 +220,15 @@ export function GameCard({
               </button>
               {isActionMenuOpen ? (
                 <div className="absolute bottom-11 right-0 z-20 w-48 overflow-hidden rounded-md border border-skyglass/15 bg-ink-950 shadow-panel">
+                  {onAddToQueue ? (
+                    <ActionMenuButton
+                      label="Add to Queue"
+                      onClick={() => {
+                        onAddToQueue(game);
+                        setIsActionMenuOpen(false);
+                      }}
+                    />
+                  ) : null}
                   {game.collectionType === 'wishlist' ? (
                     <ActionMenuButton
                       label="Move to Library"
@@ -227,13 +246,15 @@ export function GameCard({
                       }}
                     />
                   )}
-                  <ActionMenuButton
-                    label="Find info"
-                    onClick={() => {
-                      onFindMetadata(game);
-                      setIsActionMenuOpen(false);
-                    }}
-                  />
+                  {onFindMetadata ? (
+                    <ActionMenuButton
+                      label="Find info"
+                      onClick={() => {
+                        onFindMetadata(game);
+                        setIsActionMenuOpen(false);
+                      }}
+                    />
+                  ) : null}
                   {game.storeUrl || game.externalUrl ? (
                     <ActionMenuLink label="Open Steam store" url={game.storeUrl ?? game.externalUrl ?? ''} />
                   ) : null}
@@ -247,8 +268,18 @@ export function GameCard({
                   />
                   {game.collectionType === 'library' ? (
                     <ActionMenuButton
+                      label="Drop"
+                      onClick={() => {
+                        onStatusChange(game.id, 'Dropped');
+                        setIsActionMenuOpen(false);
+                      }}
+                      tone="danger"
+                    />
+                  ) : null}
+                  {game.collectionType === 'library' ? (
+                    <ActionMenuButton
                       disabled={typeof game.steamAppId !== 'number'}
-                      label="Remove and ignore"
+                      label="Ignore"
                       onClick={() => {
                         onRemoveAndIgnore(game);
                         setIsActionMenuOpen(false);

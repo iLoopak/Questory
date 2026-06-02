@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { FormEvent } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { BackToTopButton } from './components/BackToTopButton';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { CollectionToolbar } from './components/CollectionToolbar';
-import { GameCard } from './components/GameCard';
+import { CollectionGrid, CollectionList, CollectionShelf } from './components/CollectionViews';
 import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
@@ -20,7 +20,7 @@ import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
-import { getGameCoverSources, hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
+import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
   loadOnboardingState,
@@ -137,8 +137,6 @@ const librarySortOptions = [
 ] as const;
 const quickFilterOptions = ['Playing', 'Paused', 'Backlog / Want to play', 'Missing info', 'Played > 0h'] as const;
 const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
-const shelfInitialRenderCount = 72;
-const shelfRenderBatchSize = 48;
 
 type SourceFilter = (typeof sourceFilterOptions)[number];
 type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
@@ -1420,6 +1418,7 @@ function App() {
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
+              onAddToQueue={(game) => addGameToQueue(game, game.platform)}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
@@ -1445,6 +1444,7 @@ function App() {
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
+              onAddToQueue={(game) => addGameToQueue(game, game.platform)}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
@@ -1521,6 +1521,11 @@ function App() {
               }}
               onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
+              onAddToQueue={(game) => addGameToQueue(game, game.platform)}
+              onAddToWishlist={addToWishlist}
+              onMoveToLibrary={moveToLibrary}
+              onRemove={removeGame}
+              onRemoveAndIgnore={removeAndIgnoreSteamGame}
             />
           ) : activeNavItem === 'Stats' ? (
             <StatsPanel
@@ -1801,6 +1806,7 @@ type CollectionPanelProps = {
   onAddGame: () => void;
   onAddToWishlist: (game: Game) => void;
   onAddManyToWishlist: (games: Game[]) => void;
+  onAddToQueue: (game: Game) => void;
   onBulkEnrich: (gameIds: string[]) => void;
   onBulkRemove: (gameIds: string[]) => void;
   onBulkRemoveAndIgnore: (games: Game[]) => void;
@@ -1827,6 +1833,7 @@ function CollectionPanel({
   onAddGame,
   onAddToWishlist,
   onAddManyToWishlist,
+  onAddToQueue,
   onBulkEnrich,
   onBulkRemove,
   onBulkRemoveAndIgnore,
@@ -1847,11 +1854,8 @@ function CollectionPanel({
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
-  const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const activeViewModeCollectionRef = useRef(collectionType);
-  const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
-  const shelfCardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
   const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
   const emptyText =
@@ -1864,8 +1868,6 @@ function CollectionPanel({
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
-  const renderedShelfGames = games.slice(0, shelfRenderCount);
-  const hasMoreShelfGames = shelfRenderCount < games.length;
 
   useEffect(() => {
     saveCollectionViewMode(activeViewModeCollectionRef.current, viewMode);
@@ -1876,10 +1878,6 @@ function CollectionPanel({
     setViewMode(loadCollectionViewMode(collectionType));
   }, [collectionType]);
 
-  useEffect(() => {
-    setShelfRenderCount(shelfInitialRenderCount);
-    shelfCardRefs.current = [];
-  }, [filters, games.length, viewMode]);
 
   useEffect(() => {
     setSelectedGameIds((currentSelection) => {
@@ -2024,78 +2022,6 @@ function CollectionPanel({
     onBulkEnrich(selectedGames.map((game) => game.id));
   }
 
-  function loadMoreShelfGames() {
-    setShelfRenderCount((currentCount) => Math.min(games.length, currentCount + shelfRenderBatchSize));
-  }
-
-  function handleShelfScroll() {
-    const scroller = shelfScrollerRef.current;
-
-    if (!scroller || !hasMoreShelfGames) {
-      return;
-    }
-
-    if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 640) {
-      loadMoreShelfGames();
-    }
-  }
-
-  function focusShelfCard(index: number) {
-    const targetCard = shelfCardRefs.current[index];
-
-    if (!targetCard) {
-      return;
-    }
-
-    targetCard.focus({ preventScroll: true });
-    targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
-
-  function handleShelfKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, index: number, game: Game) {
-    if (event.key === 'ArrowRight' || event.key === 'DPadRight') {
-      event.preventDefault();
-
-      if (index + 1 >= renderedShelfGames.length && hasMoreShelfGames) {
-        loadMoreShelfGames();
-        window.setTimeout(() => focusShelfCard(Math.min(index + 1, games.length - 1)), 0);
-        return;
-      }
-
-      if (index >= renderedShelfGames.length - 8 && hasMoreShelfGames) {
-        loadMoreShelfGames();
-      }
-
-      focusShelfCard(Math.min(index + 1, games.length - 1));
-      return;
-    }
-
-    if (event.key === 'ArrowLeft' || event.key === 'DPadLeft') {
-      event.preventDefault();
-      focusShelfCard(Math.max(index - 1, 0));
-      return;
-    }
-
-    if (event.key === 'ArrowDown' || event.key === 'DPadDown') {
-      event.preventDefault();
-      focusShelfCard(Math.min(index + 4, games.length - 1));
-      return;
-    }
-
-    if (event.key === 'ArrowUp' || event.key === 'DPadUp') {
-      event.preventDefault();
-      focusShelfCard(Math.max(index - 4, 0));
-      return;
-    }
-
-    if (event.key === 'a' || event.key === 'A' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      if (isMultiSelectMode) {
-        toggleSelectedGame(game.id);
-      } else {
-        onOpenDetails(game.id);
-      }
-    }
-  }
 
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
@@ -2356,73 +2282,42 @@ function CollectionPanel({
 
       {games.length > 0 ? (
         viewMode === 'Shelf View' ? (
-          <div>
-            <div
-              ref={shelfScrollerRef}
-              aria-label={`${title} shelf`}
-              className="qs-shelf-scroller -mx-2 flex snap-x gap-2 overflow-x-auto px-2 pb-3 pt-1 sm:-mx-3 sm:px-3"
-              onScroll={handleShelfScroll}
-            >
-              {renderedShelfGames.map((game, index) => (
-                <ShelfGameCard
-                  key={game.id}
-                  refCallback={(element) => {
-                    shelfCardRefs.current[index] = element;
-                  }}
-                  game={game}
-                  index={index}
-                  isMultiSelectMode={isMultiSelectMode}
-                  isSelected={selectedGameIds.has(game.id)}
-                  onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
-                  onOpenDetails={() => onOpenDetails(game.id)}
-                  onToggleSelected={() => toggleSelectedGame(game.id)}
-                />
-              ))}
-              {hasMoreShelfGames ? (
-                <button
-                  className="qs-shelf-card grid min-h-[22rem] w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center place-items-center rounded-xl border border-dashed border-skyglass/25 bg-ink-950/70 p-4 text-center text-sm font-semibold text-slate-300 transition hover:border-mint/40 hover:bg-mint/10 hover:text-white"
-                  onClick={loadMoreShelfGames}
-                  type="button"
-                >
-                  Load more covers
-                  <span className="mt-2 block text-xs font-medium text-slate-500">{games.length - renderedShelfGames.length} still hidden for performance</span>
-                </button>
-              ) : null}
-            </div>
-            <p className="text-xs text-slate-500">Use D-pad / arrow keys to move across covers. Press A or Enter to open.</p>
-          </div>
+          <CollectionShelf
+            games={games}
+            isMultiSelectMode={isMultiSelectMode}
+            selectedGameIds={selectedGameIds}
+            onOpenDetails={onOpenDetails}
+            onToggleSelected={toggleSelectedGame}
+          />
         ) : viewMode === 'Compact View' ? (
-          <div className="grid gap-2">
-            {games.map((game) => (
-              <CompactGameRow
-                key={game.id}
-                game={game}
-                isMultiSelectMode={isMultiSelectMode}
-                isSelected={selectedGameIds.has(game.id)}
-                onOpenDetails={() => onOpenDetails(game.id)}
-                onToggleSelected={() => toggleSelectedGame(game.id)}
-              />
-            ))}
-          </div>
+          <CollectionList
+            games={games}
+            isMultiSelectMode={isMultiSelectMode}
+            selectedGameIds={selectedGameIds}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+            onToggleSelected={toggleSelectedGame}
+          />
         ) : (
-          <div className="qs-game-grid grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4">
-            {games.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                isMultiSelectMode={isMultiSelectMode}
-                isSelected={selectedGameIds.has(game.id)}
-                onAddToWishlist={onAddToWishlist}
-                onFindMetadata={onFindMetadata}
-                onMoveToLibrary={onMoveToLibrary}
-                onOpenDetails={() => onOpenDetails(game.id)}
-                onRemove={onRemove}
-                onRemoveAndIgnore={onRemoveAndIgnore}
-                onStatusChange={onStatusChange}
-                onToggleSelected={() => toggleSelectedGame(game.id)}
-              />
-            ))}
-          </div>
+          <CollectionGrid
+            games={games}
+            isMultiSelectMode={isMultiSelectMode}
+            selectedGameIds={selectedGameIds}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+            onToggleSelected={toggleSelectedGame}
+          />
         )
       ) : (
         <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
@@ -2433,166 +2328,6 @@ function CollectionPanel({
         </div>
       )}
     </section>
-  );
-}
-
-type ShelfGameCardProps = {
-  game: Game;
-  index: number;
-  isMultiSelectMode: boolean;
-  isSelected: boolean;
-  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
-  onOpenDetails: () => void;
-  onToggleSelected: () => void;
-  refCallback: (element: HTMLButtonElement | null) => void;
-};
-
-function ShelfGameCard({
-  game,
-  index,
-  isMultiSelectMode,
-  isSelected,
-  onKeyDown,
-  onOpenDetails,
-  onToggleSelected,
-  refCallback,
-}: ShelfGameCardProps) {
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const activeCoverSource = coverSources[coverSourceIndex];
-
-  useEffect(() => {
-    setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
-  }, [coverSources]);
-
-  return (
-    <button
-      ref={refCallback}
-      aria-label={`${isMultiSelectMode ? 'Select' : 'Open'} ${game.title}`}
-      aria-posinset={index + 1}
-      aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-shelf-card group relative flex flex-col w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
-        isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : 'border-skyglass/18'
-      }`}
-      onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
-      onKeyDown={onKeyDown}
-      type="button"
-    >
-      {isMultiSelectMode ? (
-        <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
-          {isSelected ? '✓' : ''}
-        </span>
-      ) : null}
-
-      <span className="relative block aspect-[3/4] overflow-hidden rounded-lg bg-ink-700">
-        {activeCoverSource ? (
-          <>
-            {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-            <img
-              alt=""
-              className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] ${
-                isCoverLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              decoding="async"
-              loading="lazy"
-              onError={() => {
-                setIsCoverLoaded(false);
-                setCoverSourceIndex((currentIndex) => currentIndex + 1);
-              }}
-              onLoad={() => setIsCoverLoaded(true)}
-              src={activeCoverSource}
-            />
-          </>
-        ) : (
-          <MissingCover title={game.title} />
-        )}
-        <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <span className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">
-          {game.platform}
-        </span>
-        {game.status === 'Playing' || game.status === 'Paused' ? (
-          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={game.status} />
-        ) : null}
-      </span>
-
-      <span className="mt-3 block min-h-[3rem]">
-        <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
-        <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
-      </span>
-    </button>
-  );
-}
-
-type CompactGameRowProps = {
-  game: Game;
-  isMultiSelectMode: boolean;
-  isSelected: boolean;
-  onOpenDetails: () => void;
-  onToggleSelected: () => void;
-};
-
-function CompactGameRow({ game, isMultiSelectMode, isSelected, onOpenDetails, onToggleSelected }: CompactGameRowProps) {
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const activeCoverSource = coverSources[coverSourceIndex];
-
-  useEffect(() => {
-    setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
-  }, [coverSources]);
-
-  return (
-    <button
-      aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`flex min-w-0 items-center gap-3 rounded-lg border bg-ink-950/70 p-2 text-left transition hover:border-mint/35 hover:bg-mint/10 focus-visible:border-mint/70 ${
-        isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : 'border-skyglass/15'
-      }`}
-      onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
-      type="button"
-    >
-      <span className="relative block h-16 w-12 shrink-0 overflow-hidden rounded-md bg-ink-700">
-        {activeCoverSource ? (
-          <img
-            alt=""
-            className={`h-full w-full object-cover transition-opacity ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
-            decoding="async"
-            loading="lazy"
-            onError={() => {
-              setIsCoverLoaded(false);
-              setCoverSourceIndex((currentIndex) => currentIndex + 1);
-            }}
-            onLoad={() => setIsCoverLoaded(true)}
-            src={activeCoverSource}
-          />
-        ) : (
-          <MissingCover title={game.title} />
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-white">{game.title}</span>
-        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-          <span className="rounded-full border border-skyglass/20 bg-ink-900 px-2 py-0.5 text-slate-200">{game.platform}</span>
-          <span>{game.status}</span>
-        </span>
-      </span>
-      {isMultiSelectMode ? <span className="text-sm font-semibold text-mint">{isSelected ? 'Selected' : 'Select'}</span> : null}
-    </button>
-  );
-}
-
-function MissingCover({ title }: { title: string }) {
-  return (
-    <span className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-950 px-3 text-center">
-      <span>
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-lg border border-mint/25 bg-ink-950 text-xl font-bold text-mint shadow-glow">
-          {title.slice(0, 1).toUpperCase()}
-        </span>
-        <span className="mt-3 block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">No cover</span>
-      </span>
-    </span>
   );
 }
 
