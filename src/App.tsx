@@ -191,6 +191,7 @@ function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [isAppReady, setIsAppReady] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [libraryFilters, setLibraryFilters] = useState<CollectionFilters>(() =>
     loadCollectionFilters(libraryFiltersStorageKey),
   );
@@ -287,6 +288,14 @@ function App() {
     const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
 
     return () => window.cancelAnimationFrame(readyFrame);
+  }, []);
+
+  useEffect(() => {
+    function handleScroll() {
+      setIsScrolled(window.scrollY > 15);
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
@@ -1340,7 +1349,7 @@ function App() {
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
-        <header className="qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 py-1.5">
+        <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label="QuestShelf">
             <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md border border-mint/30 bg-ink-950 shadow-glow">
               <img className="qs-logo-glow h-full w-full object-cover" src={questShelfIcon} alt="" />
@@ -2520,7 +2529,7 @@ function ShelfGameCard({
       aria-label={`${isMultiSelectMode ? 'Select' : 'Open'} ${game.title}`}
       aria-posinset={index + 1}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-shelf-card group relative w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
+      className={`qs-shelf-card group relative flex flex-col w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
         isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : 'border-skyglass/18'
       }`}
       onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
