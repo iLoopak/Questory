@@ -42,5 +42,7 @@ export type RawgMetadata = Pick<
   | 'backgroundImage'
   | 'metadataSource'
   | 'metadataUpdatedAt'
+  | 'artworkSource'
+  | 'artworkUpdatedAt'
 > &
   Partial<Pick<Game, 'coverImage'>>;

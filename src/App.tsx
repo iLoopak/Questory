@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
@@ -17,7 +18,7 @@ import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
-import { getGameCoverSources } from './lib/gameCoverImages';
+import { getGameCoverSources, hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
   loadOnboardingState,
@@ -85,7 +86,7 @@ import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
-const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Recommendation', 'Stats', 'Settings'] as const;
+const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Recommendation', 'Stats', 'Settings'] as const;
 const allNavItems = ['Home', ...navItems, 'Metadata'] as const;
 type NavItem = (typeof allNavItems)[number];
 const settingsCategories = [
@@ -138,7 +139,7 @@ type CollectionFilters = {
   tag: string;
 };
 
-type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'coverImage'>>;
+type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>;
 
 const initialCollectionFilters: CollectionFilters = {
   enrichment: allOption,
@@ -1037,6 +1038,11 @@ function App() {
       return;
     }
 
+    if (action === 'find-artwork') {
+      openArtworkAudit();
+      return;
+    }
+
     if (action === 'wishlist') {
       addToWishlist(game);
       recordReviewDecision('wishlisted');
@@ -1207,16 +1213,30 @@ function App() {
 
   function updateGameMetadata(gameId: string, metadata: RawgMetadata) {
     setGames((currentGames) =>
-      currentGames.map((game) =>
-        game.id === gameId
-          ? touchGameRecord({
-              ...game,
+      currentGames.map((game) => {
+        if (game.id !== gameId) {
+          return game;
+        }
+
+        const shouldKeepExistingArtwork = Boolean(
+          metadata.coverImage && (hasProtectedArtwork(game) || !isMissingOrGeneratedCover(game.coverImage)),
+        );
+        const safeMetadata = shouldKeepExistingArtwork
+          ? {
               ...metadata,
-              metadataSkippedAt: undefined,
-              metadataManualManagedAt: undefined,
-            })
-          : game,
-      ),
+              artworkSource: game.artworkSource,
+              artworkUpdatedAt: game.artworkUpdatedAt,
+              coverImage: game.coverImage,
+            }
+          : metadata;
+
+        return touchGameRecord({
+          ...game,
+          ...safeMetadata,
+          metadataSkippedAt: undefined,
+          metadataManualManagedAt: undefined,
+        });
+      }),
     );
   }
 
@@ -1251,6 +1271,24 @@ function App() {
           : game,
       ),
     );
+  }
+
+  function updateGameArtwork(gameId: string, changes: Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) {
+    setGames((currentGames) =>
+      currentGames.map((game) =>
+        game.id === gameId
+          ? touchGameRecord({
+              ...game,
+              ...changes,
+            })
+          : game,
+      ),
+    );
+  }
+
+  function openArtworkAudit() {
+    setSelectedGameId(null);
+    setActiveNavItem('Artwork');
   }
 
   function openGameFromHome(game: Game) {
@@ -1417,6 +1455,17 @@ function App() {
               onMetadataEnriched={() => markOnboardingItemComplete('metadata-enriched')}
               onMetadataUpdate={updateGameMetadata}
               selectionRequestId={metadataSelectionRequest?.requestId}
+            />
+          ) : activeNavItem === 'Artwork' ? (
+            <ArtworkAuditPanel
+              games={games}
+              onApplyArtworkUpdate={updateGameArtwork}
+              onEnrichGames={startMetadataWorkflow}
+              onOpenDetails={(gameId) => {
+                const targetGame = games.find((game) => game.id === gameId);
+                setSelectedGameId(gameId);
+                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+              }}
             />
           ) : activeNavItem === 'Recommendation' ? (
             <RecommendationPanel
@@ -2658,6 +2707,8 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
       platform: resolvedPlatform as GamePlatform,
       status,
       coverImage: coverImage.trim(),
+      artworkSource: coverImage.trim() ? 'user' : undefined,
+      artworkUpdatedAt: coverImage.trim() ? importedAt : undefined,
       playtimeHours: parsedPlaytime,
       tags: parseTagInput(tagText),
       lastPlayedAt: status === 'Playing' ? importedAt.slice(0, 10) : null,
@@ -3590,11 +3641,15 @@ function formatBulkSummary(summary: BulkActionSummary) {
 }
 
 function mergeSteamWishlistSync(existingGame: Game, syncedGame: Game, syncedAt: string): Game {
+  const shouldUseSyncedArtwork = isMissingOrGeneratedCover(existingGame.coverImage) && syncedGame.coverImage;
+
   return {
     ...existingGame,
     title: existingGame.title || syncedGame.title,
     platform: existingGame.platform || syncedGame.platform,
-    coverImage: existingGame.coverImage || syncedGame.coverImage,
+    artworkSource: shouldUseSyncedArtwork ? syncedGame.artworkSource : existingGame.artworkSource,
+    artworkUpdatedAt: shouldUseSyncedArtwork ? syncedAt : existingGame.artworkUpdatedAt,
+    coverImage: shouldUseSyncedArtwork ? syncedGame.coverImage : existingGame.coverImage,
     steamAppId: existingGame.steamAppId ?? syncedGame.steamAppId,
     externalSource: existingGame.externalSource ?? syncedGame.externalSource,
     externalUrl: syncedGame.externalUrl,

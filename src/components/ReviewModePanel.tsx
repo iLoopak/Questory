@@ -11,6 +11,7 @@ export type ReviewModeAction =
   | 'dropped'
   | 'ignore'
   | 'enrich'
+  | 'find-artwork'
   | 'open-details'
   | 'skip'
   | 'note';
@@ -76,6 +77,7 @@ const emptyReviewActionStats: ReviewActionStats = {
 const secondaryActions: Array<{ action: ReviewModeAction; label: string }> = [
   { action: 'open-details', label: 'Open full details' },
   { action: 'enrich', label: 'Enrich metadata' },
+  { action: 'find-artwork', label: 'Find Artwork' },
   { action: 'note', label: 'Add note' },
 ];
 
