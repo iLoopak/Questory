@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import {
+  addActiveQueuePlatform,
   compareQueueEntries,
+  getActiveQueuePlatforms,
   getPlatformMaxActiveGames,
   getQueuePlatforms,
+  hideQueuePlatform,
+  moveQueuePlatform,
+  removeQueuePlatform,
+  renameQueuePlatform,
   type PlatformQueueEntry,
   type PlatformQueueState,
 } from '../lib/platformQueueStorage';
@@ -15,6 +21,7 @@ type QueuePanelProps = {
   queueState: PlatformQueueState;
   onAddGameToQueue: (game: Game, platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
+  onQueueStateChange: (state: PlatformQueueState) => void;
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
   onOpenDetails: (gameId: string) => void;
@@ -28,25 +35,28 @@ export function QueuePanel({
   queueState,
   onAddGameToQueue,
   onLimitChange,
+  onQueueStateChange,
   onMoveEntry,
   onMoveEntryToPlatform,
   onOpenDetails,
   onRemoveEntry,
   onStartReview,
 }: QueuePanelProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform>(initialPlatform ?? 'Steam');
+  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform>(initialPlatform ?? queueState.activePlatforms[0] ?? 'Steam');
+  const [customPlatformName, setCustomPlatformName] = useState('');
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
   const [selectedGameId, setSelectedGameId] = useState('');
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
+  const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
   const displayedQueuePlatforms = useMemo(() => {
-    if (!initialPlatform) {
-      return queuePlatforms;
+    if (!initialPlatform || !activeQueuePlatforms.includes(initialPlatform)) {
+      return activeQueuePlatforms;
     }
 
-    return [initialPlatform, ...queuePlatforms.filter((platform) => platform !== initialPlatform)];
-  }, [initialPlatform, queuePlatforms]);
+    return [initialPlatform, ...activeQueuePlatforms.filter((platform) => platform !== initialPlatform)];
+  }, [activeQueuePlatforms, initialPlatform]);
 
   const addableGames = games
     .filter((game) => game.collectionType === 'library' && !queueGameIds.has(game.id))
@@ -62,6 +72,22 @@ export function QueuePanel({
       platformRefs.current.get(initialPlatform)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   }, [initialPlatform]);
+
+  function addQueuePlatform(platform: GamePlatform) {
+    const nextState = addActiveQueuePlatform(queueState, platform);
+    onQueueStateChange(nextState);
+    setSelectedPlatform(platform);
+    setCustomPlatformName('');
+  }
+
+  function addCustomQueuePlatform() {
+    const platform = customPlatformName.trim() as GamePlatform;
+    if (!platform) {
+      return;
+    }
+
+    addQueuePlatform(platform);
+  }
 
   function addSelectedGame() {
     const game = gamesById.get(selectedGameId);
@@ -112,7 +138,7 @@ export function QueuePanel({
             value={selectedPlatform}
             onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform)}
           >
-            {queuePlatforms.map((platform) => (
+            {activeQueuePlatforms.map((platform) => (
               <option key={platform} value={platform}>
                 {platform}
               </option>
@@ -122,13 +148,60 @@ export function QueuePanel({
 
         <button
           className="h-9 self-end rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-          disabled={!selectedGameId}
+          disabled={!selectedGameId || activeQueuePlatforms.length === 0}
           onClick={addSelectedGame}
           type="button"
         >
           Add
         </button>
       </div>
+
+      <div className="mb-3 rounded-md border border-skyglass/15 bg-ink-950/70 p-2">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-white">+ Add Queue Platform</h3>
+            <p className="text-xs text-slate-500">Create only the queues you care about. Hidden queues stay available for imports and metadata.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {queuePlatforms
+            .filter((platform) => !activeQueuePlatforms.includes(platform))
+            .slice(0, 12)
+            .map((platform) => (
+              <button
+                key={platform}
+                className="h-8 rounded-md border border-white/10 px-2 text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint"
+                onClick={() => addQueuePlatform(platform)}
+                type="button"
+              >
+                {platform}
+              </button>
+            ))}
+          <label className="flex min-w-[220px] flex-1 gap-2">
+            <span className="sr-only">Custom queue platform</span>
+            <input
+              className="h-8 min-w-0 flex-1 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+              placeholder="Custom Platform"
+              value={customPlatformName}
+              onChange={(event) => setCustomPlatformName(event.target.value)}
+            />
+            <button
+              className="h-8 rounded-md bg-mint px-3 text-xs font-semibold text-ink-950 hover:bg-mint/90 disabled:bg-slate-600 disabled:text-slate-300"
+              disabled={!customPlatformName.trim()}
+              onClick={addCustomQueuePlatform}
+              type="button"
+            >
+              Add
+            </button>
+          </label>
+        </div>
+      </div>
+
+      {displayedQueuePlatforms.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">
+          No active queue platforms yet. Add Steam, Retroid, PS5, Switch 2, or a custom platform to make Queue personal.
+        </div>
+      ) : null}
 
       <div className="grid gap-2 xl:grid-cols-2">
         {displayedQueuePlatforms.map((platform) => (
@@ -148,7 +221,11 @@ export function QueuePanel({
               }
             }}
             queueEntries={queueState.entries.filter((entry) => entry.targetPlatform === platform).sort(compareQueueEntries)}
+            onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
             onLimitChange={onLimitChange}
+            onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
+            onRemovePlatform={(platform) => onQueueStateChange(removeQueuePlatform(queueState, platform))}
+            onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
             onMoveEntry={onMoveEntry}
             onMoveEntryToPlatform={onMoveEntryToPlatform}
             onOpenDetails={onOpenDetails}
@@ -169,7 +246,11 @@ function PlatformQueueColumn({
   platformOptions,
   setPlatformRef,
   queueEntries,
+  onHidePlatform,
   onLimitChange,
+  onMovePlatform,
+  onRemovePlatform,
+  onRenamePlatform,
   onMoveEntry,
   onMoveEntryToPlatform,
   onOpenDetails,
@@ -183,23 +264,37 @@ function PlatformQueueColumn({
   platformOptions: GamePlatform[];
   setPlatformRef: (element: HTMLElement | null) => void;
   queueEntries: PlatformQueueEntry[];
+  onHidePlatform: (platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
+  onMovePlatform: (platform: GamePlatform, direction: 'up' | 'down') => void;
+  onRemovePlatform: (platform: GamePlatform) => void;
+  onRenamePlatform: (platform: GamePlatform, nextPlatform: GamePlatform) => void;
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
+  const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
+
+  function renamePlatform() {
+    const nextName = window.prompt('Rename queue platform', platform);
+    if (!nextName?.trim()) {
+      return;
+    }
+
+    onRenamePlatform(platform, nextName.trim() as GamePlatform);
+  }
 
   return (
-    <section ref={setPlatformRef} className={`rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'border-mint/50 shadow-glow' : 'border-skyglass/15'}`}>
+    <section ref={setPlatformRef} className={`rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'border-mint/50 shadow-glow' : hasGames ? 'border-skyglass/15' : 'border-skyglass/10 opacity-80'}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold text-white">{platform}</h3>
         <details className="relative">
           <summary className="cursor-pointer rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10">
             Options
           </summary>
-          <div className="absolute right-0 z-20 mt-2 w-44 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel">
+          <div className="absolute right-0 z-20 mt-2 grid w-48 gap-2 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Active limit</span>
               <input
@@ -211,6 +306,11 @@ function PlatformQueueColumn({
                 onChange={(event) => onLimitChange(platform, Number(event.target.value))}
               />
             </label>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onHidePlatform(platform)} type="button">Hide Queue</button>
+            <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemovePlatform(platform)} type="button">Remove Queue</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">Rename Queue</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'up')} type="button">Move Up</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'down')} type="button">Move Down</button>
           </div>
         </details>
       </div>

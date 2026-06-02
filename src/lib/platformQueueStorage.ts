@@ -24,6 +24,7 @@ export type PlatformQueueSettings = {
 };
 
 export type PlatformQueueState = {
+  activePlatforms: GamePlatform[];
   entries: PlatformQueueEntry[];
   schemaVersion: typeof platformQueueSchemaVersion;
   settings: PlatformQueueSettings[];
@@ -63,12 +64,30 @@ export const defaultQueuePlatforms: GamePlatform[] = [
   'Other',
 ];
 
+export const suggestedQueuePlatforms: GamePlatform[] = [
+  'Steam',
+  'PS5',
+  'Switch',
+  'Switch 2',
+  'Retroid',
+  'Steam Deck',
+  'Legion Go',
+  'PC',
+  'PS4',
+  'Xbox Series X|S',
+  'Android',
+  'Other',
+];
+
 const defaultActiveLimits = new Map<GamePlatform, number>([
   ['PS5', 1],
   ['PS4', 1],
   ['Switch', 1],
   ['Switch 2', 1],
   ['Steam', 2],
+  ['Steam Deck', 2],
+  ['Retroid', 3],
+  ['Legion Go', 2],
   ['PC', 2],
   ['PSP', 3],
   ['PS Vita', 3],
@@ -82,6 +101,7 @@ const defaultActiveLimits = new Map<GamePlatform, number>([
 ]);
 
 const emptyQueueState: PlatformQueueState = {
+  activePlatforms: [],
   entries: [],
   schemaVersion: platformQueueSchemaVersion,
   settings: [],
@@ -99,11 +119,101 @@ export function getQueuePlatforms(games: Game[], state: PlatformQueueState): Gam
   return Array.from(
     new Set([
       ...defaultQueuePlatforms,
+      ...suggestedQueuePlatforms,
       ...games.map((game) => game.platform),
       ...state.entries.map((entry) => entry.targetPlatform),
       ...state.settings.map((setting) => setting.platform),
+      ...state.activePlatforms,
     ]),
   ).sort((first, second) => first.localeCompare(second));
+}
+
+export function getActiveQueuePlatforms(state: PlatformQueueState): GamePlatform[] {
+  return [...state.activePlatforms];
+}
+
+export function addActiveQueuePlatform(state: PlatformQueueState, platform: GamePlatform): PlatformQueueState {
+  const normalizedPlatform = normalizePlatformName(platform);
+  if (!normalizedPlatform || state.activePlatforms.includes(normalizedPlatform)) {
+    return state;
+  }
+
+  return normalizePlatformQueueState({
+    ...state,
+    activePlatforms: [...state.activePlatforms, normalizedPlatform],
+  });
+}
+
+export function hideQueuePlatform(state: PlatformQueueState, platform: GamePlatform): PlatformQueueState {
+  return normalizePlatformQueueState({
+    ...state,
+    activePlatforms: state.activePlatforms.filter((activePlatform) => activePlatform !== platform),
+  });
+}
+
+export function removeQueuePlatform(state: PlatformQueueState, platform: GamePlatform): PlatformQueueState {
+  return normalizePlatformQueueState({
+    ...state,
+    activePlatforms: state.activePlatforms.filter((activePlatform) => activePlatform !== platform),
+    entries: state.entries.filter((entry) => entry.targetPlatform !== platform),
+    settings: state.settings.filter((setting) => setting.platform !== platform),
+  });
+}
+
+export function renameQueuePlatform(state: PlatformQueueState, platform: GamePlatform, nextPlatform: GamePlatform): PlatformQueueState {
+  const normalizedNextPlatform = normalizePlatformName(nextPlatform);
+  if (!normalizedNextPlatform || normalizedNextPlatform === platform) {
+    return state;
+  }
+
+  return normalizePlatformQueueState({
+    ...state,
+    activePlatforms: state.activePlatforms.map((activePlatform) => (activePlatform === platform ? normalizedNextPlatform : activePlatform)),
+    entries: state.entries.map((entry) =>
+      entry.targetPlatform === platform
+        ? {
+            ...entry,
+            targetPlatform: normalizedNextPlatform,
+          }
+        : entry,
+    ),
+    settings: state.settings.map((setting) =>
+      setting.platform === platform
+        ? {
+            ...setting,
+            platform: normalizedNextPlatform,
+          }
+        : setting,
+    ),
+  });
+}
+
+export function moveQueuePlatform(state: PlatformQueueState, platform: GamePlatform, direction: 'up' | 'down'): PlatformQueueState {
+  const currentIndex = state.activePlatforms.indexOf(platform);
+  if (currentIndex < 0) {
+    return state;
+  }
+
+  const nextIndex = direction === 'up' ? Math.max(0, currentIndex - 1) : Math.min(state.activePlatforms.length - 1, currentIndex + 1);
+  if (nextIndex === currentIndex) {
+    return state;
+  }
+
+  const activePlatforms = [...state.activePlatforms];
+  const [activePlatform] = activePlatforms.splice(currentIndex, 1);
+  activePlatforms.splice(nextIndex, 0, activePlatform);
+
+  return normalizePlatformQueueState({
+    ...state,
+    activePlatforms,
+  });
+}
+
+export function setActiveQueuePlatforms(state: PlatformQueueState, platforms: GamePlatform[]): PlatformQueueState {
+  return normalizePlatformQueueState({
+    ...state,
+    activePlatforms: platforms,
+  });
 }
 
 export function getPlatformMaxActiveGames(state: PlatformQueueState, platform: GamePlatform) {
@@ -133,6 +243,7 @@ export function addGameToPlatformQueue(
 
   return normalizeQueuePositions({
     ...state,
+    activePlatforms: state.activePlatforms.includes(targetPlatform) ? state.activePlatforms : [...state.activePlatforms, targetPlatform],
     entries: [...nextEntries, entry],
   });
 }
@@ -194,6 +305,7 @@ export function moveQueueEntryToPlatform(
 
   return normalizeQueuePositions({
     ...state,
+    activePlatforms: state.activePlatforms.includes(targetPlatform) ? state.activePlatforms : [...state.activePlatforms, targetPlatform],
     entries: nextEntries,
   });
 }
@@ -242,11 +354,18 @@ export function compareQueueEntries(first: PlatformQueueEntry, second: PlatformQ
 
 export function normalizePlatformQueueState(value: unknown): PlatformQueueState {
   const parsedState = value && typeof value === 'object' ? (value as Partial<PlatformQueueState>) : {};
+  const entries = Array.isArray(parsedState.entries) ? parsedState.entries.filter(isQueueEntry) : [];
+  const settings = Array.isArray(parsedState.settings) ? parsedState.settings.filter(isQueueSetting) : [];
+  const hasSavedActivePlatforms = Array.isArray(parsedState.activePlatforms);
+  const activePlatforms = hasSavedActivePlatforms
+    ? parsedState.activePlatforms?.filter((platform): platform is GamePlatform => typeof platform === 'string') ?? []
+    : Array.from(new Set([...defaultQueuePlatforms, ...entries.map((entry) => entry.targetPlatform), ...settings.map((setting) => setting.platform)]));
 
   return normalizeQueuePositions({
-    entries: Array.isArray(parsedState.entries) ? parsedState.entries.filter(isQueueEntry) : [],
+    activePlatforms: normalizePlatformList(activePlatforms),
+    entries,
     schemaVersion: platformQueueSchemaVersion,
-    settings: Array.isArray(parsedState.settings) ? parsedState.settings.filter(isQueueSetting) : [],
+    settings,
   });
 }
 
@@ -261,6 +380,7 @@ function normalizeQueuePositions(state: PlatformQueueState): PlatformQueueState 
 
   return {
     ...state,
+    activePlatforms: normalizePlatformList(state.activePlatforms),
     schemaVersion: platformQueueSchemaVersion,
     entries: Array.from(groupedEntries.entries()).flatMap(([, entries]) =>
       entries.sort(compareQueueEntries).map((entry, index) => ({
@@ -269,6 +389,14 @@ function normalizeQueuePositions(state: PlatformQueueState): PlatformQueueState 
       })),
     ),
   };
+}
+
+function normalizePlatformList(platforms: GamePlatform[]): GamePlatform[] {
+  return Array.from(new Set(platforms.map(normalizePlatformName).filter((platform): platform is GamePlatform => Boolean(platform))));
+}
+
+function normalizePlatformName(platform: GamePlatform) {
+  return platform.trim() as GamePlatform;
 }
 
 function isQueueEntry(value: unknown): value is PlatformQueueEntry {
