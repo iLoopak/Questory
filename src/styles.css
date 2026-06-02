@@ -536,3 +536,41 @@ body.qs-controller-active .qs-toast {
     transform: translateY(0) scale(1);
   }
 }
+
+.qs-shelf-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 243, 223, 0.36) rgba(143, 180, 202, 0.08);
+  scroll-behavior: smooth;
+  scroll-padding-inline: clamp(0.75rem, 5vw, 2rem);
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qs-shelf-scroller::-webkit-scrollbar {
+  height: 0.7rem;
+}
+
+.qs-shelf-scroller::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(143, 180, 202, 0.08);
+}
+
+.qs-shelf-scroller::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(34, 243, 223, 0.36);
+}
+
+.qs-shelf-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 16rem 25rem;
+}
+
+@media (orientation: landscape) and (max-height: 640px) {
+  .qs-shelf-card {
+    width: clamp(9.5rem, 18vw, 13.5rem);
+  }
+
+  .qs-shelf-scroller {
+    padding-bottom: 0.85rem;
+  }
+}

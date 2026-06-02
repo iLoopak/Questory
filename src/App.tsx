@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { GameCard } from './components/GameCard';
@@ -17,6 +17,7 @@ import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
+import { getGameCoverSources } from './lib/gameCoverImages';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
   loadOnboardingState,
@@ -100,6 +101,7 @@ type SettingsCategory = (typeof settingsCategories)[number];
 const allOption = 'All';
 const questShelfIcon = '/icons/questshelf-icon.svg';
 const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
+const collectionViewModeStorageKey = 'questshelf.collectionViewMode.v1';
 const settingsCategoryStorageKey = 'questshelf.settingsCategory.v1';
 const wishlistFiltersStorageKey = 'questshelf.wishlistFilters.v1';
 const sourceFilterOptions = ['All', 'Steam', 'Manual', 'Wishlist', 'Retro / future-ready'] as const;
@@ -114,11 +116,15 @@ const librarySortOptions = [
   'Status',
 ] as const;
 const quickFilterOptions = ['Playing', 'Paused', 'Backlog / Want to play', 'Missing info', 'Played > 0h'] as const;
+const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
+const shelfInitialRenderCount = 72;
+const shelfRenderBatchSize = 48;
 
 type SourceFilter = (typeof sourceFilterOptions)[number];
 type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
 type LibrarySortOption = (typeof librarySortOptions)[number];
 type QuickFilter = (typeof quickFilterOptions)[number];
+type CollectionViewMode = (typeof collectionViewModes)[number];
 
 type CollectionFilters = {
   enrichment: EnrichmentFilter;
@@ -1746,6 +1752,11 @@ function CollectionPanel({
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
+  const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
+  const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
+  const activeViewModeCollectionRef = useRef(collectionType);
+  const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
+  const shelfCardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
   const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
   const emptyText =
@@ -1756,6 +1767,22 @@ function CollectionPanel({
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
   const hasActiveFilters = isCollectionFiltered(filters);
+  const renderedShelfGames = games.slice(0, shelfRenderCount);
+  const hasMoreShelfGames = shelfRenderCount < games.length;
+
+  useEffect(() => {
+    saveCollectionViewMode(activeViewModeCollectionRef.current, viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    activeViewModeCollectionRef.current = collectionType;
+    setViewMode(loadCollectionViewMode(collectionType));
+  }, [collectionType]);
+
+  useEffect(() => {
+    setShelfRenderCount(shelfInitialRenderCount);
+    shelfCardRefs.current = [];
+  }, [filters, games.length, viewMode]);
 
   useEffect(() => {
     setSelectedGameIds((currentSelection) => {
@@ -1886,6 +1913,79 @@ function CollectionPanel({
     onBulkEnrich(selectedGames.map((game) => game.id));
   }
 
+  function loadMoreShelfGames() {
+    setShelfRenderCount((currentCount) => Math.min(games.length, currentCount + shelfRenderBatchSize));
+  }
+
+  function handleShelfScroll() {
+    const scroller = shelfScrollerRef.current;
+
+    if (!scroller || !hasMoreShelfGames) {
+      return;
+    }
+
+    if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 640) {
+      loadMoreShelfGames();
+    }
+  }
+
+  function focusShelfCard(index: number) {
+    const targetCard = shelfCardRefs.current[index];
+
+    if (!targetCard) {
+      return;
+    }
+
+    targetCard.focus({ preventScroll: true });
+    targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  function handleShelfKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, index: number, game: Game) {
+    if (event.key === 'ArrowRight' || event.key === 'DPadRight') {
+      event.preventDefault();
+
+      if (index + 1 >= renderedShelfGames.length && hasMoreShelfGames) {
+        loadMoreShelfGames();
+        window.setTimeout(() => focusShelfCard(Math.min(index + 1, games.length - 1)), 0);
+        return;
+      }
+
+      if (index >= renderedShelfGames.length - 8 && hasMoreShelfGames) {
+        loadMoreShelfGames();
+      }
+
+      focusShelfCard(Math.min(index + 1, games.length - 1));
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'DPadLeft') {
+      event.preventDefault();
+      focusShelfCard(Math.max(index - 1, 0));
+      return;
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'DPadDown') {
+      event.preventDefault();
+      focusShelfCard(Math.min(index + 4, games.length - 1));
+      return;
+    }
+
+    if (event.key === 'ArrowUp' || event.key === 'DPadUp') {
+      event.preventDefault();
+      focusShelfCard(Math.max(index - 4, 0));
+      return;
+    }
+
+    if (event.key === 'a' || event.key === 'A' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (isMultiSelectMode) {
+        toggleSelectedGame(game.id);
+      } else {
+        onOpenDetails(game.id);
+      }
+    }
+  }
+
   return (
     <section className="qs-glass min-w-0 rounded-lg border p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -1939,6 +2039,34 @@ function CollectionPanel({
       {collectionType === 'wishlist' && steamWishlistSyncState ? (
         <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
       ) : null}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-skyglass/15 bg-ink-950/70 p-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">View mode</p>
+          <p className="text-sm text-slate-400">Shelf mode keeps browsing cover-first for handheld screens.</p>
+        </div>
+        <div className="grid grid-cols-3 overflow-hidden rounded-md border border-skyglass/15 bg-ink-900/70" role="group" aria-label={`${title} view mode`}>
+          {collectionViewModes.map((mode) => {
+            const isActive = viewMode === mode;
+
+            return (
+              <button
+                key={mode}
+                aria-pressed={isActive}
+                className={`h-10 border-r border-skyglass/10 px-3 text-xs font-semibold transition last:border-r-0 sm:text-sm ${
+                  isActive
+                    ? 'bg-mint text-ink-950 shadow-glow'
+                    : 'text-slate-300 hover:bg-mint/10 hover:text-white'
+                }`}
+                onClick={() => setViewMode(mode)}
+                type="button"
+              >
+                {mode.replace(' View', '')}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(3,minmax(8.5rem,1fr))]">
@@ -2097,24 +2225,75 @@ function CollectionPanel({
       ) : null}
 
       {games.length > 0 ? (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
-          {games.map((game) => (
-            <GameCard
-              key={game.id}
-              game={game}
-              isMultiSelectMode={isMultiSelectMode}
-              isSelected={selectedGameIds.has(game.id)}
-              onAddToWishlist={onAddToWishlist}
-              onFindMetadata={onFindMetadata}
-              onMoveToLibrary={onMoveToLibrary}
-              onOpenDetails={() => onOpenDetails(game.id)}
-              onRemove={onRemove}
-              onRemoveAndIgnore={onRemoveAndIgnore}
-              onStatusChange={onStatusChange}
-              onToggleSelected={() => toggleSelectedGame(game.id)}
-            />
-          ))}
-        </div>
+        viewMode === 'Shelf View' ? (
+          <div>
+            <div
+              ref={shelfScrollerRef}
+              aria-label={`${title} shelf`}
+              className="qs-shelf-scroller -mx-3 flex snap-x gap-4 overflow-x-auto px-3 pb-5 pt-2 sm:-mx-4 sm:px-4"
+              onScroll={handleShelfScroll}
+            >
+              {renderedShelfGames.map((game, index) => (
+                <ShelfGameCard
+                  key={game.id}
+                  refCallback={(element) => {
+                    shelfCardRefs.current[index] = element;
+                  }}
+                  game={game}
+                  index={index}
+                  isMultiSelectMode={isMultiSelectMode}
+                  isSelected={selectedGameIds.has(game.id)}
+                  onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
+                  onOpenDetails={() => onOpenDetails(game.id)}
+                  onToggleSelected={() => toggleSelectedGame(game.id)}
+                />
+              ))}
+              {hasMoreShelfGames ? (
+                <button
+                  className="qs-shelf-card grid min-h-[22rem] w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center place-items-center rounded-xl border border-dashed border-skyglass/25 bg-ink-950/70 p-4 text-center text-sm font-semibold text-slate-300 transition hover:border-mint/40 hover:bg-mint/10 hover:text-white"
+                  onClick={loadMoreShelfGames}
+                  type="button"
+                >
+                  Load more covers
+                  <span className="mt-2 block text-xs font-medium text-slate-500">{games.length - renderedShelfGames.length} still hidden for performance</span>
+                </button>
+              ) : null}
+            </div>
+            <p className="text-xs text-slate-500">Use D-pad / arrow keys to move across covers. Press A or Enter to open.</p>
+          </div>
+        ) : viewMode === 'Compact View' ? (
+          <div className="grid gap-2">
+            {games.map((game) => (
+              <CompactGameRow
+                key={game.id}
+                game={game}
+                isMultiSelectMode={isMultiSelectMode}
+                isSelected={selectedGameIds.has(game.id)}
+                onOpenDetails={() => onOpenDetails(game.id)}
+                onToggleSelected={() => toggleSelectedGame(game.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
+            {games.map((game) => (
+              <GameCard
+                key={game.id}
+                game={game}
+                isMultiSelectMode={isMultiSelectMode}
+                isSelected={selectedGameIds.has(game.id)}
+                onAddToWishlist={onAddToWishlist}
+                onFindMetadata={onFindMetadata}
+                onMoveToLibrary={onMoveToLibrary}
+                onOpenDetails={() => onOpenDetails(game.id)}
+                onRemove={onRemove}
+                onRemoveAndIgnore={onRemoveAndIgnore}
+                onStatusChange={onStatusChange}
+                onToggleSelected={() => toggleSelectedGame(game.id)}
+              />
+            ))}
+          </div>
+        )
       ) : (
         <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
           <div>
@@ -2124,6 +2303,166 @@ function CollectionPanel({
         </div>
       )}
     </section>
+  );
+}
+
+type ShelfGameCardProps = {
+  game: Game;
+  index: number;
+  isMultiSelectMode: boolean;
+  isSelected: boolean;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
+  onOpenDetails: () => void;
+  onToggleSelected: () => void;
+  refCallback: (element: HTMLButtonElement | null) => void;
+};
+
+function ShelfGameCard({
+  game,
+  index,
+  isMultiSelectMode,
+  isSelected,
+  onKeyDown,
+  onOpenDetails,
+  onToggleSelected,
+  refCallback,
+}: ShelfGameCardProps) {
+  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const activeCoverSource = coverSources[coverSourceIndex];
+
+  useEffect(() => {
+    setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
+  }, [coverSources]);
+
+  return (
+    <button
+      ref={refCallback}
+      aria-label={`${isMultiSelectMode ? 'Select' : 'Open'} ${game.title}`}
+      aria-posinset={index + 1}
+      aria-selected={isMultiSelectMode ? isSelected : undefined}
+      className={`qs-shelf-card group relative w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
+        isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : 'border-skyglass/18'
+      }`}
+      onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
+      onKeyDown={onKeyDown}
+      type="button"
+    >
+      {isMultiSelectMode ? (
+        <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
+          {isSelected ? '✓' : ''}
+        </span>
+      ) : null}
+
+      <span className="relative block aspect-[3/4] overflow-hidden rounded-lg bg-ink-700">
+        {activeCoverSource ? (
+          <>
+            {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+            <img
+              alt=""
+              className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] ${
+                isCoverLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              decoding="async"
+              loading="lazy"
+              onError={() => {
+                setIsCoverLoaded(false);
+                setCoverSourceIndex((currentIndex) => currentIndex + 1);
+              }}
+              onLoad={() => setIsCoverLoaded(true)}
+              src={activeCoverSource}
+            />
+          </>
+        ) : (
+          <MissingCover title={game.title} />
+        )}
+        <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
+        <span className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">
+          {game.platform}
+        </span>
+        {game.status === 'Playing' || game.status === 'Paused' ? (
+          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={game.status} />
+        ) : null}
+      </span>
+
+      <span className="mt-3 block min-h-[3rem]">
+        <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
+        <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
+      </span>
+    </button>
+  );
+}
+
+type CompactGameRowProps = {
+  game: Game;
+  isMultiSelectMode: boolean;
+  isSelected: boolean;
+  onOpenDetails: () => void;
+  onToggleSelected: () => void;
+};
+
+function CompactGameRow({ game, isMultiSelectMode, isSelected, onOpenDetails, onToggleSelected }: CompactGameRowProps) {
+  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const activeCoverSource = coverSources[coverSourceIndex];
+
+  useEffect(() => {
+    setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
+  }, [coverSources]);
+
+  return (
+    <button
+      aria-selected={isMultiSelectMode ? isSelected : undefined}
+      className={`flex min-w-0 items-center gap-3 rounded-lg border bg-ink-950/70 p-2 text-left transition hover:border-mint/35 hover:bg-mint/10 focus-visible:border-mint/70 ${
+        isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : 'border-skyglass/15'
+      }`}
+      onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
+      type="button"
+    >
+      <span className="relative block h-16 w-12 shrink-0 overflow-hidden rounded-md bg-ink-700">
+        {activeCoverSource ? (
+          <img
+            alt=""
+            className={`h-full w-full object-cover transition-opacity ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
+            decoding="async"
+            loading="lazy"
+            onError={() => {
+              setIsCoverLoaded(false);
+              setCoverSourceIndex((currentIndex) => currentIndex + 1);
+            }}
+            onLoad={() => setIsCoverLoaded(true)}
+            src={activeCoverSource}
+          />
+        ) : (
+          <MissingCover title={game.title} />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-white">{game.title}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          <span className="rounded-full border border-skyglass/20 bg-ink-900 px-2 py-0.5 text-slate-200">{game.platform}</span>
+          <span>{game.status}</span>
+        </span>
+      </span>
+      {isMultiSelectMode ? <span className="text-sm font-semibold text-mint">{isSelected ? 'Selected' : 'Select'}</span> : null}
+    </button>
+  );
+}
+
+function MissingCover({ title }: { title: string }) {
+  return (
+    <span className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-950 px-3 text-center">
+      <span>
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-lg border border-mint/25 bg-ink-950 text-xl font-bold text-mint shadow-glow">
+          {title.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="mt-3 block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">No cover</span>
+      </span>
+    </span>
   );
 }
 
@@ -3333,6 +3672,36 @@ function saveCollectionFilters(storageKey: string, filters: CollectionFilters) {
   } catch {
     // Filter persistence is nice to have; the library itself still works without it.
   }
+}
+
+function getCollectionViewModeKey(collectionType: GameCollectionType) {
+  return `${collectionViewModeStorageKey}.${collectionType}`;
+}
+
+function loadCollectionViewMode(collectionType: GameCollectionType): CollectionViewMode {
+  if (typeof window === 'undefined') {
+    return 'Grid View';
+  }
+
+  try {
+    const storedViewMode = window.localStorage.getItem(getCollectionViewModeKey(collectionType));
+
+    return isCollectionViewMode(storedViewMode) ? storedViewMode : 'Grid View';
+  } catch {
+    return 'Grid View';
+  }
+}
+
+function saveCollectionViewMode(collectionType: GameCollectionType, viewMode: CollectionViewMode) {
+  try {
+    window.localStorage.setItem(getCollectionViewModeKey(collectionType), viewMode);
+  } catch {
+    // View mode persistence is optional; browsing still works without it.
+  }
+}
+
+function isCollectionViewMode(value: unknown): value is CollectionViewMode {
+  return collectionViewModes.some((viewMode) => viewMode === value);
 }
 
 function loadSettingsCategory(): SettingsCategory {
