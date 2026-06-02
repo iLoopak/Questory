@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 type ToolbarOption = string;
 
@@ -21,6 +21,7 @@ type CollectionToolbarProps = {
   children?: ReactNode;
   moreFiltersActiveCount?: number;
   moreFiltersOpen?: boolean;
+  moreFiltersButtonRef?: Ref<HTMLButtonElement>;
   onClearFilters?: () => void;
   onMoreFiltersClick?: () => void;
   onSearchChange?: (value: string) => void;
@@ -38,6 +39,7 @@ export function CollectionToolbar({
   children,
   moreFiltersActiveCount = 0,
   moreFiltersOpen = false,
+  moreFiltersButtonRef,
   onClearFilters,
   onMoreFiltersClick,
   onSearchChange,
@@ -95,6 +97,7 @@ export function CollectionToolbar({
         {hasMoreFilters ? (
           <button
             aria-expanded={moreFiltersOpen}
+            ref={moreFiltersButtonRef}
             className={`qs-collection-toolbar-button qs-filters-button h-9 rounded-md border px-3 text-sm font-semibold transition ${
               moreFiltersOpen || moreFiltersActiveCount > 0
                 ? 'border-mint/40 bg-mint/15 text-mint shadow-glow'

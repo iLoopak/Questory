@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
+import { ViewportModal } from './ViewportModal';
 import type { PlatformQueueEntry } from '../lib/platformQueueStorage';
 import {
   availableTimeOptions,
@@ -55,6 +56,8 @@ export function RecommendationPanel({
   const [recommendationSearchTerm, setRecommendationSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<RecommendationViewMode>('Grid View');
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const moreFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
+  const moreFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const queuedGameIds = useMemo(() => new Set(queueEntries.map((entry) => entry.gameId)), [queueEntries]);
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
@@ -143,6 +146,7 @@ export function RecommendationPanel({
         ]}
         moreFiltersActiveCount={activeMoreFilterCount}
         moreFiltersOpen={isMoreFiltersOpen}
+        moreFiltersButtonRef={moreFiltersButtonRef}
         onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
         viewMode={{
           label: 'Recommendation view mode',
@@ -171,20 +175,19 @@ export function RecommendationPanel({
       />
 
       {isMoreFiltersOpen ? (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onClick={() => setIsMoreFiltersOpen(false)}>
-          <section
-            aria-label="Recommendation filters"
-            aria-modal="true"
-            className="qs-filter-drawer qs-glass w-full max-w-4xl overflow-hidden rounded-t-2xl border shadow-panel sm:rounded-2xl"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
+        <ViewportModal
+          ariaLabel="Recommendation filters"
+          initialFocusRef={moreFiltersCloseRef}
+          restoreFocusRef={moreFiltersButtonRef}
+          onClose={() => setIsMoreFiltersOpen(false)}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
               <div>
                 <h3 className="text-base font-semibold text-white">Recommendation filters</h3>
                 <p className="mt-0.5 text-xs text-slate-400">Tune the same result list without switching to a custom recommendation layout.</p>
               </div>
               <button
+                ref={moreFiltersCloseRef}
                 className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
                 onClick={() => setIsMoreFiltersOpen(false)}
                 type="button"
@@ -228,9 +231,8 @@ export function RecommendationPanel({
                   Show games
                 </button>
               </div>
-            </div>
-          </section>
-        </div>
+          </div>
+        </ViewportModal>
       ) : null}
 
       {recommendation ? (

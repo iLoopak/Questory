@@ -1230,3 +1230,19 @@ textarea,
     text-indent: 0;
   }
 }
+
+.qs-viewport-modal {
+  z-index: 1000;
+  min-height: 100dvh;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+.qs-viewport-modal .qs-filter-drawer {
+  max-height: calc(100dvh - max(1rem, var(--qs-safe-top)) - max(1rem, var(--qs-safe-bottom)));
+  touch-action: auto;
+}
+
+.qs-modal-open .qs-back-to-top {
+  display: none;
+}
