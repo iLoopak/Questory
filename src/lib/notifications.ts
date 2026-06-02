@@ -32,7 +32,7 @@ export function getGameTitle(game: Pick<Game, 'title'>) {
 }
 
 export function getStatusToastMessage(game: Pick<Game, 'title'>, status: GameStatus) {
-  return status === 'Finished' ? '✓ Finished' : `🚫 ${status}`;
+  return status === 'Finished' ? '🏆 Finished' : `🚫 ${status}`;
 }
 
 export function getWishlistToastMessage(game: Pick<Game, 'title'>) {
@@ -44,7 +44,7 @@ export function getBulkWishlistToastMessage(count: number) {
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return '📌 Queued';
+  return `📌 Added to ${platform} Queue`;
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {

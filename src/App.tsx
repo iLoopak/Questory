@@ -1668,7 +1668,7 @@ function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastS
     <aside
       aria-label="QuestShelf notifications"
       aria-live="polite"
-      className="pointer-events-none fixed right-3 top-[calc(0.75rem+max(0px,var(--qs-safe-top)))] z-40 grid max-w-[min(calc(100vw-1.5rem),20rem)] justify-items-end gap-2 sm:right-5 sm:top-[calc(1rem+max(0px,var(--qs-safe-top)))]"
+      className="pointer-events-none fixed right-3 top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1100] grid max-w-[min(calc(100vw-1.5rem),20rem)] justify-items-end gap-2 sm:right-5 sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))]"
       role="status"
     >
       {visibleActions.map((action) => {

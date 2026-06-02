@@ -1,10 +1,13 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 
+type ViewportModalPlacement = 'bottom-sheet' | 'center';
+
 type ViewportModalProps = {
   ariaLabel: string;
   children: ReactNode;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  placement?: ViewportModalPlacement;
   restoreFocusRef?: RefObject<HTMLElement | null>;
   onClose: () => void;
 };
@@ -44,7 +47,7 @@ function getFocusableElements(container: HTMLElement | null) {
   });
 }
 
-export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, restoreFocusRef }: ViewportModalProps) {
+export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, placement = 'bottom-sheet', restoreFocusRef }: ViewportModalProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
@@ -144,16 +147,24 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, r
     return null;
   }
 
+  const isCentered = placement === 'center';
+  const backdropClassName = isCentered
+    ? 'qs-viewport-modal qs-viewport-modal-center fixed inset-0 flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-4'
+    : 'qs-viewport-modal fixed inset-0 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:items-center sm:p-4';
+  const panelClassName = isCentered
+    ? 'qs-filter-drawer qs-glass w-full max-w-lg overflow-hidden rounded-2xl border shadow-panel'
+    : 'qs-filter-drawer qs-glass w-full max-w-4xl overflow-hidden rounded-t-2xl border shadow-panel sm:rounded-2xl';
+
   return createPortal(
     <div
-      className="qs-viewport-modal fixed inset-0 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:items-center sm:p-4"
+      className={backdropClassName}
       onClick={onClose}
       onKeyDown={handleKeyDown}
     >
       <section
         aria-label={ariaLabel}
         aria-modal="true"
-        className="qs-filter-drawer qs-glass w-full max-w-4xl overflow-hidden rounded-t-2xl border shadow-panel sm:rounded-2xl"
+        className={panelClassName}
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
         role="dialog"
