@@ -29,7 +29,6 @@ type CollectionToolbarProps = {
   searchPlaceholder?: string;
   searchValue?: string;
   selects?: ToolbarSelect[];
-  summary?: ReactNode;
   title: string;
   viewMode?: ToolbarViewMode;
 };
@@ -47,7 +46,6 @@ export function CollectionToolbar({
   searchPlaceholder = 'Search',
   searchValue,
   selects = [],
-  summary,
   title,
   viewMode,
 }: CollectionToolbarProps) {
@@ -58,9 +56,8 @@ export function CollectionToolbar({
   return (
     <div className="qs-collection-toolbar mb-2 min-w-0 rounded-md border border-skyglass/15 bg-ink-950/70 p-1.5">
       <div className="qs-collection-toolbar-row">
-        <div className="qs-collection-toolbar-title min-w-0 pb-1">
+        <div className="qs-collection-toolbar-title min-w-0">
           <h2 className="truncate text-sm font-semibold text-white">{title}</h2>
-          {summary ? <div className="mt-0.5 truncate text-[0.7rem] text-slate-400">{summary}</div> : null}
         </div>
 
         {hasSearch ? (

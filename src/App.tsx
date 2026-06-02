@@ -1962,14 +1962,6 @@ function CollectionPanel({
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
         title={title}
-        summary={
-          hasActiveFilters || isMultiSelectMode ? (
-            <>
-              {hasActiveFilters ? `${games.length} shown` : null}
-              {isMultiSelectMode ? `${hasActiveFilters ? ' - ' : ''}${selectedCount} selected` : null}
-            </>
-          ) : undefined
-        }
         searchValue={filters.searchTerm}
         searchPlaceholder="Find title"
         onSearchChange={(value) => onFiltersChange({ searchTerm: value })}

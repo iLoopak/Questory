@@ -8,6 +8,7 @@ import {
   type ArtworkSource,
 } from '../lib/gameCoverImages';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { CollectionToolbar } from './CollectionToolbar';
 import type { Game } from '../types/game';
 
 type ArtworkAuditPanelProps = {
@@ -151,68 +152,50 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
   return (
     <section className="qs-glass min-w-0 overflow-hidden rounded-lg border lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <header className="border-b border-skyglass/15 bg-ink-950/70 p-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Artwork Coverage</div>
-              <h2 className="mt-1 text-2xl font-semibold text-white">Metadata health audit</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-                Local-first cover audit using the QuestShelf priority order: manual covers, Steam artwork, RAWG artwork,
-                imported source artwork, then deterministic generated fallback covers.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
+        <header className="border-b border-skyglass/15 bg-ink-950/70 p-2 sm:p-3">
+          <CollectionToolbar
+            title="Artwork"
+            primaryAction={
               <button
-                className="h-10 rounded-md border border-mint/30 bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+                className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
                 disabled={isFindingArtwork || audit.needsRealArtwork.length === 0}
                 onClick={() => void findMissingArtwork()}
                 type="button"
               >
-                Find missing artwork
+                Find artwork
               </button>
-              <button
-                className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
-                disabled={!isFindingArtwork}
-                onClick={() => {
-                  shouldCancel.current = true;
-                }}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            <AuditStat label="Total games" value={audit.totalGames} />
-            <AuditStat label="With artwork" value={audit.gamesWithArtwork} />
-            <AuditStat label="Missing artwork" value={audit.gamesMissingArtwork} />
-            <AuditStat label="Coverage" value={`${audit.coveragePercentage}%`} />
-            <AuditStat label="RAWG no cover" value={audit.rawgMetadataWithoutCover.length} />
-            <AuditStat label="Steam no cover" value={audit.steamMetadataWithoutCover.length} />
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <AuditActionButton disabled={isFindingArtwork || audit.needsRealArtwork.length === 0} onClick={() => void findMissingArtwork()}>
-              Fix missing artwork
-            </AuditActionButton>
-            <AuditActionButton disabled={isFindingArtwork || audit.enrichedWithoutAppliedCover.length === 0} onClick={applyRawgImages}>
-              Apply RAWG image where available
-            </AuditActionButton>
-            <AuditActionButton disabled={isFindingArtwork || audit.steamMetadataWithoutCover.length === 0} onClick={refreshSteamArtwork}>
-              Refresh Steam artwork
-            </AuditActionButton>
-            <AuditActionButton disabled={isFindingArtwork || audit.needsRealArtwork.length === 0} onClick={generateFallbackCovers}>
-              Generate fallback covers
-            </AuditActionButton>
-            <AuditActionButton
-              disabled={isFindingArtwork || audit.missingRawgMetadata.length === 0}
-              onClick={() => onEnrichGames(audit.missingRawgMetadata.map((game) => game.id))}
-            >
-              Enrich missing metadata
-            </AuditActionButton>
-          </div>
+            }
+            actionMenu={
+              <>
+                <AuditActionButton disabled={isFindingArtwork || audit.needsRealArtwork.length === 0} onClick={() => void findMissingArtwork()}>
+                  Fix missing artwork
+                </AuditActionButton>
+                <AuditActionButton disabled={isFindingArtwork || audit.enrichedWithoutAppliedCover.length === 0} onClick={applyRawgImages}>
+                  Apply RAWG image
+                </AuditActionButton>
+                <AuditActionButton disabled={isFindingArtwork || audit.steamMetadataWithoutCover.length === 0} onClick={refreshSteamArtwork}>
+                  Refresh Steam artwork
+                </AuditActionButton>
+                <AuditActionButton disabled={isFindingArtwork || audit.needsRealArtwork.length === 0} onClick={generateFallbackCovers}>
+                  Generate fallbacks
+                </AuditActionButton>
+                <AuditActionButton
+                  disabled={isFindingArtwork || audit.missingRawgMetadata.length === 0}
+                  onClick={() => onEnrichGames(audit.missingRawgMetadata.map((game) => game.id))}
+                >
+                  Enrich metadata
+                </AuditActionButton>
+                <AuditActionButton
+                  disabled={!isFindingArtwork}
+                  onClick={() => {
+                    shouldCancel.current = true;
+                  }}
+                >
+                  Cancel
+                </AuditActionButton>
+              </>
+            }
+          />
 
           {isFindingArtwork ? (
             <div className="mt-4">
@@ -249,11 +232,9 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
 }
 
 function getArtworkAudit(games: Game[]) {
-  const gamesWithArtwork = games.filter(hasRealArtwork).length;
   const missingArtwork = games.filter((game) => !game.coverImage?.trim());
   const fallbackArtwork = games.filter((game) => Boolean(game.coverImage?.trim()) && isMissingOrGeneratedCover(game.coverImage));
   const needsRealArtwork = games.filter((game) => !hasRealArtwork(game));
-  const rawgMetadataWithoutCover = games.filter((game) => Boolean(game.rawgId || game.backgroundImage) && !hasRealArtwork(game));
   const steamMetadataWithoutCover = games.filter((game) => typeof game.steamAppId === 'number' && !hasRealArtwork(game));
   const enrichedWithoutAppliedCover = games.filter((game) => {
     if (!game.backgroundImage || hasRealArtwork(game)) {
@@ -264,17 +245,12 @@ function getArtworkAudit(games: Game[]) {
   });
 
   return {
-    coveragePercentage: games.length > 0 ? Math.round((gamesWithArtwork / games.length) * 100) : 0,
     enrichedWithoutAppliedCover,
     fallbackArtwork,
-    gamesMissingArtwork: games.length - gamesWithArtwork,
-    gamesWithArtwork,
     missingArtwork,
     missingRawgMetadata: games.filter((game) => !game.rawgId && !game.metadataSource),
     needsRealArtwork,
-    rawgMetadataWithoutCover,
     steamMetadataWithoutCover,
-    totalGames: games.length,
   };
 }
 
@@ -327,15 +303,6 @@ function runBulk(games: Game[], applyGame: (game: Game) => ArtworkBulkSummary) {
   }, { ...emptySummary });
 }
 
-function AuditStat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-ink-950/70 p-3">
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-white">{value}</div>
-    </div>
-  );
-}
-
 function AuditActionButton({ children, disabled, onClick }: { children: string; disabled: boolean; onClick: () => void }) {
   return (
     <button
@@ -354,7 +321,6 @@ function ArtworkBucket({ bucket, games, onOpenDetails, title }: { bucket: AuditB
     <section className="rounded-xl border border-white/10 bg-ink-950/60 p-3">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold text-white">{title}</h3>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold text-slate-300">{games.length}</span>
       </div>
 
       <div className="mt-3 grid gap-2">

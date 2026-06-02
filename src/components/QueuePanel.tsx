@@ -114,7 +114,6 @@ export function QueuePanel({
     <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
         title="Queue"
-        summary={`${displayedQueuePlatforms.length} active`}
         searchValue={queueSearchTerm}
         searchPlaceholder="Find queue game"
         onSearchChange={setQueueSearchTerm}
