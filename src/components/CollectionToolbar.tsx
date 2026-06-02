@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 
 type ToolbarOption = string;
 
@@ -52,14 +52,53 @@ export function CollectionToolbar({
   const hasSearch = searchValue !== undefined && onSearchChange;
   const hasMoreFilters = Boolean(onMoreFiltersClick);
   const selectedViewLabel = viewMode?.value.replace(' View', '') ?? 'View';
+  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const viewMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const actionsMenuRef = useRef<HTMLDetailsElement | null>(null);
+
+  useEffect(() => {
+    setIsViewMenuOpen(false);
+    setIsActionsMenuOpen(false);
+  }, [title]);
+
+  useEffect(() => {
+    if (!isViewMenuOpen && !isActionsMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (target instanceof Node && (viewMenuRef.current?.contains(target) || actionsMenuRef.current?.contains(target))) {
+        return;
+      }
+
+      setIsViewMenuOpen(false);
+      setIsActionsMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      setIsViewMenuOpen(false);
+      setIsActionsMenuOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isActionsMenuOpen, isViewMenuOpen]);
 
   return (
     <div className="qs-collection-toolbar mb-2 min-w-0 rounded-md border border-skyglass/15 bg-ink-950/70 p-1.5">
       <div className="qs-collection-toolbar-row">
-        <div className="qs-collection-toolbar-title min-w-0">
-          <h2 className="truncate text-sm font-semibold text-white">{title}</h2>
-        </div>
-
         {hasSearch ? (
           <label className="qs-collection-toolbar-search min-w-0">
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
@@ -110,7 +149,12 @@ export function CollectionToolbar({
         ) : null}
 
         {viewMode ? (
-          <details className="qs-toolbar-menu qs-view-menu">
+          <details
+            ref={viewMenuRef}
+            className="qs-toolbar-menu qs-view-menu"
+            open={isViewMenuOpen}
+            onToggle={(event) => setIsViewMenuOpen(event.currentTarget.open)}
+          >
             <summary
               aria-label={`${viewMode.label ?? 'View mode'}: ${selectedViewLabel}`}
               className="qs-collection-toolbar-button grid h-9 cursor-pointer place-items-center rounded-md border border-skyglass/15 bg-ink-900/70 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10 hover:text-white"
@@ -131,7 +175,10 @@ export function CollectionToolbar({
                     className={`h-9 rounded-md px-3 text-left text-sm font-semibold transition ${
                       isActive ? 'bg-mint text-ink-950 shadow-glow' : 'text-slate-200 hover:bg-mint/10 hover:text-white'
                     }`}
-                    onClick={() => viewMode.onChange(mode)}
+                    onClick={() => {
+                      viewMode.onChange(mode);
+                      setIsViewMenuOpen(false);
+                    }}
                     role="menuitemradio"
                     type="button"
                   >
@@ -146,7 +193,12 @@ export function CollectionToolbar({
         {primaryAction ? <div className="qs-collection-primary-action min-w-0">{primaryAction}</div> : null}
 
         {actionMenu ? (
-          <details className="qs-toolbar-menu qs-actions-menu">
+          <details
+            ref={actionsMenuRef}
+            className="qs-toolbar-menu qs-actions-menu"
+            open={isActionsMenuOpen}
+            onToggle={(event) => setIsActionsMenuOpen(event.currentTarget.open)}
+          >
             <summary className="qs-collection-toolbar-button grid h-9 cursor-pointer place-items-center rounded-md border border-skyglass/15 bg-ink-900/70 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10 hover:text-white">
               <span>
                 Actions <span aria-hidden="true">▾</span>

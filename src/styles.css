@@ -1016,9 +1016,8 @@ textarea,
 .qs-collection-toolbar-row {
   display: grid;
   grid-template-columns:
-    minmax(4.5rem, 0.55fr)
-    minmax(6.25rem, 1.4fr)
-    repeat(2, minmax(5rem, 0.72fr))
+    minmax(6.25rem, 1.6fr)
+    repeat(2, minmax(5rem, 0.76fr))
     repeat(4, max-content);
   align-items: end;
   gap: 0.375rem;
@@ -1102,14 +1101,10 @@ textarea,
 @media (max-width: 760px) {
   .qs-collection-toolbar-row {
     grid-template-columns:
-      minmax(5.25rem, 1.15fr)
-      repeat(2, minmax(4.35rem, 0.66fr))
+      minmax(5.25rem, 1.2fr)
+      repeat(2, minmax(4.35rem, 0.68fr))
       repeat(4, max-content);
     gap: 0.25rem;
-  }
-
-  .qs-collection-toolbar-title {
-    display: none;
   }
 
   .qs-collection-toolbar-search span,
@@ -1159,7 +1154,7 @@ textarea,
   .qs-collection-toolbar-row {
     grid-template-columns:
       minmax(3.9rem, 1fr)
-      repeat(2, minmax(3.1rem, 0.45fr))
+      repeat(2, minmax(3.1rem, 0.48fr))
       repeat(4, max-content);
   }
 
