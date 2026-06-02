@@ -674,3 +674,17 @@ body.qs-controller-active .qs-toast {
     max-height: calc(100dvh - 6.25rem);
   }
 }
+
+.qs-filter-drawer {
+  margin:
+    max(0px, var(--qs-safe-top))
+    max(0px, var(--qs-safe-right))
+    max(0px, var(--qs-safe-bottom))
+    max(0px, var(--qs-safe-left));
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .qs-filter-drawer {
+    max-height: calc(100dvh - max(0.5rem, var(--qs-safe-top)) - max(0.5rem, var(--qs-safe-bottom)));
+  }
+}

@@ -1747,9 +1747,11 @@ function CollectionPanel({
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const activeViewModeCollectionRef = useRef(collectionType);
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
+  const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const shelfCardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
   const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
@@ -1761,6 +1763,8 @@ function CollectionPanel({
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
   const hasActiveFilters = isCollectionFiltered(filters);
+  const activeFilterCount = getActiveFilterCount(filters);
+  const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
   const renderedShelfGames = games.slice(0, shelfRenderCount);
   const hasMoreShelfGames = shelfRenderCount < games.length;
 
@@ -1789,6 +1793,12 @@ function CollectionPanel({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (isAdvancedFiltersOpen && (event.key === 'Escape' || event.key === 'b' || event.key === 'B' || event.key === 'GamepadB')) {
+        event.preventDefault();
+        setIsAdvancedFiltersOpen(false);
+        return;
+      }
+
       if (event.key !== 'Escape' || !isMultiSelectMode) {
         return;
       }
@@ -1803,7 +1813,15 @@ function CollectionPanel({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMultiSelectMode, selectedGameIds.size]);
+  }, [isAdvancedFiltersOpen, isMultiSelectMode, selectedGameIds.size]);
+
+  useEffect(() => {
+    if (!isAdvancedFiltersOpen) {
+      return;
+    }
+
+    window.setTimeout(() => advancedFiltersCloseRef.current?.focus(), 0);
+  }, [isAdvancedFiltersOpen]);
 
   function toggleMultiSelectMode() {
     setIsMultiSelectMode((currentMode) => {
@@ -2061,104 +2079,184 @@ function CollectionPanel({
         </div>
       </div>
 
-      <div className="mb-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-2">
-        <div className="qs-filter-grid grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(3,minmax(8.5rem,1fr))]">
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
+      <div className="mb-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-1.5">
+        <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto pb-0.5">
+          <label className="min-w-[11rem] flex-[1.3]">
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
             <input
               className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
               onChange={(event) => onFiltersChange({ searchTerm: event.target.value })}
-              placeholder="Find by title"
+              placeholder="Find title"
               type="search"
               value={filters.searchTerm}
             />
           </label>
 
-          <FilterSelect
-            label="Platform"
-            value={filters.platform}
-            options={[allOption, ...platformOptions]}
-            onChange={(value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption })}
-          />
-
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            options={[allOption, ...gameStatuses]}
-            onChange={(value) => onFiltersChange({ status: value as GameStatus | typeof allOption })}
-          />
-
-          <FilterSelect
-            label="Sort"
-            value={filters.sortBy}
-            options={[...librarySortOptions]}
-            onChange={(value) => onFiltersChange({ sortBy: value as LibrarySortOption })}
-          />
-        </div>
-
-        <details className="mt-2 rounded-md border border-skyglass/10 bg-ink-900/50 p-2">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-300">More filters</summary>
-          <div className="mt-2 grid gap-2 md:grid-cols-3">
+          <div className="min-w-[8.75rem] flex-1">
             <FilterSelect
-              label="Source"
-              value={filters.source}
-              options={[...sourceFilterOptions]}
-              onChange={(value) => onFiltersChange({ source: value as SourceFilter })}
-            />
-
-            <FilterSelect
-              label="Info"
-              value={filters.enrichment}
-              options={[...enrichmentFilterOptions]}
-              onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
-            />
-
-            <FilterSelect
-              label="Tag"
-              value={filters.tag}
-              options={[allOption, ...tags]}
-              onChange={(value) => onFiltersChange({ tag: value })}
+              label="Status"
+              value={filters.status}
+              options={[allOption, ...gameStatuses]}
+              onChange={(value) => onFiltersChange({ status: value as GameStatus | typeof allOption })}
             />
           </div>
-        </details>
 
-        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <details className="min-w-0">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-300">Quick filters</summary>
-            <div className="mt-2 flex flex-wrap gap-2">
-            {quickFilterOptions.map((quickFilter) => {
-              const isActive = filters.quickFilters.includes(quickFilter);
+          <div className="min-w-[8.75rem] flex-1">
+            <FilterSelect
+              label="Platform"
+              value={filters.platform}
+              options={[allOption, ...platformOptions]}
+              onChange={(value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption })}
+            />
+          </div>
 
-              return (
-                <button
-                  key={quickFilter}
-                  className={`h-8 rounded-full border px-3 text-xs font-semibold transition ${
-                    isActive
-                      ? 'border-mint/40 bg-mint/15 text-mint shadow-glow'
-                      : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
-                  }`}
-                  onClick={() => toggleQuickFilter(quickFilter)}
-                  type="button"
-                >
-                  {quickFilter}
-                </button>
-              );
-            })}
-            </div>
-          </details>
+          <button
+            aria-expanded={isAdvancedFiltersOpen}
+            className={`h-9 shrink-0 rounded-md border px-3 text-sm font-semibold transition ${
+              isAdvancedFiltersOpen || activeAdvancedFilterCount > 0
+                ? 'border-mint/40 bg-mint/15 text-mint shadow-glow'
+                : 'border-skyglass/15 bg-ink-900/70 text-slate-200 hover:bg-mint/10 hover:text-white'
+            }`}
+            onClick={() => setIsAdvancedFiltersOpen(true)}
+            type="button"
+          >
+            More Filters{activeAdvancedFilterCount > 0 ? ` (${activeAdvancedFilterCount})` : ''}
+          </button>
 
-          <div className="flex items-center gap-3">
+          {hasActiveFilters ? (
             <button
-              className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600"
-              disabled={!hasActiveFilters}
+              className="h-9 shrink-0 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
               onClick={onClearFilters}
               type="button"
             >
               Clear filters
             </button>
-          </div>
+          ) : null}
         </div>
+
+        {hasActiveFilters ? (
+          <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+            <span className="rounded-full border border-mint/25 bg-mint/10 px-2 py-0.5 font-semibold text-mint">
+              {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
+            </span>
+            <span>{games.length} shown</span>
+          </div>
+        ) : null}
       </div>
+
+      {isAdvancedFiltersOpen ? (
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onClick={() => setIsAdvancedFiltersOpen(false)}>
+          <section
+            aria-label={`${title} advanced filters`}
+            aria-modal="true"
+            className="qs-filter-drawer qs-glass w-full max-w-4xl overflow-hidden rounded-t-2xl border shadow-panel sm:rounded-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
+              <div>
+                <h3 className="text-base font-semibold text-white">Advanced filters</h3>
+                <p className="mt-0.5 text-xs text-slate-400">Sort, source, info, tags, collection scope, and quick activity filters.</p>
+              </div>
+              <button
+                ref={advancedFiltersCloseRef}
+                className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                onClick={() => setIsAdvancedFiltersOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <FilterSelect
+                  label="Sort / activity"
+                  value={filters.sortBy}
+                  options={[...librarySortOptions]}
+                  onChange={(value) => onFiltersChange({ sortBy: value as LibrarySortOption })}
+                />
+
+                <FilterSelect
+                  label="Source / scope"
+                  value={filters.source}
+                  options={[...sourceFilterOptions]}
+                  onChange={(value) => onFiltersChange({ source: value as SourceFilter })}
+                />
+
+                <FilterSelect
+                  label="Enrichment status"
+                  value={filters.enrichment}
+                  options={[...enrichmentFilterOptions]}
+                  onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
+                />
+
+                <FilterSelect
+                  label="Tags"
+                  value={filters.tag}
+                  options={[allOption, ...tags]}
+                  onChange={(value) => onFiltersChange({ tag: value })}
+                />
+              </div>
+
+              <div className="mt-4 rounded-md border border-skyglass/10 bg-ink-950/60 p-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-white">Quick filters</h4>
+                    <p className="text-xs text-slate-500">Includes playtime, recently playable backlog states, and missing metadata shortcuts.</p>
+                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Touch / D-pad friendly</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {quickFilterOptions.map((quickFilter) => {
+                    const isActive = filters.quickFilters.includes(quickFilter);
+
+                    return (
+                      <button
+                        key={quickFilter}
+                        aria-pressed={isActive}
+                        className={`min-h-10 rounded-full border px-3 text-xs font-semibold transition ${
+                          isActive
+                            ? 'border-mint/40 bg-mint/15 text-mint shadow-glow'
+                            : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
+                        }`}
+                        onClick={() => toggleQuickFilter(quickFilter)}
+                        type="button"
+                      >
+                        {quickFilter}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-400">
+                  {hasActiveFilters ? `${activeFilterCount} ${activeFilterCount === 1 ? 'filter' : 'filters'} active - ${games.length} shown` : 'No filters active'}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {hasActiveFilters ? (
+                    <button
+                      className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                      onClick={onClearFilters}
+                      type="button"
+                    >
+                      Clear filters
+                    </button>
+                  ) : null}
+                  <button
+                    className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
+                    onClick={() => setIsAdvancedFiltersOpen(false)}
+                    type="button"
+                  >
+                    Show games
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {isMultiSelectMode ? (
         <div className="mb-2 rounded-md border border-mint/20 bg-ink-950/80 p-2 shadow-glow">
@@ -3426,9 +3524,9 @@ type FilterSelectProps = {
 function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
       <select
-        className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
+        className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -3626,16 +3724,30 @@ function isRetroOrFutureReady(game: Game) {
 }
 
 function isCollectionFiltered(filters: CollectionFilters) {
-  return (
-    filters.enrichment !== allOption ||
-    filters.platform !== allOption ||
-    filters.quickFilters.length > 0 ||
-    filters.searchTerm.trim().length > 0 ||
-    filters.source !== allOption ||
-    filters.status !== allOption ||
-    filters.tag !== allOption ||
-    filters.sortBy !== initialCollectionFilters.sortBy
-  );
+  return getActiveFilterCount(filters) > 0;
+}
+
+function getActiveFilterCount(filters: CollectionFilters) {
+  return [
+    filters.enrichment !== allOption,
+    filters.platform !== allOption,
+    filters.quickFilters.length > 0,
+    filters.searchTerm.trim().length > 0,
+    filters.source !== allOption,
+    filters.status !== allOption,
+    filters.tag !== allOption,
+    filters.sortBy !== initialCollectionFilters.sortBy,
+  ].filter(Boolean).length;
+}
+
+function getActiveAdvancedFilterCount(filters: CollectionFilters) {
+  return [
+    filters.enrichment !== allOption,
+    filters.quickFilters.length > 0,
+    filters.source !== allOption,
+    filters.tag !== allOption,
+    filters.sortBy !== initialCollectionFilters.sortBy,
+  ].filter(Boolean).length;
 }
 
 function loadCollectionFilters(storageKey: string): CollectionFilters {
