@@ -382,7 +382,7 @@ function CompactGameRow({
   return (
     <article
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`flex min-w-0 flex-col gap-2 rounded-lg border bg-ink-950/70 p-2 transition hover:border-mint/35 hover:bg-mint/10 focus-within:border-mint/70 sm:flex-row sm:items-center ${
+      className={`qs-compact-card flex min-w-0 flex-col gap-2 rounded-lg border bg-ink-950/70 p-2 transition hover:border-mint/35 hover:bg-mint/10 focus-within:border-mint/70 sm:flex-row sm:items-center ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/25' : 'border-skyglass/15'
       }`}
     >
