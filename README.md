@@ -23,6 +23,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Optional RAWG metadata enrichment for individual games.
 - Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
 - Metadata enrichment workflow for larger libraries with batch processing and manual match review.
+- Artwork Coverage audit for cover health, RAWG/Steam image application, and deterministic generated fallback covers.
 - Local Recommendation Engine v1 for choosing what to play next.
 - Local Stats dashboard for backlog progress, playtime, platform/source breakdowns, and metadata coverage.
 - Settings Data Management for portable JSON backup export/import, validated restore, and local reset.
@@ -200,6 +201,33 @@ Library and Wishlist each have their own compact toolbar for browsing larger col
 Sort options include title, recently played, most or least playtime, recently imported, metadata missing first, and status. QuestShelf stores the last used Library and Wishlist filters locally in browser `localStorage`, so the view is restored on the next launch without sending anything to a server.
 
 The active summary shows how many games are visible out of the full collection. In multi-select mode, **Select all visible** applies only to the currently filtered result set.
+
+
+## Artwork Priority, Fallback Covers, and Audit Tools
+
+QuestShelf treats artwork as a first-class local library field because Library, Review Mode, Shelf View, Queue, Home, Recommendation, and Stats all use cover-forward layouts.
+
+Artwork is resolved in this priority order:
+
+1. User-provided `coverImage` marked with `artworkSource: "user"`.
+2. Steam artwork derived from `steamAppId` or stored with `artworkSource: "steam"`.
+3. RAWG `backgroundImage` / cover metadata stored with `artworkSource: "rawg"`.
+4. Imported source artwork from non-manual imports.
+5. A deterministic generated fallback cover.
+
+QuestShelf stores optional artwork metadata on game records with `artworkSource` and `artworkUpdatedAt`. Manual covers and Steam covers are protected: RAWG enrichment and bulk artwork repair do not overwrite user-provided artwork, and Steam artwork is not replaced by another source unless the user explicitly applies a different cover in a local edit flow.
+
+Generated fallback covers are local SVG data URLs, so they require no backend and no heavy image library. They are deterministic from the game ID, title, and platform, which means the same game always receives the same Steam Deck-style visual. Each fallback includes the game title, platform badge, subtle gradient background, QuestShelf neon teal accent border/glow, and an initials mark so artwork-first screens stay polished even when no external cover exists.
+
+Open **Artwork** to use the Artwork Coverage / Metadata Health audit:
+
+- Summary cards show total games, games with artwork, missing artwork, coverage percentage, RAWG metadata without an applied cover, and Steam metadata without an applied cover.
+- Audit lists separate **Missing artwork**, **Poor / fallback artwork**, and **Enriched but cover not applied** buckets.
+- Bulk actions include **Fix missing artwork**, **Apply RAWG image where available**, **Refresh Steam artwork**, **Generate fallback covers**, and **Enrich missing metadata**.
+- Bulk actions report fixed, fallback generated, skipped, and failed counts.
+- **Find missing artwork** runs locally with progress and cancel support. It tries Steam artwork when `steamAppId` exists, then RAWG background artwork when available, then generates fallback covers for anything still missing.
+
+Review Mode uses the same artwork resolver, so games without real covers show generated fallback covers instead of blank or single-letter placeholders. The Review Mode details actions also include **Find Artwork**, which opens the artwork audit tools without uploading user data.
 
 ## PWA Install and Offline Behavior
 

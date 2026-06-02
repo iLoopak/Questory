@@ -36,12 +36,16 @@ export type GameStatus = (typeof gameStatuses)[number];
 export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
 
+export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
+
 export type Game = {
   id: string;
   title: string;
   platform: GamePlatform;
   status: GameStatus;
   coverImage: string;
+  artworkSource?: ArtworkSource;
+  artworkUpdatedAt?: string;
   playtimeHours: number;
   playtimeCacheHours?: number;
   rating?: number | null;

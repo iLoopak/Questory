@@ -7,7 +7,7 @@ import { gameStatuses } from '../types/game';
 type GameDetailViewProps = {
   game: Game;
   onBack: () => void;
-  onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'>) => void;
+  onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
 };
 
 export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailViewProps) {
@@ -43,11 +43,13 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
     }
 
     onTrackingChange(game.id, {
+      artworkSource: 'rawg',
+      artworkUpdatedAt: new Date().toISOString(),
       coverImage: game.backgroundImage,
       notes: game.notes,
       status: game.status,
       tags: game.tags,
-    } as Pick<Game, 'notes' | 'status' | 'tags'>);
+    });
   }
 
   return (
