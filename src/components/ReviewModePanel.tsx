@@ -38,8 +38,8 @@ const negativeActions: Array<{
   tone: 'danger' | 'quiet';
 }> = [
   { action: 'ignore', hint: 'D-pad ←', icon: '🚫', label: 'Ignore', tone: 'danger' },
-  { action: 'dropped', hint: 'D-pad ←', icon: '⌄', label: 'Drop', tone: 'danger' },
-  { action: 'skip', hint: 'B', icon: '↷', label: 'Skip', tone: 'quiet' },
+  { action: 'dropped', hint: 'D-pad ←', icon: '🗑️', label: 'Drop', tone: 'danger' },
+  { action: 'skip', hint: 'B', icon: '⏭️', label: 'Skip', tone: 'quiet' },
 ];
 
 const positiveActions: Array<{
@@ -49,10 +49,10 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'A', icon: '+', label: 'Add to Queue', tone: 'accent' },
-  { action: 'playing', hint: 'Y', icon: '▶', label: 'Playing Now', tone: 'accent' },
-  { action: 'wishlist', hint: 'X', icon: '♡', label: 'Wishlist', tone: 'neutral' },
-  { action: 'finished', hint: '✓', icon: '✓', label: 'Finished', tone: 'neutral' },
+  { action: 'queue', hint: 'A', icon: '📌', label: 'Queue', tone: 'accent' },
+  { action: 'playing', hint: 'Y', icon: '🎮', label: 'Playing', tone: 'accent' },
+  { action: 'wishlist', hint: 'X', icon: '💖', label: 'Wishlist', tone: 'neutral' },
+  { action: 'finished', hint: 'D-pad →', icon: '🏆', label: 'Finished', tone: 'neutral' },
 ];
 
 const decisionActions = [...negativeActions, ...positiveActions];
@@ -464,7 +464,7 @@ function FocusedReviewCard({
           {negativeActions.map((action, index) => (
             <button
               key={action.action}
-              className={`qs-review-action qs-review-action-side min-h-12 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${getActionClassName(
+              className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(
                 action.tone,
                 highlightedActionIndex === index,
               )}`}
@@ -472,27 +472,29 @@ function FocusedReviewCard({
               onFocus={() => onHighlight(index)}
               type="button"
             >
-              <span className="flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-white/8 text-lg">{action.icon}</span>
-                <span>
-                  <span className="block">{action.label}</span>
-                  <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] opacity-70">{action.hint}</span>
+              <div className="flex items-center gap-1.5 justify-center">
+                <span className="text-base select-none leading-none">{action.icon}</span>
+                <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
+              </div>
+              {action.hint && (
+                <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                  {action.hint}
                 </span>
-              </span>
+              )}
             </button>
           ))}
         </div>
       </section>
 
-      <section className="qs-review-hero" aria-label={`${game.title} review card`}>
+      <section className="qs-review-hero flex flex-col items-center" aria-label={`${game.title} review card`}>
         <div className="qs-review-cover overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
-          <div className="qs-review-artwork-frame h-full min-h-[300px]">
+          <div className="qs-review-artwork-frame relative h-full w-full">
             {activeCoverSource ? (
-              <div className="relative h-full">
+              <div className="relative h-full w-full">
                 {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
                 <img
-                  alt=""
-                  className={`h-full w-full object-contain transition-opacity duration-300 ${
+                  alt={game.title}
+                  className={`h-full w-full object-cover transition-opacity duration-300 ${
                     isCoverLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   decoding="async"
@@ -504,32 +506,29 @@ function FocusedReviewCard({
                   onLoad={() => setIsCoverLoaded(true)}
                   src={activeCoverSource}
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950 via-ink-950/76 to-transparent p-4 pt-16">
-                  <span className="inline-flex rounded-full border border-mint/30 bg-ink-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint backdrop-blur">
-                    {game.platform}
-                  </span>
-                  <h3 className="mt-2 text-3xl font-semibold leading-tight text-white drop-shadow-lg sm:text-4xl">
-                    {game.title}
-                  </h3>
-                </div>
               </div>
             ) : (
               <div className="grid h-full place-items-center bg-ink-800 px-4 text-center">
-                <div>
-                  <div className="mx-auto grid h-28 w-28 place-items-center rounded-2xl border border-white/10 bg-ink-950 text-5xl font-semibold text-mint">
-                    {game.title.slice(0, 1).toUpperCase()}
-                  </div>
-                  <span className="mt-5 inline-flex rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint">
-                    {game.platform}
-                  </span>
-                  <h3 className="mt-3 text-3xl font-semibold leading-tight text-white sm:text-4xl">{game.title}</h3>
+                <div className="mx-auto grid h-24 w-24 place-items-center rounded-2xl border border-white/10 bg-ink-950 text-4xl font-semibold text-mint">
+                  {game.title.slice(0, 1).toUpperCase()}
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="qs-gamepad-hints mt-3 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+        <div className="mt-3 text-center w-full px-2">
+          <div className="flex items-center justify-center gap-2">
+            <span className="inline-flex rounded-full border border-mint/30 bg-mint/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em] text-mint">
+              {game.platform}
+            </span>
+          </div>
+          <h3 className="mt-2 text-xl sm:text-2xl font-bold leading-snug text-white line-clamp-2 px-1" title={game.title}>
+            {game.title}
+          </h3>
+        </div>
+
+        <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
           <span>L1/R1 Previous / Next</span>
           <span>•</span>
           <span>D-pad Left discard</span>
@@ -538,7 +537,7 @@ function FocusedReviewCard({
         </div>
 
         {isQueuePickerOpen ? (
-          <section className="mt-3 rounded-2xl border border-mint/25 bg-mint/10 p-3">
+          <section className="mt-3 rounded-2xl border border-mint/25 bg-mint/10 p-3 w-full">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-white">Choose queue platform</h4>
               <button
@@ -564,7 +563,7 @@ function FocusedReviewCard({
           </section>
         ) : null}
 
-        <details className="qs-review-details mt-3 rounded-2xl border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300">
+        <details className="qs-review-details mt-3 rounded-2xl border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300 w-full">
           <summary className="cursor-pointer select-none font-semibold text-slate-100">Details</summary>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <div>
@@ -663,7 +662,7 @@ function FocusedReviewCard({
             return (
               <button
                 key={action.action}
-                className={`qs-review-action qs-review-action-side min-h-12 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${getActionClassName(
+                className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(
                   action.tone,
                   highlightedActionIndex === index,
                 )}`}
@@ -671,13 +670,15 @@ function FocusedReviewCard({
                 onFocus={() => onHighlight(index)}
                 type="button"
               >
-                <span className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-white/8 text-lg">{action.icon}</span>
-                  <span>
-                    <span className="block">{action.label}</span>
-                    <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] opacity-70">{action.hint}</span>
+                <div className="flex items-center gap-1.5 justify-center">
+                  <span className="text-base select-none leading-none">{action.icon}</span>
+                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
+                </div>
+                {action.hint && (
+                  <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                    {action.hint}
                   </span>
-                </span>
+                )}
               </button>
             );
           })}
