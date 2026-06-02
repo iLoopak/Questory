@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
+import { BackToTopButton } from './components/BackToTopButton';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { CollectionToolbar } from './components/CollectionToolbar';
@@ -1586,6 +1587,8 @@ function App() {
         onUndo={undoAction}
         onViewGame={viewGameFromToast}
       />
+
+      <BackToTopButton />
 
       {isAddGameOpen ? (
         <AddGameDialog
