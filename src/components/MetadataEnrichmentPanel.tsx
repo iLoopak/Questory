@@ -320,7 +320,6 @@ export function MetadataEnrichmentPanel({
         <div className="border-b border-skyglass/15 bg-ink-950/70 p-2 sm:p-3">
           <CollectionToolbar
             title="Game info"
-            summary={`${missingMetadataGames.length} need info`}
             searchValue={metadataSearchTerm}
             searchPlaceholder="Find metadata target"
             onSearchChange={setMetadataSearchTerm}

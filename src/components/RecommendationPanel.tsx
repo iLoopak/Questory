@@ -126,7 +126,6 @@ export function RecommendationPanel({
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
         title="Recommendation"
-        summary={recommendation ? `${recommendations.length} matches · ${Math.round(recommendation.confidence * 100)}% confidence` : `${recommendations.length} matches`}
         searchValue={recommendationSearchTerm}
         searchPlaceholder="Find title"
         onSearchChange={setRecommendationSearchTerm}
