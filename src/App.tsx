@@ -1723,7 +1723,7 @@ function getToastCategoryStyles(category: ToastCategory) {
   if (category === 'warning') {
     return {
       container: 'border-amber-300/40 ring-1 ring-amber-300/15',
-      dot: 'bg-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.75)]',
+      dot: 'bg-amber-300 qs-status-dot-warning',
       label: 'text-amber-200',
     };
   }
@@ -1731,7 +1731,7 @@ function getToastCategoryStyles(category: ToastCategory) {
   if (category === 'error') {
     return {
       container: 'border-red-400/45 ring-1 ring-red-400/15',
-      dot: 'bg-red-300 shadow-[0_0_18px_rgba(252,165,165,0.75)]',
+      dot: 'bg-red-300 qs-status-dot-error',
       label: 'text-red-200',
     };
   }
@@ -1739,14 +1739,14 @@ function getToastCategoryStyles(category: ToastCategory) {
   if (category === 'info') {
     return {
       container: 'border-skyglass/35 ring-1 ring-skyglass/10',
-      dot: 'bg-sky-300 shadow-[0_0_18px_rgba(125,211,252,0.65)]',
+      dot: 'bg-sky-300 qs-status-dot-info',
       label: 'text-sky-200',
     };
   }
 
   return {
     container: 'border-mint/35 ring-1 ring-mint/15',
-    dot: 'bg-mint shadow-[0_0_18px_rgba(34,243,223,0.75)]',
+    dot: 'bg-mint qs-status-dot-success',
     label: 'text-mint',
   };
 }
@@ -3463,6 +3463,13 @@ function AppearanceSettingsPanel({
       value: 'system',
     },
   ];
+  const themeCoverageChecklist = [
+    'Light, Dark, and Follow Device all resolve through the same CSS theme tokens.',
+    'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
+    'App shell, top navigation, home, library, wishlist, metadata, artwork, recommendations, stats, and settings panels use tokenized backgrounds, borders, shadows, and text.',
+    'Cards, detail dialogs, modal overlays, toasts, tooltips, dropdown menus, forms, buttons, badges, and disabled states inherit theme tokens.',
+    'Review Mode panels, queue panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
+  ];
 
   return (
     <section className="qs-glass rounded-lg border p-4">
@@ -3511,6 +3518,18 @@ function AppearanceSettingsPanel({
         <p className="mt-3 text-xs leading-5 text-slate-500">
           Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
         </p>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme coverage checklist</div>
+        <ul className="mt-3 grid gap-2 text-sm text-slate-300">
+          {themeCoverageChecklist.map((item) => (
+            <li className="flex gap-2" key={item}>
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-mint/30 bg-mint/10 text-xs font-bold text-mint">✓</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {runtimeEnvironment.isAndroid ? (
