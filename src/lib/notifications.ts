@@ -25,34 +25,34 @@ export type MergeableNotification = NotificationDraft & {
 };
 
 export const maxVisibleToastCount = 3;
-export const maxPendingToastCount = 5;
+export const maxPendingToastCount = 3;
 
 export function getGameTitle(game: Pick<Game, 'title'>) {
   return game.title.trim() || 'Game';
 }
 
 export function getStatusToastMessage(game: Pick<Game, 'title'>, status: GameStatus) {
-  return `${getGameTitle(game)} marked as ${status}`;
+  return status === 'Finished' ? '✓ Finished' : `🚫 ${status}`;
 }
 
 export function getWishlistToastMessage(game: Pick<Game, 'title'>) {
-  return `${getGameTitle(game)} added to Wishlist`;
+  return '💖 Wishlisted';
 }
 
 export function getBulkWishlistToastMessage(count: number) {
-  return `${count} ${count === 1 ? 'game' : 'games'} added to Wishlist`;
+  return count === 1 ? '💖 Wishlisted' : `💖 ${count} wishlisted`;
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `${getGameTitle(game)} added to ${platform} Queue`;
+  return '📌 Queued';
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `${getGameTitle(game)} moved to ${platform} Queue`;
+  return '📌 Moved to Queue';
 }
 
 export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `${getGameTitle(game)} removed from ${platform} Queue`;
+  return 'Removed from Queue';
 }
 
 export function getViewGameAction(gameId: string): ToastAction {

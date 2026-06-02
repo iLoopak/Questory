@@ -1091,7 +1091,7 @@ function App() {
     }
 
     if (action === 'ignore') {
-      addUndoAction(`${game.title} hidden from Review Mode`, {
+      addUndoAction('🚫 Ignored', {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
         description: `Restore ${game.title} to Review Mode`,
@@ -1587,7 +1587,6 @@ function App() {
 
       <UndoToastStack
         actions={pendingUndoActions}
-        onDismiss={dismissUndoAction}
         onOpenQueue={openQueueFromToast}
         onUndo={undoAction}
         onViewGame={viewGameFromToast}
@@ -1636,19 +1635,17 @@ function App() {
 
 type UndoToastStackProps = {
   actions: PendingUndoAction[];
-  onDismiss: (actionId: string) => void;
   onOpenQueue: () => void;
   onUndo: (actionId: string) => void;
   onViewGame: (gameId: string) => void;
 };
 
-function UndoToastStack({ actions, onDismiss, onOpenQueue, onUndo, onViewGame }: UndoToastStackProps) {
+function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastStackProps) {
   if (actions.length === 0) {
     return null;
   }
 
   const visibleActions = actions.slice(-maxVisibleToastCount).reverse();
-  const hiddenActionCount = Math.max(0, actions.length - visibleActions.length);
 
   function runToastAction(actionId: string, toastAction: ToastAction) {
     if (toastAction.kind === 'undo') {
@@ -1669,62 +1666,36 @@ function UndoToastStack({ actions, onDismiss, onOpenQueue, onUndo, onViewGame }:
   return (
     <aside
       aria-label="QuestShelf notifications"
-      aria-live="assertive"
-      className="fixed bottom-4 left-3 right-3 z-40 grid gap-2 pb-[max(0px,var(--qs-safe-bottom))] sm:left-auto sm:right-5 sm:w-full sm:max-w-md"
+      aria-live="polite"
+      className="pointer-events-none fixed right-3 top-[calc(0.75rem+max(0px,var(--qs-safe-top)))] z-40 grid max-w-[min(calc(100vw-1.5rem),20rem)] justify-items-end gap-2 sm:right-5 sm:top-[calc(1rem+max(0px,var(--qs-safe-top)))]"
       role="status"
     >
-      {hiddenActionCount > 0 ? (
-        <div className="rounded-full border border-skyglass/20 bg-ink-950/95 px-3 py-2 text-center text-xs font-semibold text-slate-300 shadow-panel">
-          {hiddenActionCount} more recent {hiddenActionCount === 1 ? 'message' : 'messages'} merged
-        </div>
-      ) : null}
       {visibleActions.map((action) => {
         const category = action.category ?? 'success';
         const categoryStyles = getToastCategoryStyles(category);
-        const actionButtons = action.actions && action.actions.length > 0 ? action.actions : [getUndoAction()];
+        const undoAction =
+          action.actions?.find((toastAction) => toastAction.kind === 'undo') ?? getUndoAction();
 
         return (
           <div
             key={action.id}
-            className={`qs-toast qs-glass rounded-xl border bg-ink-950/95 p-3 shadow-panel ${categoryStyles.container}`}
+            className={`qs-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-full border px-3 py-2 shadow-glow ${categoryStyles.container}`}
           >
-            <div className="flex items-start gap-3">
-              <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${categoryStyles.dot}`} aria-hidden="true" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`text-[0.65rem] font-bold uppercase tracking-[0.18em] ${categoryStyles.label}`}>
-                    {getToastCategoryLabel(category)}
-                  </span>
-                  {action.repeatCount && action.repeatCount > 1 ? (
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-300">
-                      ×{action.repeatCount}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-sm font-semibold leading-5 text-white">{action.message}</p>
-                <p className="mt-1 text-xs text-slate-400">Undo stays available for a few seconds.</p>
-              </div>
-              <button
-                aria-label={`Dismiss notification: ${action.message}`}
-                className="h-9 w-9 shrink-0 rounded-md border border-white/10 text-lg leading-none text-slate-300 transition hover:bg-white/10 hover:text-white"
-                onClick={() => onDismiss(action.id)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-              {actionButtons.map((toastAction) => (
-                <button
-                  className={getToastButtonClass(toastAction.kind)}
-                  key={`${action.id}-${toastAction.kind}-${toastAction.gameId ?? 'global'}`}
-                  onClick={() => runToastAction(action.id, toastAction)}
-                  type="button"
-                >
-                  {toastAction.label}
-                </button>
-              ))}
-            </div>
+            <span className="min-w-0 truncate text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
+              {action.message}
+            </span>
+            {action.repeatCount && action.repeatCount > 1 ? (
+              <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[0.65rem] font-bold text-slate-300">
+                ×{action.repeatCount}
+              </span>
+            ) : null}
+            <button
+              className={getToastButtonClass(undoAction.kind)}
+              onClick={() => runToastAction(action.id, undoAction)}
+              type="button"
+            >
+              {undoAction.label}
+            </button>
           </div>
         );
       })}
@@ -1732,56 +1703,32 @@ function UndoToastStack({ actions, onDismiss, onOpenQueue, onUndo, onViewGame }:
   );
 }
 
-function getToastCategoryLabel(category: ToastCategory) {
-  if (category === 'success') {
-    return 'Success';
-  }
-
-  if (category === 'warning') {
-    return 'Warning';
-  }
-
-  if (category === 'error') {
-    return 'Error';
-  }
-
-  return 'Info';
-}
-
 function getToastCategoryStyles(category: ToastCategory) {
   if (category === 'warning') {
     return {
-      container: 'border-amber-300/40 ring-1 ring-amber-300/15',
-      dot: 'bg-amber-300 qs-status-dot-warning',
-      label: 'text-amber-200',
+      container: 'border-amber-300/35 bg-amber-950/90 text-amber-50 ring-1 ring-amber-300/15',
     };
   }
 
   if (category === 'error') {
     return {
-      container: 'border-red-400/45 ring-1 ring-red-400/15',
-      dot: 'bg-red-300 qs-status-dot-error',
-      label: 'text-red-200',
+      container: 'border-red-400/40 bg-red-950/90 text-red-50 ring-1 ring-red-400/15',
     };
   }
 
   if (category === 'info') {
     return {
-      container: 'border-skyglass/35 ring-1 ring-skyglass/10',
-      dot: 'bg-sky-300 qs-status-dot-info',
-      label: 'text-sky-200',
+      container: 'border-skyglass/35 bg-ink-900/92 text-sky-50 ring-1 ring-skyglass/10',
     };
   }
 
   return {
-    container: 'border-mint/35 ring-1 ring-mint/15',
-    dot: 'bg-mint qs-status-dot-success',
-    label: 'text-mint',
+    container: 'border-mint/35 bg-ink-950/92 text-mint ring-1 ring-mint/15',
   };
 }
 
 function getToastButtonClass(kind: ToastAction['kind']) {
-  const baseClass = 'min-h-11 rounded-md px-3 text-sm font-semibold transition focus-visible:translate-y-0';
+  const baseClass = 'min-h-0 rounded-full px-3 py-1 text-xs font-bold transition focus-visible:translate-y-0 sm:text-sm';
 
   if (kind === 'undo') {
     return `${baseClass} bg-mint text-ink-950 shadow-glow hover:bg-mint/90`;
