@@ -3,6 +3,7 @@ import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
+import { CollectionToolbar } from './components/CollectionToolbar';
 import { GameCard } from './components/GameCard';
 import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
@@ -2095,149 +2096,89 @@ function CollectionPanel({
 
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
-      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
-          {hasActiveFilters || isMultiSelectMode ? (
-            <p className="mt-1 text-sm text-slate-400">
-              {hasActiveFilters ? `${games.length} shown` : null}{isMultiSelectMode ? `${hasActiveFilters ? ' - ' : ''}${selectedCount} selected` : null}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
-            onClick={() => onStartReview(collectionType === 'wishlist' ? 'wishlist' : 'backlog')}
-            type="button"
-          >
-            Review {collectionType === 'wishlist' ? 'wishlist' : 'backlog'}
-          </button>
+      <CollectionToolbar
+        title={title}
+        summary={
+          hasActiveFilters || isMultiSelectMode ? (
+            <>
+              {hasActiveFilters ? `${games.length} shown` : null}
+              {isMultiSelectMode ? `${hasActiveFilters ? ' - ' : ''}${selectedCount} selected` : null}
+            </>
+          ) : undefined
+        }
+        searchValue={filters.searchTerm}
+        searchPlaceholder="Find title"
+        onSearchChange={(value) => onFiltersChange({ searchTerm: value })}
+        selects={[
+          {
+            label: 'Status',
+            value: filters.status,
+            options: [allOption, ...gameStatuses],
+            onChange: (value) => onFiltersChange({ status: value as GameStatus | typeof allOption }),
+          },
+          {
+            label: 'Platform',
+            value: filters.platform,
+            options: [allOption, ...platformOptions],
+            onChange: (value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption }),
+          },
+        ]}
+        moreFiltersActiveCount={activeAdvancedFilterCount}
+        moreFiltersOpen={isAdvancedFiltersOpen}
+        onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
+        onClearFilters={hasActiveFilters ? onClearFilters : undefined}
+        viewMode={{
+          label: `${title} view mode`,
+          options: collectionViewModes,
+          value: viewMode,
+          onChange: (mode) => setViewMode(mode as CollectionViewMode),
+        }}
+        primaryAction={
           <button
             className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
             onClick={onAddGame}
             type="button"
           >
-            Add game
+            Add
           </button>
-          {collectionType === 'wishlist' && onSyncSteamWishlist ? (
+        }
+        actionMenu={
+          <>
             <button
-              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
-              disabled={steamWishlistSyncState?.status === 'loading'}
-              onClick={onSyncSteamWishlist}
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              onClick={() => onStartReview(collectionType === 'wishlist' ? 'wishlist' : 'backlog')}
               type="button"
             >
-              {steamWishlistSyncState?.status === 'loading' ? 'Syncing...' : 'Sync Steam'}
+              Review {collectionType === 'wishlist' ? 'wishlist' : 'backlog'}
             </button>
-          ) : null}
-          <button
-            className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${
-              isMultiSelectMode
-                ? 'border-mint/40 bg-mint/10 text-mint shadow-glow'
-                : 'border-skyglass/15 text-slate-200 hover:bg-mint/10 hover:text-white'
-            }`}
-            onClick={toggleMultiSelectMode}
-            type="button"
-          >
-            {isMultiSelectMode ? 'Exit select' : 'Select'}
-          </button>
-        </div>
-      </div>
-
-      {collectionType === 'wishlist' && steamWishlistSyncState ? (
-        <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
-      ) : null}
-
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-1.5">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">View</p>
-        </div>
-        <div className="grid grid-cols-3 overflow-hidden rounded-md border border-skyglass/15 bg-ink-900/70" role="group" aria-label={`${title} view mode`}>
-          {collectionViewModes.map((mode) => {
-            const isActive = viewMode === mode;
-
-            return (
+            {collectionType === 'wishlist' && onSyncSteamWishlist ? (
               <button
-                key={mode}
-                aria-pressed={isActive}
-                className={`h-8 border-r border-skyglass/10 px-2.5 text-xs font-semibold transition last:border-r-0 sm:text-sm ${
-                  isActive
-                    ? 'bg-mint text-ink-950 shadow-glow'
-                    : 'text-slate-300 hover:bg-mint/10 hover:text-white'
-                }`}
-                onClick={() => setViewMode(mode)}
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
+                disabled={steamWishlistSyncState?.status === 'loading'}
+                onClick={onSyncSteamWishlist}
                 type="button"
               >
-                {mode.replace(' View', '')}
+                {steamWishlistSyncState?.status === 'loading' ? 'Syncing Steam...' : 'Sync Steam'}
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mb-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-1.5">
-        <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto pb-0.5">
-          <label className="min-w-[11rem] flex-[1.3]">
-            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
-            <input
-              className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
-              onChange={(event) => onFiltersChange({ searchTerm: event.target.value })}
-              placeholder="Find title"
-              type="search"
-              value={filters.searchTerm}
-            />
-          </label>
-
-          <div className="min-w-[8.75rem] flex-1">
-            <FilterSelect
-              label="Status"
-              value={filters.status}
-              options={[allOption, ...gameStatuses]}
-              onChange={(value) => onFiltersChange({ status: value as GameStatus | typeof allOption })}
-            />
-          </div>
-
-          <div className="min-w-[8.75rem] flex-1">
-            <FilterSelect
-              label="Platform"
-              value={filters.platform}
-              options={[allOption, ...platformOptions]}
-              onChange={(value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption })}
-            />
-          </div>
-
-          <button
-            aria-expanded={isAdvancedFiltersOpen}
-            className={`h-9 shrink-0 rounded-md border px-3 text-sm font-semibold transition ${
-              isAdvancedFiltersOpen || activeAdvancedFilterCount > 0
-                ? 'border-mint/40 bg-mint/15 text-mint shadow-glow'
-                : 'border-skyglass/15 bg-ink-900/70 text-slate-200 hover:bg-mint/10 hover:text-white'
-            }`}
-            onClick={() => setIsAdvancedFiltersOpen(true)}
-            type="button"
-          >
-            More Filters{activeAdvancedFilterCount > 0 ? ` (${activeAdvancedFilterCount})` : ''}
-          </button>
-
-          {hasActiveFilters ? (
+            ) : null}
             <button
-              className="h-9 shrink-0 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
-              onClick={onClearFilters}
+              className={`h-9 rounded-md border px-3 text-left text-sm font-semibold transition ${
+                isMultiSelectMode
+                  ? 'border-mint/40 bg-mint/10 text-mint shadow-glow'
+                  : 'border-skyglass/15 text-slate-200 hover:bg-mint/10 hover:text-white'
+              }`}
+              onClick={toggleMultiSelectMode}
               type="button"
             >
-              Clear filters
+              {isMultiSelectMode ? 'Exit select' : 'Select'}
             </button>
-          ) : null}
-        </div>
+          </>
+        }
+      />
 
-        {hasActiveFilters ? (
-          <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-            <span className="rounded-full border border-mint/25 bg-mint/10 px-2 py-0.5 font-semibold text-mint">
-              {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
-            </span>
-            <span>{games.length} shown</span>
-          </div>
-        ) : null}
-      </div>
+      {collectionType === 'wishlist' && steamWishlistSyncState && steamWishlistSyncState.status !== 'idle' ? (
+        <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
+      ) : null}
 
       {isAdvancedFiltersOpen ? (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onClick={() => setIsAdvancedFiltersOpen(false)}>

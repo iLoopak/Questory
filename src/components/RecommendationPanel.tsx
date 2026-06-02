@@ -13,6 +13,7 @@ import {
 import type { ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { gamePlatforms } from '../types/game';
+import { CollectionToolbar } from './CollectionToolbar';
 
 type RecommendationPanelProps = {
   games: Game[];
@@ -33,6 +34,7 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
   const [recommendFromQueueOnly, setRecommendFromQueueOnly] = useState(false);
   const [recommendNextGame, setRecommendNextGame] = useState(false);
   const [rerollIndex, setRerollIndex] = useState(0);
+  const [recommendationSearchTerm, setRecommendationSearchTerm] = useState('');
   const queuedGameIds = useMemo(() => new Set(queueEntries.map((entry) => entry.gameId)), [queueEntries]);
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
@@ -55,8 +57,13 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
       return nextGame ? [nextGame] : [];
     }
 
-    return recommendFromQueueOnly ? games.filter((game) => queuedGameIds.has(game.id)) : games;
-  }, [games, queueEntries, queuedGameIds, recommendFromQueueOnly, recommendNextGame]);
+    const sourceGames = recommendFromQueueOnly ? games.filter((game) => queuedGameIds.has(game.id)) : games;
+    const normalizedSearch = recommendationSearchTerm.trim().toLowerCase();
+
+    return sourceGames.filter((game) =>
+      normalizedSearch ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedSearch) : true,
+    );
+  }, [games, queueEntries, queuedGameIds, recommendFromQueueOnly, recommendNextGame, recommendationSearchTerm]);
 
   const recommendations = useMemo(() => getRecommendations(recommendationGames, preferences), [recommendationGames, preferences]);
   const recommendation = recommendations.length > 0 ? recommendations[rerollIndex % recommendations.length] : null;
@@ -70,95 +77,69 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
     <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-74px)]">
       <div className="flex h-full min-h-0 flex-col">
         <div className="border-b border-white/10 bg-ink-950/70 p-2 sm:p-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Recommendation</h2>
-            </div>
-          </div>
-
-          <div className="mt-2 grid gap-2 xl:grid-cols-[1.1fr_1fr_1fr]">
-            <SegmentedControl
-              label="Available time"
-              options={availableTimeOptions}
-              value={availableTime}
-              onChange={(value) => updatePreference(() => setAvailableTime(value as AvailableTime))}
-            />
-            <SegmentedControl
-              label="Mood"
-              options={moodOptions}
-              value={mood}
-              onChange={(value) => updatePreference(() => setMood(value as RecommendationMood))}
-            />
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
-              <select
-                className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
-                value={preferredPlatform}
-                onChange={(event) =>
-                  updatePreference(() => setPreferredPlatform(event.target.value as GamePlatform | typeof anyPlatform))
-                }
-              >
-                {[anyPlatform, ...platformOptions].map((platform) => (
-                  <option key={platform} value={platform}>
-                    {platform}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <details className="mt-2 rounded-md border border-white/10 bg-ink-900 p-2">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-300">More options</summary>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                <input
-                  checked={includeFinishedGames}
-                  className="h-4 w-4 accent-mint"
-                  onChange={(event) => updatePreference(() => setIncludeFinishedGames(event.target.checked))}
-                  type="checkbox"
+          <CollectionToolbar
+            title="Recommendation"
+            summary={`${recommendations.length} matches`}
+            searchValue={recommendationSearchTerm}
+            searchPlaceholder="Search pool"
+            onSearchChange={setRecommendationSearchTerm}
+            selects={[
+              {
+                label: 'Status',
+                value: availableTime,
+                options: availableTimeOptions,
+                onChange: (value) => updatePreference(() => setAvailableTime(value as AvailableTime)),
+              },
+              {
+                label: 'Platform',
+                value: preferredPlatform,
+                options: [anyPlatform, ...platformOptions],
+                onChange: (value) => updatePreference(() => setPreferredPlatform(value as GamePlatform | typeof anyPlatform)),
+              },
+            ]}
+            moreFiltersActiveCount={[includeFinishedGames, includeWishlist, recommendFromQueueOnly, recommendNextGame].filter(Boolean).length}
+            actionMenu={
+              <>
+                <SegmentedControl
+                  label="Mood"
+                  options={moodOptions}
+                  value={mood}
+                  onChange={(value) => updatePreference(() => setMood(value as RecommendationMood))}
                 />
-                Finished
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                <input
-                  checked={includeWishlist}
-                  className="h-4 w-4 accent-mint"
-                  onChange={(event) => updatePreference(() => setIncludeWishlist(event.target.checked))}
-                  type="checkbox"
-                />
-                Wishlist
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                <input
-                  checked={recommendFromQueueOnly}
-                  className="h-4 w-4 accent-mint"
-                  onChange={(event) => updatePreference(() => setRecommendFromQueueOnly(event.target.checked))}
-                  type="checkbox"
-                />
-                Queue only
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                <input
-                  checked={recommendNextGame}
-                  className="h-4 w-4 accent-mint"
-                  onChange={(event) => updatePreference(() => setRecommendNextGame(event.target.checked))}
-                  type="checkbox"
-                />
-                Next queued
-              </label>
-            </div>
-          </details>
+                <button
+                  className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20"
+                  onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
+                  type="button"
+                >
+                  Review this pool
+                </button>
+                <details className="rounded-md border border-white/10 bg-ink-900 p-2">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-300">More Filters</summary>
+                  <div className="mt-3 grid gap-2">
+                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+                      <input checked={includeFinishedGames} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setIncludeFinishedGames(event.target.checked))} type="checkbox" />
+                      Finished
+                    </label>
+                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+                      <input checked={includeWishlist} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setIncludeWishlist(event.target.checked))} type="checkbox" />
+                      Wishlist
+                    </label>
+                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+                      <input checked={recommendFromQueueOnly} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setRecommendFromQueueOnly(event.target.checked))} type="checkbox" />
+                      Queue only
+                    </label>
+                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+                      <input checked={recommendNextGame} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setRecommendNextGame(event.target.checked))} type="checkbox" />
+                      Next queued
+                    </label>
+                  </div>
+                </details>
+              </>
+            }
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
-          <div className="mb-2 flex flex-wrap gap-2">
-            <button
-              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
-              onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
-              type="button"
-            >
-              Review this pool
-            </button>
-          </div>
           {recommendation ? (
             <RecommendationCard
               key={recommendation.game.id}
