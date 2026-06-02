@@ -202,19 +202,34 @@ img {
 
 .qs-review-stage {
   display: grid;
-  grid-template-columns: minmax(8rem, 0.42fr) minmax(18rem, 1.15fr) minmax(8rem, 0.42fr);
+  grid-template-columns: minmax(8rem, 0.34fr) minmax(22rem, 1.35fr) minmax(8rem, 0.34fr);
   align-items: center;
-  gap: clamp(0.75rem, 2vw, 1.5rem);
+  gap: clamp(0.6rem, 1.6vw, 1.25rem);
 }
 
 .qs-review-hero {
   justify-self: center;
-  width: min(100%, 54vh, 34rem);
+  width: min(100%, 58vw, 46rem);
 }
 
 .qs-review-cover {
   width: 100%;
-  max-height: min(68dvh, 680px);
+  max-height: min(76dvh, 760px);
+}
+
+.qs-review-artwork-frame {
+  aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(34, 243, 223, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.45), rgba(2, 6, 23, 0.92));
+}
+
+.qs-review-details {
+  opacity: 0.72;
+}
+
+.qs-review-details[open] {
+  opacity: 1;
 }
 
 .qs-review-zone {
@@ -224,17 +239,17 @@ img {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
-  border: 1px solid rgba(143, 180, 202, 0.1);
+  border: 1px solid rgba(143, 180, 202, 0.08);
   border-radius: 1.25rem;
   padding: clamp(0.75rem, 1.6vw, 1rem);
 }
 
 .qs-review-zone-negative {
-  background: linear-gradient(90deg, rgba(248, 113, 113, 0.12), rgba(248, 113, 113, 0.03) 58%, transparent);
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.1), rgba(248, 113, 113, 0.025) 58%, transparent);
 }
 
 .qs-review-zone-positive {
-  background: linear-gradient(270deg, rgba(34, 243, 223, 0.14), rgba(34, 243, 223, 0.04) 58%, transparent);
+  background: linear-gradient(270deg, rgba(34, 243, 223, 0.12), rgba(34, 243, 223, 0.03) 58%, transparent);
 }
 
 .qs-review-zone-label {
@@ -378,16 +393,16 @@ img {
   }
 
   .qs-review-stage {
-    grid-template-columns: minmax(7.5rem, 0.48fr) minmax(15rem, 1fr) minmax(7.5rem, 0.48fr);
-    gap: 0.6rem;
+    grid-template-columns: minmax(7rem, 0.32fr) minmax(18rem, 1.4fr) minmax(7rem, 0.32fr);
+    gap: 0.55rem;
   }
 
   .qs-review-hero {
-    width: min(100%, 44vw, 21rem);
+    width: min(100%, 58vw, 32rem);
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 8.5rem);
+    max-height: calc(100dvh - 7rem);
   }
 
   .qs-review-zone {
@@ -662,16 +677,16 @@ body.qs-controller-active .qs-toast {
   }
 
   .qs-review-stage {
-    grid-template-columns: minmax(6.5rem, 0.44fr) minmax(12rem, 0.9fr) minmax(6.5rem, 0.44fr);
-    gap: 0.5rem;
+    grid-template-columns: minmax(6rem, 0.3fr) minmax(16rem, 1.45fr) minmax(6rem, 0.3fr);
+    gap: 0.45rem;
   }
 
   .qs-review-hero {
-    width: min(100%, 38vw, 18rem);
+    width: min(100%, 58vw, 30rem);
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 6.25rem);
+    max-height: calc(100dvh - 5.75rem);
   }
 }
 
