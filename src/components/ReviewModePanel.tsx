@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
+import { ViewportModal } from './ViewportModal';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 
@@ -101,6 +102,8 @@ export function ReviewModePanel({
   const [isReviewOptionsOpen, setIsReviewOptionsOpen] = useState(false);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
+  const queueButtonRef = useRef<HTMLButtonElement | null>(null);
+  const firstQueuePlatformButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const platformOptions = useMemo(() => {
     return Array.from(new Set(games.map((game) => game.platform))).sort((first, second) =>
@@ -409,14 +412,12 @@ export function ReviewModePanel({
               game={activeGame}
               highlightedActionIndex={highlightedActionIndex}
               isNoteOpen={isNoteOpen}
-              isQueuePickerOpen={isQueuePickerOpen}
               noteDraft={noteDraft}
               onAction={(action) => performAction(activeGame, action)}
-              onAddToQueue={addToQueue}
               onHighlight={setHighlightedActionIndex}
               onNoteDraftChange={setNoteDraft}
-              onQueuePickerClose={() => setIsQueuePickerOpen(false)}
               onSubmitNote={submitNote}
+              queueButtonRef={queueButtonRef}
               queuePlatforms={queuePlatforms}
             />
           ) : (
@@ -431,6 +432,47 @@ export function ReviewModePanel({
           )}
         </div>
       </div>
+
+      {activeGame && isQueuePickerOpen ? (
+        <ViewportModal
+          ariaLabel={`Choose queue platform for ${activeGame.title}`}
+          initialFocusRef={firstQueuePlatformButtonRef}
+          placement="center"
+          restoreFocusRef={queueButtonRef}
+          onClose={() => setIsQueuePickerOpen(false)}
+        >
+          <div className="qs-review-queue-modal p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose queue</div>
+                <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to platform queue</h2>
+                <p className="mt-1 line-clamp-2 text-sm text-slate-400">{activeGame.title}</p>
+              </div>
+              <button
+                className="min-h-10 rounded-lg border border-white/10 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
+                onClick={() => setIsQueuePickerOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {queuePlatforms.map((platform, index) => (
+                <button
+                  key={platform}
+                  className="min-h-14 rounded-xl border border-mint/35 bg-mint/10 px-4 text-left text-base font-bold text-mint transition hover:bg-mint hover:text-ink-950 focus-visible:bg-mint focus-visible:text-ink-950"
+                  onClick={() => addToQueue(platform)}
+                  ref={index === 0 ? firstQueuePlatformButtonRef : undefined}
+                  type="button"
+                >
+                  {platform}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-500">Single tap queues this game, closes the picker, and advances Review Mode. Press Escape or B to cancel.</p>
+          </div>
+        </ViewportModal>
+      ) : null}
     </section>
   );
 }
@@ -439,27 +481,23 @@ function FocusedReviewCard({
   game,
   highlightedActionIndex,
   isNoteOpen,
-  isQueuePickerOpen,
   noteDraft,
   onAction,
-  onAddToQueue,
   onHighlight,
   onNoteDraftChange,
-  onQueuePickerClose,
   onSubmitNote,
+  queueButtonRef,
   queuePlatforms,
 }: {
   game: Game;
   highlightedActionIndex: number;
   isNoteOpen: boolean;
-  isQueuePickerOpen: boolean;
   noteDraft: string;
   onAction: (action: ReviewModeAction) => void;
-  onAddToQueue: (platform: GamePlatform) => void;
   onHighlight: (index: number) => void;
   onNoteDraftChange: (value: string) => void;
-  onQueuePickerClose: () => void;
   onSubmitNote: () => void;
+  queueButtonRef: RefObject<HTMLButtonElement | null>;
   queuePlatforms: GamePlatform[];
 }) {
   const coverSources = getGameCoverSources(game);
@@ -528,7 +566,7 @@ function FocusedReviewCard({
                 {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
                 <img
                   alt={game.title}
-                  className={`h-full w-full object-cover transition-opacity duration-300 ${
+                  className={`h-full w-full object-contain p-2 transition-opacity duration-300 ${
                     isCoverLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   decoding="async"
@@ -570,32 +608,6 @@ function FocusedReviewCard({
           <span>D-pad Right keep</span>
         </div>
 
-        {isQueuePickerOpen ? (
-          <section className="mt-3 rounded-2xl border border-mint/25 bg-mint/10 p-3 w-full">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold text-white">Choose queue platform</h4>
-              <button
-                className="min-h-10 rounded-lg border border-white/10 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
-                onClick={onQueuePickerClose}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
-              {queuePlatforms.map((platform) => (
-                <button
-                  key={platform}
-                  className="min-h-12 rounded-lg border border-mint/35 bg-ink-950/80 px-3 text-sm font-semibold text-mint transition hover:bg-mint hover:text-ink-950 focus-visible:bg-mint focus-visible:text-ink-950"
-                  onClick={() => onAddToQueue(platform)}
-                  type="button"
-                >
-                  {platform}
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         <details className="qs-review-details mt-3 rounded-2xl border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300 w-full">
           <summary className="cursor-pointer select-none font-semibold text-slate-100">Details</summary>
@@ -702,6 +714,7 @@ function FocusedReviewCard({
                 )}`}
                 onClick={() => onAction(action.action)}
                 onFocus={() => onHighlight(index)}
+                ref={action.action === 'queue' ? queueButtonRef : undefined}
                 type="button"
               >
                 <div className="flex items-center gap-1.5 justify-center">
