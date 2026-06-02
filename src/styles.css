@@ -633,9 +633,12 @@ body.qs-controller-active .qs-game-card:focus {
 body.qs-controller-active .qs-toast {
   border-width: 2px;
   box-shadow:
-    0 0 0 3px rgb(var(--text-primary-rgb) / 0.08),
-    0 20px 70px rgb(var(--accent-rgb) / 0.22),
-    0 20px 60px rgb(var(--overlay-rgb) / 0.45);
+    0 0 0 2px rgb(var(--accent-rgb) / 0.16),
+    0 10px 34px rgb(var(--overlay-rgb) / 0.32);
+}
+
+.qs-toast button {
+  min-height: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -924,12 +927,22 @@ textarea,
 }
 
 :root[data-theme='light'] .qs-setup-card,
-:root[data-theme='light'] .qs-controller-debug,
-:root[data-theme='light'] .qs-toast {
+:root[data-theme='light'] .qs-controller-debug {
   background: var(--surface-raised);
   color: var(--text-primary);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-panel);
+}
+
+:root[data-theme='light'] .qs-toast {
+  background: linear-gradient(135deg, rgb(var(--accent-rgb) / 0.95), rgb(var(--accent-rgb) / 0.78));
+  border-color: rgb(var(--accent-rgb) / 0.42);
+  color: var(--ink-950);
+  box-shadow: 0 12px 32px rgb(var(--accent-rgb) / 0.22);
+}
+
+:root[data-theme='light'] .qs-toast span {
+  color: var(--ink-950);
 }
 
 :root[data-theme='light'] body.qs-controller-active button:focus,
