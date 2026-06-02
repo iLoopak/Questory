@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import { getGameCoverSources } from '../lib/gameCoverImages';
+import { useMemo, useState } from 'react';
+import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
+import { CollectionToolbar } from './CollectionToolbar';
 import type { PlatformQueueEntry } from '../lib/platformQueueStorage';
 import {
   availableTimeOptions,
@@ -11,21 +11,39 @@ import {
   type RecommendationPreferences,
 } from '../lib/recommendationEngine';
 import type { ReviewSource } from '../lib/reviewModeStorage';
-import type { Game, GamePlatform } from '../types/game';
+import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { gamePlatforms } from '../types/game';
-import { CollectionToolbar } from './CollectionToolbar';
 
 type RecommendationPanelProps = {
   games: Game[];
   queueEntries: PlatformQueueEntry[];
+  onAddToQueue: (game: Game) => void;
+  onAddToWishlist: (game: Game) => void;
+  onMoveToLibrary: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
+  onRemove: (gameId: string) => void;
+  onRemoveAndIgnore: (game: Game) => void;
   onStartReview: (source: ReviewSource) => void;
-  onStatusChange: (gameId: string, status: 'Playing') => void;
+  onStatusChange: (gameId: string, status: GameStatus) => void;
 };
 
-const anyPlatform = 'Any';
+type RecommendationViewMode = 'Grid View' | 'Shelf View' | 'Compact View';
 
-export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStartReview, onStatusChange }: RecommendationPanelProps) {
+const anyPlatform = 'Any';
+const recommendationViewModes: readonly RecommendationViewMode[] = ['Grid View', 'Shelf View', 'Compact View'];
+
+export function RecommendationPanel({
+  games,
+  queueEntries,
+  onAddToQueue,
+  onAddToWishlist,
+  onMoveToLibrary,
+  onOpenDetails,
+  onRemove,
+  onRemoveAndIgnore,
+  onStartReview,
+  onStatusChange,
+}: RecommendationPanelProps) {
   const [availableTime, setAvailableTime] = useState<AvailableTime>('30 min');
   const [mood, setMood] = useState<RecommendationMood>('comfort');
   const [preferredPlatform, setPreferredPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
@@ -35,6 +53,8 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
   const [recommendNextGame, setRecommendNextGame] = useState(false);
   const [rerollIndex, setRerollIndex] = useState(0);
   const [recommendationSearchTerm, setRecommendationSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<RecommendationViewMode>('Grid View');
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const queuedGameIds = useMemo(() => new Set(queueEntries.map((entry) => entry.gameId)), [queueEntries]);
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
@@ -67,246 +87,204 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
 
   const recommendations = useMemo(() => getRecommendations(recommendationGames, preferences), [recommendationGames, preferences]);
   const recommendation = recommendations.length > 0 ? recommendations[rerollIndex % recommendations.length] : null;
+  const recommendedGameIds = useMemo(() => new Set(recommendations.map((currentRecommendation) => currentRecommendation.game.id)), [recommendations]);
+  const recommendationResults = useMemo(() => {
+    if (!recommendation) {
+      return recommendations.map((currentRecommendation) => currentRecommendation.game);
+    }
+
+    return [
+      recommendation.game,
+      ...recommendations
+        .map((currentRecommendation) => currentRecommendation.game)
+        .filter((game) => game.id !== recommendation.game.id),
+    ];
+  }, [recommendation, recommendations]);
+  const activeMoreFilterCount = [includeFinishedGames, includeWishlist, recommendFromQueueOnly, recommendNextGame].filter(Boolean).length;
 
   function updatePreference(update: () => void) {
     update();
     setRerollIndex(0);
   }
 
+  function getHighlightLabel(game: Game) {
+    if (recommendation?.game.id === game.id) {
+      return '🎯 Recommended Today';
+    }
+
+    if (recommendedGameIds.has(game.id)) {
+      return '⭐ Recommended';
+    }
+
+    return undefined;
+  }
+
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-74px)]">
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="border-b border-white/10 bg-ink-950/70 p-2 sm:p-3">
-          <CollectionToolbar
-            title="Recommendation"
-            summary={`${recommendations.length} matches`}
-            searchValue={recommendationSearchTerm}
-            searchPlaceholder="Search pool"
-            onSearchChange={setRecommendationSearchTerm}
-            selects={[
-              {
-                label: 'Status',
-                value: availableTime,
-                options: availableTimeOptions,
-                onChange: (value) => updatePreference(() => setAvailableTime(value as AvailableTime)),
-              },
-              {
-                label: 'Platform',
-                value: preferredPlatform,
-                options: [anyPlatform, ...platformOptions],
-                onChange: (value) => updatePreference(() => setPreferredPlatform(value as GamePlatform | typeof anyPlatform)),
-              },
-            ]}
-            moreFiltersActiveCount={[includeFinishedGames, includeWishlist, recommendFromQueueOnly, recommendNextGame].filter(Boolean).length}
-            actionMenu={
-              <>
-                <SegmentedControl
-                  label="Mood"
-                  options={moodOptions}
-                  value={mood}
-                  onChange={(value) => updatePreference(() => setMood(value as RecommendationMood))}
-                />
+    <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
+      <CollectionToolbar
+        title="Recommendation"
+        summary={recommendation ? `${recommendations.length} matches · ${Math.round(recommendation.confidence * 100)}% confidence` : `${recommendations.length} matches`}
+        searchValue={recommendationSearchTerm}
+        searchPlaceholder="Find title"
+        onSearchChange={setRecommendationSearchTerm}
+        selects={[
+          {
+            label: 'Status',
+            value: availableTime,
+            options: availableTimeOptions,
+            onChange: (value) => updatePreference(() => setAvailableTime(value as AvailableTime)),
+          },
+          {
+            label: 'Platform',
+            value: preferredPlatform,
+            options: [anyPlatform, ...platformOptions],
+            onChange: (value) => updatePreference(() => setPreferredPlatform(value as GamePlatform | typeof anyPlatform)),
+          },
+        ]}
+        moreFiltersActiveCount={activeMoreFilterCount}
+        moreFiltersOpen={isMoreFiltersOpen}
+        onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
+        viewMode={{
+          label: 'Recommendation view mode',
+          options: recommendationViewModes,
+          value: viewMode,
+          onChange: (mode) => setViewMode(mode as RecommendationViewMode),
+        }}
+        actionMenu={
+          <>
+            <button
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              onClick={() => setRerollIndex((currentIndex) => currentIndex + 1)}
+              type="button"
+            >
+              Reroll recommendation
+            </button>
+            <button
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
+              type="button"
+            >
+              Review this pool
+            </button>
+          </>
+        }
+      />
+
+      {isMoreFiltersOpen ? (
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onClick={() => setIsMoreFiltersOpen(false)}>
+          <section
+            aria-label="Recommendation filters"
+            aria-modal="true"
+            className="qs-filter-drawer qs-glass w-full max-w-4xl overflow-hidden rounded-t-2xl border shadow-panel sm:rounded-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
+              <div>
+                <h3 className="text-base font-semibold text-white">Recommendation filters</h3>
+                <p className="mt-0.5 text-xs text-slate-400">Tune the same result list without switching to a custom recommendation layout.</p>
+              </div>
+              <button
+                className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                onClick={() => setIsMoreFiltersOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Mood</div>
+                <div className="mt-2 flex gap-1 overflow-x-auto rounded-md border border-white/10 bg-ink-900 p-1">
+                  {moodOptions.map((option) => (
+                    <button
+                      key={option}
+                      className={`h-9 shrink-0 rounded px-3 text-sm font-medium transition ${
+                        option === mood ? 'bg-mint text-ink-950 shadow-glow' : 'text-slate-300 hover:bg-mint/10 hover:text-white'
+                      }`}
+                      onClick={() => updatePreference(() => setMood(option))}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <RecommendationToggle checked={includeFinishedGames} label="Finished" onChange={(checked) => updatePreference(() => setIncludeFinishedGames(checked))} />
+                <RecommendationToggle checked={includeWishlist} label="Wishlist" onChange={(checked) => updatePreference(() => setIncludeWishlist(checked))} />
+                <RecommendationToggle checked={recommendFromQueueOnly} label="Queue only" onChange={(checked) => updatePreference(() => setRecommendFromQueueOnly(checked))} />
+                <RecommendationToggle checked={recommendNextGame} label="Next queued" onChange={(checked) => updatePreference(() => setRecommendNextGame(checked))} />
+              </div>
+
+              <div className="mt-4 flex justify-end">
                 <button
-                  className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20"
-                  onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
+                  className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
+                  onClick={() => setIsMoreFiltersOpen(false)}
                   type="button"
                 >
-                  Review this pool
+                  Show games
                 </button>
-                <details className="rounded-md border border-white/10 bg-ink-900 p-2">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-300">More Filters</summary>
-                  <div className="mt-3 grid gap-2">
-                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                      <input checked={includeFinishedGames} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setIncludeFinishedGames(event.target.checked))} type="checkbox" />
-                      Finished
-                    </label>
-                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                      <input checked={includeWishlist} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setIncludeWishlist(event.target.checked))} type="checkbox" />
-                      Wishlist
-                    </label>
-                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                      <input checked={recommendFromQueueOnly} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setRecommendFromQueueOnly(event.target.checked))} type="checkbox" />
-                      Queue only
-                    </label>
-                    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
-                      <input checked={recommendNextGame} className="h-4 w-4 accent-mint" onChange={(event) => updatePreference(() => setRecommendNextGame(event.target.checked))} type="checkbox" />
-                      Next queued
-                    </label>
-                  </div>
-                </details>
-              </>
-            }
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
-          {recommendation ? (
-            <RecommendationCard
-              key={recommendation.game.id}
-              confidence={recommendation.confidence}
-              game={recommendation.game}
-              onMarkPlaying={() => onStatusChange(recommendation.game.id, 'Playing')}
-              onOpenDetails={() => onOpenDetails(recommendation.game.id)}
-              onReroll={() => setRerollIndex((currentIndex) => currentIndex + 1)}
-              reasons={recommendation.reasons}
-            />
-          ) : (
-            <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-4 text-center">
-              <div>
-                <h3 className="text-lg font-semibold text-white">No recommendation available</h3>
               </div>
             </div>
-          )}
+          </section>
         </div>
-      </div>
+      ) : null}
+
+      {recommendation ? (
+        <div className="mb-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+          <span className="font-semibold">🎯 Recommended Today:</span> {recommendation.game.title}
+          {recommendation.reasons.length > 0 ? <span className="text-slate-300"> · {recommendation.reasons.join(' · ')}</span> : null}
+        </div>
+      ) : null}
+
+      {recommendationResults.length > 0 ? (
+        viewMode === 'Shelf View' ? (
+          <CollectionShelf games={recommendationResults} getHighlightLabel={getHighlightLabel} onOpenDetails={onOpenDetails} />
+        ) : viewMode === 'Compact View' ? (
+          <CollectionList
+            games={recommendationResults}
+            getHighlightLabel={getHighlightLabel}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+          />
+        ) : (
+          <CollectionGrid
+            games={recommendationResults}
+            getHighlightLabel={getHighlightLabel}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+          />
+        )
+      ) : (
+        <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
+          <div>
+            <h3 className="text-lg font-semibold text-white">No recommendation available</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">Adjust search, platform, or filters to bring games back into the recommendation pool.</p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-type RecommendationCardProps = {
-  confidence: number;
-  game: Game;
-  onMarkPlaying: () => void;
-  onOpenDetails: () => void;
-  onReroll: () => void;
-  reasons: string[];
-};
-
-function RecommendationCard({
-  confidence,
-  game,
-  onMarkPlaying,
-  onOpenDetails,
-  onReroll,
-  reasons,
-}: RecommendationCardProps) {
-  const coverSources = getCoverSources(game);
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const activeCoverSource = coverSources[coverSourceIndex];
-
-  useEffect(() => {
-    setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
-  }, [game.id]);
-
+function RecommendationToggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
-    <article className="grid gap-3 rounded-lg border border-white/10 bg-ink-800 p-3 shadow-panel xl:grid-cols-[180px_minmax(0,1fr)]">
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-700">
-        <div className="aspect-[2/3]">
-          {activeCoverSource ? (
-            <div className="relative h-full">
-              {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-              <img
-                alt=""
-                className={`h-full w-full object-cover transition-opacity duration-300 ${
-                  isCoverLoaded ? 'opacity-100' : 'opacity-0'
-                }`}
-                decoding="async"
-                loading="lazy"
-                onError={() => {
-                  setIsCoverLoaded(false);
-                  setCoverSourceIndex((currentIndex) => currentIndex + 1);
-                }}
-                onLoad={() => setIsCoverLoaded(true)}
-                src={activeCoverSource}
-              />
-            </div>
-          ) : (
-            <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
-              <div>
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
-                  {game.title.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">No cover</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-3">
-        <div>
-          <h3 className="text-2xl font-semibold text-white">{game.title}</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>{game.platform}</Badge>
-            {game.collectionType === 'wishlist' ? <Badge>Wishlist</Badge> : null}
-            <Badge>{game.status}</Badge>
-          </div>
-        </div>
-
-        <section className="rounded-md border border-white/10 bg-ink-950 p-3">
-          <h4 className="text-sm font-semibold text-white">Why this?</h4>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {reasons.map((reason) => (
-              <span key={reason} className="rounded-full bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
-                {reason}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <div className="mt-auto flex flex-wrap gap-2">
-          <button
-            className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-            onClick={onReroll}
-            type="button"
-          >
-            Reroll
-          </button>
-          <button
-            className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
-            onClick={onMarkPlaying}
-            type="button"
-          >
-            Play now
-          </button>
-          <button
-            className="h-10 rounded-md border border-white/10 px-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-            onClick={onOpenDetails}
-            type="button"
-          >
-            Details
-          </button>
-        </div>
-      </div>
-    </article>
+    <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
+      <input checked={checked} className="h-4 w-4 accent-mint" onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+      {label}
+    </label>
   );
-}
-
-type SegmentedControlProps = {
-  label: string;
-  onChange: (value: string) => void;
-  options: readonly string[];
-  value: string;
-};
-
-function SegmentedControl({ label, onChange, options, value }: SegmentedControlProps) {
-  return (
-    <div>
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
-      <div className="mt-2 flex gap-1 overflow-x-auto rounded-md border border-white/10 bg-ink-900 p-1">
-        {options.map((option) => (
-          <button
-            key={option}
-            className={`h-8 shrink-0 rounded px-2 text-xs font-medium transition ${
-              option === value ? 'bg-white text-ink-950' : 'text-slate-300 hover:bg-white/10 hover:text-white'
-            }`}
-            onClick={() => onChange(option)}
-            type="button"
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Badge({ children }: { children: ReactNode }) {
-  return <span className="rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">{children}</span>;
-}
-
-function getCoverSources(game: Game) {
-  return getGameCoverSources(game);
 }
