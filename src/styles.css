@@ -143,7 +143,23 @@ select {
 
 button {
   cursor: pointer;
+  transition-duration: 170ms;
+  transition-timing-function: ease;
   user-select: none;
+}
+
+button:not(:disabled),
+[role='button'] {
+  transform-origin: center;
+}
+
+button:not(:disabled):active,
+[role='button']:active {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 button,
@@ -388,9 +404,91 @@ img {
     max(0px, var(--qs-safe-left));
 }
 
+
 .qs-game-grid > * {
   content-visibility: auto;
   contain-intrinsic-size: 390px 270px;
+}
+
+.qs-game-card,
+.qs-shelf-card,
+.qs-compact-card,
+.qs-review-cover,
+.qs-setup-card {
+  transform-origin: center;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.qs-game-card:hover,
+.qs-game-card:focus-within,
+.qs-shelf-card:hover,
+.qs-shelf-card:focus-visible,
+.qs-compact-card:hover,
+.qs-compact-card:focus-within,
+.qs-setup-card:hover,
+.qs-setup-card:focus-within {
+  transform: translateY(-2px) scale(1.01);
+}
+
+.qs-game-card:hover,
+.qs-game-card:focus-within,
+.qs-compact-card:hover,
+.qs-compact-card:focus-within,
+.qs-setup-card:hover,
+.qs-setup-card:focus-within {
+  box-shadow:
+    inset 0 1px 0 rgb(var(--text-primary-rgb) / 0.06),
+    0 26px 78px rgb(var(--overlay-rgb) / 0.46),
+    var(--shadow-glow);
+}
+
+.qs-shelf-card:hover,
+.qs-shelf-card:focus-visible,
+.qs-review-cover:hover,
+.qs-review-cover:focus-within {
+  box-shadow:
+    0 22px 64px rgb(var(--overlay-rgb) / 0.4),
+    var(--shadow-glow);
+}
+
+.qs-game-card:active,
+.qs-shelf-card:active,
+.qs-compact-card:active,
+.qs-setup-card:active {
+  transform: translateY(0) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  [role='button'],
+  .qs-game-card,
+  .qs-shelf-card,
+  .qs-compact-card,
+  .qs-review-cover,
+  .qs-setup-card {
+    transition-duration: 1ms;
+  }
+
+  button:not(:disabled):active,
+  [role='button']:active,
+  .qs-game-card:hover,
+  .qs-game-card:focus-within,
+  .qs-shelf-card:hover,
+  .qs-shelf-card:focus-visible,
+  .qs-compact-card:hover,
+  .qs-compact-card:focus-within,
+  .qs-setup-card:hover,
+  .qs-setup-card:focus-within,
+  .qs-game-card:active,
+  .qs-shelf-card:active,
+  .qs-compact-card:active,
+  .qs-setup-card:active {
+    transform: none;
+  }
 }
 
 .line-clamp-2 {
