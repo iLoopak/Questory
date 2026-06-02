@@ -663,7 +663,7 @@ body.qs-controller-active .qs-toast {
 
 .qs-shelf-card {
   content-visibility: auto;
-  contain-intrinsic-size: 16rem 25rem;
+  contain-intrinsic-size: 16rem auto;
 }
 
 @media (orientation: landscape) and (max-height: 640px) {
@@ -683,6 +683,30 @@ body.qs-controller-active .qs-toast {
 
 .qs-compact-header {
   min-height: 2.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  transition: all 0.3s ease;
+}
+
+.qs-compact-header.qs-header-stuck {
+  background: rgba(7, 17, 31, 0.95) !important;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(34, 243, 223, 0.05);
+  border-color: rgba(34, 243, 223, 0.25);
+}
+
+/* Ensure that elements scrolled into view are not covered by the sticky header */
+[tabindex],
+button,
+a,
+input,
+select,
+textarea,
+.qs-content-panel,
+.qs-queue-shell,
+.qs-review-shell {
+  scroll-margin-top: 3.5rem;
 }
 
 .qs-content-panel,
@@ -937,4 +961,10 @@ body.qs-controller-active .qs-toast {
 
 .qs-status-dot-info {
   box-shadow: 0 0 18px rgb(var(--info-rgb) / 0.65);
+}
+
+:root[data-theme='light'] .qs-compact-header.qs-header-stuck {
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08), 0 0 1px rgba(0, 124, 116, 0.1);
+  border-color: rgba(0, 124, 116, 0.25);
 }
