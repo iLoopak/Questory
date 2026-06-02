@@ -5,6 +5,7 @@ import { BackToTopButton } from './components/BackToTopButton';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { CollectionToolbar } from './components/CollectionToolbar';
+import { ViewportModal } from './components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from './components/CollectionViews';
 import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
@@ -1802,6 +1803,7 @@ function CollectionPanel({
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const activeViewModeCollectionRef = useRef(collectionType);
+  const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
   const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
@@ -1837,12 +1839,6 @@ function CollectionPanel({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (isAdvancedFiltersOpen && (event.key === 'Escape' || event.key === 'b' || event.key === 'B' || event.key === 'GamepadB')) {
-        event.preventDefault();
-        setIsAdvancedFiltersOpen(false);
-        return;
-      }
-
       if (event.key !== 'Escape' || !isMultiSelectMode) {
         return;
       }
@@ -1857,15 +1853,7 @@ function CollectionPanel({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAdvancedFiltersOpen, isMultiSelectMode, selectedGameIds.size]);
-
-  useEffect(() => {
-    if (!isAdvancedFiltersOpen) {
-      return;
-    }
-
-    window.setTimeout(() => advancedFiltersCloseRef.current?.focus(), 0);
-  }, [isAdvancedFiltersOpen]);
+  }, [isMultiSelectMode, selectedGameIds.size]);
 
   function toggleMultiSelectMode() {
     setIsMultiSelectMode((currentMode) => {
@@ -2001,6 +1989,7 @@ function CollectionPanel({
         ]}
         moreFiltersActiveCount={activeAdvancedFilterCount}
         moreFiltersOpen={isAdvancedFiltersOpen}
+        moreFiltersButtonRef={advancedFiltersButtonRef}
         onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
         viewMode={{
@@ -2057,15 +2046,13 @@ function CollectionPanel({
       ) : null}
 
       {isAdvancedFiltersOpen ? (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onClick={() => setIsAdvancedFiltersOpen(false)}>
-          <section
-            aria-label={`${title} advanced filters`}
-            aria-modal="true"
-            className="qs-filter-drawer qs-glass w-full max-w-4xl overflow-hidden rounded-t-2xl border shadow-panel sm:rounded-2xl"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
+        <ViewportModal
+          ariaLabel={`${title} advanced filters`}
+          initialFocusRef={advancedFiltersCloseRef}
+          restoreFocusRef={advancedFiltersButtonRef}
+          onClose={() => setIsAdvancedFiltersOpen(false)}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
               <div>
                 <h3 className="text-base font-semibold text-white">Advanced filters</h3>
                 <p className="mt-0.5 text-xs text-slate-400">Sort, source, info, tags, collection scope, and quick activity filters.</p>
@@ -2165,9 +2152,8 @@ function CollectionPanel({
                   </button>
                 </div>
               </div>
-            </div>
-          </section>
-        </div>
+          </div>
+        </ViewportModal>
       ) : null}
 
       {isMultiSelectMode ? (
