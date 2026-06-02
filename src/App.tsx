@@ -28,9 +28,16 @@ import {
   type OnboardingState,
 } from './lib/onboardingStorage';
 import {
+  addActiveQueuePlatform,
   addGameToPlatformQueue,
+  getActiveQueuePlatforms,
   getQueuePlatforms,
+  hideQueuePlatform,
+  moveQueuePlatform,
+  removeQueuePlatform,
+  renameQueuePlatform,
   getQueueSummary,
+  setActiveQueuePlatforms,
   loadPlatformQueueState,
   moveQueueEntry,
   moveQueueEntryToPlatform,
@@ -101,6 +108,7 @@ const settingsCategories = [
   'Integrations',
   'Library',
   'Wishlist',
+  'Queue Platforms',
   'Retro',
   'Appearance',
   'Data & Backup',
@@ -1448,6 +1456,7 @@ function App() {
               queueState={platformQueueState}
               onAddGameToQueue={addGameToQueue}
               onLimitChange={updateQueueLimit}
+              onQueueStateChange={setPlatformQueueState}
               onMoveEntry={moveQueueGame}
               onMoveEntryToPlatform={moveQueueGameToPlatform}
               onOpenDetails={(gameId) => {
@@ -1528,6 +1537,7 @@ function App() {
               resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
+              platformQueueState={platformQueueState}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -1542,6 +1552,7 @@ function App() {
               onOnboardingAction={handleOnboardingAction}
               onOnboardingClose={hideOnboarding}
               onOpenOnboarding={openOnboarding}
+              onPlatformQueueStateChange={setPlatformQueueState}
               onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
               onRemoveDemoGames={removeDemoGames}
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
@@ -2989,6 +3000,7 @@ type SettingsPanelProps = {
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  platformQueueState: PlatformQueueState;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -3003,6 +3015,7 @@ type SettingsPanelProps = {
   onOnboardingAction: (itemId: OnboardingItemId) => void;
   onOnboardingClose: () => void;
   onOpenOnboarding: () => void;
+  onPlatformQueueStateChange: (state: PlatformQueueState) => void;
   onRawgApiKeyConfigured: () => void;
   onRemoveDemoGames: () => void;
   onReviewRetroImportedGames: () => void;
@@ -3029,6 +3042,7 @@ function SettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  platformQueueState,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -3043,6 +3057,7 @@ function SettingsPanel({
   onOnboardingAction,
   onOnboardingClose,
   onOpenOnboarding,
+  onPlatformQueueStateChange,
   onRawgApiKeyConfigured,
   onRemoveDemoGames,
   onReviewRetroImportedGames,
@@ -3140,6 +3155,10 @@ function SettingsPanel({
           ) : null}
 
           {activeCategory === 'Wishlist' ? <WishlistSettingsPanel /> : null}
+
+          {activeCategory === 'Queue Platforms' ? (
+            <QueuePlatformsSettingsPanel games={games} queueState={platformQueueState} onQueueStateChange={onPlatformQueueStateChange} />
+          ) : null}
 
           {activeCategory === 'Retro' ? (
             <div className="space-y-4">
@@ -3340,6 +3359,11 @@ function getSettingsCategoryMeta(category: SettingsCategory) {
       label: 'Wishlist',
       shortDescription: 'Planning and priorities',
     },
+    'Queue Platforms': {
+      description: 'Choose, hide, remove, rename, and reorder the queue platforms that should appear on Queue.',
+      label: 'Queue Platforms',
+      shortDescription: 'Personal active queues',
+    },
     Retro: {
       description: 'Import ROM entries, review platform preferences, and prepare emulator settings.',
       label: 'Retro',
@@ -3379,6 +3403,177 @@ function WishlistSettingsPanel() {
       <h2 className="text-xl font-semibold text-white">Wishlist settings</h2>
       <p className="mt-1 text-sm text-slate-400">Wishlist sync lives on the Wishlist screen.</p>
     </section>
+  );
+}
+
+function QueuePlatformsSettingsPanel({
+  games,
+  queueState,
+  onQueueStateChange,
+}: {
+  games: Game[];
+  queueState: PlatformQueueState;
+  onQueueStateChange: (state: PlatformQueueState) => void;
+}) {
+  const [customPlatformName, setCustomPlatformName] = useState('');
+  const allQueuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
+  const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
+  const hiddenQueuePlatforms = allQueuePlatforms.filter((platform) => !activeQueuePlatforms.includes(platform));
+
+  function addPlatform(platform: GamePlatform) {
+    onQueueStateChange(addActiveQueuePlatform(queueState, platform));
+    setCustomPlatformName('');
+  }
+
+  function addCustomPlatform() {
+    const platform = customPlatformName.trim() as GamePlatform;
+    if (!platform) {
+      return;
+    }
+
+    addPlatform(platform);
+  }
+
+  function togglePlatform(platform: GamePlatform, isEnabled: boolean) {
+    onQueueStateChange(isEnabled ? addActiveQueuePlatform(queueState, platform) : hideQueuePlatform(queueState, platform));
+  }
+
+  return (
+    <section className="qs-glass rounded-lg border p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-white">Queue Platforms</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Supported platforms remain available for imports and metadata. Active queue platforms are the only ones shown on Queue.
+          </p>
+        </div>
+        <div className="rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint">
+          {activeQueuePlatforms.length} active
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <input
+          className="h-10 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
+          placeholder="Custom Platform, Retroid, Steam Deck..."
+          value={customPlatformName}
+          onChange={(event) => setCustomPlatformName(event.target.value)}
+        />
+        <button
+          className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90 disabled:bg-slate-600 disabled:text-slate-300"
+          disabled={!customPlatformName.trim()}
+          onClick={addCustomPlatform}
+          type="button"
+        >
+          Add Queue Platform
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+          <h3 className="font-semibold text-white">Active queues</h3>
+          <div className="mt-3 grid gap-2">
+            {activeQueuePlatforms.length > 0 ? (
+              activeQueuePlatforms.map((platform) => (
+                <QueuePlatformManagementRow
+                  key={platform}
+                  isActive
+                  platform={platform}
+                  onHide={() => onQueueStateChange(hideQueuePlatform(queueState, platform))}
+                  onMoveDown={() => onQueueStateChange(moveQueuePlatform(queueState, platform, 'down'))}
+                  onMoveUp={() => onQueueStateChange(moveQueuePlatform(queueState, platform, 'up'))}
+                  onRemove={() => onQueueStateChange(removeQueuePlatform(queueState, platform))}
+                  onRename={(nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
+                  onToggle={(isEnabled) => togglePlatform(platform, isEnabled)}
+                />
+              ))
+            ) : (
+              <div className="rounded-md border border-dashed border-white/10 p-3 text-sm text-slate-500">
+                New users start with no queues. Enable only the platforms you want to plan around.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+          <h3 className="font-semibold text-white">Available / hidden</h3>
+          <div className="mt-3 grid gap-2">
+            {hiddenQueuePlatforms.map((platform) => (
+              <QueuePlatformManagementRow
+                key={platform}
+                isActive={false}
+                platform={platform}
+                onHide={() => onQueueStateChange(hideQueuePlatform(queueState, platform))}
+                onMoveDown={() => undefined}
+                onMoveUp={() => undefined}
+                onRemove={() => onQueueStateChange(removeQueuePlatform(queueState, platform))}
+                onRename={(nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
+                onToggle={(isEnabled) => togglePlatform(platform, isEnabled)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+        <h3 className="font-semibold text-white">Bulk management</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10" onClick={() => onQueueStateChange(setActiveQueuePlatforms(queueState, allQueuePlatforms))} type="button">
+            Enable multiple
+          </button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10" onClick={() => onQueueStateChange(setActiveQueuePlatforms(queueState, []))} type="button">
+            Disable multiple
+          </button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10" onClick={() => onQueueStateChange(setActiveQueuePlatforms(queueState, [...activeQueuePlatforms].sort((first, second) => first.localeCompare(second))))} type="button">
+            Reorder multiple A-Z
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QueuePlatformManagementRow({
+  isActive,
+  platform,
+  onHide,
+  onMoveDown,
+  onMoveUp,
+  onRemove,
+  onRename,
+  onToggle,
+}: {
+  isActive: boolean;
+  platform: GamePlatform;
+  onHide: () => void;
+  onMoveDown: () => void;
+  onMoveUp: () => void;
+  onRemove: () => void;
+  onRename: (platform: GamePlatform) => void;
+  onToggle: (isEnabled: boolean) => void;
+}) {
+  function renamePlatform() {
+    const nextPlatform = window.prompt('Rename queue platform', platform);
+    if (nextPlatform?.trim()) {
+      onRename(nextPlatform.trim() as GamePlatform);
+    }
+  }
+
+  return (
+    <div className="grid gap-2 rounded-md border border-skyglass/15 bg-ink-900/70 p-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+      <input checked={isActive} className="h-4 w-4 accent-mint" onChange={(event) => onToggle(event.target.checked)} type="checkbox" />
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-white">{platform}</div>
+        <div className="text-xs text-slate-500">{isActive ? 'Shown on Queue' : 'Hidden from Queue but available for imports/metadata'}</div>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveUp} type="button">Up</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveDown} type="button">Down</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">Rename</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onHide} type="button">Hide</button>
+        <button className="h-8 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={onRemove} type="button">Remove</button>
+      </div>
+    </div>
   );
 }
 
