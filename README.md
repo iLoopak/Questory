@@ -289,7 +289,15 @@ QuestShelf uses the provided app icon direction as the source brand asset. The i
 - `questshelf-icon.svg`: favicon, header logo, and general PWA icon.
 - `questshelf-maskable.svg`: maskable PWA icon using the same artwork with a full safe-area background.
 
-The UI theme follows the icon with a near-black/deep navy background, restrained neon teal accents, blue-gray borders, soft glow focus states, and glassy console-style panels. Neon teal is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens.
+The UI theme follows the icon with tokenized app surfaces, restrained neon teal accents, blue-gray borders, soft glow focus states, and glassy console-style panels. Neon teal is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens, while Light, Dark, and Follow Device can all transform the same screens without a reload.
+
+### Theme Coverage Checklist
+
+- Light, Dark, and Follow Device resolve through the shared CSS theme tokens in `src/styles.css` and Tailwind color aliases in `tailwind.config.js`.
+- App shell, top navigation, Home, Library, Wishlist, Queue, Review Mode, Artwork, Recommendation, Stats, Metadata, Settings, and Onboarding use tokenized surfaces, borders, text, shadows, and accents.
+- Cards, panels, modals, overlays, buttons, dropdowns, tooltips, detail dialogs, setup widgets, queue panels, and review mode panels should be checked after any new UI change.
+- Switching between Light, Dark, and Follow Device should update the current screen, browser theme color, native color-scheme, focus rings, scrollbars, and transient UI without a page reload.
+- Theme audits should include a raw-color scan of source UI files so fixed dark colors do not leak into Light Theme.
 
 ## Steam Integration Foundation
 
