@@ -13,6 +13,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.installHintDismissed.v1'
   | 'questshelf.landscapeLock.v1'
   | 'questshelf.settingsCategory.v1'
+  | 'questshelf.themePreference.v1'
   | 'questshelf.storageIssues.v1';
 
 export type StorageKeyScope = 'core' | 'integration' | 'device' | 'ui' | 'recovery';
@@ -123,6 +124,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Last opened Settings category.',
     scope: 'ui',
     schema: 'Settings category string.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.themePreference.v1',
+    purpose: 'Light, Dark, or System appearance preference.',
+    scope: 'ui',
+    schema: '\'light\' | \'dark\' | \'system\'.',
   },
   {
     backup: 'never',

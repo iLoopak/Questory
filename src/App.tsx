@@ -66,6 +66,14 @@ import {
 } from './lib/reviewModeStorage';
 import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
+  applyThemePreference,
+  loadThemePreference,
+  saveThemePreference,
+  watchSystemTheme,
+  type ResolvedTheme,
+  type ThemePreference,
+} from './lib/themePreferences';
+import {
   createUndoActionId,
   loadPendingUndoActions,
   savePendingUndoActions,
@@ -184,6 +192,8 @@ function App() {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => applyThemePreference(loadThemePreference()));
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -223,6 +233,19 @@ function App() {
   useEffect(() => {
     savePlatformQueueState(platformQueueState);
   }, [platformQueueState]);
+
+  useEffect(() => {
+    setResolvedTheme(applyThemePreference(themePreference));
+    saveThemePreference(themePreference);
+
+    if (themePreference !== 'system') {
+      return undefined;
+    }
+
+    return watchSystemTheme(() => {
+      setResolvedTheme(applyThemePreference('system'));
+    });
+  }, [themePreference]);
 
   useEffect(() => {
     pendingUndoActionsRef.current = pendingUndoActions;
@@ -1502,7 +1525,9 @@ function App() {
               isOnboardingOpen={isOnboardingOpen}
               isOnboardingComplete={isOnboardingComplete}
               lastRetroImportsHiddenByFilters={areLastRetroImportsHiddenByFilters}
+              resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
+              themePreference={themePreference}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -1523,6 +1548,7 @@ function App() {
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
+              onThemePreferenceChange={setThemePreferenceState}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
             />
@@ -2960,7 +2986,9 @@ type SettingsPanelProps = {
   isOnboardingComplete: boolean;
   isOnboardingOpen: boolean;
   lastRetroImportsHiddenByFilters: boolean;
+  resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  themePreference: ThemePreference;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -2978,6 +3006,7 @@ type SettingsPanelProps = {
   onRawgApiKeyConfigured: () => void;
   onRemoveDemoGames: () => void;
   onReviewRetroImportedGames: () => void;
+  onThemePreferenceChange: (preference: ThemePreference) => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
@@ -2997,7 +3026,9 @@ function SettingsPanel({
   isOnboardingComplete,
   isOnboardingOpen,
   lastRetroImportsHiddenByFilters,
+  resolvedTheme,
   runtimeEnvironment,
+  themePreference,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -3015,6 +3046,7 @@ function SettingsPanel({
   onRawgApiKeyConfigured,
   onRemoveDemoGames,
   onReviewRetroImportedGames,
+  onThemePreferenceChange,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
@@ -3132,9 +3164,12 @@ function SettingsPanel({
             <AppearanceSettingsPanel
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
+              resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
+              themePreference={themePreference}
               onControllerDebugChange={onControllerDebugChange}
               onLandscapeLockChange={onLandscapeLockChange}
+              onThemePreferenceChange={onThemePreferenceChange}
             />
           ) : null}
 
@@ -3395,25 +3430,99 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
 function AppearanceSettingsPanel({
   isControllerDebugEnabled,
   isLandscapeLockEnabled,
+  resolvedTheme,
   runtimeEnvironment,
+  themePreference,
   onControllerDebugChange,
   onLandscapeLockChange,
+  onThemePreferenceChange,
 }: {
   isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
+  resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
+  themePreference: ThemePreference;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
+  onThemePreferenceChange: (preference: ThemePreference) => void;
 }) {
+  const themeOptions: Array<{ description: string; label: string; value: ThemePreference }> = [
+    {
+      description: 'Bright cards and dark text tuned for outdoor handheld sessions.',
+      label: 'Light',
+      value: 'light',
+    },
+    {
+      description: 'The classic QuestShelf neon teal glow on dark gaming panels.',
+      label: 'Dark',
+      value: 'dark',
+    },
+    {
+      description: 'Automatically follows Android, PWA, browser, and desktop OS theme changes.',
+      label: 'Follow Device',
+      value: 'system',
+    },
+  ];
+
   return (
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Appearance</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Choose how QuestShelf renders across browser, PWA, and Android handheld sessions.
+          </p>
         </div>
+        <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
+          {resolvedTheme} active
+        </span>
       </div>
 
-      <label className="mt-4 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme</div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Theme">
+          {themeOptions.map((option) => {
+            const isSelected = themePreference === option.value;
+
+            return (
+              <button
+                aria-checked={isSelected}
+                className={`min-h-28 rounded-md border p-3 text-left transition ${
+                  isSelected
+                    ? 'border-mint/60 bg-mint/15 text-white shadow-glow'
+                    : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/35 hover:bg-mint/10 hover:text-white'
+                }`}
+                key={option.value}
+                onClick={() => onThemePreferenceChange(option.value)}
+                role="radio"
+                type="button"
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`grid h-5 w-5 place-items-center rounded-full border ${isSelected ? 'border-mint bg-mint text-ink-950' : 'border-skyglass/30'}`}>
+                    {isSelected ? <span className="h-2 w-2 rounded-full bg-ink-950" /> : null}
+                  </span>
+                  <span className="font-semibold">{option.label}</span>
+                </span>
+                <span className="mt-2 block text-xs leading-5 text-slate-500">{option.description}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
+        </p>
+      </div>
+
+      {runtimeEnvironment.isAndroid ? (
+        <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
+          <span className="block font-semibold text-white">Android integration</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">
+            QuestShelf respects Android light/dark mode when Follow Device is selected and refreshes system chrome after resume.
+          </span>
+        </div>
+      ) : null}
+
+      <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
         <input
           checked={isLandscapeLockEnabled}
           className="mt-1 h-5 w-5 accent-mint"

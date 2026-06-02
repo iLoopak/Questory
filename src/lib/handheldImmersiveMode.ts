@@ -18,6 +18,12 @@ type StatusBarModule = {
   };
 };
 
+type NavigationBarModule = {
+  NavigationBar?: {
+    setColor?: (options: { color: string; darkButtons?: boolean }) => Promise<void>;
+  };
+};
+
 type AppModule = {
   App: {
     addListener: (eventName: 'appStateChange' | 'resume', listenerFunc: (state?: { isActive: boolean }) => void) => Promise<{
@@ -29,8 +35,10 @@ type AppModule = {
 const capacitorCoreModuleName = '@capacitor/core';
 const statusBarModuleName = '@capacitor/status-bar';
 const appModuleName = '@capacitor/app';
+const navigationBarModuleName = '@capacitor/navigation-bar';
 const screenOrientationModuleName = '@capacitor/screen-orientation';
-const systemBarColor = '#050a12';
+const darkSystemBarColor = '#050a12';
+const lightSystemBarColor = '#f5f7fa';
 const landscapeLockPreferenceKey = 'questshelf.landscapeLock.v1';
 
 export async function configureHandheldImmersiveMode() {
@@ -41,6 +49,7 @@ export async function configureHandheldImmersiveMode() {
   await applyFullscreenStatusBar();
   await applyLandscapePreference();
   window.addEventListener('focus', applyFullscreenStatusBar);
+  window.addEventListener('questshelf:theme-change', () => void applyFullscreenStatusBar());
   window.addEventListener('questshelf:landscape-lock-change', () => void applyLandscapePreference());
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
@@ -70,10 +79,16 @@ async function applyFullscreenStatusBar() {
   }
 
   try {
-    await statusBar.StatusBar.setStyle({ style: statusBar.Style?.Dark ?? 'DARK' });
-    await statusBar.StatusBar.setBackgroundColor({ color: systemBarColor });
+    const resolvedTheme = getResolvedDocumentTheme();
+    const barColor = resolvedTheme === 'light' ? lightSystemBarColor : darkSystemBarColor;
+
+    await statusBar.StatusBar.setStyle({
+      style: resolvedTheme === 'light' ? (statusBar.Style?.Light ?? 'LIGHT') : (statusBar.Style?.Dark ?? 'DARK'),
+    });
+    await statusBar.StatusBar.setBackgroundColor({ color: barColor });
     await statusBar.StatusBar.setOverlaysWebView({ overlay: true });
     await statusBar.StatusBar.hide();
+    await applyNavigationBarColor(barColor, resolvedTheme === 'light');
   } catch {
     // Immersive mode is a progressive Android enhancement; the app shell remains usable if a device denies it.
   }
@@ -102,6 +117,19 @@ async function applyLandscapePreference() {
   } catch {
     // Optional plugin support: the manifest/config still prefer landscape when the plugin is absent.
   }
+}
+
+async function applyNavigationBarColor(color: string, darkButtons: boolean) {
+  try {
+    const navigationBar = (await import(/* @vite-ignore */ navigationBarModuleName)) as NavigationBarModule;
+    await navigationBar.NavigationBar?.setColor?.({ color, darkButtons });
+  } catch {
+    // Navigation bar color support depends on the optional native plugin and Android API level.
+  }
+}
+
+function getResolvedDocumentTheme() {
+  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
 async function isNativeAndroid() {
