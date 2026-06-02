@@ -85,8 +85,9 @@ import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
-const navItems = ['Home', 'Library', 'Wishlist', 'Queue', 'Review Mode', 'Metadata', 'Recommendation', 'Stats', 'Settings'] as const;
-type NavItem = (typeof navItems)[number];
+const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Recommendation', 'Stats', 'Settings'] as const;
+const allNavItems = ['Home', ...navItems, 'Metadata'] as const;
+type NavItem = (typeof allNavItems)[number];
 const settingsCategories = [
   'Integrations',
   'Library',
@@ -179,7 +180,7 @@ function App() {
   const [wishlistFilters, setWishlistFilters] = useState<CollectionFilters>(() =>
     loadCollectionFilters(wishlistFiltersStorageKey),
   );
-  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Home');
+  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
@@ -376,7 +377,9 @@ function App() {
 
       event.preventDefault();
       setActiveNavItem((currentItem) => {
-        const currentIndex = navItems.indexOf(currentItem);
+        const currentIndex = navItems.includes(currentItem as (typeof navItems)[number])
+          ? navItems.indexOf(currentItem as (typeof navItems)[number])
+          : 0;
         const direction = event.key === 'PageDown' ? 1 : -1;
         return navItems[(currentIndex + direction + navItems.length) % navItems.length];
       });
@@ -1267,23 +1270,20 @@ function App() {
 
   return (
     <main className="min-h-screen bg-ink-950 text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-5 lg:px-6">
-        <header className="qs-glass flex flex-col gap-4 rounded-lg border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-mint/30 bg-ink-950 shadow-glow">
+      <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
+        <header className="qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 py-1.5">
+          <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label="QuestShelf">
+            <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md border border-mint/30 bg-ink-950 shadow-glow">
               <img className="qs-logo-glow h-full w-full object-cover" src={questShelfIcon} alt="" />
             </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
-              <h1 className="mt-1 truncate text-2xl font-semibold text-white sm:text-3xl">Gaming backlog</h1>
-            </div>
+            <div className="hidden min-w-0 text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">QuestShelf</div>
           </div>
 
-          <nav className="qs-top-nav flex gap-2 overflow-x-auto rounded-lg border border-skyglass/15 bg-ink-950/70 p-1 shadow-inner">
+          <nav className="qs-top-nav flex flex-1 gap-1 overflow-x-auto rounded-md border border-skyglass/15 bg-ink-950/70 p-0.5 shadow-inner">
             {navItems.map((item) => (
               <button
                 key={item}
-                className={`h-10 shrink-0 rounded-md px-3 text-sm font-medium transition ${
+                className={`h-8 shrink-0 rounded px-2.5 text-xs font-semibold transition sm:h-9 sm:text-sm ${
                   item === activeNavItem
                     ? 'bg-mint text-ink-950 shadow-glow'
                     : 'text-slate-300 hover:bg-mint/10 hover:text-white hover:shadow-glow'
@@ -1302,11 +1302,11 @@ function App() {
           </nav>
         </header>
 
-        <div className="pt-4">
+        <div className="pt-2">
           <PwaStatusBanner />
         </div>
 
-        <section className="flex-1 py-4">
+        <section className="flex-1 py-2">
           {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
             <GameDetailView
               game={selectedGame}
@@ -1337,7 +1337,6 @@ function App() {
               games={filteredLibraryGames}
               platformOptions={platformOptions}
               tags={tags}
-              totalCount={libraryGames.length}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
@@ -1363,7 +1362,6 @@ function App() {
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
               tags={tags}
-              totalCount={wishlistGames.length}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
@@ -1522,11 +1520,9 @@ function App() {
             />
           </div>
         ) : (
-          <button className="qs-setup-launcher" onClick={openOnboarding} type="button">
-            <span>Setup</span>
-            <strong>
-              {completedOnboardingItemIds.size}/{onboardingItemIds.length}
-            </strong>
+          <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={`Open setup checklist, ${completedOnboardingItemIds.size} of ${onboardingItemIds.length} complete`}>
+            <span aria-hidden="true">⚙</span>
+            <strong>Setup {completedOnboardingItemIds.size}/{onboardingItemIds.length}</strong>
           </button>
         )
       ) : null}
@@ -1703,7 +1699,6 @@ type CollectionPanelProps = {
   platformOptions: GamePlatform[];
   steamWishlistSyncState?: SteamWishlistSyncState;
   tags: string[];
-  totalCount: number;
   onAddGame: () => void;
   onAddToWishlist: (game: Game) => void;
   onAddManyToWishlist: (games: Game[]) => void;
@@ -1730,7 +1725,6 @@ function CollectionPanel({
   platformOptions,
   steamWishlistSyncState,
   tags,
-  totalCount,
   onAddGame,
   onAddToWishlist,
   onAddManyToWishlist,
@@ -1987,10 +1981,10 @@ function CollectionPanel({
   }
 
   return (
-    <section className="qs-glass min-w-0 rounded-lg border p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">{title}</h2>
+          <h2 className="text-lg font-semibold text-white">{title}</h2>
           {hasActiveFilters || isMultiSelectMode ? (
             <p className="mt-1 text-sm text-slate-400">
               {hasActiveFilters ? `${games.length} shown` : null}{isMultiSelectMode ? `${hasActiveFilters ? ' - ' : ''}${selectedCount} selected` : null}
@@ -1999,14 +1993,14 @@ function CollectionPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+            className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
             onClick={() => onStartReview(collectionType === 'wishlist' ? 'wishlist' : 'backlog')}
             type="button"
           >
             Review {collectionType === 'wishlist' ? 'wishlist' : 'backlog'}
           </button>
           <button
-            className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
+            className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
             onClick={onAddGame}
             type="button"
           >
@@ -2014,7 +2008,7 @@ function CollectionPanel({
           </button>
           {collectionType === 'wishlist' && onSyncSteamWishlist ? (
             <button
-              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600"
               disabled={steamWishlistSyncState?.status === 'loading'}
               onClick={onSyncSteamWishlist}
               type="button"
@@ -2023,7 +2017,7 @@ function CollectionPanel({
             </button>
           ) : null}
           <button
-            className={`h-10 rounded-md border px-3 text-sm font-semibold transition ${
+            className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${
               isMultiSelectMode
                 ? 'border-mint/40 bg-mint/10 text-mint shadow-glow'
                 : 'border-skyglass/15 text-slate-200 hover:bg-mint/10 hover:text-white'
@@ -2040,10 +2034,9 @@ function CollectionPanel({
         <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
       ) : null}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-skyglass/15 bg-ink-950/70 p-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-1.5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">View mode</p>
-          <p className="text-sm text-slate-400">Shelf mode keeps browsing cover-first for handheld screens.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">View</p>
         </div>
         <div className="grid grid-cols-3 overflow-hidden rounded-md border border-skyglass/15 bg-ink-900/70" role="group" aria-label={`${title} view mode`}>
           {collectionViewModes.map((mode) => {
@@ -2053,7 +2046,7 @@ function CollectionPanel({
               <button
                 key={mode}
                 aria-pressed={isActive}
-                className={`h-10 border-r border-skyglass/10 px-3 text-xs font-semibold transition last:border-r-0 sm:text-sm ${
+                className={`h-8 border-r border-skyglass/10 px-2.5 text-xs font-semibold transition last:border-r-0 sm:text-sm ${
                   isActive
                     ? 'bg-mint text-ink-950 shadow-glow'
                     : 'text-slate-300 hover:bg-mint/10 hover:text-white'
@@ -2068,12 +2061,12 @@ function CollectionPanel({
         </div>
       </div>
 
-      <div className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(3,minmax(8.5rem,1fr))]">
+      <div className="mb-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-2">
+        <div className="qs-filter-grid grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.25fr)_repeat(3,minmax(8.5rem,1fr))]">
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
             <input
-              className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
+              className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
               onChange={(event) => onFiltersChange({ searchTerm: event.target.value })}
               placeholder="Find by title"
               type="search"
@@ -2103,9 +2096,9 @@ function CollectionPanel({
           />
         </div>
 
-        <details className="mt-3 rounded-md border border-skyglass/10 bg-ink-900/50 p-3">
+        <details className="mt-2 rounded-md border border-skyglass/10 bg-ink-900/50 p-2">
           <summary className="cursor-pointer text-sm font-semibold text-slate-300">More filters</summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
             <FilterSelect
               label="Source"
               value={filters.source}
@@ -2129,7 +2122,7 @@ function CollectionPanel({
           </div>
         </details>
 
-        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <details className="min-w-0">
             <summary className="cursor-pointer text-sm font-semibold text-slate-300">Quick filters</summary>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -2168,7 +2161,7 @@ function CollectionPanel({
       </div>
 
       {isMultiSelectMode ? (
-        <div className="mb-4 rounded-lg border border-mint/20 bg-ink-950/80 p-3 shadow-glow">
+        <div className="mb-2 rounded-md border border-mint/20 bg-ink-950/80 p-2 shadow-glow">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="text-sm font-semibold text-white">{selectedCount} selected</div>
             <div className="flex flex-wrap gap-2">
@@ -2219,7 +2212,7 @@ function CollectionPanel({
       ) : null}
 
       {bulkSummary ? (
-        <div className="mb-4 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
+        <div className="mb-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
           {formatBulkSummary(bulkSummary)}
         </div>
       ) : null}
@@ -2230,7 +2223,7 @@ function CollectionPanel({
             <div
               ref={shelfScrollerRef}
               aria-label={`${title} shelf`}
-              className="qs-shelf-scroller -mx-3 flex snap-x gap-4 overflow-x-auto px-3 pb-5 pt-2 sm:-mx-4 sm:px-4"
+              className="qs-shelf-scroller -mx-2 flex snap-x gap-2 overflow-x-auto px-2 pb-3 pt-1 sm:-mx-3 sm:px-3"
               onScroll={handleShelfScroll}
             >
               {renderedShelfGames.map((game, index) => (
@@ -2275,7 +2268,7 @@ function CollectionPanel({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 2xl:grid-cols-4">
+          <div className="qs-game-grid grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4">
             {games.map((game) => (
               <GameCard
                 key={game.id}
@@ -2781,14 +2774,14 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
           <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
             <button
-              className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+              className="h-9 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
               onClick={onClose}
               type="button"
             >
               Cancel
             </button>
             <button
-            className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            className="h-9 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
               type="submit"
             >
               Save game
@@ -3003,7 +2996,6 @@ function SettingsPanel({
                 completedCount={completedOnboardingItemIds.size}
                 isComplete={isOnboardingComplete}
                 onOpenOnboarding={onOpenOnboarding}
-                totalCount={onboardingItemIds.length}
               />
               {isOnboardingOpen ? (
                 <OnboardingChecklist
@@ -3230,7 +3222,7 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
         <div className="flex flex-wrap gap-2">
           {import.meta.env.DEV ? (
             <button
-              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
               onClick={onLoadDemoData}
               type="button"
             >
@@ -3238,7 +3230,7 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
             </button>
           ) : null}
           <button
-            className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
             disabled={demoGameCount === 0}
             onClick={onRemoveDemoGames}
             type="button"
@@ -3315,12 +3307,10 @@ function OnboardingSettingsPanel({
   completedCount,
   isComplete,
   onOpenOnboarding,
-  totalCount,
 }: {
   completedCount: number;
   isComplete: boolean;
   onOpenOnboarding: () => void;
-  totalCount: number;
 }) {
   return (
     <section className="qs-glass rounded-lg border p-4">
@@ -3330,7 +3320,7 @@ function OnboardingSettingsPanel({
         </div>
 
         <button
-          className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+          className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
           onClick={onOpenOnboarding}
           type="button"
         >
@@ -3795,7 +3785,7 @@ function PlaceholderPanel({ title }: PlaceholderPanelProps) {
   return (
     <section className="qs-glass grid min-w-0 place-items-center rounded-lg border p-8 text-center lg:h-[calc(100vh-116px)]">
       <div>
-        <h2 className="text-xl font-semibold text-white">{title}</h2>
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
         <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
           This section is intentionally waiting for a later foundation pass.
         </p>

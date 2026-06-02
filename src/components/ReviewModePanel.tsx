@@ -308,15 +308,13 @@ export function ReviewModePanel({
   }
 
   return (
-    <section className="qs-review-shell overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-116px)]">
+    <section className="qs-review-shell overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-74px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <header className="flex flex-col gap-3 border-b border-skyglass/10 bg-ink-950/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <header className="flex flex-col gap-2 border-b border-skyglass/10 bg-ink-950/80 p-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review Mode</div>
-            <div className="mt-1 flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <div>
-                <h2 className="text-lg font-semibold text-white">Reviewing {sourceLabel}</h2>
-                <p className="text-xs text-slate-400">One game. One decision.</p>
+                <h2 className="text-base font-semibold text-white">Review: {sourceLabel}</h2>
               </div>
               <span className="rounded-full border border-mint/25 bg-mint/10 px-3 py-1 text-sm font-semibold text-mint">
                 {progressLabel}
@@ -324,12 +322,12 @@ export function ReviewModePanel({
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-[minmax(150px,190px)_minmax(140px,170px)_auto]">
+          <div className="grid gap-2 sm:grid-cols-[minmax(130px,170px)_minmax(120px,150px)_auto]">
             <label className="sr-only" htmlFor="review-source">
               Review batch
             </label>
             <select
-              className="h-11 rounded-md border border-skyglass/15 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+              className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm text-white outline-none transition focus:border-mint"
               id="review-source"
               value={source}
               onChange={(event) => onSourceChange(event.target.value as ReviewSource)}
@@ -345,7 +343,7 @@ export function ReviewModePanel({
               Platform
             </label>
             <select
-              className="h-11 rounded-md border border-skyglass/15 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+              className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm text-white outline-none transition focus:border-mint"
               id="review-platform"
               value={selectedPlatform}
               onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform | typeof anyPlatform)}
@@ -359,7 +357,7 @@ export function ReviewModePanel({
 
             {ignoredGameIds.size > 0 ? (
               <button
-                className="min-h-11 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
                 onClick={onRestoreIgnored}
                 type="button"
               >
@@ -369,7 +367,7 @@ export function ReviewModePanel({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
           {activeGame ? (
             <FocusedReviewCard
               game={activeGame}
@@ -453,7 +451,7 @@ function FocusedReviewCard({
           {negativeActions.map((action, index) => (
             <button
               key={action.action}
-              className={`qs-review-action qs-review-action-side min-h-16 rounded-xl border px-4 py-3 text-left text-base font-semibold transition ${getActionClassName(
+              className={`qs-review-action qs-review-action-side min-h-12 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${getActionClassName(
                 action.tone,
                 highlightedActionIndex === index,
               )}`}
@@ -614,7 +612,7 @@ function FocusedReviewCard({
             return (
               <button
                 key={action.action}
-                className={`qs-review-action qs-review-action-side min-h-16 rounded-xl border px-4 py-3 text-left text-base font-semibold transition ${getActionClassName(
+                className={`qs-review-action qs-review-action-side min-h-12 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${getActionClassName(
                   action.tone,
                   highlightedActionIndex === index,
                 )}`}
@@ -653,28 +651,14 @@ function ReviewComplete({
   onReturnToLibrary: () => void;
   onReviewAnother: () => void;
 }) {
-  const completionStats = [
-    { label: 'Reviewed', value: reviewedCount },
-    { label: 'Queued', value: actionStats.queued },
-    { label: 'Playing', value: actionStats.playing },
-    { label: 'Wishlisted', value: actionStats.wishlisted },
-    { label: 'Dropped', value: actionStats.dropped },
-    { label: 'Ignored', value: actionStats.ignored },
-  ];
+  void actionStats;
 
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
-        <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {completionStats.map((stat) => (
-            <div key={stat.label} className="rounded-2xl border border-white/10 bg-ink-950/70 p-4">
-              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{stat.label}</dt>
-              <dd className="mt-2 text-3xl font-semibold text-white">{stat.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className="mt-3 text-sm text-slate-400">Reviewed {reviewedCount} games. Analytics stay in Stats.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
