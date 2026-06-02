@@ -120,7 +120,7 @@ const settingsCategories = [
 type SettingsCategory = (typeof settingsCategories)[number];
 
 const allOption = 'All';
-const questShelfIcon = '/icons/questshelf-icon.svg';
+const questShelfIcon = '/icons/questshelf-new-icon.png';
 const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
 const collectionViewModeStorageKey = 'questshelf.collectionViewMode.v1';
 const settingsCategoryStorageKey = 'questshelf.settingsCategory.v1';

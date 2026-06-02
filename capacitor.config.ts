@@ -4,13 +4,13 @@ const config: CapacitorConfig = {
   appId: 'app.questshelf.handheld',
   appName: 'QuestShelf',
   webDir: 'dist',
-  backgroundColor: '#050a12',
+  backgroundColor: '#0d0c0c',
   android: {
-    backgroundColor: '#050a12',
+    backgroundColor: '#0d0c0c',
   },
   plugins: {
     SplashScreen: {
-      backgroundColor: '#050a12',
+      backgroundColor: '#0d0c0c',
       launchAutoHide: true,
       launchShowDuration: 900,
       launchFadeOutDuration: 220,
@@ -20,7 +20,7 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
     StatusBar: {
-      backgroundColor: '#050a12',
+      backgroundColor: '#0d0c0c',
       overlaysWebView: true,
       style: 'DARK',
     },

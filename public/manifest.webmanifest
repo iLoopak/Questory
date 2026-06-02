@@ -6,25 +6,19 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape",
-  "theme_color": "#22f3df",
-  "background_color": "#02060d",
+  "theme_color": "#ff5a2c",
+  "background_color": "#0d0c0c",
   "icons": [
     {
-      "src": "/icons/questshelf-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icons/questshelf-new-icon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/questshelf-maskable.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/questshelf-maskable.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icons/questshelf-new-icon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
       "purpose": "maskable"
     },
     {
