@@ -37,8 +37,8 @@ const statusBarModuleName = '@capacitor/status-bar';
 const appModuleName = '@capacitor/app';
 const navigationBarModuleName = '@capacitor/navigation-bar';
 const screenOrientationModuleName = '@capacitor/screen-orientation';
-const darkSystemBarColor = '#050a12';
-const lightSystemBarColor = '#f5f7fa';
+const darkSystemBarColor = '#0d0c0c';
+const lightSystemBarColor = '#faf7f5';
 const landscapeLockPreferenceKey = 'questshelf.landscapeLock.v1';
 
 export async function configureHandheldImmersiveMode() {

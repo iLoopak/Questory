@@ -30,7 +30,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - File-based Sync Folder / Auto Backup foundation for user-owned synced folders.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 - Capacitor-ready Android handheld foundation with fullscreen status bar handling and mirrored native Preferences persistence.
-- QuestShelf visual branding with the official neon teal app icon, favicon, PWA icons, and console-style dark theme.
+- QuestShelf visual branding with the official ember-orange app icon, favicon, PWA icons, and console-style dark theme.
 
 No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
@@ -217,7 +217,7 @@ Artwork is resolved in this priority order:
 
 QuestShelf stores optional artwork metadata on game records with `artworkSource` and `artworkUpdatedAt`. Manual covers and Steam covers are protected: RAWG enrichment and bulk artwork repair do not overwrite user-provided artwork, and Steam artwork is not replaced by another source unless the user explicitly applies a different cover in a local edit flow.
 
-Generated fallback covers are local SVG data URLs, so they require no backend and no heavy image library. They are deterministic from the game ID, title, and platform, which means the same game always receives the same Steam Deck-style visual. Each fallback includes the game title, platform badge, subtle gradient background, QuestShelf neon teal accent border/glow, and an initials mark so artwork-first screens stay polished even when no external cover exists.
+Generated fallback covers are local SVG data URLs, so they require no backend and no heavy image library. They are deterministic from the game ID, title, and platform, which means the same game always receives the same Steam Deck-style visual. Each fallback includes the game title, platform badge, subtle gradient background, QuestShelf ember-orange accent border/glow, and an initials mark so artwork-first screens stay polished even when no external cover exists.
 
 Open **Artwork** to use the Artwork Coverage / Metadata Health audit:
 
@@ -245,7 +245,7 @@ The PWA manifest uses:
 - Display mode: `standalone`
 - Orientation: landscape-friendly
 - SVG app icons generated from the QuestShelf icon direction for favicon, app shell, and PWA manifest usage
-- Dark navy background and neon teal theme color
+- Warm charcoal background and ember-orange theme color
 
 Offline support is intentionally app-shell focused:
 
@@ -284,12 +284,19 @@ Steam and RAWG API calls still require network access. The locally saved library
 
 ## Visual Branding
 
-QuestShelf uses the provided app icon direction as the source brand asset. The icon files live in `public/icons/`:
+QuestShelf uses the provided app icon direction as the source brand asset. The primary icon files live in `public/icons/`:
 
-- `questshelf-icon.svg`: favicon, header logo, and general PWA icon.
-- `questshelf-maskable.svg`: maskable PWA icon using the same artwork with a full safe-area background.
+- `questshelf-new-icon.png` (1254×1254): source brand artwork used for the favicon, `apple-touch-icon`, header logo, and the PWA `any` + `maskable` icons in `manifest.webmanifest`.
+- `questshelf-icon.svg` / `questshelf-maskable.svg`: earlier vector artwork, retained for reference and no longer referenced by the app shell.
 
-The UI theme follows the icon with tokenized app surfaces, restrained neon teal accents, blue-gray borders, soft glow focus states, and glassy console-style panels. Neon teal is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens, while Light, Dark, and Follow Device can all transform the same screens without a reload.
+Android launcher resources are generated from the source PNG with `@capacitor/assets` and live in `resources/android/` (adaptive-icon XML in `mipmap-anydpi-v26/` plus per-density `mipmap-*` rasters). The adaptive icon pairs the new foreground artwork with the `@color/questshelf_launcher_background` brand background. Regenerate with:
+
+```shell
+# place the source art at assets/icon-only.png and assets/icon-foreground.png, then:
+npx @capacitor/assets generate --android --iconBackgroundColor '#0D0C0C' --iconBackgroundColorDark '#0D0C0C'
+```
+
+The UI theme follows the icon with tokenized app surfaces, restrained ember-orange accents, warm charcoal borders, soft glow focus states, and glassy console-style panels. Ember orange is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens, while Light, Dark, and Follow Device can all transform the same screens without a reload.
 
 ### Theme Coverage Checklist
 

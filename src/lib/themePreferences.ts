@@ -6,8 +6,8 @@ export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 
 const preferenceModuleName = '@capacitor/preferences';
 const darkThemeQuery = '(prefers-color-scheme: dark)';
-const darkThemeColor = '#050a12';
-const lightThemeColor = '#F5F7FA';
+const darkThemeColor = '#0d0c0c';
+const lightThemeColor = '#FAF7F5';
 
 type PreferencesPlugin = {
   Preferences: {
