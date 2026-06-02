@@ -67,16 +67,16 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
   }
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-116px)]">
+    <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-74px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="border-b border-white/10 bg-ink-950/70 p-4">
+        <div className="border-b border-white/10 bg-ink-950/70 p-2 sm:p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-white">What should I play?</h2>
+              <h2 className="text-lg font-semibold text-white">Recommendation</h2>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr]">
+          <div className="mt-2 grid gap-2 xl:grid-cols-[1.1fr_1fr_1fr]">
             <SegmentedControl
               label="Available time"
               options={availableTimeOptions}
@@ -92,7 +92,7 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
               <select
-                className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+                className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
                 value={preferredPlatform}
                 onChange={(event) =>
                   updatePreference(() => setPreferredPlatform(event.target.value as GamePlatform | typeof anyPlatform))
@@ -106,7 +106,7 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
               </select>
             </label>
           </div>
-          <details className="mt-3 rounded-md border border-white/10 bg-ink-900 p-3">
+          <details className="mt-2 rounded-md border border-white/10 bg-ink-900 p-2">
             <summary className="cursor-pointer text-sm font-semibold text-slate-300">More options</summary>
             <div className="mt-3 flex flex-wrap gap-2">
               <label className="flex items-center gap-2 rounded-md border border-white/10 bg-ink-950 px-3 py-2 text-sm text-slate-300">
@@ -149,10 +149,10 @@ export function RecommendationPanel({ games, queueEntries, onOpenDetails, onStar
           </details>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-          <div className="mb-3 flex flex-wrap gap-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+          <div className="mb-2 flex flex-wrap gap-2">
             <button
-              className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
               onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
               type="button"
             >
@@ -210,7 +210,7 @@ function RecommendationCard({
   }, [game.id]);
 
   return (
-    <article className="grid gap-4 rounded-lg border border-white/10 bg-ink-800 p-4 shadow-panel xl:grid-cols-[220px_minmax(0,1fr)]">
+    <article className="grid gap-3 rounded-lg border border-white/10 bg-ink-800 p-3 shadow-panel xl:grid-cols-[180px_minmax(0,1fr)]">
       <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-700">
         <div className="aspect-[2/3]">
           {activeCoverSource ? (
@@ -244,9 +244,9 @@ function RecommendationCard({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-3">
         <div>
-          <h3 className="mt-2 text-3xl font-semibold text-white">{game.title}</h3>
+          <h3 className="text-2xl font-semibold text-white">{game.title}</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge>{game.platform}</Badge>
             {game.collectionType === 'wishlist' ? <Badge>Wishlist</Badge> : null}
@@ -254,7 +254,7 @@ function RecommendationCard({
           </div>
         </div>
 
-        <section className="rounded-md border border-white/10 bg-ink-950 p-4">
+        <section className="rounded-md border border-white/10 bg-ink-950 p-3">
           <h4 className="text-sm font-semibold text-white">Why this?</h4>
           <div className="mt-3 flex flex-wrap gap-2">
             {reasons.map((reason) => (

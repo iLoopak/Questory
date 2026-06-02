@@ -74,14 +74,13 @@ export function QueuePanel({
   }
 
   return (
-    <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-3 sm:p-4 lg:h-[calc(100vh-116px)] lg:overflow-y-auto">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
+      <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Queue</div>
-          <h2 className="mt-1 text-xl font-semibold text-white">What to play next</h2>
+          <h2 className="text-lg font-semibold text-white">Queue</h2>
         </div>
         <button
-          className="min-h-11 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
+          className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
           onClick={onStartReview}
           type="button"
         >
@@ -89,11 +88,11 @@ export function QueuePanel({
         </button>
       </div>
 
-      <div className="mb-4 grid gap-3 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3 lg:grid-cols-[minmax(0,1fr)_220px_140px]">
+      <div className="mb-2 grid gap-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-2 lg:grid-cols-[minmax(0,1fr)_220px_110px]">
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add game</span>
           <select
-            className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+            className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
             value={selectedGameId}
             onChange={(event) => setSelectedGameId(event.target.value)}
           >
@@ -109,7 +108,7 @@ export function QueuePanel({
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
           <select
-            className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+            className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
             value={selectedPlatform}
             onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform)}
           >
@@ -122,7 +121,7 @@ export function QueuePanel({
         </label>
 
         <button
-          className="min-h-11 self-end rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+          className="h-9 self-end rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
           disabled={!selectedGameId}
           onClick={addSelectedGame}
           type="button"
@@ -131,7 +130,7 @@ export function QueuePanel({
         </button>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-2 xl:grid-cols-2">
         {displayedQueuePlatforms.map((platform) => (
           <PlatformQueueColumn
             key={platform}
@@ -299,12 +298,12 @@ function QueueEntryRow({
   return (
     <article
       aria-label={`${game.title} queue entry. A opens details, X moves up, Y moves down.`}
-      className="rounded-md border border-skyglass/15 bg-ink-950 p-3"
+      className="rounded-md border border-skyglass/15 bg-ink-950 p-2"
       onKeyDown={handleQueueEntryKeyDown}
       role="group"
       tabIndex={0}
     >
-      <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+      <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
         <div className="grid h-9 w-9 place-items-center rounded-md border border-mint/25 bg-mint/10 text-sm font-semibold text-mint">
           {entry.queuePosition}
         </div>
@@ -350,7 +349,7 @@ function QueueEntryRow({
 function QueueGameRow({ game, onOpenDetails }: { game: Game; onOpenDetails: (gameId: string) => void }) {
   return (
     <button
-      className="min-h-11 rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-left text-sm text-mint transition hover:bg-mint/20"
+      className="min-h-9 rounded-md border border-mint/20 bg-mint/10 px-3 py-1.5 text-left text-sm text-mint transition hover:bg-mint/20"
       onClick={() => onOpenDetails(game.id)}
       type="button"
     >

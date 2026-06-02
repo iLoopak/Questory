@@ -574,3 +574,103 @@ body.qs-controller-active .qs-toast {
     padding-bottom: 0.85rem;
   }
 }
+
+/* Handheld compact mode: Retroid / Android handheld landscape screens prioritize game content over chrome. */
+.qs-handheld-shell {
+  gap: 0;
+}
+
+.qs-compact-header {
+  min-height: 2.75rem;
+}
+
+.qs-content-panel,
+.qs-queue-shell,
+.qs-review-shell {
+  scroll-padding: 0.5rem;
+}
+
+@media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
+  .qs-handheld-shell {
+    padding: max(0.25rem, var(--qs-safe-top)) max(0.5rem, var(--qs-safe-right)) max(0.35rem, var(--qs-safe-bottom)) max(0.5rem, var(--qs-safe-left));
+  }
+
+  .qs-compact-header {
+    min-height: 2.25rem;
+    padding-block: 0.25rem;
+  }
+
+  .qs-top-nav {
+    gap: 0.125rem;
+  }
+
+  .qs-top-nav button {
+    min-height: 2rem;
+    padding-inline: 0.55rem;
+    font-size: 0.72rem;
+  }
+
+  .qs-content-panel,
+  .qs-queue-shell,
+  .qs-review-shell {
+    border-radius: 0.5rem;
+  }
+
+  .qs-game-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
+    gap: 0.5rem;
+  }
+
+  .qs-game-card {
+    min-height: 250px;
+  }
+
+  .qs-game-card > div:first-of-type {
+    max-height: 6.75rem;
+  }
+
+  .qs-game-card > div:last-child {
+    gap: 0.5rem;
+    padding: 0.6rem;
+  }
+
+  .qs-shelf-scroller {
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .qs-shelf-card {
+    min-height: 17rem;
+    width: clamp(8.5rem, 20vw, 12rem);
+  }
+
+  .qs-setup-launcher {
+    right: max(0.5rem, var(--qs-safe-right));
+    bottom: max(0.5rem, var(--qs-safe-bottom));
+    min-height: 2.25rem;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0 0.65rem;
+    font-size: 0.75rem;
+  }
+
+  .qs-setup-launcher strong {
+    min-width: 0;
+    height: auto;
+    background: transparent;
+    color: inherit;
+  }
+
+  .qs-review-stage {
+    grid-template-columns: minmax(6.5rem, 0.44fr) minmax(12rem, 0.9fr) minmax(6.5rem, 0.44fr);
+    gap: 0.5rem;
+  }
+
+  .qs-review-hero {
+    width: min(100%, 38vw, 18rem);
+  }
+
+  .qs-review-cover {
+    max-height: calc(100dvh - 6.25rem);
+  }
+}
