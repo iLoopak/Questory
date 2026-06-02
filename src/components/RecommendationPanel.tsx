@@ -234,12 +234,6 @@ export function RecommendationPanel({
         </ViewportModal>
       ) : null}
 
-      {recommendation ? (
-        <div className="mb-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
-          <span className="font-semibold">🎯 Recommended Today:</span> {recommendation.game.title}
-          {recommendation.reasons.length > 0 ? <span className="text-slate-300"> · {recommendation.reasons.join(' · ')}</span> : null}
-        </div>
-      ) : null}
 
       {recommendationResults.length > 0 ? (
         viewMode === 'Shelf View' ? (
