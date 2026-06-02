@@ -11,7 +11,8 @@ import {
   type RawgMatchScore,
 } from '../lib/rawgMatchScoring';
 import { getGameDetails, mapRawgDetailsToMetadata, RawgApiError, searchGameByName } from '../services/rawgApi';
-import type { Game } from '../types/game';
+import type { Game, GamePlatform } from '../types/game';
+import { CollectionToolbar } from './CollectionToolbar';
 import type { RawgMetadata, RawgSearchResult } from '../types/rawg';
 
 type MetadataEnrichmentPanelProps = {
@@ -64,6 +65,9 @@ export function MetadataEnrichmentPanel({
   const [manualPicker, setManualPicker] = useState<ManualPickerState | null>(null);
   const [isQueueRunning, setIsQueueRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const [metadataSearchTerm, setMetadataSearchTerm] = useState('');
+  const [metadataStatusFilter, setMetadataStatusFilter] = useState('All');
+  const [metadataPlatformFilter, setMetadataPlatformFilter] = useState<GamePlatform | 'All'>('All');
   const shouldStopQueue = useRef(false);
 
   useEffect(() => {
@@ -74,9 +78,40 @@ export function MetadataEnrichmentPanel({
     setSelectedGameIds(new Set(initialSelectedGameIds));
   }, [initialSelectedGameIds, selectionRequestId]);
 
-  const missingMetadataGames = useMemo(() => {
-    return games.filter((game) => game.metadataSource !== 'rawg');
+  const platformOptions = useMemo(() => {
+    return Array.from(new Set(games.map((game) => game.platform))).sort((first, second) => first.localeCompare(second));
   }, [games]);
+
+  const missingMetadataGames = useMemo(() => {
+    const normalizedSearch = metadataSearchTerm.trim().toLowerCase();
+
+    return games
+      .filter((game) => game.metadataSource !== 'rawg')
+      .filter((game) => (metadataPlatformFilter === 'All' ? true : game.platform === metadataPlatformFilter))
+      .filter((game) => {
+        if (metadataStatusFilter === 'Skipped') {
+          return Boolean(game.metadataSkippedAt);
+        }
+
+        if (metadataStatusFilter === 'Manual') {
+          return Boolean(game.metadataManualManagedAt);
+        }
+
+        if (metadataStatusFilter === 'Ready') {
+          return !game.metadataManualManagedAt && !game.metadataSkippedAt;
+        }
+
+        if (metadataStatusFilter === 'Review') {
+          const state = enrichmentStateByGameId[game.id];
+          return state?.status === 'suggested' || state?.status === 'needs-review';
+        }
+
+        return true;
+      })
+      .filter((game) =>
+        normalizedSearch ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedSearch) : true,
+      );
+  }, [enrichmentStateByGameId, games, metadataPlatformFilter, metadataSearchTerm, metadataStatusFilter]);
 
   const queueableGames = missingMetadataGames.filter((game) => {
     return !game.metadataManualManagedAt && !game.metadataSkippedAt;
@@ -282,51 +317,70 @@ export function MetadataEnrichmentPanel({
   return (
     <section className="qs-glass min-w-0 overflow-hidden rounded-lg border lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="border-b border-skyglass/15 bg-ink-950/70 p-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Game info</h2>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
+        <div className="border-b border-skyglass/15 bg-ink-950/70 p-2 sm:p-3">
+          <CollectionToolbar
+            title="Game info"
+            summary={`${missingMetadataGames.length} need info`}
+            searchValue={metadataSearchTerm}
+            searchPlaceholder="Find metadata target"
+            onSearchChange={setMetadataSearchTerm}
+            selects={[
+              {
+                label: 'Status',
+                value: metadataStatusFilter,
+                options: ['All', 'Ready', 'Review', 'Skipped', 'Manual'],
+                onChange: setMetadataStatusFilter,
+              },
+              {
+                label: 'Platform',
+                value: metadataPlatformFilter,
+                options: ['All', ...platformOptions],
+                onChange: (value) => setMetadataPlatformFilter(value as GamePlatform | 'All'),
+              },
+            ]}
+            primaryAction={
               <button
-                className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                className="h-9 rounded-md bg-mint px-3 text-sm font-medium text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
                 disabled={isQueueRunning || queueableGames.length === 0}
                 onClick={() => void runQueue(queueableGames)}
                 type="button"
               >
                 Find all
               </button>
-              <button
-                className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
-                disabled={isQueueRunning || selectedQueueableGames.length === 0}
-                onClick={() => void runQueue(selectedQueueableGames)}
-                type="button"
-              >
-                Find selected
-              </button>
-              <button
-                className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
-                disabled={!isQueueRunning}
-                onClick={() => {
-                  shouldStopQueue.current = true;
-                }}
-                type="button"
-              >
-                Stop
-              </button>
-            </div>
-          </div>
+            }
+            actionMenu={
+              <>
+                <button
+                  className="h-9 rounded-md border border-skyglass/15 px-3 text-left text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
+                  disabled={isQueueRunning || selectedQueueableGames.length === 0}
+                  onClick={() => void runQueue(selectedQueueableGames)}
+                  type="button"
+                >
+                  Find selected
+                </button>
+                <button
+                  className="h-9 rounded-md border border-skyglass/15 px-3 text-left text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
+                  disabled={!isQueueRunning}
+                  onClick={() => {
+                    shouldStopQueue.current = true;
+                  }}
+                  type="button"
+                >
+                  Stop
+                </button>
+              </>
+            }
+          />
 
           {isQueueRunning ? (
-            <div className="mt-4">
-              <div className="mb-2 flex justify-between text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+            <div className="mt-2">
+              <div className="mb-1 flex justify-between text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
                 <span>Progress</span>
                 <span>
                   {progress.completed}/{progress.total}
                 </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-ink-800">
+              <div className="h-1.5 overflow-hidden rounded-full bg-ink-800">
                 <div
                   className="h-full rounded-full bg-mint transition-all"
                   style={{ width: `${progress.total > 0 ? (progress.completed / progress.total) * 100 : 0}%` }}
@@ -336,9 +390,10 @@ export function MetadataEnrichmentPanel({
           ) : null}
 
           {!isQueueRunning && reviewGames.length > 0 ? (
-            <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
-              {reviewGames.length} need review.
-            </div>
+            <details className="mt-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+              <summary className="cursor-pointer font-semibold">{reviewGames.length} need review</summary>
+              <p className="mt-1 text-xs text-amber-100/80">Open matching rows below to choose the correct metadata result.</p>
+            </details>
           ) : null}
         </div>
 

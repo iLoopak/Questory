@@ -14,6 +14,7 @@ import {
   type PlatformQueueState,
 } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
+import { CollectionToolbar } from './CollectionToolbar';
 
 type QueuePanelProps = {
   games: Game[];
@@ -46,20 +47,30 @@ export function QueuePanel({
   const [customPlatformName, setCustomPlatformName] = useState('');
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
   const [selectedGameId, setSelectedGameId] = useState('');
+  const [queueSearchTerm, setQueueSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All'>('All');
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
   const displayedQueuePlatforms = useMemo(() => {
-    if (!initialPlatform || !activeQueuePlatforms.includes(initialPlatform)) {
-      return activeQueuePlatforms;
+    const visiblePlatforms = platformFilter === 'All' ? activeQueuePlatforms : activeQueuePlatforms.filter((platform) => platform === platformFilter);
+
+    if (!initialPlatform || !visiblePlatforms.includes(initialPlatform)) {
+      return visiblePlatforms;
     }
 
-    return [initialPlatform, ...activeQueuePlatforms.filter((platform) => platform !== initialPlatform)];
-  }, [activeQueuePlatforms, initialPlatform]);
+    return [initialPlatform, ...visiblePlatforms.filter((platform) => platform !== initialPlatform)];
+  }, [activeQueuePlatforms, initialPlatform, platformFilter]);
 
+  const normalizedQueueSearch = queueSearchTerm.trim().toLowerCase();
   const addableGames = games
     .filter((game) => game.collectionType === 'library' && !queueGameIds.has(game.id))
+    .filter((game) =>
+      normalizedQueueSearch
+        ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch)
+        : true,
+    )
     .sort((first, second) => first.title.localeCompare(second.title));
 
   useEffect(() => {
@@ -101,101 +112,112 @@ export function QueuePanel({
 
   return (
     <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
-      <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Queue</h2>
-        </div>
-        <button
-          className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20"
-          onClick={onStartReview}
-          type="button"
-        >
-          Build in Review Mode
-        </button>
-      </div>
-
-      <div className="mb-2 grid gap-2 rounded-md border border-skyglass/15 bg-ink-950/70 p-2 lg:grid-cols-[minmax(0,1fr)_220px_110px]">
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add game</span>
-          <select
-            className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
-            value={selectedGameId}
-            onChange={(event) => setSelectedGameId(event.target.value)}
+      <CollectionToolbar
+        title="Queue"
+        summary={`${displayedQueuePlatforms.length} active`}
+        searchValue={queueSearchTerm}
+        searchPlaceholder="Find queue game"
+        onSearchChange={setQueueSearchTerm}
+        selects={[
+          {
+            label: 'Status',
+            value: 'Queued',
+            options: ['Queued'],
+            onChange: () => undefined,
+          },
+          {
+            label: 'Platform',
+            value: platformFilter,
+            options: ['All', ...activeQueuePlatforms],
+            onChange: (value) => setPlatformFilter(value as GamePlatform | 'All'),
+          },
+        ]}
+        primaryAction={
+          <button
+            className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+            disabled={!selectedGameId || activeQueuePlatforms.length === 0}
+            onClick={addSelectedGame}
+            type="button"
           >
-            <option value="">Choose a Library game</option>
-            {addableGames.map((game) => (
-              <option key={game.id} value={game.id}>
-                {game.title} - {game.platform}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
-          <select
-            className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
-            value={selectedPlatform}
-            onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform)}
-          >
-            {activeQueuePlatforms.map((platform) => (
-              <option key={platform} value={platform}>
-                {platform}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <button
-          className="h-9 self-end rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-          disabled={!selectedGameId || activeQueuePlatforms.length === 0}
-          onClick={addSelectedGame}
-          type="button"
-        >
-          Add
-        </button>
-      </div>
-
-      <div className="mb-3 rounded-md border border-skyglass/15 bg-ink-950/70 p-2">
-        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-white">+ Add Queue Platform</h3>
-            <p className="text-xs text-slate-500">Create only the queues you care about. Hidden queues stay available for imports and metadata.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {queuePlatforms
-            .filter((platform) => !activeQueuePlatforms.includes(platform))
-            .slice(0, 12)
-            .map((platform) => (
-              <button
-                key={platform}
-                className="h-8 rounded-md border border-white/10 px-2 text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint"
-                onClick={() => addQueuePlatform(platform)}
-                type="button"
+            Add
+          </button>
+        }
+        actionMenu={
+          <>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add game</span>
+              <select
+                className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+                value={selectedGameId}
+                onChange={(event) => setSelectedGameId(event.target.value)}
               >
-                {platform}
-              </button>
-            ))}
-          <label className="flex min-w-[220px] flex-1 gap-2">
-            <span className="sr-only">Custom queue platform</span>
-            <input
-              className="h-8 min-w-0 flex-1 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-              placeholder="Custom Platform"
-              value={customPlatformName}
-              onChange={(event) => setCustomPlatformName(event.target.value)}
-            />
+                <option value="">Choose a Library game</option>
+                {addableGames.map((game) => (
+                  <option key={game.id} value={game.id}>
+                    {game.title} - {game.platform}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Target platform</span>
+              <select
+                className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+                value={selectedPlatform}
+                onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform)}
+              >
+                {activeQueuePlatforms.map((platform) => (
+                  <option key={platform} value={platform}>
+                    {platform}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
-              className="h-8 rounded-md bg-mint px-3 text-xs font-semibold text-ink-950 hover:bg-mint/90 disabled:bg-slate-600 disabled:text-slate-300"
-              disabled={!customPlatformName.trim()}
-              onClick={addCustomQueuePlatform}
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20"
+              onClick={onStartReview}
               type="button"
             >
-              Add
+              Build in Review Mode
             </button>
-          </label>
-        </div>
-      </div>
+            <details className="rounded-md border border-white/10 bg-ink-900 p-2">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-300">Manage platforms</summary>
+              <div className="mt-2 grid gap-2">
+                {queuePlatforms
+                  .filter((platform) => !activeQueuePlatforms.includes(platform))
+                  .slice(0, 12)
+                  .map((platform) => (
+                    <button
+                      key={platform}
+                      className="h-8 rounded-md border border-white/10 px-2 text-left text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint"
+                      onClick={() => addQueuePlatform(platform)}
+                      type="button"
+                    >
+                      {platform}
+                    </button>
+                  ))}
+                <label className="grid gap-2">
+                  <span className="sr-only">Custom queue platform</span>
+                  <input
+                    className="h-8 min-w-0 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+                    placeholder="Custom Platform"
+                    value={customPlatformName}
+                    onChange={(event) => setCustomPlatformName(event.target.value)}
+                  />
+                  <button
+                    className="h-8 rounded-md bg-mint px-3 text-xs font-semibold text-ink-950 hover:bg-mint/90 disabled:bg-slate-600 disabled:text-slate-300"
+                    disabled={!customPlatformName.trim()}
+                    onClick={addCustomQueuePlatform}
+                    type="button"
+                  >
+                    Add platform
+                  </button>
+                </label>
+              </div>
+            </details>
+          </>
+        }
+      />
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">
@@ -220,7 +242,13 @@ export function QueuePanel({
                 platformRefs.current.delete(platform);
               }
             }}
-            queueEntries={queueState.entries.filter((entry) => entry.targetPlatform === platform).sort(compareQueueEntries)}
+            queueEntries={queueState.entries
+              .filter((entry) => entry.targetPlatform === platform)
+              .filter((entry) => {
+                const game = gamesById.get(entry.gameId);
+                return !normalizedQueueSearch || (game ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch) : false);
+              })
+              .sort(compareQueueEntries)}
             onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
             onLimitChange={onLimitChange}
             onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
