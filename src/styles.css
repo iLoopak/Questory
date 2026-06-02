@@ -288,23 +288,28 @@ img {
 
 .qs-review-stage {
   display: grid;
-  grid-template-columns: minmax(8rem, 0.34fr) minmax(22rem, 1.35fr) minmax(8rem, 0.34fr);
+  grid-template-columns: minmax(9.5rem, 1fr) minmax(18rem, 2.5fr) minmax(9.5rem, 1fr);
   align-items: center;
-  gap: clamp(0.6rem, 1.6vw, 1.25rem);
+  gap: clamp(0.5rem, 1.5vw, 1.25rem);
+  width: 100%;
 }
 
 .qs-review-hero {
   justify-self: center;
-  width: min(100%, 58vw, 46rem);
+  width: min(100%, 52vw, 24rem);
 }
 
 .qs-review-cover {
   width: 100%;
-  max-height: min(76dvh, 760px);
+  aspect-ratio: 2 / 3;
+  max-height: min(65dvh, 520px);
+  margin: 0 auto;
 }
 
 .qs-review-artwork-frame {
-  aspect-ratio: 16 / 10;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 2 / 3;
   background:
     radial-gradient(circle at 50% 22%, rgb(var(--accent-rgb) / 0.1), transparent 34%),
     linear-gradient(180deg, rgb(var(--overlay-rgb) / 0.45), rgb(var(--ink-950-rgb) / 0.92));
@@ -479,16 +484,17 @@ img {
   }
 
   .qs-review-stage {
-    grid-template-columns: minmax(7rem, 0.32fr) minmax(18rem, 1.4fr) minmax(7rem, 0.32fr);
-    gap: 0.55rem;
+    grid-template-columns: minmax(8rem, 1fr) minmax(15rem, 2.5fr) minmax(8rem, 1fr);
+    gap: 0.45rem;
   }
 
   .qs-review-hero {
-    width: min(100%, 58vw, 32rem);
+    width: min(100%, 46vw, 18rem);
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 7rem);
+    max-height: calc(100dvh - 6.5rem);
+    aspect-ratio: 2 / 3;
   }
 
   .qs-review-zone {
@@ -496,14 +502,12 @@ img {
   }
 
   .qs-review-action-side {
-    min-height: 3.15rem;
-    padding: 0.55rem 0.65rem;
-    font-size: 0.88rem;
+    min-height: 3rem;
+    padding: 0.4rem 0.5rem;
   }
 
   .qs-review-zone-label,
-  .qs-gamepad-hints,
-  .qs-review-action-side span span:nth-child(2) {
+  .qs-gamepad-hints {
     display: none;
   }
 
@@ -763,16 +767,17 @@ body.qs-controller-active .qs-toast {
   }
 
   .qs-review-stage {
-    grid-template-columns: minmax(6rem, 0.3fr) minmax(16rem, 1.45fr) minmax(6rem, 0.3fr);
-    gap: 0.45rem;
+    grid-template-columns: minmax(8rem, 1fr) minmax(15rem, 2.5fr) minmax(8rem, 1fr);
+    gap: 0.4rem;
   }
 
   .qs-review-hero {
-    width: min(100%, 58vw, 30rem);
+    width: min(100%, 46vw, 18rem);
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 5.75rem);
+    max-height: calc(100dvh - 6rem);
+    aspect-ratio: 2 / 3;
   }
 }
 
