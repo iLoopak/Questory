@@ -286,6 +286,15 @@ img {
     0 28px 80px rgb(var(--overlay-rgb) / 0.42);
 }
 
+
+.qs-review-overlay-controls {
+  pointer-events: none;
+}
+
+.qs-review-overlay-controls > * {
+  pointer-events: auto;
+}
+
 .qs-review-stage {
   display: grid;
   grid-template-columns: minmax(9.5rem, 1fr) minmax(18rem, 2.5fr) minmax(9.5rem, 1fr);
@@ -302,7 +311,7 @@ img {
 .qs-review-cover {
   width: 100%;
   aspect-ratio: 2 / 3;
-  max-height: min(65dvh, 520px);
+  max-height: min(72dvh, 580px);
   margin: 0 auto;
 }
 
@@ -482,6 +491,11 @@ img {
     height: auto;
     max-height: none;
   }
+  .qs-review-overlay-controls {
+    right: max(0.35rem, var(--qs-safe-right));
+    top: max(0.35rem, var(--qs-safe-top));
+  }
+
 
   .qs-review-stage {
     grid-template-columns: minmax(8rem, 1fr) minmax(15rem, 2.5fr) minmax(8rem, 1fr);
@@ -493,7 +507,7 @@ img {
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 6.5rem);
+    max-height: calc(100dvh - 4.75rem);
     aspect-ratio: 2 / 3;
   }
 
@@ -800,7 +814,7 @@ textarea,
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 6rem);
+    max-height: calc(100dvh - 4.5rem);
     aspect-ratio: 2 / 3;
   }
 }

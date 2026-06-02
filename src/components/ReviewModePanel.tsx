@@ -98,6 +98,7 @@ export function ReviewModePanel({
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);
   const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
   const [isQueuePickerOpen, setIsQueuePickerOpen] = useState(false);
+  const [isReviewOptionsOpen, setIsReviewOptionsOpen] = useState(false);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
 
@@ -131,6 +132,7 @@ export function ReviewModePanel({
     setActionStats(emptyReviewActionStats);
     setHighlightedActionIndex(firstPositiveActionIndex);
     setIsQueuePickerOpen(false);
+    setIsReviewOptionsOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
   }, [selectedPlatform, source]);
@@ -143,6 +145,14 @@ export function ReviewModePanel({
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement
       ) {
+        return;
+      }
+
+      if (isReviewOptionsOpen) {
+        if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
+          event.preventDefault();
+          setIsReviewOptionsOpen(false);
+        }
         return;
       }
 
@@ -242,7 +252,7 @@ export function ReviewModePanel({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, reviewHistory]);
+  }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     onAction(game, action, note, targetPlatform);
@@ -251,6 +261,7 @@ export function ReviewModePanel({
     setActionStats((currentStats) => getNextActionStats(currentStats, action));
     setHighlightedActionIndex(firstPositiveActionIndex);
     setIsQueuePickerOpen(false);
+    setIsReviewOptionsOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
   }
@@ -277,7 +288,7 @@ export function ReviewModePanel({
   function performAction(game: Game, action: ReviewModeAction) {
     if (action === 'queue') {
       setIsQueuePickerOpen(true);
-        return;
+      return;
     }
 
     if (action === 'note') {
@@ -310,65 +321,88 @@ export function ReviewModePanel({
   }
 
   return (
-    <section className="qs-review-shell overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-74px)]">
-      <div className="flex h-full min-h-0 flex-col">
-        <header className="flex flex-col gap-2 border-b border-skyglass/10 bg-ink-950/80 p-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <div>
-                <h2 className="text-base font-semibold text-white">Review: {sourceLabel}</h2>
+    <section className="qs-review-shell relative overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-74px)]">
+      <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
+        <div
+          aria-label={`Review progress ${progressLabel}`}
+          className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-sm font-bold text-mint shadow-panel backdrop-blur-md"
+        >
+          {progressLabel}
+        </div>
+        <div className="relative">
+          <button
+            aria-expanded={isReviewOptionsOpen}
+            aria-label="Review Options"
+            className="grid h-9 w-9 place-items-center rounded-full border border-skyglass/20 bg-ink-950/85 text-lg text-slate-100 shadow-panel backdrop-blur-md transition hover:border-mint/45 hover:text-white focus-visible:border-mint"
+            onClick={() => setIsReviewOptionsOpen((isOpen) => !isOpen)}
+            type="button"
+          >
+            ⚙
+          </button>
+
+          {isReviewOptionsOpen ? (
+            <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-2xl border border-skyglass/15 bg-ink-950/95 p-3 text-left shadow-panel backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-bold text-white">Review Options</h2>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  {sourceLabel}
+                </span>
               </div>
-              <span className="rounded-full border border-mint/25 bg-mint/10 px-3 py-1 text-sm font-semibold text-mint">
-                {progressLabel}
-              </span>
+
+              <div className="mt-3 grid gap-3">
+                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400" htmlFor="review-source">
+                  Status filter
+                  <select
+                    className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
+                    id="review-source"
+                    value={source}
+                    onChange={(event) => onSourceChange(event.target.value as ReviewSource)}
+                  >
+                    {reviewSourceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {getReviewSourceLabel(option)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400" htmlFor="review-platform">
+                  Platform filter
+                  <select
+                    className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
+                    id="review-platform"
+                    value={selectedPlatform}
+                    onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform | typeof anyPlatform)}
+                  >
+                    {[anyPlatform, ...platformOptions].map((platform) => (
+                      <option key={platform} value={platform}>
+                        {platform}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Batch options</div>
+                  <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current review queue without leaving Review Mode.</p>
+                </div>
+
+                {ignoredGameIds.size > 0 ? (
+                  <button
+                    className="min-h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                    onClick={onRestoreIgnored}
+                    type="button"
+                  >
+                    Restore ignored
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
+        </div>
+      </div>
 
-          <div className="grid gap-2 sm:grid-cols-[minmax(130px,170px)_minmax(120px,150px)_auto]">
-            <label className="sr-only" htmlFor="review-source">
-              Review batch
-            </label>
-            <select
-              className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm text-white outline-none transition focus:border-mint"
-              id="review-source"
-              value={source}
-              onChange={(event) => onSourceChange(event.target.value as ReviewSource)}
-            >
-              {reviewSourceOptions.map((option) => (
-                <option key={option} value={option}>
-                  {getReviewSourceLabel(option)}
-                </option>
-              ))}
-            </select>
-
-            <label className="sr-only" htmlFor="review-platform">
-              Platform
-            </label>
-            <select
-              className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm text-white outline-none transition focus:border-mint"
-              id="review-platform"
-              value={selectedPlatform}
-              onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform | typeof anyPlatform)}
-            >
-              {[anyPlatform, ...platformOptions].map((platform) => (
-                <option key={platform} value={platform}>
-                  {platform}
-                </option>
-              ))}
-            </select>
-
-            {ignoredGameIds.size > 0 ? (
-              <button
-                className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-                onClick={onRestoreIgnored}
-                type="button"
-              >
-                Restore ignored
-              </button>
-            ) : null}
-          </div>
-        </header>
-
+      <div className="flex h-full min-h-0 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
           {activeGame ? (
             <FocusedReviewCard
@@ -523,7 +557,7 @@ function FocusedReviewCard({
               {game.platform}
             </span>
           </div>
-          <h3 className="mt-2 text-xl sm:text-2xl font-bold leading-snug text-white line-clamp-2 px-1" title={game.title}>
+          <h3 className="mt-2 text-2xl font-bold leading-snug text-white line-clamp-2 px-1 sm:text-3xl" title={game.title}>
             {game.title}
           </h3>
         </div>
