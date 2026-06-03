@@ -130,7 +130,7 @@ const settingsCategories = [
 type SettingsCategory = (typeof settingsCategories)[number];
 
 const allOption = 'All';
-const questShelfIcon = '/icons/questshelf-new-icon.png';
+const questShelfIcon = '/icons/questshelf-icon.png';
 const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
 const collectionViewModeStorageKey = 'questshelf.collectionViewMode.v1';
 const settingsCategoryStorageKey = 'questshelf.settingsCategory.v1';
@@ -167,6 +167,20 @@ type CollectionFilters = {
 };
 
 type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>;
+
+function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { className: string; fallbackClassName?: string }) {
+  const [hasImageError, setHasImageError] = useState(false);
+
+  return (
+    <div className={`grid shrink-0 place-items-center overflow-hidden bg-ink-950 text-mint shadow-glow ${className}`} aria-hidden="true">
+      {hasImageError ? (
+        <span className={`font-semibold leading-none ${fallbackClassName}`}>QS</span>
+      ) : (
+        <img className="qs-logo-glow h-full w-full object-cover" src={questShelfIcon} alt="" onError={() => setHasImageError(true)} />
+      )}
+    </div>
+  );
+}
 
 const initialCollectionFilters: CollectionFilters = {
   enrichment: allOption,
@@ -1367,9 +1381,7 @@ function App() {
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label="QuestShelf">
-            <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md border border-mint/30 bg-ink-950 shadow-glow">
-              <img className="qs-logo-glow h-full w-full object-cover" src={questShelfIcon} alt="" />
-            </div>
+            <QuestShelfLogo className="h-7 w-7 rounded-md border border-mint/30" fallbackClassName="text-[9px]" />
             <div className="hidden min-w-0 text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">QuestShelf</div>
           </div>
 
@@ -3436,7 +3448,7 @@ function AppStartupScreen() {
     <main className="grid min-h-screen place-items-center bg-ink-950 px-4 text-slate-100">
       <div className="qs-glass w-full max-w-md rounded-lg border p-5 shadow-panel">
         <div className="flex items-center gap-3">
-          <img className="qs-logo-glow h-12 w-12 rounded-lg border border-mint/30" src={questShelfIcon} alt="" />
+          <QuestShelfLogo className="h-12 w-12 rounded-lg border border-mint/30" fallbackClassName="text-sm" />
           <div>
             <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
             <h1 className="mt-1 text-2xl font-semibold text-white">Loading library</h1>
