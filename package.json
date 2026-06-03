@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "android:sync-icons": "node scripts/sync-android-icons.mjs",
+    "android:prepare": "npm run build && npx cap sync android && npm run android:sync-icons",
     "preview": "vite preview"
   },
   "dependencies": {
