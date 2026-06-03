@@ -513,7 +513,7 @@ function ImportResultPanel({
               onClick={() => onReviewImportedGames?.(importedGameIds)}
               type="button"
             >
-              Review imported games
+              Send to Quest Queue
             </button>
             <button
               className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"

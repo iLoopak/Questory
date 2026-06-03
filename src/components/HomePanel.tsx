@@ -203,12 +203,12 @@ export function HomePanel({
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">Home</div>
               <h2 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">What should I play next?</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-400">A focused launch view for handheld play: continue, pick the next queued game, or review what needs attention.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-400">A focused launch view for handheld play: continue, pick the next queued game, or process what needs attention.</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               <span>A Open</span>
               <span>Y Queue</span>
-              <span>X Review</span>
+              <span>X Quest Queue</span>
               <span>B Library</span>
             </div>
           </div>
@@ -264,11 +264,11 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Queue Yet" text="Build your first queue from Review Mode." actionLabel="Open Review Mode" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title="No Queue Yet" text="Build your first queue from Quest Queue." actionLabel="Open Quest Queue" onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
-        <HomeSection title="Recommended Today" actionLabel="Review More" onAction={() => onOpenReviewMode('backlog')}>
+        <HomeSection title="Recommended Today" actionLabel="Process" onAction={() => onOpenReviewMode('backlog')}>
           {recommendedToday.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-3">
               {recommendedToday.map((recommendation) => (
@@ -316,7 +316,7 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Queue Yet" text="Build your first queue from Review Mode." actionLabel="Build Queue" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title="No Queue Yet" text="Build your first queue from Quest Queue." actionLabel="Build Queue" onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
@@ -353,16 +353,16 @@ export function HomePanel({
         </HomeSection>
 
         <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review Remaining</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue Remaining</div>
           <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
-          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? 'game waiting for review' : 'games waiting for review'}</p>
+          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? 'game ready for Quest Queue' : 'games ready for Quest Queue'}</p>
           <button
             className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             data-home-focus="true"
             onClick={() => onOpenReviewMode('backlog')}
             type="button"
           >
-            Open Review Mode
+            Open Quest Queue
           </button>
         </section>
       </aside>

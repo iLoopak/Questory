@@ -240,13 +240,14 @@ export function ReviewModePanel({
         return;
       }
 
-      if (event.key === ']' || event.key === 'PageDown') {
+      // L2/R2 gamepads are normalized to bracket keys so L1/R1 can stay global tab controls.
+      if (event.key === ']') {
         event.preventDefault();
         performAction(activeGame, 'skip');
         return;
       }
 
-      if (event.key === '[' || event.key === 'PageUp') {
+      if (event.key === '[') {
         event.preventDefault();
         showPreviousGame();
       }
@@ -335,7 +336,7 @@ export function ReviewModePanel({
         <div className="relative">
           <button
             aria-expanded={isReviewOptionsOpen}
-            aria-label="Review Options"
+            aria-label="Quest Queue Options"
             className="grid h-9 w-9 place-items-center rounded-full border border-skyglass/20 bg-ink-950/85 text-lg text-slate-100 shadow-panel backdrop-blur-md transition hover:border-mint/45 hover:text-white focus-visible:border-mint"
             onClick={() => setIsReviewOptionsOpen((isOpen) => !isOpen)}
             type="button"
@@ -346,7 +347,7 @@ export function ReviewModePanel({
           {isReviewOptionsOpen ? (
             <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-2xl border border-skyglass/15 bg-ink-950/95 p-3 text-left shadow-panel backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-bold text-white">Review Options</h2>
+                <h2 className="text-sm font-bold text-white">Quest Queue Options</h2>
                 <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
                   {sourceLabel}
                 </span>
@@ -387,7 +388,7 @@ export function ReviewModePanel({
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Batch options</div>
-                  <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current review queue without leaving Review Mode.</p>
+                  <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current Quest Queue without leaving this flow.</p>
                 </div>
 
                 {ignoredGameIds.size > 0 ? (
@@ -469,7 +470,7 @@ export function ReviewModePanel({
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-slate-500">Single tap queues this game, closes the picker, and advances Review Mode. Press Escape or B to cancel.</p>
+            <p className="mt-3 text-xs text-slate-500">Single tap queues this game, closes the picker, and advances Quest Queue. Press Escape or B to cancel.</p>
           </div>
         </ViewportModal>
       ) : null}
@@ -601,7 +602,9 @@ function FocusedReviewCard({
         </div>
 
         <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-          <span>L1/R1 Previous / Next</span>
+          <span>L2 Previous</span>
+          <span>•</span>
+          <span>R2 Next</span>
           <span>•</span>
           <span>D-pad Left discard</span>
           <span>•</span>
@@ -755,9 +758,9 @@ function ReviewComplete({
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review complete</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
-        <p className="mt-3 text-sm text-slate-400">Reviewed {reviewedCount} games. Analytics stay in Stats.</p>
+        <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer queue decisions. Analytics stay in Stats.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
@@ -771,7 +774,7 @@ function ReviewComplete({
             onClick={onReviewAnother}
             type="button"
           >
-            Review another batch
+            Process another batch
           </button>
           <button
             className="min-h-12 rounded-xl border border-skyglass/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
