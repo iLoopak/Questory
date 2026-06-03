@@ -177,7 +177,7 @@ export function QueuePanel({
               onClick={onStartReview}
               type="button"
             >
-              Build in Review Mode
+              Build in Quest Queue
             </button>
             <details className="rounded-md border border-white/10 bg-ink-900 p-2">
               <summary className="cursor-pointer text-sm font-semibold text-slate-300">Manage platforms</summary>
@@ -373,7 +373,7 @@ function PlatformQueueColumn({
           })
         ) : (
           <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
-            No queued games. Add one above or use Review Mode.
+            No queued games. Add one above or use Quest Queue.
           </div>
         )}
       </div>

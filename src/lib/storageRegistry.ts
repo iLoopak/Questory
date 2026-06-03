@@ -79,7 +79,7 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'default',
     key: 'questshelf.reviewMode.v1',
-    purpose: 'Review Mode ignored IDs, source, and stats.',
+    purpose: 'Quest Queue ignored IDs, source, and stats.',
     scope: 'core',
     schema: 'ReviewModeState.',
   },

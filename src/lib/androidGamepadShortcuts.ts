@@ -2,6 +2,7 @@ const gamepadPollIntervalMs = 80;
 const axisRepeatInitialMs = 240;
 const axisRepeatMs = 150;
 const axisThreshold = 0.55;
+const triggerAxisThreshold = 0.65;
 const debugStorageKey = 'questshelf.controllerDebug.v1';
 const focusableSelector = [
   'button:not([disabled])',
@@ -107,8 +108,12 @@ export function configureAndroidGamepadShortcuts() {
     handlePressedButton('B', nextState, lastState, () => dispatchKeyboard('Escape'));
     handlePressedButton('X', nextState, lastState, () => dispatchKeyboard('x'));
     handlePressedButton('Y', nextState, lastState, () => dispatchKeyboard('y'));
+    // Shoulder buttons remain global tab navigation across Retroid, Android gamepads, and browser Gamepad API.
     handlePressedButton('L1', nextState, lastState, () => dispatchKeyboard('PageUp'));
     handlePressedButton('R1', nextState, lastState, () => dispatchKeyboard('PageDown'));
+    // Triggers are reserved for in-screen paging, including Quest Queue previous/next game controls.
+    handlePressedButton('L2', nextState, lastState, () => dispatchKeyboard('['));
+    handlePressedButton('R2', nextState, lastState, () => dispatchKeyboard(']'));
     handlePressedButton('Start', nextState, lastState, () => dispatchKeyboard('m'));
 
     latestDebugState = {
@@ -205,7 +210,15 @@ function getPrimaryGamepad() {
 }
 
 function getButtonState(gamepad: Gamepad) {
-  return Object.fromEntries(buttonIndexMap.map(([name, index]) => [name, Boolean(gamepad.buttons[index]?.pressed)])) as ButtonState;
+  const state = Object.fromEntries(buttonIndexMap.map(([name, index]) => [name, Boolean(gamepad.buttons[index]?.pressed)])) as ButtonState;
+
+  if (gamepad.mapping !== 'standard') {
+    // Some Android/Retroid pads expose analog triggers as axes instead of standard buttons 6/7.
+    state.L2 ||= (gamepad.axes[2] ?? 0) > triggerAxisThreshold;
+    state.R2 ||= (gamepad.axes[5] ?? 0) > triggerAxisThreshold;
+  }
+
+  return state;
 }
 
 function handlePressedButton(name: GamepadButtonName, nextState: ButtonState, lastState: ButtonState, action: () => void) {
