@@ -113,15 +113,15 @@ export function QueuePanel({
   return (
     <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
-        title="Queue"
+        title="Platforms"
         searchValue={queueSearchTerm}
-        searchPlaceholder="Find queue game"
+        searchPlaceholder="Find platform game"
         onSearchChange={setQueueSearchTerm}
         selects={[
           {
             label: 'Status',
-            value: 'Queued',
-            options: ['Queued'],
+            value: 'Planned',
+            options: ['Planned'],
             onChange: () => undefined,
           },
           {
@@ -196,7 +196,7 @@ export function QueuePanel({
                     </button>
                   ))}
                 <label className="grid gap-2">
-                  <span className="sr-only">Custom queue platform</span>
+                  <span className="sr-only">Custom platform</span>
                   <input
                     className="h-8 min-w-0 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
                     placeholder="Custom Platform"
@@ -220,7 +220,7 @@ export function QueuePanel({
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">
-          No active queue platforms yet. Add Steam, Retroid, PS5, Switch 2, or a custom platform to make Queue personal.
+          No active platforms yet. Add Steam, Retroid, PS5, Switch 2, or a custom platform to make Platforms personal.
         </div>
       ) : null}
 
@@ -305,7 +305,7 @@ function PlatformQueueColumn({
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
 
   function renamePlatform() {
-    const nextName = window.prompt('Rename queue platform', platform);
+    const nextName = window.prompt('Rename platform', platform);
     if (!nextName?.trim()) {
       return;
     }
@@ -333,9 +333,9 @@ function PlatformQueueColumn({
                 onChange={(event) => onLimitChange(platform, Number(event.target.value))}
               />
             </label>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onHidePlatform(platform)} type="button">Hide Queue</button>
-            <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemovePlatform(platform)} type="button">Remove Queue</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">Rename Queue</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onHidePlatform(platform)} type="button">Hide Platform</button>
+            <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemovePlatform(platform)} type="button">Remove Platform</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">Rename Platform</button>
             <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'up')} type="button">Move Up</button>
             <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'down')} type="button">Move Down</button>
           </div>
@@ -373,7 +373,7 @@ function PlatformQueueColumn({
           })
         ) : (
           <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
-            No queued games. Add one above or use Quest Queue.
+            No platform backlog yet. Add one above or use Quest Queue.
           </div>
         )}
       </div>
@@ -424,7 +424,7 @@ function QueueEntryRow({
 
   return (
     <article
-      aria-label={`${game.title} queue entry. A opens details, X moves up, Y moves down.`}
+      aria-label={`${game.title} platform plan entry. A opens details, X moves up, Y moves down.`}
       className="rounded-md border border-skyglass/15 bg-ink-950 p-2"
       onKeyDown={handleQueueEntryKeyDown}
       role="group"
@@ -438,7 +438,9 @@ function QueueEntryRow({
           <button className="truncate text-left font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
             {game.title}
           </button>
-          <div className="mt-1 text-xs text-slate-500">{game.platform}</div>
+          <div className="mt-1">
+            <span className="platform-badge inline-flex rounded-full px-2 py-0.5 text-xs font-semibold">{game.platform}</span>
+          </div>
         </div>
         <div className="flex flex-wrap gap-1">
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">

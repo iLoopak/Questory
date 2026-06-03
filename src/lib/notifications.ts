@@ -7,7 +7,7 @@ export type ToastActionKind = 'undo' | 'open-queue' | 'view-game';
 export type ToastAction = {
   gameId?: string;
   kind: ToastActionKind;
-  label: 'Undo' | 'Open Queue' | 'View Game';
+  label: 'Undo' | 'Open Platforms' | 'View Game';
 };
 
 export type NotificationDraft = {
@@ -44,15 +44,15 @@ export function getBulkWishlistToastMessage(count: number) {
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `📌 Added to ${platform} Queue`;
+  return `📌 Added to ${platform} Platforms`;
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return '📌 Moved to Queue';
+  return '📌 Moved in Platforms';
 }
 
 export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return 'Removed from Queue';
+  return 'Removed from Platforms';
 }
 
 export function getViewGameAction(gameId: string): ToastAction {
@@ -60,7 +60,7 @@ export function getViewGameAction(gameId: string): ToastAction {
 }
 
 export function getOpenQueueAction(): ToastAction {
-  return { kind: 'open-queue', label: 'Open Queue' };
+  return { kind: 'open-queue', label: 'Open Platforms' };
 }
 
 export function getUndoAction(): ToastAction {

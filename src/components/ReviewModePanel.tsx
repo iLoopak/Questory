@@ -50,7 +50,7 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'A', icon: '📌', label: 'Queue', tone: 'accent' },
+  { action: 'queue', hint: 'A', icon: '📌', label: 'Plan', tone: 'accent' },
   { action: 'playing', hint: 'Y', icon: '🎮', label: 'Playing', tone: 'accent' },
   { action: 'wishlist', hint: 'X', icon: '💖', label: 'Wishlist', tone: 'neutral' },
   { action: 'finished', hint: 'D-pad →', icon: '🏆', label: 'Finished', tone: 'neutral' },
@@ -436,7 +436,7 @@ export function ReviewModePanel({
 
       {activeGame && isQueuePickerOpen ? (
         <ViewportModal
-          ariaLabel={`Choose queue platform for ${activeGame.title}`}
+          ariaLabel={`Choose platform plan for ${activeGame.title}`}
           initialFocusRef={firstQueuePlatformButtonRef}
           placement="center"
           restoreFocusRef={queueButtonRef}
@@ -445,8 +445,8 @@ export function ReviewModePanel({
           <div className="qs-review-queue-modal p-4 sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose queue</div>
-                <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to platform queue</h2>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose platform</div>
+                <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Platforms</h2>
                 <p className="mt-1 line-clamp-2 text-sm text-slate-400">{activeGame.title}</p>
               </div>
               <button
@@ -470,7 +470,7 @@ export function ReviewModePanel({
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-slate-500">Single tap queues this game, closes the picker, and advances Quest Queue. Press Escape or B to cancel.</p>
+            <p className="mt-3 text-xs text-slate-500">Single tap adds this game to Platforms, closes the picker, and advances Quest Queue. Press Escape or B to cancel.</p>
           </div>
         </ViewportModal>
       ) : null}
@@ -592,7 +592,7 @@ function FocusedReviewCard({
 
         <div className="mt-3 text-center w-full px-2">
           <div className="flex items-center justify-center gap-2">
-            <span className="inline-flex rounded-full border border-mint/30 bg-mint/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em] text-mint">
+            <span className="platform-badge inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]">
               {game.platform}
             </span>
           </div>
@@ -760,14 +760,14 @@ function ReviewComplete({
       <div className="max-w-3xl">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
-        <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer queue decisions. Analytics stay in Stats.</p>
+        <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer platform decisions. Analytics stay in Stats.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             onClick={onOpenQueue}
             type="button"
           >
-            Open Queue
+            Open Platforms
           </button>
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"

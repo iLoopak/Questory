@@ -123,7 +123,7 @@ export function HomePanel({
         return {
           ...scoredGame,
           reasons: [
-            queuedGameIds.has(game.id) ? 'Next in a queue' : null,
+            queuedGameIds.has(game.id) ? 'Next in Platforms' : null,
             game.status === 'Playing' ? 'Already in progress' : null,
             activePlatforms.has(game.platform) ? `Fits active ${game.platform} play` : null,
             ...scoredGame.reasons,
@@ -203,11 +203,11 @@ export function HomePanel({
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">Home</div>
               <h2 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">What should I play next?</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-400">A focused launch view for handheld play: continue, pick the next queued game, or process what needs attention.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-400">A focused launch view for handheld play: continue, pick the next planned game, or process what needs attention.</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               <span>A Open</span>
-              <span>Y Queue</span>
+              <span>Y Platforms</span>
               <span>X Quest Queue</span>
               <span>B Library</span>
             </div>
@@ -226,13 +226,13 @@ export function HomePanel({
           )}
         </HomeSection>
 
-        <HomeSection title="Next Up" actionLabel="Open Queue" onAction={() => onOpenQueue()}>
+        <HomeSection title="Next Up" actionLabel="Open Platforms" onAction={() => onOpenQueue()}>
           {activeQueuePreviews.length > 0 ? (
             <div className="grid gap-3 xl:grid-cols-3">
               {activeQueuePreviews.map((queue) => (
                 <article key={queue.platform} className="rounded-xl border border-skyglass/15 bg-ink-950/72 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <h4 className="text-base font-semibold text-white">{queue.platform} Queue</h4>
+                    <h4 className="text-base font-semibold text-white">{queue.platform} Plan</h4>
                     <button
                       className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
                       data-home-focus="true"
@@ -264,7 +264,7 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Queue Yet" text="Build your first queue from Quest Queue." actionLabel="Open Quest Queue" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title="No Platform Plan Yet" text="Build your first platform plan from Quest Queue." actionLabel="Open Quest Queue" onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
@@ -290,13 +290,13 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Recommendation Yet" text="Queue a game or mark something as Playing first." actionLabel="Open Queue" onAction={() => onOpenQueue()} />
+            <EmptyState title="No Recommendation Yet" text="Add a game to Platforms or mark something as Playing first." actionLabel="Open Platforms" onAction={() => onOpenQueue()} />
           )}
         </HomeSection>
       </div>
 
       <aside className="min-w-0 space-y-4 lg:overflow-y-auto lg:pl-1">
-        <HomeSection compact title="Your Active Queues" actionLabel="All Queues" onAction={() => onOpenQueue()}>
+        <HomeSection compact title="Your Platforms" actionLabel="All Platforms" onAction={() => onOpenQueue()}>
           {queueSnapshot.length > 0 ? (
             <div className="grid gap-2">
               {queueSnapshot.map((queue) => (
@@ -309,14 +309,14 @@ export function HomePanel({
                 >
                   <span>
                     <span className="block font-semibold text-white">{queue.platform}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">Open Queue</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">Open Platforms</span>
                   </span>
-                  <span className="text-sm font-semibold text-mint">{queue.count} {queue.count === 1 ? 'game' : 'games'} queued</span>
+                  <span className="text-sm font-semibold text-mint">{queue.count} {queue.count === 1 ? 'game' : 'games'} planned</span>
                 </button>
               ))}
             </div>
           ) : (
-            <EmptyState title="No Queue Yet" text="Build your first queue from Quest Queue." actionLabel="Build Queue" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title="No Platform Plan Yet" text="Build your first platform plan from Quest Queue." actionLabel="Build Plan" onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
@@ -425,7 +425,7 @@ function GamePosterButton({ game, eyebrow, onClick, wide = false }: { game: Game
       <div className="relative flex min-h-56 flex-col justify-end p-3">
         <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint">{eyebrow}</span>
         <span className="line-clamp-2 text-xl font-semibold leading-tight text-white drop-shadow">{game.title}</span>
-        <span className="mt-2 text-sm text-slate-300">{game.platform}</span>
+        <span className="platform-badge mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-semibold">{game.platform}</span>
       </div>
     </button>
   );
