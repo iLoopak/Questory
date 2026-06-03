@@ -3,7 +3,7 @@ const APP_SHELL_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/icons/questshelf-new-icon.png',
+  '/icons/questshelf-icon.png',
   '/covers/bloodborne.svg',
   '/covers/cyberpunk.svg',
   '/covers/forza.svg',

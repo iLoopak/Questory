@@ -10,13 +10,13 @@
   "background_color": "#0d0c0c",
   "icons": [
     {
-      "src": "/icons/questshelf-new-icon.png",
+      "src": "/icons/questshelf-icon.png",
       "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/questshelf-new-icon.png",
+      "src": "/icons/questshelf-icon.png",
       "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "maskable"
