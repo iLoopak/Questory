@@ -534,7 +534,7 @@ function ImportResultPanel({
               onClick={() => onAddImportedToQueue?.(importedGameIds)}
               type="button"
             >
-              Add to queue
+              Add to Platforms
             </button>
             {importedGamesHiddenByFilters ? (
               <button

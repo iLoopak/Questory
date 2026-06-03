@@ -72,7 +72,7 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'default',
     key: 'questshelf.platformQueues.v1',
-    purpose: 'Active queue platforms, platform queue entries, and per-platform limits.',
+    purpose: 'Active platforms, platform plan entries, and per-platform limits.',
     scope: 'core',
     schema: 'PlatformQueueState.',
   },

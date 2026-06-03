@@ -324,7 +324,7 @@ function ShelfGameCard({
           <MissingCover title={game.title} />
         )}
         <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <span className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">
+        <span className="platform-badge absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold">
           {game.platform}
         </span>
         {game.status === 'Playing' || game.status === 'Paused' ? (
@@ -414,9 +414,10 @@ function CompactGameRow({
             ) : null}
             <span className="line-clamp-1 text-sm font-semibold text-white sm:text-base">{game.title}</span>
           </span>
-          <span className="mt-1 block text-xs text-slate-400">
-            {game.platform} · {game.status}
-            {game.collectionType === 'wishlist' ? ' · Wishlist' : ''}
+          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+            <span className="platform-badge rounded-full px-2 py-0.5 font-semibold">{game.platform}</span>
+            <span>{game.status}</span>
+            {game.collectionType === 'wishlist' ? <span>Wishlist</span> : null}
           </span>
         </span>
       </button>
@@ -435,7 +436,7 @@ function CompactGameRow({
               </option>
             ))}
           </select>
-          {onAddToQueue ? <RowAction label="Queue" onClick={() => onAddToQueue(game)} /> : null}
+          {onAddToQueue ? <RowAction label="Platforms" onClick={() => onAddToQueue(game)} /> : null}
           {game.collectionType === 'wishlist' ? (
             <RowAction label="Library" onClick={() => onMoveToLibrary?.(game)} />
           ) : (

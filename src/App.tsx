@@ -108,7 +108,7 @@ const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Rec
 const navItemLabels: Record<(typeof navItems)[number], string> = {
   Artwork: 'Artwork',
   Library: 'Library',
-  Queue: 'Queue',
+  Queue: 'Platforms',
   Recommendation: 'Recommendation',
   'Review Mode': 'Quest Queue',
   Settings: 'Settings',
@@ -121,7 +121,7 @@ const settingsCategories = [
   'Integrations',
   'Library',
   'Wishlist',
-  'Queue Platforms',
+  'Platforms',
   'Retro',
   'Appearance',
   'Data & Backup',
@@ -1084,7 +1084,7 @@ function App() {
     addUndoAction(getQueueToastMessage(game, platform), {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
-      description: `Remove ${game.title} from ${platform} Queue and restore queue positions`,
+        description: `Remove ${game.title} from ${platform} Platforms plan and restore positions`,
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(game.id)] });
 
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
@@ -1228,7 +1228,7 @@ function App() {
       addUndoAction(getMoveQueueToastMessage(game, platform), {
         actionType: 'move-between-collections',
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to ${currentEntry.targetPlatform} Queue`,
+        description: `Restore ${game.title} to ${currentEntry.targetPlatform} Platforms plan`,
       }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
@@ -1242,7 +1242,7 @@ function App() {
       addUndoAction(getRemoveQueueToastMessage(game, entry.targetPlatform), {
         actionType: 'remove-from-queue',
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to queue position ${entry.queuePosition}`,
+        description: `Restore ${game.title} to plan position ${entry.queuePosition}`,
       }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
@@ -2796,7 +2796,7 @@ function SettingsPanel({
 
           {activeCategory === 'Wishlist' ? <WishlistSettingsPanel /> : null}
 
-          {activeCategory === 'Queue Platforms' ? (
+          {activeCategory === 'Platforms' ? (
             <QueuePlatformsSettingsPanel games={games} queueState={platformQueueState} onQueueStateChange={onPlatformQueueStateChange} />
           ) : null}
 
@@ -2999,10 +2999,10 @@ function getSettingsCategoryMeta(category: SettingsCategory) {
       label: 'Wishlist',
       shortDescription: 'Planning and priorities',
     },
-    'Queue Platforms': {
-      description: 'Choose, hide, remove, rename, and reorder the queue platforms that should appear on Queue.',
-      label: 'Queue Platforms',
-      shortDescription: 'Personal active queues',
+    Platforms: {
+      description: 'Choose, hide, remove, rename, and reorder the active gaming platforms that appear in Platforms.',
+      label: 'Platforms',
+      shortDescription: 'Active platform plans',
     },
     Retro: {
       description: 'Import ROM entries, review platform preferences, and prepare emulator settings.',
@@ -3082,9 +3082,9 @@ function QueuePlatformsSettingsPanel({
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Queue Platforms</h2>
+          <h2 className="text-xl font-semibold text-white">Platforms</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Supported platforms remain available for imports and metadata. Active queue platforms are the only ones shown on Queue.
+            Supported platforms remain available for imports and metadata. Active platforms are the only ones shown in Platforms.
           </p>
         </div>
         <div className="rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint">
@@ -3105,13 +3105,13 @@ function QueuePlatformsSettingsPanel({
           onClick={addCustomPlatform}
           type="button"
         >
-          Add Queue Platform
+          Add Platform
         </button>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-          <h3 className="font-semibold text-white">Active queues</h3>
+          <h3 className="font-semibold text-white">Active platforms</h3>
           <div className="mt-3 grid gap-2">
             {activeQueuePlatforms.length > 0 ? (
               activeQueuePlatforms.map((platform) => (
@@ -3129,7 +3129,7 @@ function QueuePlatformsSettingsPanel({
               ))
             ) : (
               <div className="rounded-md border border-dashed border-white/10 p-3 text-sm text-slate-500">
-                New users start with no queues. Enable only the platforms you want to plan around.
+                New users start with no active platforms. Enable only the platforms you want to plan around.
               </div>
             )}
           </div>
@@ -3193,7 +3193,7 @@ function QueuePlatformManagementRow({
   onToggle: (isEnabled: boolean) => void;
 }) {
   function renamePlatform() {
-    const nextPlatform = window.prompt('Rename queue platform', platform);
+    const nextPlatform = window.prompt('Rename platform', platform);
     if (nextPlatform?.trim()) {
       onRename(nextPlatform.trim() as GamePlatform);
     }
@@ -3204,7 +3204,7 @@ function QueuePlatformManagementRow({
       <input checked={isActive} className="h-4 w-4 accent-mint" onChange={(event) => onToggle(event.target.checked)} type="checkbox" />
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-white">{platform}</div>
-        <div className="text-xs text-slate-500">{isActive ? 'Shown on Queue' : 'Hidden from Queue but available for imports/metadata'}</div>
+        <div className="text-xs text-slate-500">{isActive ? 'Shown in Platforms' : 'Hidden from Platforms but available for imports/metadata'}</div>
       </div>
       <div className="flex flex-wrap gap-1">
         <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveUp} type="button">Up</button>
@@ -3303,7 +3303,7 @@ function AppearanceSettingsPanel({
     'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
     'App shell, top navigation, home, library, wishlist, metadata, artwork, recommendations, stats, and settings panels use tokenized backgrounds, borders, shadows, and text.',
     'Cards, detail dialogs, modal overlays, toasts, tooltips, dropdown menus, forms, buttons, badges, and disabled states inherit theme tokens.',
-    'Quest Queue panels, queue panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
+    'Quest Queue panels, Platforms panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
   ];
 
   return (
@@ -3482,11 +3482,11 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Queue') {
-    return 'Queue is the focused plan for what to play next by platform.';
+    return 'Platforms is the focused plan for active systems, currently playing games, and platform backlogs.';
   }
 
   if (activeNavItem === 'Review Mode') {
-    return 'Quest Queue helps quickly process imported games into platform queues, wishlist picks, status updates, or ignores.';
+    return 'Quest Queue helps quickly process imported games into platform plans, wishlist picks, status updates, or ignores.';
   }
 
   if (activeNavItem === 'Stats') {
@@ -3834,6 +3834,10 @@ function loadSettingsCategory(): SettingsCategory {
 
     if (storedCategory === 'Data') {
       return 'Data & Backup';
+    }
+
+    if (storedCategory === 'Queue Platforms') {
+      return 'Platforms';
     }
 
     return isOption(storedCategory, settingsCategories) ? storedCategory : 'Integrations';

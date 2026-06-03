@@ -157,7 +157,7 @@ export function GameCard({
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-transparent" />
-        <span className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full border border-skyglass/20 bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
+        <span className="platform-badge absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold">
           {game.platform}
         </span>
         {game.collectionType === 'wishlist' ? (
@@ -222,7 +222,7 @@ export function GameCard({
                 <div className="absolute bottom-11 right-0 z-20 w-48 overflow-hidden rounded-md border border-skyglass/15 bg-ink-950 shadow-panel">
                   {onAddToQueue ? (
                     <ActionMenuButton
-                      label="Add to Queue"
+                      label="Add to Platforms"
                       onClick={() => {
                         onAddToQueue(game);
                         setIsActionMenuOpen(false);
