@@ -1,4 +1,4 @@
-const CACHE_NAME = 'questshelf-app-shell-v3';
+const CACHE_NAME = 'questshelf-app-shell-v4';
 const APP_SHELL_ASSETS = [
   '/',
   '/index.html',
