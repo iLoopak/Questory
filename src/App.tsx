@@ -12,7 +12,7 @@ import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
-import { QueuePanel } from './components/QueuePanel';
+import { QueuePanel, type PlayingGameAction } from './components/QueuePanel';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { RetroImportPanel } from './components/RetroImportPanel';
@@ -1135,45 +1135,72 @@ function App() {
       return;
     }
 
-    const previousPlayingGames = games.filter((currentGame) => currentGame.status === 'Playing' && currentGame.platform === platform && currentGame.id !== gameId);
-    addUndoAction(`Now playing on ${platform}`, {
+    addUndoAction(`Added to Currently Playing on ${platform}`, {
       actionType: 'play-now',
-      affectedGameIds: [game.id, ...previousPlayingGames.map((previousGame) => previousGame.id)],
-      description: `Restore ${game.title} to ${platform} backlog and previous playing state`,
+      affectedGameIds: [game.id],
+      description: `Restore ${game.title} to ${platform} backlog`,
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
 
     const today = new Date().toISOString().slice(0, 10);
     const platformTag = getPlatformTag(platformQueueState, platform);
     setGames((currentGames) =>
       currentGames.map((currentGame) => {
-        if (currentGame.id === gameId) {
-          return touchGameRecord({
-            ...currentGame,
-            platform,
-            status: 'Playing',
-            tags: platformTag ? Array.from(new Set([...currentGame.tags, platformTag])) : currentGame.tags,
-            lastPlayedAt: today,
-          });
+        if (currentGame.id !== gameId) {
+          return currentGame;
         }
 
-        if (previousPlayingGames.some((previousGame) => previousGame.id === currentGame.id)) {
-          return touchGameRecord({
-            ...currentGame,
-            status: 'Want to play',
-          });
-        }
-
-        return currentGame;
+        return touchGameRecord({
+          ...currentGame,
+          platform,
+          status: 'Playing',
+          tags: platformTag ? Array.from(new Set([...currentGame.tags, platformTag])) : currentGame.tags,
+          lastPlayedAt: today,
+        });
       }),
     );
 
-    setPlatformQueueState((currentState) => {
-      const selectedRemoved = removeGameFromPlatformQueue(currentState, gameId);
-      return previousPlayingGames.reduce(
-        (nextState, previousGame) => addGameToPlatformQueueTop(nextState, previousGame, platform),
-        selectedRemoved,
-      );
-    });
+    setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId));
+  }
+
+  function updateCurrentlyPlayingGame(gameId: string, platform: GamePlatform, action: PlayingGameAction) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    if (!game) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const nextStatus: GameStatus = action === 'finished' ? 'Finished' : action === 'drop' ? 'Dropped' : 'Want to play';
+    const actionLabels: Record<PlayingGameAction, string> = {
+      'move-to-backlog': 'Moved to Backlog',
+      finished: 'Marked Finished',
+      drop: 'Dropped',
+      'remove-from-playing': 'Removed from Currently Playing',
+    };
+
+    addUndoAction(`${actionLabels[action]} on ${platform}`, {
+      actionType: 'playing-action',
+      affectedGameIds: [game.id],
+      description: `Restore ${game.title} to Currently Playing`,
+    }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
+
+    setGames((currentGames) =>
+      currentGames.map((currentGame) => {
+        if (currentGame.id !== gameId) {
+          return currentGame;
+        }
+
+        return touchGameRecord({
+          ...currentGame,
+          status: nextStatus,
+          finishedAt: action === 'finished' ? now : currentGame.finishedAt,
+          droppedAt: action === 'drop' ? now : currentGame.droppedAt,
+        });
+      }),
+    );
+
+    setPlatformQueueState((currentState) =>
+      action === 'move-to-backlog' ? addGameToPlatformQueueTop(currentState, { ...game, status: 'Want to play' }, platform) : removeGameFromPlatformQueue(currentState, gameId),
+    );
   }
 
   function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
@@ -1600,6 +1627,7 @@ function App() {
               onMoveEntry={moveQueueGame}
               onMoveEntryToPlatform={moveQueueGameToPlatform}
               onPlayNow={playQueueGameNow}
+              onPlayingAction={updateCurrentlyPlayingGame}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
