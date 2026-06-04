@@ -1331,6 +1331,18 @@ function App() {
     );
   }
 
+  function playGameFromCompactRow(game: Game) {
+    playQueueGameNow(game.id, game.platform);
+  }
+
+  function finishGameFromCompactRow(game: Game) {
+    updateCurrentlyPlayingGame(game.id, game.platform, 'finished');
+  }
+
+  function dropGameFromCompactRow(game: Game) {
+    updateCurrentlyPlayingGame(game.id, game.platform, 'drop');
+  }
+
   function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     if (action === 'skip') {
       recordReviewDecision('skipped');
@@ -1705,6 +1717,9 @@ function App() {
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
               onAddToQueue={openBacklogPicker}
+              onPlayNow={playGameFromCompactRow}
+              onFinish={finishGameFromCompactRow}
+              onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
               onBulkRefreshSteamPlaytime={(gameIds) => refreshSteamPlaytime(gameIds)}
@@ -1732,6 +1747,9 @@ function App() {
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
               onAddToQueue={openBacklogPicker}
+              onPlayNow={playGameFromCompactRow}
+              onFinish={finishGameFromCompactRow}
+              onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
@@ -2082,6 +2100,9 @@ type CollectionPanelProps = {
   onAddToWishlist: (game: Game) => void;
   onAddManyToWishlist: (games: Game[]) => void;
   onAddToQueue: (game: Game) => void;
+  onPlayNow: (game: Game) => void;
+  onFinish: (game: Game) => void;
+  onDrop: (game: Game) => void;
   onBulkEnrich: (gameIds: string[]) => void;
   onBulkRefreshSteamPlaytime?: (gameIds: string[]) => Promise<SteamPlaytimeRefreshSummary | null>;
   onBulkRemove: (gameIds: string[]) => void;
@@ -2111,6 +2132,9 @@ function CollectionPanel({
   onAddToWishlist,
   onAddManyToWishlist,
   onAddToQueue,
+  onPlayNow,
+  onFinish,
+  onDrop,
   onBulkEnrich,
   onBulkRefreshSteamPlaytime,
   onBulkRemove,
@@ -2576,6 +2600,9 @@ function CollectionPanel({
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
             onMoveToLibrary={onMoveToLibrary}
+            onPlayNow={onPlayNow}
+            onFinish={onFinish}
+            onDrop={onDrop}
             onOpenDetails={onOpenDetails}
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}

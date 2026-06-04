@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
-import { gameStatuses } from '../types/game';
 import { GameCard } from './GameCard';
 
 type CollectionActionHandlers = {
@@ -10,6 +9,9 @@ type CollectionActionHandlers = {
   onAddToWishlist?: (game: Game) => void;
   onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
+  onPlayNow?: (game: Game) => void;
+  onFinish?: (game: Game) => void;
+  onDrop?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
@@ -216,6 +218,9 @@ export function CollectionList({
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
+  onPlayNow,
+  onFinish,
+  onDrop,
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
@@ -234,6 +239,9 @@ export function CollectionList({
           onAddToQueue={onAddToQueue}
           onAddToWishlist={onAddToWishlist}
           onMoveToLibrary={onMoveToLibrary}
+          onPlayNow={onPlayNow}
+          onFinish={onFinish}
+          onDrop={onDrop}
           onOpenDetails={() => onOpenDetails(game.id)}
           onRemove={() => onRemove(game.id)}
           onRemoveAndIgnore={() => onRemoveAndIgnore(game)}
@@ -367,6 +375,9 @@ type CompactGameRowProps = {
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
+  onPlayNow?: (game: Game) => void;
+  onFinish?: (game: Game) => void;
+  onDrop?: (game: Game) => void;
   onOpenDetails: () => void;
   onRemove: () => void;
   onRemoveAndIgnore: () => void;
@@ -382,6 +393,9 @@ function CompactGameRow({
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
+  onPlayNow,
+  onFinish,
+  onDrop,
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
@@ -442,28 +456,20 @@ function CompactGameRow({
       </button>
 
       {!isMultiSelectMode ? (
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <select
-            aria-label={`Change status for ${game.title}`}
-            className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm text-slate-100 outline-none transition focus:border-mint"
-            onChange={(event) => onStatusChange(event.target.value as GameStatus)}
-            value={game.status}
-          >
-            {gameStatuses.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap gap-1.5 sm:justify-end" aria-label={`${game.title} quick actions`}>
           {onAddToQueue ? <RowAction label="Backlog" onClick={() => onAddToQueue(game)} /> : null}
+          <RowAction label="Playing" onClick={() => onPlayNow?.(game)} primary />
           {game.collectionType === 'wishlist' ? (
             <RowAction label="Library" onClick={() => onMoveToLibrary?.(game)} />
           ) : (
             <RowAction label="Wishlist" onClick={() => onAddToWishlist?.(game)} />
           )}
-          <RowAction label="Details" onClick={onOpenDetails} primary />
-          <RowAction label="Ignore" onClick={onRemoveAndIgnore} tone="danger" />
-          <RowAction label={game.collectionType === 'wishlist' ? 'Remove' : 'Drop'} onClick={game.collectionType === 'wishlist' ? onRemove : () => onStatusChange('Dropped')} tone="danger" />
+          <RowAction label="Finished" onClick={() => onFinish?.(game) ?? onStatusChange('Finished')} />
+          <RowAction label="Details" onClick={onOpenDetails} />
+          <span className="flex gap-1.5 border-l border-skyglass/15 pl-1" aria-label={`${game.title} destructive actions`}>
+            <RowAction label="Ignore" onClick={onRemoveAndIgnore} tone="danger" />
+            <RowAction label={game.collectionType === 'wishlist' ? 'Remove' : 'Drop'} onClick={game.collectionType === 'wishlist' ? onRemove : () => onDrop?.(game) ?? onStatusChange('Dropped')} tone="danger" />
+          </span>
         </div>
       ) : null}
     </article>
@@ -473,7 +479,7 @@ function CompactGameRow({
 function RowAction({ label, onClick, primary = false, tone }: { label: string; onClick: () => void; primary?: boolean; tone?: 'danger' }) {
   return (
     <button
-      className={`h-9 rounded-md border px-2.5 text-sm font-medium transition ${
+      className={`h-8 rounded-md border px-2 text-xs font-semibold transition sm:h-9 sm:px-2.5 sm:text-sm ${
         primary
           ? 'border-mint/30 bg-mint/10 text-mint hover:bg-mint/20'
           : tone === 'danger'
