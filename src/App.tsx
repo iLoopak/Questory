@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { BackToTopButton } from './components/BackToTopButton';
 import { BacklogPlatformPicker } from './components/BacklogPlatformPicker';
@@ -35,6 +35,10 @@ import {
 import {
   addActiveQueuePlatform,
   addGameToPlatformQueue,
+  addGameToPlatformQueueTop,
+  createPlatformArtworkPreset,
+  getPlatformAccentColor,
+  getPlatformTag,
   getActiveQueuePlatforms,
   getQueuePlatforms,
   hideQueuePlatform,
@@ -49,6 +53,9 @@ import {
   removeGameFromPlatformQueue,
   savePlatformQueueState,
   updatePlatformQueueSetting,
+  updatePlatformQueueVisualSettings,
+  platformAccentPalette,
+  platformArtworkPresetOptions,
   type PlatformQueueState,
 } from './lib/platformQueueStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
@@ -1105,7 +1112,68 @@ function App() {
       description: `Remove ${game.title} from ${platform} backlog and restore positions`,
     }, undefined, { actions: [getUndoAction()] });
 
+    const platformTag = getPlatformTag(platformQueueState, platform);
+    if (platformTag && !game.tags.includes(platformTag)) {
+      setGames((currentGames) =>
+        currentGames.map((currentGame) =>
+          currentGame.id === game.id
+            ? touchGameRecord({
+                ...currentGame,
+                tags: Array.from(new Set([...currentGame.tags, platformTag])),
+              })
+            : currentGame,
+        ),
+      );
+    }
+
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
+  }
+
+  function playQueueGameNow(gameId: string, platform: GamePlatform) {
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    if (!game) {
+      return;
+    }
+
+    const previousPlayingGames = games.filter((currentGame) => currentGame.status === 'Playing' && currentGame.platform === platform && currentGame.id !== gameId);
+    addUndoAction(`Now playing on ${platform}`, {
+      actionType: 'play-now',
+      affectedGameIds: [game.id, ...previousPlayingGames.map((previousGame) => previousGame.id)],
+      description: `Restore ${game.title} to ${platform} backlog and previous playing state`,
+    }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const platformTag = getPlatformTag(platformQueueState, platform);
+    setGames((currentGames) =>
+      currentGames.map((currentGame) => {
+        if (currentGame.id === gameId) {
+          return touchGameRecord({
+            ...currentGame,
+            platform,
+            status: 'Playing',
+            tags: platformTag ? Array.from(new Set([...currentGame.tags, platformTag])) : currentGame.tags,
+            lastPlayedAt: today,
+          });
+        }
+
+        if (previousPlayingGames.some((previousGame) => previousGame.id === currentGame.id)) {
+          return touchGameRecord({
+            ...currentGame,
+            status: 'Want to play',
+          });
+        }
+
+        return currentGame;
+      }),
+    );
+
+    setPlatformQueueState((currentState) => {
+      const selectedRemoved = removeGameFromPlatformQueue(currentState, gameId);
+      return previousPlayingGames.reduce(
+        (nextState, previousGame) => addGameToPlatformQueueTop(nextState, previousGame, platform),
+        selectedRemoved,
+      );
+    });
   }
 
   function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
@@ -1531,6 +1599,7 @@ function App() {
               onQueueStateChange={setPlatformQueueState}
               onMoveEntry={moveQueueGame}
               onMoveEntryToPlatform={moveQueueGameToPlatform}
+              onPlayNow={playQueueGameNow}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -1678,6 +1747,7 @@ function App() {
           game={backlogPickerGame}
           isOpen={Boolean(backlogPickerGame)}
           platforms={activeQueuePlatforms}
+          queueState={platformQueueState}
           onAddPlatform={addQueuePlatform}
           onClose={() => setBacklogPickerGame(null)}
           onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
@@ -3173,7 +3243,14 @@ function QueuePlatformsSettingsPanel({
                 <QueuePlatformManagementRow
                   key={platform}
                   isActive
+                  accentColor={getPlatformAccentColor(queueState, platform)}
+                  artworkUrl={queueState.settings.find((setting) => setting.platform === platform)?.artworkUrl ?? ''}
                   platform={platform}
+                  platformTag={getPlatformTag(queueState, platform)}
+                  onAccentColorChange={(accentColor) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { accentColor }))}
+                  onArtworkUrlChange={(artworkUrl) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { artworkUrl }))}
+                  onPlatformTagChange={(platformTag) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { platformTag }))}
+                  onPresetArtwork={(preset) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { artworkUrl: createPlatformArtworkPreset(platform, getPlatformAccentColor(queueState, platform), preset) }))}
                   onHide={() => onQueueStateChange(hideQueuePlatform(queueState, platform))}
                   onMoveDown={() => onQueueStateChange(moveQueuePlatform(queueState, platform, 'down'))}
                   onMoveUp={() => onQueueStateChange(moveQueuePlatform(queueState, platform, 'up'))}
@@ -3197,7 +3274,14 @@ function QueuePlatformsSettingsPanel({
               <QueuePlatformManagementRow
                 key={platform}
                 isActive={false}
+                accentColor={getPlatformAccentColor(queueState, platform)}
+                artworkUrl={queueState.settings.find((setting) => setting.platform === platform)?.artworkUrl ?? ''}
                 platform={platform}
+                platformTag={getPlatformTag(queueState, platform)}
+                onAccentColorChange={(accentColor) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { accentColor }))}
+                onArtworkUrlChange={(artworkUrl) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { artworkUrl }))}
+                onPlatformTagChange={(platformTag) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { platformTag }))}
+                onPresetArtwork={(preset) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, { artworkUrl: createPlatformArtworkPreset(platform, getPlatformAccentColor(queueState, platform), preset) }))}
                 onHide={() => onQueueStateChange(hideQueuePlatform(queueState, platform))}
                 onMoveDown={() => undefined}
                 onMoveUp={() => undefined}
@@ -3229,24 +3313,40 @@ function QueuePlatformsSettingsPanel({
 }
 
 function QueuePlatformManagementRow({
+  accentColor,
+  artworkUrl,
   isActive,
   platform,
+  platformTag,
+  onAccentColorChange,
+  onArtworkUrlChange,
   onHide,
   onMoveDown,
   onMoveUp,
+  onPlatformTagChange,
+  onPresetArtwork,
   onRemove,
   onRename,
   onToggle,
 }: {
+  accentColor: string;
+  artworkUrl: string;
   isActive: boolean;
   platform: GamePlatform;
+  platformTag: string;
+  onAccentColorChange: (accentColor: string) => void;
+  onArtworkUrlChange: (artworkUrl: string) => void;
   onHide: () => void;
   onMoveDown: () => void;
   onMoveUp: () => void;
+  onPlatformTagChange: (platformTag: string) => void;
+  onPresetArtwork: (preset: (typeof platformArtworkPresetOptions)[number]) => void;
   onRemove: () => void;
   onRename: (platform: GamePlatform) => void;
   onToggle: (isEnabled: boolean) => void;
 }) {
+  const accentStyle = { '--platform-accent': accentColor, borderColor: accentColor } as CSSProperties;
+
   function renamePlatform() {
     const nextPlatform = window.prompt('Rename platform', platform);
     if (nextPlatform?.trim()) {
@@ -3254,12 +3354,70 @@ function QueuePlatformManagementRow({
     }
   }
 
+  function uploadArtwork(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        onArtworkUrlChange(reader.result);
+      }
+    });
+    reader.readAsDataURL(file);
+  }
+
   return (
-    <div className="grid gap-2 rounded-md border border-skyglass/15 bg-ink-900/70 p-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-      <input checked={isActive} className="h-4 w-4 accent-mint" onChange={(event) => onToggle(event.target.checked)} type="checkbox" />
+    <div className="grid gap-2 rounded-md border bg-ink-900/70 p-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start" style={accentStyle}>
+      <input checked={isActive} className="mt-1 h-4 w-4" style={{ accentColor }} onChange={(event) => onToggle(event.target.checked)} type="checkbox" />
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-white">{platform}</div>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
+          <div className="truncate text-sm font-semibold text-white">{platform}</div>
+        </div>
         <div className="text-xs text-slate-500">{isActive ? 'Shown in Platforms' : 'Hidden from Platforms but available for imports/metadata'}</div>
+        {artworkUrl ? (
+          <div className="mt-2 h-12 overflow-hidden rounded border border-white/10">
+            <img alt="" className="h-full w-full object-cover" src={artworkUrl} />
+          </div>
+        ) : null}
+        <details className="mt-2 rounded-md border border-white/10 bg-ink-950/60 p-2">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Identity</summary>
+          <div className="mt-3 grid gap-3">
+            <label className="grid gap-1">
+              <span className="text-xs font-semibold text-slate-400">Accent Color</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <input className="h-9 w-12 rounded border border-white/10 bg-transparent" type="color" value={accentColor} onChange={(event) => onAccentColorChange(event.target.value)} />
+                {platformAccentPalette.map((color) => (
+                  <button key={color} aria-label={`Use ${color}`} className="h-7 w-7 rounded-full border border-white/20" style={{ backgroundColor: color }} onClick={() => onAccentColorChange(color)} type="button" />
+                ))}
+              </div>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs font-semibold text-slate-400">Platform Artwork URL</span>
+              <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="https://..." value={artworkUrl} onChange={(event) => onArtworkUrlChange(event.target.value)} />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs font-semibold text-slate-400">Upload image</span>
+              <input className="text-xs text-slate-300 file:mr-2 file:h-8 file:rounded file:border-0 file:bg-mint file:px-2 file:text-xs file:font-semibold file:text-ink-950" accept="image/*" type="file" onChange={(event) => uploadArtwork(event.target.files?.[0] ?? null)} />
+            </label>
+            <div>
+              <span className="text-xs font-semibold text-slate-400">Preset image</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {platformArtworkPresetOptions.map((preset) => (
+                  <button key={preset} className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onPresetArtwork(preset)} type="button">{preset}</button>
+                ))}
+                <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onArtworkUrlChange('')} type="button">Clear</button>
+              </div>
+            </div>
+            <label className="grid gap-1">
+              <span className="text-xs font-semibold text-slate-400">Platform tag</span>
+              <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="handheld, pc, retro..." value={platformTag} onChange={(event) => onPlatformTagChange(event.target.value)} />
+              <span className="text-xs text-slate-500">Games added to this backlog inherit this existing custom tag. History is preserved by each game’s own tag list.</span>
+            </label>
+          </div>
+        </details>
       </div>
       <div className="flex flex-wrap gap-1">
         <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveUp} type="button">Up</button>
