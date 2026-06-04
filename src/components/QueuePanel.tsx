@@ -17,6 +17,8 @@ import {
   type PlatformQueueState,
 } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
+
+export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { CollectionToolbar } from './CollectionToolbar';
 
@@ -30,6 +32,7 @@ type QueuePanelProps = {
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
   onPlayNow: (gameId: string, platform: GamePlatform) => void;
+  onPlayingAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
   onStartReview: () => void;
@@ -45,6 +48,7 @@ export function QueuePanel({
   onMoveEntry,
   onMoveEntryToPlatform,
   onPlayNow,
+  onPlayingAction,
   onOpenDetails,
   onRemoveEntry,
   onStartReview,
@@ -276,6 +280,7 @@ export function QueuePanel({
             onMoveEntry={onMoveEntry}
             onMoveEntryToPlatform={onMoveEntryToPlatform}
             onPlayNow={onPlayNow}
+            onPlayingAction={onPlayingAction}
             onOpenDetails={onOpenDetails}
             onRemoveEntry={onRemoveEntry}
           />
@@ -305,6 +310,7 @@ function PlatformQueueColumn({
   onMoveEntry,
   onMoveEntryToPlatform,
   onPlayNow,
+  onPlayingAction,
   onOpenDetails,
   onRemoveEntry,
 }: {
@@ -327,6 +333,7 @@ function PlatformQueueColumn({
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
   onPlayNow: (gameId: string, platform: GamePlatform) => void;
+  onPlayingAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
@@ -363,11 +370,11 @@ function PlatformQueueColumn({
           </summary>
           <div className="absolute right-0 z-20 mt-2 grid w-48 gap-2 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel">
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Active limit</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Future active limit</span>
               <input
                 className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
                 min={1}
-                max={10}
+                max={25}
                 type="number"
                 value={maxActiveGames}
                 onChange={(event) => onLimitChange(platform, Number(event.target.value))}
@@ -384,9 +391,20 @@ function PlatformQueueColumn({
 
       {currentlyPlaying.length > 0 ? (
         <div className="mb-3 grid gap-2 border-b border-skyglass/15 pb-3">
-          {currentlyPlaying.map((game) => (
-            <QueueGameRow key={game.id} game={game} onOpenDetails={onOpenDetails} />
-          ))}
+          <div className="rounded-xl border border-mint/30 bg-gradient-to-br from-mint/15 via-ink-900 to-ink-950 p-3 shadow-panel">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">Currently Playing</h4>
+                <p className="mt-1 text-xs text-slate-400">{currentlyPlaying.length} active {currentlyPlaying.length === 1 ? 'game' : 'games'} on {platform}</p>
+              </div>
+              <span className="rounded-full border px-2 py-1 text-xs font-semibold" style={{ borderColor: 'var(--platform-accent)', color: 'var(--platform-accent)' }}>Active list</span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {currentlyPlaying.map((game) => (
+                <QueueGameRow key={game.id} game={game} platform={platform} onAction={onPlayingAction} onOpenDetails={onOpenDetails} />
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -414,7 +432,7 @@ function PlatformQueueColumn({
           })
         ) : (
           <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
-            No platform backlog yet. Add one above or use Quest Queue.
+            No platform backlog yet. Add games above or use Quest Queue.
           </div>
         )}
       </div>
@@ -520,20 +538,36 @@ function QueueEntryRow({
   );
 }
 
-function QueueGameRow({ game, onOpenDetails }: { game: Game; onOpenDetails: (gameId: string) => void }) {
+function QueueGameRow({
+  game,
+  platform,
+  onAction,
+  onOpenDetails,
+}: {
+  game: Game;
+  platform: GamePlatform;
+  onAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
+  onOpenDetails: (gameId: string) => void;
+}) {
   return (
-    <button
-      className="group flex min-w-0 items-center gap-3 rounded-lg border border-mint/25 bg-mint/10 p-2 text-left text-sm text-mint transition hover:border-mint/45 hover:bg-mint/20 hover:shadow-glow"
-      onClick={() => onOpenDetails(game.id)}
-      type="button"
-    >
-      <QueueCoverThumbnail game={game} size="playing" />
-      <span className="min-w-0">
-        <span className="block truncate text-base font-semibold text-white group-hover:text-mint">{game.title}</span>
+    <article className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-mint/25 bg-ink-950/80 p-2 text-sm text-mint transition hover:border-mint/45 hover:bg-mint/10">
+      <button className="text-left" onClick={() => onOpenDetails(game.id)} type="button">
+        <QueueCoverThumbnail game={game} size="playing" />
+      </button>
+      <div className="min-w-0">
+        <button className="block max-w-full truncate text-left text-base font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
+          {game.title}
+        </button>
         <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--platform-accent)' }}>Currently Playing</span>
         <span className="mt-1 block truncate text-xs text-slate-400">{game.platform}</span>
-      </span>
-    </button>
+        <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} currently playing actions`}>
+          <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-100 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Backlog</button>
+          <button className="h-8 rounded-md border border-mint/30 px-2 text-xs text-mint hover:bg-mint/10" onClick={() => onAction(game.id, platform, 'finished')} type="button">Finished</button>
+          <button className="h-8 rounded-md border border-amber-300/30 px-2 text-xs text-amber-100 hover:bg-amber-500/10" onClick={() => onAction(game.id, platform, 'drop')} type="button">Drop</button>
+          <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-300 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">Remove from Playing</button>
+        </div>
+      </div>
+    </article>
   );
 }
 

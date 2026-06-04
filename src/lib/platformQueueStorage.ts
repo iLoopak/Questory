@@ -110,25 +110,14 @@ const defaultPlatformAccentColors = new Map<GamePlatform, string>([
 export const platformArtworkPresetOptions = ['Aurora', 'Grid', 'Glow'] as const;
 export type PlatformArtworkPreset = (typeof platformArtworkPresetOptions)[number];
 
+const defaultActiveGameLimit = 3;
+
 const defaultActiveLimits = new Map<GamePlatform, number>([
-  ['PS5', 1],
-  ['PS4', 1],
-  ['Switch', 1],
-  ['Switch 2', 1],
-  ['Steam', 2],
-  ['Steam Deck', 2],
-  ['Retroid', 3],
-  ['Legion Go', 2],
-  ['PC', 2],
-  ['PSP', 3],
-  ['PS Vita', 3],
-  ['Game Boy Advance', 3],
-  ['Game Boy Color', 3],
-  ['Game Boy', 3],
-  ['SNES', 3],
-  ['NES', 3],
-  ['Nintendo 64', 3],
-  ['Nintendo DS', 3],
+  ['Steam', 4],
+  ['Steam Deck', 4],
+  ['Retroid', 4],
+  ['Legion Go', 4],
+  ['PC', 4],
 ]);
 
 const emptyQueueState: PlatformQueueState = {
@@ -249,7 +238,7 @@ export function setActiveQueuePlatforms(state: PlatformQueueState, platforms: Ga
 
 export function getPlatformMaxActiveGames(state: PlatformQueueState, platform: GamePlatform) {
   const savedSetting = getPlatformQueueSetting(state, platform);
-  return savedSetting?.maxActiveGames ?? defaultActiveLimits.get(platform) ?? 2;
+  return savedSetting?.maxActiveGames ?? defaultActiveLimits.get(platform) ?? defaultActiveGameLimit;
 }
 
 export function getPlatformQueueSetting(state: PlatformQueueState, platform: GamePlatform) {
@@ -393,7 +382,7 @@ export function updatePlatformQueueSetting(
   platform: GamePlatform,
   maxActiveGames: number,
 ): PlatformQueueState {
-  const boundedLimit = Math.max(1, Math.min(10, Math.round(maxActiveGames)));
+  const boundedLimit = Math.max(1, Math.min(25, Math.round(maxActiveGames)));
   return upsertPlatformQueueSetting(state, platform, { maxActiveGames: boundedLimit });
 }
 
@@ -468,7 +457,7 @@ function upsertPlatformQueueSetting(
     settings: [
       ...settings,
       normalizeQueueSetting({
-        maxActiveGames: defaultActiveLimits.get(platform) ?? 2,
+        maxActiveGames: defaultActiveLimits.get(platform) ?? defaultActiveGameLimit,
         ...currentSetting,
         ...changes,
         platform,
@@ -520,7 +509,7 @@ function normalizeQueueSetting(setting: PlatformQueueSettings): PlatformQueueSet
   return {
     accentColor: isValidAccentColor(setting.accentColor) ? setting.accentColor : undefined,
     artworkUrl: typeof setting.artworkUrl === 'string' && setting.artworkUrl.trim() ? setting.artworkUrl.trim() : undefined,
-    maxActiveGames: Math.max(1, Math.min(10, Math.round(setting.maxActiveGames || defaultActiveLimits.get(setting.platform) || 2))),
+    maxActiveGames: Math.max(1, Math.min(25, Math.round(setting.maxActiveGames || defaultActiveLimits.get(setting.platform) || defaultActiveGameLimit))),
     platform: normalizePlatformName(setting.platform),
     platformTag: typeof setting.platformTag === 'string' && setting.platformTag.trim() ? setting.platformTag.trim() : undefined,
   };
