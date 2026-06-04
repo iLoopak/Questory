@@ -831,7 +831,10 @@ function App() {
     }
   }
 
-  async function refreshSteamPlaytime(gameIds?: string[], options: { showToast?: boolean } = {}) {
+  async function refreshSteamPlaytime(
+    gameIds?: string[],
+    options: { completionToastMessage?: (summary: SteamPlaytimeRefreshSummary) => string; emptyToastMessage?: string; showToast?: boolean } = {},
+  ) {
     const targetGames = (gameIds ? games.filter((game) => gameIds.includes(game.id)) : games).filter(
       (game) => game.collectionType === 'library',
     );
@@ -847,7 +850,7 @@ function App() {
       };
       setSteamPlaytimeRefreshState({
         status: 'success',
-        message: 'No Steam library games were selected for playtime refresh.',
+        message: options.emptyToastMessage ?? 'No Steam library games were selected for playtime refresh.',
         progress: { completed: 0, total: 0 },
         summary,
       });
@@ -855,7 +858,7 @@ function App() {
         actions: [getDismissAction()],
         category: 'warning',
         dedupeKey: 'steam-playtime-refresh:no-steam-games',
-        message: 'Select Steam library games to refresh playtime.',
+        message: options.emptyToastMessage ?? 'Select Steam library games to refresh playtime.',
       });
       return summary;
     }
@@ -871,7 +874,7 @@ function App() {
       const settings = loadSteamSettings();
       const ownedGames = await getOwnedGames(settings);
       const refreshedAt = new Date().toISOString();
-      const targetGameIds = new Set(refreshableGames.map((game) => game.id));
+      const targetGameIds = new Set(targetGames.map((game) => game.id));
       const result = refreshSteamPlaytimeForGames(games, targetGameIds, ownedGames, refreshedAt);
       const completed = result.summary.updatedCount + result.summary.unchangedCount + result.summary.failedCount;
 
@@ -888,7 +891,7 @@ function App() {
           actions: [getViewGameAction(refreshableGames[0].id)],
           category: result.summary.failedCount > 0 ? 'warning' : 'success',
           dedupeKey: `steam-playtime-refresh:${refreshableGames[0].id}`,
-          message: 'Playtime updated',
+          message: options.completionToastMessage?.(result.summary) ?? `Updated playtime for ${result.summary.updatedCount} game${result.summary.updatedCount === 1 ? '' : 's'}`,
         });
       }
 
@@ -1724,7 +1727,13 @@ function App() {
               onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
-              onBulkRefreshSteamPlaytime={(gameIds) => refreshSteamPlaytime(gameIds)}
+              onBulkRefreshSteamPlaytime={(gameIds, options) =>
+                refreshSteamPlaytime(gameIds, {
+                  completionToastMessage: (summary) => `Updated playtime for ${summary.updatedCount} game${summary.updatedCount === 1 ? '' : 's'}`,
+                  emptyToastMessage: options?.emptyToastMessage,
+                  showToast: true,
+                })
+              }
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
               onClearFilters={() => setLibraryFilters(initialCollectionFilters)}
@@ -2110,7 +2119,7 @@ type CollectionPanelProps = {
   onFinish: (game: Game) => void;
   onDrop: (game: Game) => void;
   onBulkEnrich: (gameIds: string[]) => void;
-  onBulkRefreshSteamPlaytime?: (gameIds: string[]) => Promise<SteamPlaytimeRefreshSummary | null>;
+  onBulkRefreshSteamPlaytime?: (gameIds: string[], options?: { emptyToastMessage?: string }) => Promise<SteamPlaytimeRefreshSummary | null>;
   onBulkRemove: (gameIds: string[]) => void;
   onBulkRemoveAndIgnore: (games: Game[]) => void;
   onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
@@ -2176,6 +2185,8 @@ function CollectionPanel({
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
   const selectedRefreshableSteamCount = selectedGames.filter(isRefreshableSteamGame).length;
+  const visibleRefreshableSteamCount = games.filter(isRefreshableSteamGame).length;
+  const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
@@ -2320,18 +2331,39 @@ function CollectionPanel({
   }
 
   async function refreshSelectedSteamPlaytime() {
-    if (selectedCount === 0 || !onBulkRefreshSteamPlaytime) {
+    if (selectedCount === 0 || !onBulkRefreshSteamPlaytime || isSteamPlaytimeSyncing) {
       return;
     }
 
     setBulkSummary(null);
-    const summary = await onBulkRefreshSteamPlaytime(selectedGames.map((game) => game.id));
+    const summary = await onBulkRefreshSteamPlaytime(selectedGames.map((game) => game.id), {
+      emptyToastMessage: 'No selected Steam games are eligible for playtime sync.',
+    });
 
     if (summary) {
       setBulkSummary(summary);
     }
   }
 
+  async function syncLibrarySteamPlaytime() {
+    if (collectionType !== 'library' || !onBulkRefreshSteamPlaytime || isSteamPlaytimeSyncing) {
+      return;
+    }
+
+    const hasSelection = selectedCount > 0;
+    const targetGames = hasSelection ? selectedGames : games;
+
+    setBulkSummary(null);
+    const summary = await onBulkRefreshSteamPlaytime(targetGames.map((game) => game.id), {
+      emptyToastMessage: hasSelection
+        ? 'No selected Steam games are eligible for playtime sync.'
+        : 'No visible Steam games are eligible for playtime sync.',
+    });
+
+    if (summary) {
+      setBulkSummary(summary);
+    }
+  }
 
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
@@ -2391,6 +2423,21 @@ function CollectionPanel({
                 type="button"
               >
                 {steamWishlistSyncState?.status === 'loading' ? 'Syncing Steam...' : 'Sync Steam'}
+              </button>
+            ) : null}
+            {collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
+              <button
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
+                disabled={isSteamPlaytimeSyncing}
+                onClick={syncLibrarySteamPlaytime}
+                title={
+                  selectedCount > 0
+                    ? `Sync selected Steam games (${selectedRefreshableSteamCount} eligible)`
+                    : `Sync visible Steam games (${visibleRefreshableSteamCount} eligible)`
+                }
+                type="button"
+              >
+                {isSteamPlaytimeSyncing ? 'Syncing Steam playtime...' : 'Sync Steam playtime'}
               </button>
             ) : null}
             <button
@@ -2547,7 +2594,7 @@ function CollectionPanel({
                 </button>
               ) : null}
               {collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
-                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedRefreshableSteamCount === 0} onClick={refreshSelectedSteamPlaytime} type="button">
+                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedRefreshableSteamCount === 0 || isSteamPlaytimeSyncing} onClick={refreshSelectedSteamPlaytime} type="button">
                   Refresh Steam Playtime
                 </button>
               ) : null}
@@ -4141,6 +4188,8 @@ function formatBulkSummary(summary: BulkActionSummary) {
     summary.updatedCount ? `${summary.updatedCount} updated` : null,
     summary.removedCount ? `${summary.removedCount} removed` : null,
     summary.ignoredCount ? `${summary.ignoredCount} ignored` : null,
+    summary.failedCount ? `${summary.failedCount} failed` : null,
+    summary.skippedNonSteamCount ? `${summary.skippedNonSteamCount} non-Steam skipped` : null,
     summary.wishlistedCount ? `${summary.wishlistedCount} sent to Wishlist` : null,
     typeof summary.skippedCount === 'number' ? `${summary.skippedCount} skipped` : null,
   ].filter(Boolean);
