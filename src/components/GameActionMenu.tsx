@@ -3,21 +3,6 @@ import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent
 import { createPortal } from 'react-dom';
 import type { Game, GameStatus } from '../types/game';
 
-type MenuAnchorRect = {
-  height: number;
-  left: number;
-  top: number;
-  width: number;
-};
-
-type MenuPosition = {
-  left: number;
-  maxHeight: number;
-  placement: 'above' | 'below';
-  top: number;
-  width: number;
-};
-
 type GameActionMenuProps = {
   game: Game;
   variant?: 'card' | 'compact' | 'shelf';
@@ -26,6 +11,7 @@ type GameActionMenuProps = {
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
   onClose?: () => void;
+  onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onOpenChange?: (isOpen: boolean) => void;
   onOpenDetails?: () => void;
@@ -48,9 +34,6 @@ type GameActionMenuItem = {
   tone?: 'danger';
 };
 
-const menuWidth = 232;
-const viewportMargin = 12;
-
 export function GameActionMenu({
   game,
   variant = 'card',
@@ -59,6 +42,7 @@ export function GameActionMenu({
   onAddToQueue,
   onAddToWishlist,
   onClose,
+  onFindMetadata,
   onMoveToLibrary,
   onOpenChange,
   onOpenDetails,
@@ -91,16 +75,6 @@ export function GameActionMenu({
     setMenuOpen(false);
   }, [setMenuOpen]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    return () => {
-      window.setTimeout(() => buttonRef.current?.focus({ preventScroll: true }), 0);
-    };
-  }, [isOpen]);
-
   function handleToggle(event: ReactMouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
     setMenuOpen(!isOpen);
@@ -127,7 +101,7 @@ export function GameActionMenu({
         ref={buttonRef}
         aria-controls={isOpen ? menuId : undefined}
         aria-expanded={isOpen}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-label={`More actions for ${game.title}`}
         className={getActionButtonClass(variant)}
         data-controller-action="context-menu"
@@ -146,6 +120,7 @@ export function GameActionMenu({
           onAddToQueue={onAddToQueue}
           onAddToWishlist={onAddToWishlist}
           onClose={closeMenu}
+          onFindMetadata={onFindMetadata}
           onMoveToLibrary={onMoveToLibrary}
           onOpenDetails={onOpenDetails}
           onRemove={onRemove}
@@ -165,6 +140,7 @@ function GameActionMenuOverlay({
   onAddToQueue,
   onAddToWishlist,
   onClose,
+  onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
   onRemove,
@@ -172,8 +148,6 @@ function GameActionMenuOverlay({
   onStatusChange,
 }: GameActionMenuOverlayProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [anchorRect, setAnchorRect] = useState<MenuAnchorRect | null>(() => getAnchorRect(anchorRef.current));
-  const [position, setPosition] = useState<MenuPosition>(() => getSheetPosition());
   const actions = useMemo(
     () =>
       buildGameActionMenuItems({
@@ -182,76 +156,41 @@ function GameActionMenuOverlay({
         onAddToQueue,
         onAddToWishlist,
         onClose,
+        onFindMetadata,
         onMoveToLibrary,
         onOpenDetails,
         onRemove,
         onRemoveAndIgnore,
         onStatusChange,
       }),
-    [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange],
+    [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange],
   );
 
   const primaryActions = actions.filter((action) => action.tone !== 'danger');
   const destructiveActions = actions.filter((action) => action.tone === 'danger');
 
   useEffect(() => {
-    const updateAnchorRect = () => setAnchorRect(getAnchorRect(anchorRef.current));
-
-    updateAnchorRect();
-    window.addEventListener('resize', updateAnchorRect);
-    window.addEventListener('scroll', updateAnchorRect, true);
+    const firstMenuItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])');
+    firstMenuItem?.focus({ preventScroll: true });
 
     return () => {
-      window.removeEventListener('resize', updateAnchorRect);
-      window.removeEventListener('scroll', updateAnchorRect, true);
+      window.setTimeout(() => anchorRef.current?.focus({ preventScroll: true }), 0);
     };
   }, [anchorRef]);
 
   useEffect(() => {
-    setPosition(getMenuPosition(anchorRect, menuRef.current));
-  }, [anchorRect, actions.length]);
-
-  useEffect(() => {
-    const firstMenuItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])');
-    firstMenuItem?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node | null;
-
-      if (!target) {
-        return;
-      }
-
-      if (menuRef.current?.contains(target) || anchorRef.current?.contains(target)) {
-        return;
-      }
-
-      onClose();
-    }
-
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' || event.key === 'BrowserBack' || event.key === 'Backspace') {
+      if (event.key === 'Escape' || event.key === 'BrowserBack' || event.key === 'GamepadB') {
         event.preventDefault();
         event.stopPropagation();
         onClose();
-        return;
-      }
-
-      if (event.key === 'Tab') {
-        onClose();
       }
     }
 
-    window.addEventListener('pointerdown', handlePointerDown, true);
     window.addEventListener('keydown', handleKeyDown, true);
 
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown, true);
-      window.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [anchorRef, onClose]);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onClose]);
 
   function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
@@ -268,35 +207,52 @@ function GameActionMenuOverlay({
     enabledItems[nextIndex]?.focus({ preventScroll: true });
   }
 
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
   return createPortal(
-    <div className="fixed inset-0 z-[1200] pointer-events-none" aria-label="Game actions overlay">
+    <div
+      className="fixed inset-0 z-[1200] flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <div
         ref={menuRef}
         id={menuId}
-        className="pointer-events-auto fixed overflow-hidden rounded-xl border border-skyglass/20 bg-ink-950/98 shadow-panel ring-1 ring-white/10 backdrop-blur-md"
-        role="menu"
         aria-label={`Actions for ${game.title}`}
+        aria-modal="true"
+        className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-2xl border border-skyglass/20 bg-ink-950/98 shadow-panel ring-1 ring-white/10 backdrop-blur-md sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleMenuKeyDown}
-        style={{
-          left: `${position.left}px`,
-          maxHeight: `${position.maxHeight}px`,
-          top: `${position.top}px`,
-          width: `${position.width}px`,
-        }}
+        role="dialog"
+        tabIndex={-1}
       >
-        {anchorRect ? <span className={`absolute right-5 h-2 w-2 rotate-45 border-skyglass/20 bg-ink-950 ${position.placement === 'below' ? '-top-1 border-l border-t' : '-bottom-1 border-b border-r'}`} /> : null}
-        <div className="max-h-[inherit] overflow-y-auto py-1">
-          {primaryActions.map((action) => (
-            <GameActionMenuItemButton key={action.label} action={action} />
-          ))}
-          {destructiveActions.length > 0 ? (
-            <div className="mt-1 border-t border-red-400/20 pt-1" aria-label={`${game.title} destructive actions`}>
-              {destructiveActions.map((action) => (
-                <GameActionMenuItemButton key={action.label} action={action} />
-              ))}
-            </div>
-          ) : null}
+        <div className="flex items-start justify-between gap-3 border-b border-skyglass/15 bg-white/[0.03] px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Actions</p>
+            <h3 className="mt-1 truncate text-base font-semibold text-white">{game.title}</h3>
+          </div>
+          <button
+            className="min-h-10 shrink-0 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+            onClick={onClose}
+            type="button"
+          >
+            Close
+          </button>
+        </div>
+        <div className="max-h-[min(74dvh,34rem)] overflow-y-auto py-2 pb-[max(1rem,calc(var(--qs-safe-bottom)+0.75rem))]">
+          <div role="menu" aria-label={`Actions for ${game.title}`}>
+            {primaryActions.map((action) => (
+              <GameActionMenuItemButton key={action.label} action={action} />
+            ))}
+            {destructiveActions.length > 0 ? (
+              <div className="mt-2 border-t border-red-400/20 pt-2" aria-label={`${game.title} destructive actions`}>
+                {destructiveActions.map((action) => (
+                  <GameActionMenuItemButton key={action.label} action={action} />
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>,
@@ -305,7 +261,7 @@ function GameActionMenuOverlay({
 }
 
 function GameActionMenuItemButton({ action }: { action: GameActionMenuItem }) {
-  const className = `block min-h-11 w-full px-4 py-3 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint ${
+  const className = `block min-h-12 w-full px-5 py-3.5 text-left text-base font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint sm:text-sm ${
     action.tone === 'danger'
       ? 'text-red-200 hover:bg-red-500/10 focus-visible:bg-red-500/10'
       : 'text-slate-100 hover:bg-mint/10 focus-visible:bg-mint/10'
@@ -346,6 +302,7 @@ function buildGameActionMenuItems({
   onAddToQueue,
   onAddToWishlist,
   onClose,
+  onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
   onRemove,
@@ -359,8 +316,8 @@ function buildGameActionMenuItems({
       items.push({
         ...item,
         onSelect: () => {
-          item.onSelect?.();
           onClose();
+          item.onSelect?.();
         },
       });
       return;
@@ -373,36 +330,40 @@ function buildGameActionMenuItems({
           return;
         }
 
-        item.onSelect?.();
         onClose();
+        window.setTimeout(() => item.onSelect?.(), 0);
       },
     });
   };
 
   if (includeDetails && onOpenDetails) {
-    addAction({ label: 'Details', onSelect: onOpenDetails });
+    addAction({ label: 'Details / Edit', onSelect: onOpenDetails });
+  }
+
+  if (onFindMetadata) {
+    addAction({ label: 'Refresh metadata', onSelect: () => onFindMetadata(game) });
   }
 
   if (onAddToQueue) {
-    addAction({ label: 'Add to Backlog', onSelect: () => onAddToQueue(game) });
+    addAction({ label: 'Add to Queue', onSelect: () => onAddToQueue(game) });
   }
 
-  addAction({ label: 'Playing', onSelect: () => onStatusChange(game.id, 'Playing') });
+  addAction({ label: 'Playing Now', onSelect: () => onStatusChange(game.id, 'Playing') });
 
   if (game.collectionType === 'wishlist') {
-    addAction({ label: 'Move to Library', onSelect: () => onMoveToLibrary?.(game) });
-  } else {
-    addAction({ label: 'Add to Wishlist', onSelect: () => onAddToWishlist?.(game) });
+    addAction({ label: 'Move to Library', onSelect: () => onMoveToLibrary?.(game), disabled: !onMoveToLibrary });
+  } else if (onAddToWishlist) {
+    addAction({ label: 'Wishlist', onSelect: () => onAddToWishlist(game) });
   }
 
   addAction({ label: 'Finished', onSelect: () => onStatusChange(game.id, 'Finished') });
 
   if (game.storeUrl || game.externalUrl) {
-    addAction({ label: 'Open Steam Store', href: game.storeUrl ?? game.externalUrl });
+    addAction({ label: 'Open Store', href: game.storeUrl ?? game.externalUrl });
   }
 
   addAction({ label: game.collectionType === 'wishlist' ? 'Remove from Wishlist' : 'Remove', onSelect: () => onRemove(game.id), tone: 'danger' });
-  addAction({ label: 'Drop', onSelect: () => onStatusChange(game.id, 'Dropped'), tone: 'danger' });
+  addAction({ label: 'Dropped', onSelect: () => onStatusChange(game.id, 'Dropped'), tone: 'danger' });
   addAction({
     disabled: typeof game.steamAppId !== 'number',
     label: 'Ignore',
@@ -425,60 +386,4 @@ function getActionButtonClass(variant: GameActionMenuProps['variant']) {
   }
 
   return `${baseClass} h-10 w-11 text-base`;
-}
-
-function getAnchorRect(anchor: HTMLButtonElement | null): MenuAnchorRect | null {
-  if (!anchor) {
-    return null;
-  }
-
-  const rect = anchor.getBoundingClientRect();
-  return {
-    height: rect.height,
-    left: rect.left,
-    top: rect.top,
-    width: rect.width,
-  };
-}
-
-function getMenuPosition(anchorRect: MenuAnchorRect | null, menuElement: HTMLDivElement | null): MenuPosition {
-  if (!anchorRect) {
-    return getSheetPosition();
-  }
-
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const measuredHeight = menuElement?.offsetHeight ?? 420;
-  const width = Math.min(menuWidth, viewportWidth - viewportMargin * 2);
-  const left = Math.min(Math.max(anchorRect.left + anchorRect.width - width, viewportMargin), viewportWidth - width - viewportMargin);
-  const belowTop = anchorRect.top + anchorRect.height + 8;
-  const aboveTop = anchorRect.top - measuredHeight - 8;
-  const belowSpace = viewportHeight - belowTop - viewportMargin;
-  const aboveSpace = anchorRect.top - viewportMargin - 8;
-  const placement = belowSpace >= Math.min(measuredHeight, 280) || belowSpace >= aboveSpace ? 'below' : 'above';
-  const availableHeight = placement === 'below' ? belowSpace : aboveSpace;
-  const top = placement === 'below'
-    ? belowTop
-    : Math.max(viewportMargin, anchorRect.top - Math.min(measuredHeight, availableHeight) - 8);
-
-  return {
-    left,
-    maxHeight: Math.max(220, Math.min(measuredHeight, availableHeight, viewportHeight - viewportMargin * 2)),
-    placement,
-    top,
-    width,
-  };
-}
-
-function getSheetPosition(): MenuPosition {
-  const width = Math.min(menuWidth, window.innerWidth - viewportMargin * 2);
-  const maxHeight = Math.min(420, window.innerHeight - viewportMargin * 2);
-
-  return {
-    left: Math.max(viewportMargin, (window.innerWidth - width) / 2),
-    maxHeight,
-    placement: 'below',
-    top: Math.max(viewportMargin, window.innerHeight - maxHeight - viewportMargin),
-    width,
-  };
 }

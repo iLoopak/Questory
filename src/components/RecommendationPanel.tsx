@@ -21,6 +21,7 @@ type RecommendationPanelProps = {
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
+  onFindMetadata?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
@@ -39,6 +40,7 @@ export function RecommendationPanel({
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
+  onFindMetadata,
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
@@ -125,7 +127,7 @@ export function RecommendationPanel({
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
-        title="Recommendation"
+        title="Recommendations"
         searchValue={recommendationSearchTerm}
         searchPlaceholder="Find title"
         onSearchChange={setRecommendationSearchTerm}
@@ -148,7 +150,7 @@ export function RecommendationPanel({
         moreFiltersButtonRef={moreFiltersButtonRef}
         onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
         viewMode={{
-          label: 'Recommendation view mode',
+          label: 'Recommendations view mode',
           options: recommendationViewModes,
           value: viewMode,
           onChange: (mode) => setViewMode(mode as RecommendationViewMode),
@@ -167,7 +169,7 @@ export function RecommendationPanel({
               onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
               type="button"
             >
-              Send pool to Quest Queue
+              Send pool to Review Mode
             </button>
           </>
         }
@@ -175,14 +177,14 @@ export function RecommendationPanel({
 
       {isMoreFiltersOpen ? (
         <ViewportModal
-          ariaLabel="Recommendation filters"
+          ariaLabel="Recommendations filters"
           initialFocusRef={moreFiltersCloseRef}
           restoreFocusRef={moreFiltersButtonRef}
           onClose={() => setIsMoreFiltersOpen(false)}
         >
           <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
               <div>
-                <h3 className="text-base font-semibold text-white">Recommendation filters</h3>
+                <h3 className="text-base font-semibold text-white">Recommendations filters</h3>
                 <p className="mt-0.5 text-xs text-slate-400">Tune the same result list without switching to a custom recommendation layout.</p>
               </div>
               <button
@@ -217,7 +219,7 @@ export function RecommendationPanel({
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <RecommendationToggle checked={includeFinishedGames} label="Finished" onChange={(checked) => updatePreference(() => setIncludeFinishedGames(checked))} />
                 <RecommendationToggle checked={includeWishlist} label="Wishlist" onChange={(checked) => updatePreference(() => setIncludeWishlist(checked))} />
-                <RecommendationToggle checked={recommendFromQueueOnly} label="Platforms only" onChange={(checked) => updatePreference(() => setRecommendFromQueueOnly(checked))} />
+                <RecommendationToggle checked={recommendFromQueueOnly} label="Queue only" onChange={(checked) => updatePreference(() => setRecommendFromQueueOnly(checked))} />
                 <RecommendationToggle checked={recommendNextGame} label="Next planned" onChange={(checked) => updatePreference(() => setRecommendNextGame(checked))} />
               </div>
 
@@ -243,6 +245,7 @@ export function RecommendationPanel({
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
             onRemove={onRemove}
@@ -257,6 +260,7 @@ export function RecommendationPanel({
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
             onRemove={onRemove}
@@ -271,6 +275,7 @@ export function RecommendationPanel({
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
             onRemove={onRemove}

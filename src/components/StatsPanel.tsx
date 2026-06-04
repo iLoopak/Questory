@@ -147,7 +147,7 @@ function SummaryGrid({ stats }: { stats: QuestShelfStats }) {
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="Total games in Library" value={stats.libraryTotal.toString()} />
       <MetricCard label="Total Wishlist items" value={stats.wishlistTotal.toString()} />
-      <MetricCard label="Currently Playing" value={stats.statusCounts.Playing.toString()} />
+      <MetricCard label="Playing Now" value={stats.statusCounts.Playing.toString()} />
       <MetricCard label="Paused" value={stats.statusCounts.Paused.toString()} />
       <MetricCard label="Finished" value={stats.statusCounts.Finished.toString()} />
       <MetricCard label="Dropped" value={stats.statusCounts.Dropped.toString()} />
@@ -161,7 +161,7 @@ function ProgressGrid({ stats }: { stats: QuestShelfStats }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       <ProgressCard label="Finished percentage" value={`${stats.finishedPercent}%`} percent={stats.finishedPercent} />
-      <MetricCard label="Active backlog" value={stats.activeBacklogCount.toString()} />
+      <MetricCard label="Active Queue" value={stats.activeBacklogCount.toString()} />
       <MetricCard label="Played but not finished" value={stats.gamesWithPlaytimeNotFinished.toString()} />
       <MetricCard label="Never played" value={stats.gamesNeverPlayed.toString()} />
     </div>

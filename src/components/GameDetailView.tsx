@@ -83,7 +83,7 @@ export function GameDetailView({
   const primaryActions: GameDetailAction[] = [
     {
       icon: '📌',
-      label: 'Backlog',
+      label: 'Queue',
       onClick: () => onAddToQueue?.(game),
       tone: 'accent',
       disabled: !onAddToQueue,

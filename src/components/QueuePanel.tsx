@@ -199,7 +199,7 @@ export function QueuePanel({
               onClick={onStartReview}
               type="button"
             >
-              Build in Quest Queue
+              Build in Review Mode
             </button>
             <details className="rounded-md border border-white/10 bg-ink-900 p-2">
               <summary className="cursor-pointer text-sm font-semibold text-slate-300">Manage platforms</summary>
@@ -395,7 +395,7 @@ function PlatformQueueColumn({
           <div className="rounded-xl border border-mint/30 bg-gradient-to-br from-mint/15 via-ink-900 to-ink-950 p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">Currently Playing</h4>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">Playing Now</h4>
                 <p className="mt-1 text-xs text-slate-400">{currentlyPlaying.length} active {currentlyPlaying.length === 1 ? 'game' : 'games'} on {platform}</p>
               </div>
               <span className="rounded-full border px-2 py-1 text-xs font-semibold" style={{ borderColor: 'var(--platform-accent)', color: 'var(--platform-accent)' }}>Active list</span>
@@ -434,7 +434,7 @@ function PlatformQueueColumn({
           })
         ) : (
           <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
-            No platform backlog yet. Add games above or use Quest Queue.
+            No Queue yet. Add games above or use Review Mode.
           </div>
         )}
       </div>
@@ -562,10 +562,10 @@ function QueueGameRow({
         <button className="block max-w-full truncate text-left text-base font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
           {game.title}
         </button>
-        <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--platform-accent)' }}>Currently Playing</span>
+        <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--platform-accent)' }}>Playing Now</span>
         <span className="mt-1 block truncate text-xs text-slate-400">{game.platform}</span>
         <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} currently playing actions`}>
-          <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-100 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Backlog</button>
+          <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-100 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Queue</button>
           <button className="h-8 rounded-md border border-mint/30 px-2 text-xs text-mint hover:bg-mint/10" onClick={() => onAction(game.id, platform, 'finished')} type="button">Finished</button>
           <button className="h-8 rounded-md border border-amber-300/30 px-2 text-xs text-amber-100 hover:bg-amber-500/10" onClick={() => onAction(game.id, platform, 'drop')} type="button">Drop</button>
           <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-300 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">Remove from Playing</button>
