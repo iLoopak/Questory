@@ -14,6 +14,7 @@ import {
   type PlatformQueueState,
 } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
+import { getGameCoverSources } from '../lib/gameCoverImages';
 import { CollectionToolbar } from './CollectionToolbar';
 
 type QueuePanelProps = {
@@ -354,7 +355,7 @@ function PlatformQueueColumn({
       </div>
 
       {currentlyPlaying.length > 0 ? (
-        <div className="mb-3 grid gap-2">
+        <div className="mb-3 grid gap-2 border-b border-skyglass/15 pb-3">
           {currentlyPlaying.map((game) => (
             <QueueGameRow key={game.id} game={game} onOpenDetails={onOpenDetails} />
           ))}
@@ -441,19 +442,20 @@ function QueueEntryRow({
       role="group"
       tabIndex={0}
     >
-      <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] gap-2 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:items-center">
         <div className="grid h-9 w-9 place-items-center rounded-md border border-mint/25 bg-mint/10 text-sm font-semibold text-mint">
           {entry.queuePosition}
         </div>
+        <QueueCoverThumbnail game={game} size="tiny" />
         <div className="min-w-0">
-          <button className="truncate text-left font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
+          <button className="block max-w-full truncate text-left font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
             {game.title}
           </button>
           <div className="mt-1">
             <span className="platform-badge inline-flex rounded-full px-2 py-0.5 text-xs font-semibold">{game.platform}</span>
           </div>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="col-span-3 flex flex-wrap gap-1 sm:col-auto">
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">
             Top
           </button>
@@ -489,11 +491,62 @@ function QueueEntryRow({
 function QueueGameRow({ game, onOpenDetails }: { game: Game; onOpenDetails: (gameId: string) => void }) {
   return (
     <button
-      className="min-h-9 rounded-md border border-mint/20 bg-mint/10 px-3 py-1.5 text-left text-sm text-mint transition hover:bg-mint/20"
+      className="group flex min-w-0 items-center gap-3 rounded-lg border border-mint/25 bg-mint/10 p-2 text-left text-sm text-mint transition hover:border-mint/45 hover:bg-mint/20 hover:shadow-glow"
       onClick={() => onOpenDetails(game.id)}
       type="button"
     >
-      <span className="block truncate font-semibold">Playing: {game.title}</span>
+      <QueueCoverThumbnail game={game} size="playing" />
+      <span className="min-w-0">
+        <span className="block truncate text-base font-semibold text-white group-hover:text-mint">{game.title}</span>
+        <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em] text-mint">Currently Playing</span>
+        <span className="mt-1 block truncate text-xs text-slate-400">{game.platform}</span>
+      </span>
     </button>
+  );
+}
+
+function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'tiny' }) {
+  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const activeCoverSource = coverSources[coverSourceIndex];
+  const isPlayingSize = size === 'playing';
+
+  useEffect(() => {
+    setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
+  }, [coverSources]);
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative block shrink-0 overflow-hidden rounded-md border bg-ink-800 ${
+        isPlayingSize ? 'h-20 w-[3.75rem] border-mint/30 shadow-panel' : 'h-11 w-[2.0625rem] border-skyglass/15'
+      }`}
+    >
+      {activeCoverSource ? (
+        <>
+          {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+          <img
+            alt=""
+            className={`h-full w-full object-cover transition-opacity duration-200 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
+            decoding="async"
+            height={isPlayingSize ? 80 : 44}
+            loading="lazy"
+            onError={() => {
+              setIsCoverLoaded(false);
+              setCoverSourceIndex((currentIndex) => currentIndex + 1);
+            }}
+            onLoad={() => setIsCoverLoaded(true)}
+            src={activeCoverSource}
+            width={isPlayingSize ? 60 : 33}
+          />
+        </>
+      ) : (
+        <span className={`grid h-full w-full place-items-center font-semibold text-mint/80 ${isPlayingSize ? 'text-xl' : 'text-xs'}`}>
+          {game.title.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+    </span>
   );
 }
