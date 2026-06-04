@@ -237,7 +237,7 @@ export function RecommendationPanel({
 
       {recommendationResults.length > 0 ? (
         viewMode === 'Shelf View' ? (
-          <CollectionShelf games={recommendationResults} getHighlightLabel={getHighlightLabel} onOpenDetails={onOpenDetails} />
+          <CollectionShelf games={recommendationResults} getHighlightLabel={getHighlightLabel} onAddToQueue={onAddToQueue} onOpenDetails={onOpenDetails} />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
             games={recommendationResults}

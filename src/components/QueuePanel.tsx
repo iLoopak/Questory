@@ -43,7 +43,7 @@ export function QueuePanel({
   onRemoveEntry,
   onStartReview,
 }: QueuePanelProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform>(initialPlatform ?? queueState.activePlatforms[0] ?? 'Steam');
+  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | ''>(initialPlatform ?? queueState.activePlatforms[0] ?? '');
   const [customPlatformName, setCustomPlatformName] = useState('');
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
   const [selectedGameId, setSelectedGameId] = useState('');
@@ -84,6 +84,17 @@ export function QueuePanel({
     });
   }, [initialPlatform]);
 
+  useEffect(() => {
+    if (activeQueuePlatforms.length === 0) {
+      setSelectedPlatform('');
+      return;
+    }
+
+    if (!selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)) {
+      setSelectedPlatform(activeQueuePlatforms[0]);
+    }
+  }, [activeQueuePlatforms, selectedPlatform]);
+
   function addQueuePlatform(platform: GamePlatform) {
     const nextState = addActiveQueuePlatform(queueState, platform);
     onQueueStateChange(nextState);
@@ -102,7 +113,7 @@ export function QueuePanel({
 
   function addSelectedGame() {
     const game = gamesById.get(selectedGameId);
-    if (!game) {
+    if (!game || !selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)) {
       return;
     }
 
@@ -134,7 +145,7 @@ export function QueuePanel({
         primaryAction={
           <button
             className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-            disabled={!selectedGameId || activeQueuePlatforms.length === 0}
+            disabled={!selectedGameId || !selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)}
             onClick={addSelectedGame}
             type="button"
           >

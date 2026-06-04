@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { BackToTopButton } from './components/BackToTopButton';
+import { BacklogPlatformPicker } from './components/BacklogPlatformPicker';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { CollectionToolbar } from './components/CollectionToolbar';
@@ -239,6 +240,7 @@ function App() {
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
   const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
+  const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
     const initialState = loadOnboardingState();
     return !initialState.hasSeenChecklist && !initialState.skipped;
@@ -869,7 +871,7 @@ function App() {
       addUndoAction(getWishlistToastMessage(game), {
         actionType: 'add-to-wishlist',
         affectedGameIds: [game.id],
-        description: `Remove ${game.title} from Wishlist`,
+      description: `Remove ${game.title} from Wishlist`,
       }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
     }
 
@@ -1088,15 +1090,19 @@ function App() {
     }));
   }
 
-  function addReviewQueuePlatform(platform: GamePlatform) {
+  function addQueuePlatform(platform: GamePlatform) {
     setPlatformQueueState((currentState) => addActiveQueuePlatform(currentState, platform));
+  }
+
+  function openBacklogPicker(game: Game) {
+    setBacklogPickerGame(game);
   }
 
   function addGameToQueue(game: Game, platform: GamePlatform) {
     addUndoAction(getQueueToastMessage(game, platform), {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
-        description: `Remove ${game.title} from ${platform} backlog and restore positions`,
+      description: `Remove ${game.title} from ${platform} backlog and restore positions`,
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(game.id)] });
 
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
@@ -1136,7 +1142,7 @@ function App() {
       addUndoAction('🚫 Ignored', {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
-        description: `Restore ${game.title} to Quest Queue`,
+      description: `Restore ${game.title} to Quest Queue`,
       });
 
       setReviewModeState((currentState) => ({
@@ -1162,7 +1168,9 @@ function App() {
     }
 
     if (action === 'queue') {
-      addGameToQueue(game, targetPlatform ?? game.platform);
+      if (targetPlatform) {
+        addGameToQueue(game, targetPlatform);
+      }
       recordReviewDecision('queueCandidates');
       recordReviewDecision('reviewed');
       return;
@@ -1437,6 +1445,7 @@ function App() {
           {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
             <GameDetailView
               game={selectedGame}
+              onAddToQueue={openBacklogPicker}
               onBack={() => setSelectedGameId(null)}
               onTrackingChange={updateGameTracking}
             />
@@ -1467,7 +1476,7 @@ function App() {
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
-              onAddToQueue={(game) => addGameToQueue(game, game.platform)}
+              onAddToQueue={openBacklogPicker}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
@@ -1493,7 +1502,7 @@ function App() {
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
-              onAddToQueue={(game) => addGameToQueue(game, game.platform)}
+              onAddToQueue={openBacklogPicker}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
@@ -1535,7 +1544,7 @@ function App() {
               controllerLayout={controllerLayoutPreference}
               source={activeReviewSource}
               onAction={handleReviewAction}
-              onAddPlatform={addReviewQueuePlatform}
+              onAddPlatform={addQueuePlatform}
               onOpenQueue={() => setActiveNavItem('Queue')}
               onRestoreIgnored={restoreReviewIgnoredGames}
               onReturnToLibrary={() => setActiveNavItem('Library')}
@@ -1572,7 +1581,7 @@ function App() {
               }}
               onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
-              onAddToQueue={(game) => addGameToQueue(game, game.platform)}
+              onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onMoveToLibrary={moveToLibrary}
               onRemove={removeGame}
@@ -1658,6 +1667,17 @@ function App() {
             setSelectedGameId(game.id);
             setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
           }}
+        />
+      ) : null}
+
+      {backlogPickerGame ? (
+        <BacklogPlatformPicker
+          game={backlogPickerGame}
+          isOpen={Boolean(backlogPickerGame)}
+          platforms={activeQueuePlatforms}
+          onAddPlatform={addQueuePlatform}
+          onClose={() => setBacklogPickerGame(null)}
+          onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
         />
       ) : null}
 
@@ -2263,6 +2283,7 @@ function CollectionPanel({
             games={games}
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
+            onAddToQueue={onAddToQueue}
             onOpenDetails={onOpenDetails}
             onToggleSelected={toggleSelectedGame}
           />
