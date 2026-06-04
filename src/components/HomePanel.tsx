@@ -209,7 +209,7 @@ export function HomePanel({
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               <span>Confirm Open</span>
-              <span>Face buttons: Platforms / Quest Queue</span>
+              <span>Face buttons: Queue / Review Mode</span>
               <span>Cancel Library</span>
             </div>
           </div>
@@ -227,7 +227,7 @@ export function HomePanel({
           )}
         </HomeSection>
 
-        <HomeSection title="Next Up" actionLabel="Open Platforms" onAction={() => onOpenQueue()}>
+        <HomeSection title="Next Up" actionLabel="Open Queue" onAction={() => onOpenQueue()}>
           {activeQueuePreviews.length > 0 ? (
             <div className="grid gap-3 xl:grid-cols-3">
               {activeQueuePreviews.map((queue) => (
@@ -265,7 +265,7 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Platform Plan Yet" text="Build your first platform plan from Quest Queue." actionLabel="Open Quest Queue" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title="No Platform Plan Yet" text="Build your first Queue plan in Review Mode." actionLabel="Open Review Mode" onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
@@ -291,7 +291,7 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Recommendation Yet" text="Add a game to Platforms or mark something as Playing first." actionLabel="Open Platforms" onAction={() => onOpenQueue()} />
+            <EmptyState title="No Recommendations Yet" text="Add a game to Queue or mark something as Playing Now first." actionLabel="Open Queue" onAction={() => onOpenQueue()} />
           )}
         </HomeSection>
       </div>
@@ -310,14 +310,14 @@ export function HomePanel({
                 >
                   <span>
                     <span className="block font-semibold text-white">{queue.platform}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">Open Platforms</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">Open Queue</span>
                   </span>
                   <span className="text-sm font-semibold text-mint">{queue.count} {queue.count === 1 ? 'game' : 'games'} planned</span>
                 </button>
               ))}
             </div>
           ) : (
-            <EmptyState title="No Platform Plan Yet" text="Build your first platform plan from Quest Queue." actionLabel="Build Plan" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title="No Platform Plan Yet" text="Build your first Queue plan in Review Mode." actionLabel="Build Plan" onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
@@ -354,16 +354,16 @@ export function HomePanel({
         </HomeSection>
 
         <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue Remaining</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review Mode Remaining</div>
           <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
-          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? 'game ready for Quest Queue' : 'games ready for Quest Queue'}</p>
+          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? 'game ready for Review Mode' : 'games ready for Review Mode'}</p>
           <button
             className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             data-home-focus="true"
             onClick={() => onOpenReviewMode('backlog')}
             type="button"
           >
-            Open Quest Queue
+            Open Review Mode
           </button>
         </section>
       </aside>

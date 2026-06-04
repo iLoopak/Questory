@@ -56,8 +56,8 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'primary', icon: '📌', label: 'Add to Backlog', tone: 'accent' },
-  { action: 'playing', hint: 'topFace', icon: '🎮', label: 'Playing', tone: 'accent' },
+  { action: 'queue', hint: 'primary', icon: '📌', label: 'Add to Queue', tone: 'accent' },
+  { action: 'playing', hint: 'topFace', icon: '🎮', label: 'Playing Now', tone: 'accent' },
   { action: 'wishlist', hint: 'leftFace', icon: '💖', label: 'Wishlist', tone: 'neutral' },
   { action: 'finished', hint: '', icon: '🏆', label: 'Finished', tone: 'neutral' },
 ];
@@ -350,7 +350,7 @@ export function ReviewModePanel({
         <div className="relative">
           <button
             aria-expanded={isReviewOptionsOpen}
-            aria-label="Quest Queue Options"
+            aria-label="Review Mode Options"
             className="grid h-9 w-9 place-items-center rounded-full border border-skyglass/20 bg-ink-950/85 text-lg text-slate-100 shadow-panel backdrop-blur-md transition hover:border-mint/45 hover:text-white focus-visible:border-mint"
             onClick={() => setIsReviewOptionsOpen((isOpen) => !isOpen)}
             type="button"
@@ -361,7 +361,7 @@ export function ReviewModePanel({
           {isReviewOptionsOpen ? (
             <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-2xl border border-skyglass/15 bg-ink-950/95 p-3 text-left shadow-panel backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-bold text-white">Quest Queue Options</h2>
+                <h2 className="text-sm font-bold text-white">Review Mode Options</h2>
                 <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
                   {sourceLabel}
                 </span>
@@ -402,7 +402,7 @@ export function ReviewModePanel({
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Batch options</div>
-                  <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current Quest Queue without leaving this flow.</p>
+                  <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current Review Mode without leaving this flow.</p>
                 </div>
 
                 {ignoredGameIds.size > 0 ? (
@@ -602,7 +602,7 @@ function FocusedReviewCard({
           <span>•</span>
           <span>D-pad focus only</span>
           <span>•</span>
-          <span>{buttonLabels.primary} Add to Backlog</span>
+          <span>{buttonLabels.primary} Add to Queue</span>
         </div>
 
 
@@ -752,7 +752,7 @@ function ReviewComplete({
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue complete</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review Mode complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
         <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer platform decisions. Analytics stay in Stats.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -761,7 +761,7 @@ function ReviewComplete({
             onClick={onOpenQueue}
             type="button"
           >
-            Open Platforms
+            Open Queue
           </button>
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"

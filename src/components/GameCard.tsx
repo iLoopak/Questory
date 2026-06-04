@@ -209,6 +209,7 @@ export function GameCard({
                 onAddToQueue={onAddToQueue}
                 onAddToWishlist={onAddToWishlist}
                 onClose={() => setIsActionMenuOpen(false)}
+                onFindMetadata={onFindMetadata}
                 onMoveToLibrary={onMoveToLibrary}
                 onOpenChange={setIsActionMenuOpen}
                 onOpenDetails={onOpenDetails}

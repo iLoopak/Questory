@@ -120,9 +120,9 @@ const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Rec
 const navItemLabels: Record<(typeof navItems)[number], string> = {
   Artwork: 'Artwork',
   Library: 'Library',
-  Queue: 'Platforms',
-  Recommendation: 'Recommendation',
-  'Review Mode': 'Quest Queue',
+  Queue: 'Queue',
+  Recommendation: 'Recommendations',
+  'Review Mode': 'Review Mode',
   Settings: 'Settings',
   Stats: 'Stats',
   Wishlist: 'Wishlist',
@@ -158,7 +158,7 @@ const librarySortOptions = [
   'Missing info first',
   'Status',
 ] as const;
-const quickFilterOptions = ['Playing', 'Paused', 'Backlog / Want to play', 'Missing info', 'Played > 0h'] as const;
+const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h'] as const;
 const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
 
 type SourceFilter = (typeof sourceFilterOptions)[number];
@@ -1263,7 +1263,7 @@ function App() {
       return;
     }
 
-    addUndoAction(`Added to Currently Playing on ${platform}`, {
+    addUndoAction(`Added to Playing Now on ${platform}`, {
       actionType: 'play-now',
       affectedGameIds: [game.id],
       description: `Restore ${game.title} to ${platform} backlog`,
@@ -1299,16 +1299,16 @@ function App() {
     const now = new Date().toISOString();
     const nextStatus: GameStatus = action === 'finished' ? 'Finished' : action === 'drop' ? 'Dropped' : 'Want to play';
     const actionLabels: Record<PlayingGameAction, string> = {
-      'move-to-backlog': 'Moved to Backlog',
+      'move-to-backlog': 'Moved to Queue',
       finished: 'Marked Finished',
       drop: 'Dropped',
-      'remove-from-playing': 'Removed from Currently Playing',
+      'remove-from-playing': 'Removed from Playing Now',
     };
 
     addUndoAction(`${actionLabels[action]} on ${platform}`, {
       actionType: 'playing-action',
       affectedGameIds: [game.id],
-      description: `Restore ${game.title} to Currently Playing`,
+      description: `Restore ${game.title} to Playing Now`,
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
 
     setGames((currentGames) =>
@@ -1377,7 +1377,7 @@ function App() {
       addUndoAction('🚫 Ignored', {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
-      description: `Restore ${game.title} to Quest Queue`,
+      description: `Restore ${game.title} to Review Mode`,
       });
 
       setReviewModeState((currentState) => ({
@@ -1837,6 +1837,7 @@ function App() {
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onMoveToLibrary={moveToLibrary}
+              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}
             />
@@ -2380,7 +2381,7 @@ function CollectionPanel({
               onClick={() => onStartReview(collectionType === 'wishlist' ? 'wishlist' : 'backlog')}
               type="button"
             >
-              Quest Queue {collectionType === 'wishlist' ? 'wishlist' : 'backlog'}
+              Review Mode {collectionType === 'wishlist' ? 'wishlist' : 'queue'}
             </button>
             {collectionType === 'wishlist' && onSyncSteamWishlist ? (
               <button
@@ -2596,6 +2597,7 @@ function CollectionPanel({
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
             onRemove={onRemove}
@@ -2611,6 +2613,7 @@ function CollectionPanel({
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onPlayNow={onPlayNow}
             onFinish={onFinish}
@@ -3821,7 +3824,7 @@ function AppearanceSettingsPanel({
     'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
     'App shell, top navigation, home, library, wishlist, metadata, artwork, recommendations, stats, and settings panels use tokenized backgrounds, borders, shadows, and text.',
     'Cards, detail dialogs, modal overlays, toasts, tooltips, dropdown menus, forms, buttons, badges, and disabled states inherit theme tokens.',
-    'Quest Queue panels, Platforms panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
+    'Review Mode panels, Queue panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
   ];
 
   return (
@@ -4028,7 +4031,7 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Review Mode') {
-    return 'Quest Queue helps quickly process imported games into platform plans, wishlist picks, status updates, or ignores.';
+    return 'Review Mode helps quickly process imported games into Queue plans, wishlist picks, status updates, or ignores.';
   }
 
   if (activeNavItem === 'Stats') {
@@ -4065,7 +4068,7 @@ function getRetroDuplicateKey(game: Game) {
 
 function appendReviewNote(existingNotes: string, note: string) {
   const timestamp = new Date().toISOString().slice(0, 10);
-  const reviewNote = `[Quest Queue ${timestamp}] ${note}`;
+  const reviewNote = `[Review Mode ${timestamp}] ${note}`;
 
   return existingNotes.trim() ? `${existingNotes.trim()}\n\n${reviewNote}` : reviewNote;
 }
@@ -4205,7 +4208,7 @@ function matchesEnrichmentFilter(game: Game, enrichment: EnrichmentFilter) {
 }
 
 function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
-  if (quickFilter === 'Playing') {
+  if (quickFilter === 'Playing Now') {
     return game.status === 'Playing';
   }
 
@@ -4213,7 +4216,7 @@ function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
     return game.status === 'Paused';
   }
 
-  if (quickFilter === 'Backlog / Want to play') {
+  if (quickFilter === 'Queue / Want to play') {
     return game.status === 'Want to play';
   }
 

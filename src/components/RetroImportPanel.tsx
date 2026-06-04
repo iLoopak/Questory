@@ -513,7 +513,7 @@ function ImportResultPanel({
               onClick={() => onReviewImportedGames?.(importedGameIds)}
               type="button"
             >
-              Send to Quest Queue
+              Send to Review Mode
             </button>
             <button
               className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
@@ -534,7 +534,7 @@ function ImportResultPanel({
               onClick={() => onAddImportedToQueue?.(importedGameIds)}
               type="button"
             >
-              Add to Backlog
+              Add to Queue
             </button>
             {importedGamesHiddenByFilters ? (
               <button

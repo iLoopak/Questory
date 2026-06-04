@@ -94,6 +94,7 @@ export function CollectionShelf({
   selectedGameIds = new Set(),
   onAddToQueue,
   onAddToWishlist,
+  onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
   onRemove,
@@ -215,6 +216,7 @@ export function CollectionShelf({
             isSelected={selectedGameIds.has(game.id)}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={() => onOpenDetails(game.id)}
@@ -250,6 +252,7 @@ export function CollectionList({
   selectedGameIds = new Set(),
   onAddToQueue,
   onAddToWishlist,
+  onFindMetadata,
   onMoveToLibrary,
   onPlayNow,
   onFinish,
@@ -273,6 +276,7 @@ export function CollectionList({
           isSelected={selectedGameIds.has(game.id)}
           onAddToQueue={onAddToQueue}
           onAddToWishlist={onAddToWishlist}
+          onFindMetadata={onFindMetadata}
           onMoveToLibrary={onMoveToLibrary}
           onPlayNow={onPlayNow}
           onFinish={onFinish}
@@ -299,6 +303,7 @@ type ShelfGameCardProps = {
   isSelected: boolean;
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
+  onFindMetadata?: (game: Game) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
@@ -320,6 +325,7 @@ function ShelfGameCard({
   isSelected,
   onAddToQueue,
   onAddToWishlist,
+  onFindMetadata,
   onKeyDown,
   onMoveToLibrary,
   onOpenDetails,
@@ -433,7 +439,7 @@ function ShelfGameCard({
               onKeyDown={(event) => event.stopPropagation()}
               type="button"
             >
-              Add to Backlog
+              Add to Queue
             </button>
           ) : null}
           <GameActionMenu
@@ -443,6 +449,7 @@ function ShelfGameCard({
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
             onClose={() => setIsActionMenuOpen(false)}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenChange={setIsActionMenuOpen}
             onOpenDetails={onOpenDetails}
@@ -465,6 +472,7 @@ type CompactGameRowProps = {
   isSelected: boolean;
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
+  onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onPlayNow?: (game: Game) => void;
   onFinish?: (game: Game) => void;
@@ -486,6 +494,7 @@ function CompactGameRow({
   isSelected,
   onAddToQueue,
   onAddToWishlist,
+  onFindMetadata,
   onMoveToLibrary,
   onPlayNow,
   onFinish,
@@ -553,13 +562,14 @@ function CompactGameRow({
 
       {!isMultiSelectMode ? (
         <div className="flex flex-wrap gap-1.5 sm:justify-end" aria-label={`${game.title} quick actions`}>
-          {onAddToQueue ? <RowAction label="Backlog" onClick={() => onAddToQueue(game)} /> : null}
+          {onAddToQueue ? <RowAction label="Queue" onClick={() => onAddToQueue(game)} /> : null}
           <RowAction label="Details" onClick={onOpenDetails} primary />
           <GameActionMenu
             game={game}
             includeDetails={includeDetailsAction}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
             onRemove={() => onRemove()}

@@ -92,7 +92,7 @@ export function BacklogPlatformPicker({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose platform</div>
-            <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Backlog</h2>
+            <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Queue</h2>
             <p className="mt-1 line-clamp-2 text-sm text-slate-400">{game.title}</p>
           </div>
           <button
