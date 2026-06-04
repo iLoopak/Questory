@@ -250,7 +250,7 @@ export function HomePanel({
                           onClick={() => onOpenDetails(game)}
                           type="button"
                         >
-                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-mint/25 bg-mint/10 text-sm font-semibold text-mint">{entry.queuePosition}</span>
+                          <span className="w-7 shrink-0 text-center text-xs font-semibold text-slate-500">#{entry.queuePosition}</span>
                           <span className="min-w-0">
                             <span className="block truncate font-semibold text-white">{game.title}</span>
                             <span className="mt-0.5 block text-xs text-slate-500">{game.platform}</span>

@@ -19,8 +19,11 @@ export type PlatformQueueEntry = {
 };
 
 export type PlatformQueueSettings = {
+  accentColor?: string;
+  artworkUrl?: string;
   maxActiveGames: number;
   platform: GamePlatform;
+  platformTag?: string;
 };
 
 export type PlatformQueueState = {
@@ -78,6 +81,34 @@ export const suggestedQueuePlatforms: GamePlatform[] = [
   'Android',
   'Other',
 ];
+
+export const platformAccentPalette = [
+  '#2563eb',
+  '#dc2626',
+  '#06b6d4',
+  '#8b5cf6',
+  '#22c55e',
+  '#f97316',
+  '#e11d48',
+  '#14b8a6',
+] as const;
+
+const defaultPlatformAccentColors = new Map<GamePlatform, string>([
+  ['Steam', '#1b4b73'],
+  ['Steam Deck', '#2563eb'],
+  ['Switch', '#e60012'],
+  ['Switch 2', '#e60012'],
+  ['Retroid', '#8b5cf6'],
+  ['Legion Go', '#06b6d4'],
+  ['PC', '#22c55e'],
+  ['PS5', '#2f6bff'],
+  ['PS4', '#2f6bff'],
+  ['Xbox Series X|S', '#107c10'],
+  ['Android', '#3ddc84'],
+]);
+
+export const platformArtworkPresetOptions = ['Aurora', 'Grid', 'Glow'] as const;
+export type PlatformArtworkPreset = (typeof platformArtworkPresetOptions)[number];
 
 const defaultActiveLimits = new Map<GamePlatform, number>([
   ['PS5', 1],
@@ -217,8 +248,29 @@ export function setActiveQueuePlatforms(state: PlatformQueueState, platforms: Ga
 }
 
 export function getPlatformMaxActiveGames(state: PlatformQueueState, platform: GamePlatform) {
-  const savedSetting = state.settings.find((setting) => setting.platform === platform);
+  const savedSetting = getPlatformQueueSetting(state, platform);
   return savedSetting?.maxActiveGames ?? defaultActiveLimits.get(platform) ?? 2;
+}
+
+export function getPlatformQueueSetting(state: PlatformQueueState, platform: GamePlatform) {
+  return state.settings.find((setting) => setting.platform === platform);
+}
+
+export function getPlatformAccentColor(state: PlatformQueueState, platform: GamePlatform) {
+  const savedColor = getPlatformQueueSetting(state, platform)?.accentColor;
+  return isValidAccentColor(savedColor) ? savedColor : getDefaultPlatformAccentColor(platform);
+}
+
+export function getDefaultPlatformAccentColor(platform: GamePlatform) {
+  return defaultPlatformAccentColors.get(platform) ?? platformAccentPalette[Math.abs(hashPlatformName(platform)) % platformAccentPalette.length];
+}
+
+export function getPlatformArtworkUrl(state: PlatformQueueState, platform: GamePlatform) {
+  return getPlatformQueueSetting(state, platform)?.artworkUrl ?? '';
+}
+
+export function getPlatformTag(state: PlatformQueueState, platform: GamePlatform) {
+  return getPlatformQueueSetting(state, platform)?.platformTag ?? '';
 }
 
 export function addGameToPlatformQueue(
@@ -245,6 +297,32 @@ export function addGameToPlatformQueue(
     ...state,
     activePlatforms: state.activePlatforms.includes(targetPlatform) ? state.activePlatforms : [...state.activePlatforms, targetPlatform],
     entries: [...nextEntries, entry],
+  });
+}
+
+export function addGameToPlatformQueueTop(
+  state: PlatformQueueState,
+  game: Game,
+  targetPlatform: GamePlatform,
+  options: Partial<Pick<PlatformQueueEntry, 'queueNotes' | 'queuePriority'>> = {},
+): PlatformQueueState {
+  const existingEntry = state.entries.find((entry) => entry.gameId === game.id);
+  const nextEntries = state.entries.filter((entry) => entry.gameId !== game.id);
+  const entry: PlatformQueueEntry = {
+    expectedCompletionDate: existingEntry?.expectedCompletionDate,
+    estimatedPlaytime: game.averagePlaytime ?? game.expectedPlaytime ?? existingEntry?.estimatedPlaytime ?? null,
+    gameId: game.id,
+    queueNotes: options.queueNotes ?? existingEntry?.queueNotes ?? '',
+    queuePosition: 0,
+    queuePriority: options.queuePriority ?? existingEntry?.queuePriority ?? 'normal',
+    queuedAt: existingEntry?.queuedAt ?? new Date().toISOString(),
+    targetPlatform,
+  };
+
+  return normalizeQueuePositions({
+    ...state,
+    activePlatforms: state.activePlatforms.includes(targetPlatform) ? state.activePlatforms : [...state.activePlatforms, targetPlatform],
+    entries: [entry, ...nextEntries],
   });
 }
 
@@ -316,13 +394,22 @@ export function updatePlatformQueueSetting(
   maxActiveGames: number,
 ): PlatformQueueState {
   const boundedLimit = Math.max(1, Math.min(10, Math.round(maxActiveGames)));
-  const settings = state.settings.filter((setting) => setting.platform !== platform);
+  return upsertPlatformQueueSetting(state, platform, { maxActiveGames: boundedLimit });
+}
 
-  return {
-    ...state,
-    schemaVersion: platformQueueSchemaVersion,
-    settings: [...settings, { maxActiveGames: boundedLimit, platform }],
-  };
+export function updatePlatformQueueVisualSettings(
+  state: PlatformQueueState,
+  platform: GamePlatform,
+  changes: Partial<Pick<PlatformQueueSettings, 'accentColor' | 'artworkUrl' | 'platformTag'>>,
+): PlatformQueueState {
+  return upsertPlatformQueueSetting(state, platform, changes);
+}
+
+export function createPlatformArtworkPreset(platform: GamePlatform, accentColor: string, preset: PlatformArtworkPreset) {
+  const safePlatform = platform.replace(/[<&>"]/g, '');
+  const pattern = preset === 'Grid' ? '<path d="M0 42H360M0 84H360M90 0V120M180 0V120M270 0V120" stroke="white" stroke-opacity="0.12" stroke-width="2"/>' : preset === 'Glow' ? '<circle cx="280" cy="35" r="110" fill="white" fill-opacity="0.16"/>' : '<path d="M0 95C80 40 140 150 230 55C285 0 330 20 360 10V120H0Z" fill="white" fill-opacity="0.14"/>';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120"><rect width="360" height="120" fill="${accentColor}"/><rect width="360" height="120" fill="url(#g)"/><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#020617" stop-opacity="0.15"/><stop offset="1" stop-color="#020617" stop-opacity="0.65"/></linearGradient></defs>${pattern}<text x="18" y="74" fill="white" fill-opacity="0.9" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="800">${safePlatform}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 export function getQueueSummary(state: PlatformQueueState, games: Game[]): PlatformQueueSummary {
@@ -365,7 +452,28 @@ export function normalizePlatformQueueState(value: unknown): PlatformQueueState 
     activePlatforms: normalizePlatformList(activePlatforms),
     entries,
     schemaVersion: platformQueueSchemaVersion,
-    settings,
+    settings: settings.map(normalizeQueueSetting),
+  });
+}
+
+function upsertPlatformQueueSetting(
+  state: PlatformQueueState,
+  platform: GamePlatform,
+  changes: Partial<PlatformQueueSettings>,
+): PlatformQueueState {
+  const currentSetting = getPlatformQueueSetting(state, platform);
+  const settings = state.settings.filter((setting) => setting.platform !== platform);
+  return normalizePlatformQueueState({
+    ...state,
+    settings: [
+      ...settings,
+      normalizeQueueSetting({
+        maxActiveGames: defaultActiveLimits.get(platform) ?? 2,
+        ...currentSetting,
+        ...changes,
+        platform,
+      }),
+    ],
   });
 }
 
@@ -406,6 +514,24 @@ function isQueueEntry(value: unknown): value is PlatformQueueEntry {
 
   const entry = value as Partial<PlatformQueueEntry>;
   return typeof entry.gameId === 'string' && typeof entry.targetPlatform === 'string' && typeof entry.queuedAt === 'string';
+}
+
+function normalizeQueueSetting(setting: PlatformQueueSettings): PlatformQueueSettings {
+  return {
+    accentColor: isValidAccentColor(setting.accentColor) ? setting.accentColor : undefined,
+    artworkUrl: typeof setting.artworkUrl === 'string' && setting.artworkUrl.trim() ? setting.artworkUrl.trim() : undefined,
+    maxActiveGames: Math.max(1, Math.min(10, Math.round(setting.maxActiveGames || defaultActiveLimits.get(setting.platform) || 2))),
+    platform: normalizePlatformName(setting.platform),
+    platformTag: typeof setting.platformTag === 'string' && setting.platformTag.trim() ? setting.platformTag.trim() : undefined,
+  };
+}
+
+function isValidAccentColor(color: unknown): color is string {
+  return typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color);
+}
+
+function hashPlatformName(platform: GamePlatform) {
+  return Array.from(platform).reduce((hash, character) => hash + character.charCodeAt(0), 0);
 }
 
 function isQueueSetting(value: unknown): value is PlatformQueueSettings {

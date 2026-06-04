@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
+import { getPlatformAccentColor, getPlatformArtworkUrl, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { ViewportModal } from './ViewportModal';
 
@@ -6,6 +7,7 @@ type BacklogPlatformPickerProps = {
   game: Game;
   isOpen: boolean;
   platforms: GamePlatform[];
+  queueState?: PlatformQueueState;
   restoreFocusRef?: RefObject<HTMLElement | null>;
   onAddPlatform: (platform: GamePlatform) => void;
   onClose: () => void;
@@ -16,6 +18,7 @@ export function BacklogPlatformPicker({
   game,
   isOpen,
   platforms,
+  queueState,
   restoreFocusRef,
   onAddPlatform,
   onClose,
@@ -103,17 +106,23 @@ export function BacklogPlatformPicker({
 
         {platforms.length > 0 ? (
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {platforms.map((platform, index) => (
-              <button
-                key={platform}
-                className="min-h-14 rounded-xl border border-mint/35 bg-mint/10 px-4 text-left text-base font-bold text-mint transition hover:bg-mint hover:text-ink-950 focus-visible:bg-mint focus-visible:text-ink-950"
-                onClick={() => selectPlatform(platform)}
-                ref={index === 0 ? firstPlatformButtonRef : undefined}
-                type="button"
-              >
-                {platform}
-              </button>
-            ))}
+            {platforms.map((platform, index) => {
+              const accentColor = queueState ? getPlatformAccentColor(queueState, platform) : '#5fffd8';
+              const artworkUrl = queueState ? getPlatformArtworkUrl(queueState, platform) : '';
+              return (
+                <button
+                  key={platform}
+                  className="relative min-h-14 overflow-hidden rounded-xl border bg-ink-950/70 px-4 text-left text-base font-bold text-white transition hover:bg-white/10 focus-visible:bg-white/10"
+                  style={{ borderColor: accentColor }}
+                  onClick={() => selectPlatform(platform)}
+                  ref={index === 0 ? firstPlatformButtonRef : undefined}
+                  type="button"
+                >
+                  {artworkUrl ? <img alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" src={artworkUrl} /> : null}
+                  <span className="relative inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} />{platform}</span>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-ink-950/60 p-4 text-center">

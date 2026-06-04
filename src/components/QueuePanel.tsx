@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 import {
   addActiveQueuePlatform,
   compareQueueEntries,
   getActiveQueuePlatforms,
+  getPlatformAccentColor,
+  getPlatformArtworkUrl,
   getPlatformMaxActiveGames,
+  getPlatformTag,
   getQueuePlatforms,
   hideQueuePlatform,
   moveQueuePlatform,
@@ -26,6 +29,7 @@ type QueuePanelProps = {
   onQueueStateChange: (state: PlatformQueueState) => void;
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
+  onPlayNow: (gameId: string, platform: GamePlatform) => void;
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
   onStartReview: () => void;
@@ -40,6 +44,7 @@ export function QueuePanel({
   onQueueStateChange,
   onMoveEntry,
   onMoveEntryToPlatform,
+  onPlayNow,
   onOpenDetails,
   onRemoveEntry,
   onStartReview,
@@ -243,8 +248,11 @@ export function QueuePanel({
             games={games}
             gamesById={gamesById}
             maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
+            accentColor={getPlatformAccentColor(queueState, platform)}
+            artworkUrl={getPlatformArtworkUrl(queueState, platform)}
             isHighlighted={platform === initialPlatform}
             platform={platform}
+            platformTag={getPlatformTag(queueState, platform)}
             platformOptions={queuePlatforms}
             setPlatformRef={(element) => {
               if (element) {
@@ -267,6 +275,7 @@ export function QueuePanel({
             onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
             onMoveEntry={onMoveEntry}
             onMoveEntryToPlatform={onMoveEntryToPlatform}
+            onPlayNow={onPlayNow}
             onOpenDetails={onOpenDetails}
             onRemoveEntry={onRemoveEntry}
           />
@@ -279,10 +288,13 @@ export function QueuePanel({
 function PlatformQueueColumn({
   games,
   gamesById,
+  accentColor,
+  artworkUrl,
   maxActiveGames,
   isHighlighted,
   platform,
   platformOptions,
+  platformTag,
   setPlatformRef,
   queueEntries,
   onHidePlatform,
@@ -292,15 +304,19 @@ function PlatformQueueColumn({
   onRenamePlatform,
   onMoveEntry,
   onMoveEntryToPlatform,
+  onPlayNow,
   onOpenDetails,
   onRemoveEntry,
 }: {
+  accentColor: string;
+  artworkUrl: string;
   games: Game[];
   gamesById: Map<string, Game>;
   maxActiveGames: number;
   isHighlighted: boolean;
   platform: GamePlatform;
   platformOptions: GamePlatform[];
+  platformTag: string;
   setPlatformRef: (element: HTMLElement | null) => void;
   queueEntries: PlatformQueueEntry[];
   onHidePlatform: (platform: GamePlatform) => void;
@@ -310,11 +326,13 @@ function PlatformQueueColumn({
   onRenamePlatform: (platform: GamePlatform, nextPlatform: GamePlatform) => void;
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
+  onPlayNow: (gameId: string, platform: GamePlatform) => void;
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
+  const accentStyle = { '--platform-accent': accentColor, borderColor: isHighlighted || hasGames ? accentColor : undefined } as CSSProperties;
 
   function renamePlatform() {
     const nextName = window.prompt('Rename platform', platform);
@@ -326,9 +344,19 @@ function PlatformQueueColumn({
   }
 
   return (
-    <section ref={setPlatformRef} className={`rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'border-mint/50 shadow-glow' : hasGames ? 'border-skyglass/15' : 'border-skyglass/10 opacity-80'}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'shadow-glow' : hasGames ? '' : 'border-skyglass/10 opacity-80'}`}>
+      {artworkUrl ? (
+        <div className="relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
+          <img alt="" className="h-full w-full object-cover opacity-75" src={artworkUrl} />
+          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 via-ink-950/35 to-ink-950/80" />
+          <h3 className="absolute bottom-2 left-3 truncate text-lg font-semibold text-white">{platform}</h3>
+        </div>
+      ) : null}
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-white">{platform}</h3>
+        <div className="min-w-0">
+          {!artworkUrl ? <h3 className="truncate text-lg font-semibold text-white" style={{ color: accentColor }}>{platform}</h3> : null}
+          {platformTag ? <div className="mt-1 text-xs text-slate-500">Tag: {platformTag}</div> : null}
+        </div>
         <details className="relative">
           <summary className="cursor-pointer rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10">
             Options
@@ -379,6 +407,7 @@ function PlatformQueueColumn({
                 onMoveEntry={onMoveEntry}
                 onMoveEntryToPlatform={onMoveEntryToPlatform}
                 onOpenDetails={onOpenDetails}
+                onPlayNow={() => onPlayNow(game.id, platform)}
                 onRemoveEntry={onRemoveEntry}
               />
             );
@@ -399,6 +428,7 @@ function QueueEntryRow({
   platformOptions,
   onMoveEntry,
   onMoveEntryToPlatform,
+  onPlayNow,
   onOpenDetails,
   onRemoveEntry,
 }: {
@@ -408,6 +438,7 @@ function QueueEntryRow({
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
   onOpenDetails: (gameId: string) => void;
+  onPlayNow: () => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
   function handleQueueEntryKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -443,9 +474,7 @@ function QueueEntryRow({
       tabIndex={0}
     >
       <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] gap-2 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:items-center">
-        <div className="grid h-9 w-9 place-items-center rounded-md border border-mint/25 bg-mint/10 text-sm font-semibold text-mint">
-          {entry.queuePosition}
-        </div>
+        <div className="w-8 pt-1 text-center text-xs font-semibold text-slate-500">#{entry.queuePosition}</div>
         <QueueCoverThumbnail game={game} size="tiny" />
         <div className="min-w-0">
           <button className="block max-w-full truncate text-left font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
@@ -456,6 +485,9 @@ function QueueEntryRow({
           </div>
         </div>
         <div className="col-span-3 flex flex-wrap gap-1 sm:col-auto">
+          <button className="h-9 rounded-md border px-2 text-xs font-semibold text-slate-100 hover:bg-white/10" style={{ borderColor: 'var(--platform-accent)', backgroundColor: 'color-mix(in srgb, var(--platform-accent) 14%, transparent)' }} onClick={onPlayNow} type="button">
+            ▶ Play Now
+          </button>
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">
             Top
           </button>
@@ -498,7 +530,7 @@ function QueueGameRow({ game, onOpenDetails }: { game: Game; onOpenDetails: (gam
       <QueueCoverThumbnail game={game} size="playing" />
       <span className="min-w-0">
         <span className="block truncate text-base font-semibold text-white group-hover:text-mint">{game.title}</span>
-        <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em] text-mint">Currently Playing</span>
+        <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--platform-accent)' }}>Currently Playing</span>
         <span className="mt-1 block truncate text-xs text-slate-400">{game.platform}</span>
       </span>
     </button>
