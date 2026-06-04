@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
+import type { PlatformQueueState } from '../lib/platformQueueStorage';
+import { PlatformBadge } from './PlatformBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 
@@ -23,6 +25,7 @@ type ReviewModePanelProps = {
   games: Game[];
   ignoredGameIds: Set<string>;
   queuePlatforms: GamePlatform[];
+  queueState?: PlatformQueueState;
   source: ReviewSource;
   onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) => void;
   onAddPlatform: (platform: GamePlatform) => void;
@@ -90,6 +93,7 @@ export function ReviewModePanel({
   games,
   ignoredGameIds,
   queuePlatforms,
+  queueState,
   source,
   onAction,
   onAddPlatform,
@@ -431,6 +435,7 @@ export function ReviewModePanel({
               buttonLabels={buttonLabels}
               queueButtonRef={queueButtonRef}
               queuePlatforms={queuePlatforms}
+              queueState={queueState}
             />
           ) : (
             <ReviewComplete
@@ -451,6 +456,7 @@ export function ReviewModePanel({
           isOpen={isQueuePickerOpen}
           platforms={queuePlatforms}
           restoreFocusRef={queueButtonRef}
+          queueState={queueState}
           onAddPlatform={onAddPlatform}
           onClose={closeQueuePicker}
           onSelectPlatform={addToQueue}
@@ -472,6 +478,7 @@ function FocusedReviewCard({
   buttonLabels,
   queueButtonRef,
   queuePlatforms,
+  queueState,
 }: {
   game: Game;
   highlightedActionIndex: number;
@@ -484,6 +491,7 @@ function FocusedReviewCard({
   buttonLabels: ReturnType<typeof getControllerButtonLabels>;
   queueButtonRef: RefObject<HTMLButtonElement | null>;
   queuePlatforms: GamePlatform[];
+  queueState?: PlatformQueueState;
 }) {
   const coverSources = getGameCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -576,9 +584,11 @@ function FocusedReviewCard({
 
         <div className="mt-3 text-center w-full px-2">
           <div className="flex items-center justify-center gap-2">
-            <span className="platform-badge inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]">
-              {game.platform}
-            </span>
+            <PlatformBadge
+              className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]"
+              platform={game.platform}
+              queueState={queueState}
+            />
           </div>
           <h3 className="mt-2 text-2xl font-bold leading-snug text-white line-clamp-2 px-1 sm:text-3xl" title={game.title}>
             {game.title}

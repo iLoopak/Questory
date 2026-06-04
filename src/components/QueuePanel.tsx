@@ -21,6 +21,7 @@ import type { Game, GamePlatform } from '../types/game';
 export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { CollectionToolbar } from './CollectionToolbar';
+import { PlatformBadge } from './PlatformBadge';
 
 type QueuePanelProps = {
   games: Game[];
@@ -421,6 +422,7 @@ function PlatformQueueColumn({
                 key={entry.gameId}
                 entry={entry}
                 game={game}
+                platformAccentColor={accentColor}
                 platformOptions={platformOptions}
                 onMoveEntry={onMoveEntry}
                 onMoveEntryToPlatform={onMoveEntryToPlatform}
@@ -443,6 +445,7 @@ function PlatformQueueColumn({
 function QueueEntryRow({
   entry,
   game,
+  platformAccentColor,
   platformOptions,
   onMoveEntry,
   onMoveEntryToPlatform,
@@ -452,6 +455,7 @@ function QueueEntryRow({
 }: {
   entry: PlatformQueueEntry;
   game: Game;
+  platformAccentColor: string;
   platformOptions: GamePlatform[];
   onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
@@ -499,7 +503,7 @@ function QueueEntryRow({
             {game.title}
           </button>
           <div className="mt-1">
-            <span className="platform-badge inline-flex rounded-full px-2 py-0.5 text-xs font-semibold">{game.platform}</span>
+            <PlatformBadge accentColor={platformAccentColor} className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} />
           </div>
         </div>
         <div className="col-span-3 flex flex-wrap gap-1 sm:col-auto">

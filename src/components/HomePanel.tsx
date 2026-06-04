@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import { compareQueueEntries, type PlatformQueueEntry } from '../lib/platformQueueStorage';
+import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import { scoreGame } from '../lib/recommendationEngine';
 import type { ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
+import { PlatformBadge } from './PlatformBadge';
 
 type HomePanelProps = {
   games: Game[];
   ignoredReviewGameIds: Set<string>;
-  queueEntries: PlatformQueueEntry[];
+  queueState: PlatformQueueState;
   onOpenDetails: (game: Game) => void;
   onOpenLibrary: () => void;
   onOpenQueue: (platform?: GamePlatform) => void;
@@ -27,13 +28,14 @@ const focusSelector = '[data-home-focus="true"]';
 export function HomePanel({
   games,
   ignoredReviewGameIds,
-  queueEntries,
+  queueState,
   onOpenDetails,
   onOpenLibrary,
   onOpenQueue,
   onOpenReviewMode,
   onOpenWishlist,
 }: HomePanelProps) {
+  const queueEntries = queueState.entries;
   const shellRef = useRef<HTMLElement | null>(null);
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const libraryGames = useMemo(() => games.filter((game) => game.collectionType === 'library'), [games]);
@@ -217,7 +219,7 @@ export function HomePanel({
           {continuePlayingGames.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {continuePlayingGames.map((game) => (
-                <GamePosterButton key={game.id} game={game} eyebrow="Currently playing" onClick={() => onOpenDetails(game)} />
+                <GamePosterButton key={game.id} game={game} eyebrow="Currently playing" onClick={() => onOpenDetails(game)} queueState={queueState} />
               ))}
             </div>
           ) : (
@@ -253,7 +255,7 @@ export function HomePanel({
                           <span className="w-7 shrink-0 text-center text-xs font-semibold text-slate-500">#{entry.queuePosition}</span>
                           <span className="min-w-0">
                             <span className="block truncate font-semibold text-white">{game.title}</span>
-                            <span className="mt-0.5 block text-xs text-slate-500">{game.platform}</span>
+                            <PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} queueState={queueState} />
                           </span>
                         </button>
                       </li>
@@ -278,7 +280,7 @@ export function HomePanel({
                   onClick={() => onOpenDetails(recommendation.game)}
                   type="button"
                 >
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{recommendation.game.platform}</span>
+                  <PlatformBadge className="w-fit rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em]" platform={getGamePlatformLabel(recommendation.game, queueState)} queueState={queueState} />
                   <span className="mt-2 block line-clamp-2 text-lg font-semibold text-white">{recommendation.game.title}</span>
                   <span className="mt-3 flex flex-wrap gap-1.5">
                     {recommendation.reasons.map((reason) => (
@@ -321,7 +323,7 @@ export function HomePanel({
 
         <HomeSection compact title="Wishlist Highlight" actionLabel="Wishlist" onAction={onOpenWishlist}>
           {wishlistHighlight ? (
-            <GamePosterButton game={wishlistHighlight} eyebrow={wishlistHighlight.priority === 'high' ? 'High priority' : 'Wishlist pick'} wide onClick={() => onOpenDetails(wishlistHighlight)} />
+            <GamePosterButton game={wishlistHighlight} eyebrow={wishlistHighlight.priority === 'high' ? 'High priority' : 'Wishlist pick'} wide onClick={() => onOpenDetails(wishlistHighlight)} queueState={queueState} />
           ) : (
             <EmptyState title="No Wishlist Yet" text="Add games you want to play later." actionLabel="Open Wishlist" onAction={onOpenWishlist} />
           )}
@@ -342,7 +344,7 @@ export function HomePanel({
                     <span className="block truncate font-semibold text-white">{game.title}</span>
                     <span className="mt-0.5 block text-xs text-slate-500">{getSourceLabel(game)}</span>
                   </span>
-                  <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{game.platform}</span>
+                  <PlatformBadge className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em]" platform={getGamePlatformLabel(game, queueState)} queueState={queueState} />
                 </button>
               ))}
             </div>
@@ -367,6 +369,11 @@ export function HomePanel({
       </aside>
     </section>
   );
+}
+
+
+function getGamePlatformLabel(game: Game, queueState: PlatformQueueState): GamePlatform {
+  return queueState.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
 }
 
 function HomeSection({
@@ -402,7 +409,7 @@ function HomeSection({
   );
 }
 
-function GamePosterButton({ game, eyebrow, onClick, wide = false }: { game: Game; eyebrow: string; onClick: () => void; wide?: boolean }) {
+function GamePosterButton({ game, eyebrow, onClick, queueState, wide = false }: { game: Game; eyebrow: string; onClick: () => void; queueState: PlatformQueueState; wide?: boolean }) {
   const coverSources = getGameCoverSources(game);
   const coverSource = coverSources[0];
 
@@ -424,7 +431,7 @@ function GamePosterButton({ game, eyebrow, onClick, wide = false }: { game: Game
       <div className="relative flex min-h-56 flex-col justify-end p-3">
         <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint">{eyebrow}</span>
         <span className="line-clamp-2 text-xl font-semibold leading-tight text-white drop-shadow">{game.title}</span>
-        <span className="platform-badge mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-semibold">{game.platform}</span>
+        <PlatformBadge className="mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-semibold" platform={getGamePlatformLabel(game, queueState)} queueState={queueState} />
       </div>
     </button>
   );

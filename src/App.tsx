@@ -1687,12 +1687,13 @@ function App() {
               onRefreshSteamPlaytime={(game) => refreshSteamPlaytime([game.id], { showToast: true })}
               onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
+              platformQueueState={platformQueueState}
             />
           ) : activeNavItem === 'Home' ? (
             <HomePanel
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
-              queueEntries={platformQueueState.entries}
+              queueState={platformQueueState}
               onOpenDetails={openGameFromHome}
               onOpenLibrary={() => {
                 setSelectedGameId(null);
@@ -1713,6 +1714,7 @@ function App() {
               games={filteredLibraryGames}
               platformOptions={platformOptions}
               tags={tags}
+              platformQueueState={platformQueueState}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
@@ -1743,6 +1745,7 @@ function App() {
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
               tags={tags}
+              platformQueueState={platformQueueState}
               onAddGame={() => setIsAddGameOpen(true)}
               onAddToWishlist={addToWishlist}
               onAddManyToWishlist={addManyToWishlist}
@@ -1790,6 +1793,7 @@ function App() {
               games={games}
               ignoredGameIds={reviewIgnoredGameIds}
               queuePlatforms={activeQueuePlatforms}
+              queueState={platformQueueState}
               controllerLayout={controllerLayoutPreference}
               source={activeReviewSource}
               onAction={handleReviewAction}
@@ -1822,7 +1826,7 @@ function App() {
           ) : activeNavItem === 'Recommendation' ? (
             <RecommendationPanel
               games={games}
-              queueEntries={platformQueueState.entries}
+              queueState={platformQueueState}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -2093,6 +2097,7 @@ type CollectionPanelProps = {
   filters: CollectionFilters;
   games: Game[];
   platformOptions: GamePlatform[];
+  platformQueueState?: PlatformQueueState;
   steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
   steamWishlistSyncState?: SteamWishlistSyncState;
   tags: string[];
@@ -2125,6 +2130,7 @@ function CollectionPanel({
   filters,
   games,
   platformOptions,
+  platformQueueState,
   steamPlaytimeRefreshState,
   steamWishlistSyncState,
   tags,
@@ -2591,6 +2597,7 @@ function CollectionPanel({
             onAddToQueue={onAddToQueue}
             onOpenDetails={onOpenDetails}
             onToggleSelected={toggleSelectedGame}
+            platformQueueState={platformQueueState}
           />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
@@ -2608,6 +2615,7 @@ function CollectionPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
+            platformQueueState={platformQueueState}
           />
         ) : (
           <CollectionGrid
@@ -2623,6 +2631,7 @@ function CollectionPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
+            platformQueueState={platformQueueState}
           />
         )
       ) : (

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
-import { gameStatuses } from '../types/game';
+import type { PlatformQueueState } from '../lib/platformQueueStorage';
+import { PlatformBadge } from './PlatformBadge';
 
 type GameCardProps = {
   game: Game;
@@ -18,6 +19,8 @@ type GameCardProps = {
   onRemoveAndIgnore: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onToggleSelected?: () => void;
+  platformQueueState?: PlatformQueueState;
+  platformLabel?: string;
 };
 
 export function GameCard({
@@ -34,6 +37,8 @@ export function GameCard({
   onRemoveAndIgnore,
   onStatusChange,
   onToggleSelected,
+  platformQueueState,
+  platformLabel,
 }: GameCardProps) {
   const coverSources = useMemo(() => {
     return getGameCoverSources(game);
@@ -157,9 +162,11 @@ export function GameCard({
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-transparent" />
-        <span className="platform-badge absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold">
-          {game.platform}
-        </span>
+        <PlatformBadge
+          className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+          platform={platformLabel ?? game.platform}
+          queueState={platformQueueState}
+        />
         {game.collectionType === 'wishlist' ? (
           <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
             Wishlist
@@ -178,22 +185,6 @@ export function GameCard({
 
           <div className="mt-2 text-sm text-slate-400">{game.status}</div>
         </div>
-
-        {!isMultiSelectMode ? (
-          <select
-            className="h-10 w-full rounded-md border border-skyglass/15 bg-ink-950/80 px-2 text-sm font-medium text-slate-100 outline-none transition focus:border-mint"
-            value={game.status}
-            aria-label={`Change status for ${game.title}`}
-            onChange={(event) => onStatusChange(game.id, event.target.value as GameStatus)}
-            onClick={stopCardAction}
-          >
-            {gameStatuses.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        ) : null}
 
         <div className="mt-auto border-t border-skyglass/15 pt-3">
           <div className="flex items-center gap-2">
@@ -251,6 +242,24 @@ export function GameCard({
                       label="Find info"
                       onClick={() => {
                         onFindMetadata(game);
+                        setIsActionMenuOpen(false);
+                      }}
+                    />
+                  ) : null}
+                  {game.collectionType === 'library' ? (
+                    <ActionMenuButton
+                      label="Playing"
+                      onClick={() => {
+                        onStatusChange(game.id, 'Playing');
+                        setIsActionMenuOpen(false);
+                      }}
+                    />
+                  ) : null}
+                  {game.collectionType === 'library' ? (
+                    <ActionMenuButton
+                      label="Finished"
+                      onClick={() => {
+                        onStatusChange(game.id, 'Finished');
                         setIsActionMenuOpen(false);
                       }}
                     />

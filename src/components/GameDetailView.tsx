@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
-import type { Game, GameStatus } from '../types/game';
+import type { Game, GamePlatform, GameStatus } from '../types/game';
+import { PlatformBadge } from './PlatformBadge';
 
 type GameDetailViewProps = {
   game: Game;
@@ -12,6 +14,7 @@ type GameDetailViewProps = {
   onRefreshSteamPlaytime?: (game: Game) => void;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
+  platformQueueState?: PlatformQueueState;
 };
 
 type GameDetailAction = {
@@ -31,6 +34,7 @@ export function GameDetailView({
   onRefreshSteamPlaytime,
   onStatusChange,
   onTrackingChange,
+  platformQueueState,
 }: GameDetailViewProps) {
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -51,6 +55,7 @@ export function GameDetailView({
   const canApplyRawgCover = canUseRawgImageAsCover(game);
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
+  const platformLabel = getGamePlatformLabel(game, platformQueueState);
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -189,7 +194,7 @@ export function GameDetailView({
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
-                    <HeroStat label="Platform / source" value={formatPlatformSource(game)} />
+                    <HeroStat label="Platform / source" value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
                     <HeroStat label="Current status" value={game.status} accent />
                     {hasPlaytime ? <HeroStat label="Playtime" value={`${game.playtimeHours}h`} /> : null}
                   </div>
@@ -331,11 +336,17 @@ export function GameDetailView({
   );
 }
 
-function HeroStat({ accent, label, value }: { accent?: boolean; label: string; value: string }) {
+
+function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
+  return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
+}
+
+function HeroStat({ accent, badge, label, value }: { accent?: boolean; badge?: ReactNode; label: string; value: string }) {
   return (
     <div className={`rounded-xl border px-3 py-2 ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'}`}>
       <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
+      {badge}
     </div>
   );
 }
