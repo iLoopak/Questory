@@ -1204,32 +1204,43 @@ textarea,
   box-shadow: var(--shadow-panel);
 }
 
-.qs-back-to-top {
-  position: fixed;
-  right: max(1rem, var(--qs-safe-right));
-  bottom: calc(max(1rem, var(--qs-safe-bottom)) + 4.75rem);
-  z-index: 50;
-  display: grid;
-  width: 3.25rem;
-  height: 3.25rem;
-  min-width: 3.25rem;
-  min-height: 3.25rem;
-  place-items: center;
-  border: 1px solid rgb(var(--accent-rgb) / 0.55);
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-size: 1.45rem;
-  font-weight: 900;
+.qs-header-back-to-top {
+  display: inline-flex;
+  min-height: 2rem;
+  width: 3.7rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border: 1px solid rgb(var(--accent-rgb) / 0.28);
+  border-radius: 0.5rem;
+  background: rgb(var(--accent-rgb) / 0.12);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
   line-height: 1;
-  box-shadow: 0 18px 44px rgb(var(--overlay-rgb) / 0.38), 0 0 28px rgb(var(--accent-rgb) / 0.28);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    border-color 170ms ease,
+    background-color 170ms ease,
+    color 170ms ease,
+    opacity 170ms ease,
+    visibility 170ms ease;
 }
 
-.qs-back-to-top:hover,
-.qs-back-to-top:focus-visible,
-.qs-back-to-top:active {
-  right: max(1rem, var(--qs-safe-right));
-  transform: none;
+.qs-header-back-to-top-visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.qs-header-back-to-top:not(:disabled):hover,
+.qs-header-back-to-top:not(:disabled):focus-visible {
+  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 @media (max-width: 760px) {
@@ -1274,16 +1285,12 @@ textarea,
     font-size: 0.8rem;
   }
 
-  .qs-back-to-top,
-  .qs-back-to-top:hover,
-  .qs-back-to-top:focus-visible,
-  .qs-back-to-top:active {
-    right: max(0.65rem, var(--qs-safe-right));
-    bottom: calc(max(0.65rem, var(--qs-safe-bottom)) + 4rem);
-    width: 3rem;
-    height: 3rem;
-    min-width: 3rem;
-    min-height: 3rem;
+  .qs-header-back-to-top {
+    width: 2.75rem;
+  }
+
+  .qs-header-back-to-top span:last-child {
+    display: none;
   }
 }
 
@@ -1383,6 +1390,8 @@ textarea,
   touch-action: auto;
 }
 
-.qs-modal-open .qs-back-to-top {
-  display: none;
+.qs-modal-open .qs-header-back-to-top {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }

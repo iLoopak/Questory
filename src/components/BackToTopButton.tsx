@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { createPortal } from 'react-dom';
 
-const scrollablePanelSelector = '.qs-content-panel, .qs-queue-shell, .qs-review-shell, .qs-settings-detail, .qs-settings-list';
+const scrollablePanelSelector =
+  '.qs-content-panel, .qs-queue-shell, .qs-review-shell, .qs-settings-detail, .qs-settings-list, .qs-scroll-panel';
 const scrollThresholdPx = 300;
 
 function getScrollablePanels() {
@@ -55,20 +55,18 @@ export function BackToTopButton() {
     });
   }
 
-  if (!isVisible) {
-    return null;
-  }
-
-  return createPortal(
+  return (
     <button
+      aria-hidden={!isVisible}
       aria-label="Back to top"
-      className="qs-back-to-top"
+      className={`qs-header-back-to-top ${isVisible ? 'qs-header-back-to-top-visible' : ''}`}
+      disabled={!isVisible}
       onClick={scrollToTop}
-      onPointerDown={(event) => event.preventDefault()}
+      title="Back to top"
       type="button"
     >
       <span aria-hidden="true">↑</span>
-    </button>,
-    document.body,
+      <span>Top</span>
+    </button>
   );
 }

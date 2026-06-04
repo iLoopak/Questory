@@ -219,7 +219,7 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
           ) : null}
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+        <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           <div className="grid gap-4 xl:grid-cols-3">
             <ArtworkBucket title="Missing artwork" bucket="missing" games={audit.missingArtwork} onOpenDetails={onOpenDetails} />
             <ArtworkBucket title="Poor / fallback artwork" bucket="fallback" games={audit.fallbackArtwork} onOpenDetails={onOpenDetails} />

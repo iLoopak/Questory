@@ -421,7 +421,7 @@ export function ReviewModePanel({
       </div>
 
       <div className="flex h-full min-h-0 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+        <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
           {activeGame ? (
             <FocusedReviewCard
               game={activeGame}
