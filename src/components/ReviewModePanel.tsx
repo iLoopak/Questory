@@ -53,7 +53,7 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'primary', icon: '📌', label: 'Plan', tone: 'accent' },
+  { action: 'queue', hint: 'primary', icon: '📌', label: 'Add to Backlog', tone: 'accent' },
   { action: 'playing', hint: 'topFace', icon: '🎮', label: 'Playing', tone: 'accent' },
   { action: 'wishlist', hint: 'leftFace', icon: '💖', label: 'Wishlist', tone: 'neutral' },
   { action: 'finished', hint: '', icon: '🏆', label: 'Finished', tone: 'neutral' },
@@ -592,7 +592,7 @@ function FocusedReviewCard({
           <span>•</span>
           <span>D-pad focus only</span>
           <span>•</span>
-          <span>{buttonLabels.primary} Plan</span>
+          <span>{buttonLabels.primary} Add to Backlog</span>
         </div>
 
 
