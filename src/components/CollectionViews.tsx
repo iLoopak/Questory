@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import type { Game, GameStatus } from '../types/game';
+import type { PlatformQueueState } from '../lib/platformQueueStorage';
+import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameCard } from './GameCard';
+import { PlatformBadge } from './PlatformBadge';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -32,6 +34,7 @@ type CollectionViewProps = CollectionActionHandlers &
   CollectionSelectionProps &
   CollectionHighlightProps & {
     games: Game[];
+    platformQueueState?: PlatformQueueState;
   };
 
 const shelfInitialRenderCount = 72;
@@ -51,6 +54,7 @@ export function CollectionGrid({
   onRemoveAndIgnore,
   onStatusChange,
   onToggleSelected,
+  platformQueueState,
 }: CollectionViewProps) {
   return (
     <div className="qs-game-grid grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4">
@@ -70,6 +74,8 @@ export function CollectionGrid({
           onRemoveAndIgnore={onRemoveAndIgnore}
           onStatusChange={onStatusChange}
           onToggleSelected={() => onToggleSelected?.(game.id)}
+          platformLabel={getGamePlatformLabel(game, platformQueueState)}
+          platformQueueState={platformQueueState}
         />
       ))}
     </div>
@@ -84,7 +90,8 @@ export function CollectionShelf({
   onAddToQueue,
   onOpenDetails,
   onToggleSelected,
-}: Pick<CollectionViewProps, 'games' | 'getHighlightLabel' | 'isMultiSelectMode' | 'onAddToQueue' | 'onOpenDetails' | 'onToggleSelected' | 'selectedGameIds'>) {
+  platformQueueState,
+}: Pick<CollectionViewProps, 'games' | 'getHighlightLabel' | 'isMultiSelectMode' | 'onAddToQueue' | 'onOpenDetails' | 'onToggleSelected' | 'selectedGameIds' | 'platformQueueState'>) {
   const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
   const shelfCardRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -192,6 +199,8 @@ export function CollectionShelf({
             onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
             onOpenDetails={() => onOpenDetails(game.id)}
             onToggleSelected={() => onToggleSelected?.(game.id)}
+            platformLabel={getGamePlatformLabel(game, platformQueueState)}
+            platformQueueState={platformQueueState}
           />
         ))}
         {hasMoreShelfGames ? (
@@ -226,6 +235,7 @@ export function CollectionList({
   onRemoveAndIgnore,
   onStatusChange,
   onToggleSelected,
+  platformQueueState,
 }: CollectionViewProps) {
   return (
     <div className="grid gap-2">
@@ -247,6 +257,8 @@ export function CollectionList({
           onRemoveAndIgnore={() => onRemoveAndIgnore(game)}
           onStatusChange={(status) => onStatusChange(game.id, status)}
           onToggleSelected={() => onToggleSelected?.(game.id)}
+          platformLabel={getGamePlatformLabel(game, platformQueueState)}
+          platformQueueState={platformQueueState}
         />
       ))}
     </div>
@@ -264,6 +276,8 @@ type ShelfGameCardProps = {
   onOpenDetails: () => void;
   onToggleSelected: () => void;
   refCallback: (element: HTMLDivElement | null) => void;
+  platformLabel: GamePlatform;
+  platformQueueState?: PlatformQueueState;
 };
 
 function ShelfGameCard({
@@ -277,6 +291,8 @@ function ShelfGameCard({
   onOpenDetails,
   onToggleSelected,
   refCallback,
+  platformLabel,
+  platformQueueState,
 }: ShelfGameCardProps) {
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -337,9 +353,11 @@ function ShelfGameCard({
           <MissingCover title={game.title} />
         )}
         <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <span className="platform-badge absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold">
-          {game.platform}
-        </span>
+        <PlatformBadge
+          className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+          platform={platformLabel}
+          queueState={platformQueueState}
+        />
         {game.status === 'Playing' || game.status === 'Paused' ? (
           <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={game.status} />
         ) : null}
@@ -383,6 +401,8 @@ type CompactGameRowProps = {
   onRemoveAndIgnore: () => void;
   onStatusChange: (status: GameStatus) => void;
   onToggleSelected: () => void;
+  platformLabel: GamePlatform;
+  platformQueueState?: PlatformQueueState;
 };
 
 function CompactGameRow({
@@ -401,6 +421,8 @@ function CompactGameRow({
   onRemoveAndIgnore,
   onStatusChange,
   onToggleSelected,
+  platformLabel,
+  platformQueueState,
 }: CompactGameRowProps) {
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -448,7 +470,7 @@ function CompactGameRow({
             <span className="line-clamp-1 text-sm font-semibold text-white sm:text-base">{game.title}</span>
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-            <span className="platform-badge rounded-full px-2 py-0.5 font-semibold">{game.platform}</span>
+            <PlatformBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
             <span>{game.status}</span>
             {game.collectionType === 'wishlist' ? <span>Wishlist</span> : null}
           </span>
@@ -474,6 +496,11 @@ function CompactGameRow({
       ) : null}
     </article>
   );
+}
+
+
+function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
+  return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
 }
 
 function RowAction({ label, onClick, primary = false, tone }: { label: string; onClick: () => void; primary?: boolean; tone?: 'danger' }) {

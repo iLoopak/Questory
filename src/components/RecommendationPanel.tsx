@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
 import { ViewportModal } from './ViewportModal';
-import type { PlatformQueueEntry } from '../lib/platformQueueStorage';
+import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import {
   availableTimeOptions,
   getRecommendations,
@@ -17,7 +17,7 @@ import { gamePlatforms } from '../types/game';
 
 type RecommendationPanelProps = {
   games: Game[];
-  queueEntries: PlatformQueueEntry[];
+  queueState: PlatformQueueState;
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
@@ -35,7 +35,7 @@ const recommendationViewModes: readonly RecommendationViewMode[] = ['Grid View',
 
 export function RecommendationPanel({
   games,
-  queueEntries,
+  queueState,
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
@@ -58,7 +58,7 @@ export function RecommendationPanel({
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const moreFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const moreFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
-  const queuedGameIds = useMemo(() => new Set(queueEntries.map((entry) => entry.gameId)), [queueEntries]);
+  const queuedGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
       first.localeCompare(second),
@@ -75,7 +75,7 @@ export function RecommendationPanel({
 
   const recommendationGames = useMemo(() => {
     if (recommendNextGame) {
-      const nextEntry = [...queueEntries].sort((first, second) => first.queuePosition - second.queuePosition)[0];
+      const nextEntry = [...queueState.entries].sort((first, second) => first.queuePosition - second.queuePosition)[0];
       const nextGame = nextEntry ? games.find((game) => game.id === nextEntry.gameId) : null;
       return nextGame ? [nextGame] : [];
     }
@@ -86,7 +86,7 @@ export function RecommendationPanel({
     return sourceGames.filter((game) =>
       normalizedSearch ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedSearch) : true,
     );
-  }, [games, queueEntries, queuedGameIds, recommendFromQueueOnly, recommendNextGame, recommendationSearchTerm]);
+  }, [games, queueState.entries, queuedGameIds, recommendFromQueueOnly, recommendNextGame, recommendationSearchTerm]);
 
   const recommendations = useMemo(() => getRecommendations(recommendationGames, preferences), [recommendationGames, preferences]);
   const recommendation = recommendations.length > 0 ? recommendations[rerollIndex % recommendations.length] : null;
@@ -237,7 +237,7 @@ export function RecommendationPanel({
 
       {recommendationResults.length > 0 ? (
         viewMode === 'Shelf View' ? (
-          <CollectionShelf games={recommendationResults} getHighlightLabel={getHighlightLabel} onAddToQueue={onAddToQueue} onOpenDetails={onOpenDetails} />
+          <CollectionShelf games={recommendationResults} getHighlightLabel={getHighlightLabel} onAddToQueue={onAddToQueue} onOpenDetails={onOpenDetails} platformQueueState={queueState} />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
             games={recommendationResults}
@@ -249,6 +249,7 @@ export function RecommendationPanel({
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
+            platformQueueState={queueState}
           />
         ) : (
           <CollectionGrid
@@ -261,6 +262,7 @@ export function RecommendationPanel({
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
+            platformQueueState={queueState}
           />
         )
       ) : (

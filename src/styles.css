@@ -534,6 +534,25 @@ img {
   box-shadow: var(--badge-shadow);
 }
 
+.platform-badge--identity {
+  border-color: color-mix(in srgb, var(--platform-badge-accent) 58%, var(--badge-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--platform-badge-accent) 18%, transparent), color-mix(in srgb, var(--platform-badge-accent) 8%, var(--badge-bg)));
+  color: var(--badge-text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--platform-badge-accent) 18%, transparent), 0 8px 18px rgb(var(--overlay-rgb) / 0.22);
+}
+
+.platform-badge--identity::before {
+  content: '';
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.4rem;
+  border-radius: 999px;
+  background: var(--platform-badge-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--platform-badge-accent) 70%, transparent);
+  vertical-align: 0.03em;
+}
+
 @media (max-width: 760px) {
   .qs-review-stage {
     grid-template-columns: 1fr;
