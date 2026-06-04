@@ -22,6 +22,13 @@ import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { I18nProvider, createTranslator, languageOptions, useI18n, translateSettingsCategory, type AppLanguage } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
+import {
+  configurableNavigationItems,
+  loadNavigationVisibilityPreferences,
+  saveNavigationVisibilityPreferences,
+  type ConfigurableNavigationItem,
+  type NavigationVisibilityPreferences,
+} from './lib/navigationVisibilityPreferences';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -119,6 +126,7 @@ import type { RawgMetadata } from './types/rawg';
 import type { SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
 const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Recommendation', 'Stats', 'Settings'] as const;
+const alwaysVisibleNavItems = ['Library', 'Settings'] as const;
 const navItemLabelKeys: Record<(typeof navItems)[number], Parameters<ReturnType<typeof createTranslator>>[0]> = {
   Artwork: 'nav.artwork',
   Library: 'nav.library',
@@ -129,7 +137,17 @@ const navItemLabelKeys: Record<(typeof navItems)[number], Parameters<ReturnType<
   Stats: 'nav.stats',
   Wishlist: 'nav.wishlist',
 };
+
+const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, Parameters<ReturnType<typeof createTranslator>>[0]> = {
+  Artwork: 'nav.artwork',
+  Queue: 'settings.navigation.platformsQueue',
+  Recommendation: 'nav.recommendations',
+  'Review Mode': 'settings.navigation.questQueueReviewMode',
+  Stats: 'nav.stats',
+  Wishlist: 'nav.wishlist',
+};
 const allNavItems = ['Home', ...navItems, 'Metadata'] as const;
+type TopNavItem = (typeof navItems)[number];
 type NavItem = (typeof allNavItems)[number];
 const settingsCategories = [
   'Integrations',
@@ -255,6 +273,9 @@ function App() {
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
+  const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
+    loadNavigationVisibilityPreferences(),
+  );
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => applyThemePreference(loadThemePreference()));
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
@@ -281,6 +302,7 @@ function App() {
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
   const t = useMemo(() => createTranslator(language), [language]);
+  const visibleNavItems = useMemo(() => getVisibleNavItems(navigationVisibility), [navigationVisibility]);
 
   useEffect(() => {
     saveGames(games);
@@ -297,6 +319,10 @@ function App() {
   useEffect(() => {
     saveOnboardingState(onboardingState);
   }, [onboardingState]);
+
+  useEffect(() => {
+    saveNavigationVisibilityPreferences(navigationVisibility);
+  }, [navigationVisibility]);
 
   useEffect(() => {
     saveReviewModeState(reviewModeState);
@@ -491,11 +517,11 @@ function App() {
 
       event.preventDefault();
       setActiveNavItem((currentItem) => {
-        const currentIndex = navItems.includes(currentItem as (typeof navItems)[number])
-          ? navItems.indexOf(currentItem as (typeof navItems)[number])
+        const currentIndex = visibleNavItems.includes(currentItem as TopNavItem)
+          ? visibleNavItems.indexOf(currentItem as TopNavItem)
           : 0;
         const direction = event.key === 'PageDown' ? 1 : -1;
-        return navItems[(currentIndex + direction + navItems.length) % navItems.length];
+        return visibleNavItems[(currentIndex + direction + visibleNavItems.length) % visibleNavItems.length];
       });
       setSelectedGameId(null);
     }
@@ -503,8 +529,16 @@ function App() {
     window.addEventListener('keydown', handleControllerNavigation);
 
     return () => window.removeEventListener('keydown', handleControllerNavigation);
-  }, [activeNavItem]);
+  }, [visibleNavItems]);
 
+  useEffect(() => {
+    if (!isTopNavItem(activeNavItem) || isNavigationItemVisible(activeNavItem, navigationVisibility)) {
+      return;
+    }
+
+    setActiveNavItem('Library');
+    setSelectedGameId(null);
+  }, [activeNavItem, navigationVisibility]);
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
@@ -1665,7 +1699,7 @@ function App() {
           </div>
 
           <nav className="qs-top-nav flex flex-1 gap-1 overflow-x-auto rounded-md border border-skyglass/15 bg-ink-950/70 p-0.5 shadow-inner">
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <button
                 key={item}
                 className={`h-8 shrink-0 rounded px-2.5 text-xs font-semibold transition sm:h-9 sm:text-sm ${
@@ -1892,6 +1926,7 @@ function App() {
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
               language={language}
+              navigationVisibility={navigationVisibility}
               platformQueueState={platformQueueState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
@@ -1905,6 +1940,7 @@ function App() {
               onControllerDebugChange={setIsControllerDebugEnabled}
               onControllerLayoutChange={setControllerLayoutPreference}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
+              onNavigationVisibilityChange={setNavigationVisibility}
               onLoadDemoData={loadDemoData}
               onOnboardingAction={handleOnboardingAction}
               onOnboardingClose={hideOnboarding}
@@ -3193,6 +3229,7 @@ type SettingsPanelProps = {
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
   language: AppLanguage;
+  navigationVisibility: NavigationVisibilityPreferences;
   platformQueueState: PlatformQueueState;
   steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
@@ -3206,6 +3243,7 @@ type SettingsPanelProps = {
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
+  onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
   onLoadDemoData: () => void;
   onOnboardingAction: (itemId: OnboardingItemId) => void;
   onOnboardingClose: () => void;
@@ -3241,6 +3279,7 @@ function SettingsPanel({
   runtimeEnvironment,
   themePreference,
   language,
+  navigationVisibility,
   platformQueueState,
   steamPlaytimeRefreshState,
   onAddRetroImportedToQueue,
@@ -3254,6 +3293,7 @@ function SettingsPanel({
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
+  onNavigationVisibilityChange,
   onLoadDemoData,
   onOnboardingAction,
   onOnboardingClose,
@@ -3386,20 +3426,27 @@ function SettingsPanel({
           ) : null}
 
           {activeCategory === 'Appearance' ? (
-            <AppearanceSettingsPanel
-              controllerLayoutPreference={controllerLayoutPreference}
-              isControllerDebugEnabled={isControllerDebugEnabled}
-              isLandscapeLockEnabled={isLandscapeLockEnabled}
-              resolvedTheme={resolvedTheme}
-              runtimeEnvironment={runtimeEnvironment}
-              themePreference={themePreference}
-              language={language}
-              onControllerDebugChange={onControllerDebugChange}
-              onControllerLayoutChange={onControllerLayoutChange}
-              onLandscapeLockChange={onLandscapeLockChange}
-              onThemePreferenceChange={onThemePreferenceChange}
-              onLanguageChange={onLanguageChange}
-            />
+            <div className="space-y-4">
+              <NavigationVisibilitySettingsPanel
+                navigationVisibility={navigationVisibility}
+                onNavigationVisibilityChange={onNavigationVisibilityChange}
+                t={t}
+              />
+              <AppearanceSettingsPanel
+                controllerLayoutPreference={controllerLayoutPreference}
+                isControllerDebugEnabled={isControllerDebugEnabled}
+                isLandscapeLockEnabled={isLandscapeLockEnabled}
+                resolvedTheme={resolvedTheme}
+                runtimeEnvironment={runtimeEnvironment}
+                themePreference={themePreference}
+                language={language}
+                onControllerDebugChange={onControllerDebugChange}
+                onControllerLayoutChange={onControllerLayoutChange}
+                onLandscapeLockChange={onLandscapeLockChange}
+                onThemePreferenceChange={onThemePreferenceChange}
+                onLanguageChange={onLanguageChange}
+              />
+            </div>
           ) : null}
 
           {activeCategory === 'About' ? (
@@ -3921,6 +3968,52 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
   );
 }
 
+
+type NavigationVisibilitySettingsPanelProps = {
+  navigationVisibility: NavigationVisibilityPreferences;
+  onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
+  t: ReturnType<typeof createTranslator>;
+};
+
+function NavigationVisibilitySettingsPanel({
+  navigationVisibility,
+  onNavigationVisibilityChange,
+  t,
+}: NavigationVisibilitySettingsPanelProps) {
+  function updateNavigationItemVisibility(item: ConfigurableNavigationItem, isVisible: boolean) {
+    onNavigationVisibilityChange({
+      ...navigationVisibility,
+      [item]: isVisible,
+    });
+  }
+
+  return (
+    <section className="rounded-xl border border-skyglass/15 bg-ink-950/70 p-4 shadow-inner">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-white">{t('settings.navigation.title')}</h3>
+        <p className="mt-1 text-sm text-slate-400">{t('settings.navigation.help')}</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {configurableNavigationItems.map((item) => (
+          <label
+            className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-skyglass/15 bg-ink-900/70 px-3 py-2 text-sm text-slate-200 transition hover:border-mint/30 hover:bg-mint/10"
+            key={item}
+          >
+            <span className="font-medium">{t(navigationVisibilityLabelKeys[item])}</span>
+            <input
+              checked={navigationVisibility[item]}
+              className="h-5 w-5 rounded border-skyglass/30 bg-ink-950 text-mint accent-mint"
+              onChange={(event) => updateNavigationItemVisibility(item, event.target.checked)}
+              type="checkbox"
+            />
+          </label>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-slate-500">{t('settings.navigation.alwaysVisible')}</p>
+    </section>
+  );
+}
+
 function AppearanceSettingsPanel({
   controllerLayoutPreference,
   isControllerDebugEnabled,
@@ -4209,6 +4302,22 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   return 'Local library and wishlist data stays on this device.';
+}
+
+function getVisibleNavItems(navigationVisibility: NavigationVisibilityPreferences): TopNavItem[] {
+  return navItems.filter((item) => isNavigationItemVisible(item, navigationVisibility));
+}
+
+function isNavigationItemVisible(item: TopNavItem, navigationVisibility: NavigationVisibilityPreferences) {
+  if (alwaysVisibleNavItems.includes(item as (typeof alwaysVisibleNavItems)[number])) {
+    return true;
+  }
+
+  return navigationVisibility[item as ConfigurableNavigationItem] ?? true;
+}
+
+function isTopNavItem(item: NavItem): item is TopNavItem {
+  return navItems.includes(item as TopNavItem);
 }
 
 function touchGameRecord(game: Game): Game {

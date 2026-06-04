@@ -15,6 +15,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.settingsCategory.v1'
   | 'questshelf.themePreference.v1'
   | 'questshelf.languagePreference.v1'
+  | 'questshelf.navigationVisibility.v1'
   | 'questshelf.storageIssues.v1';
 
 export type StorageKeyScope = 'core' | 'integration' | 'device' | 'ui' | 'recovery';
@@ -139,6 +140,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Selected app language.',
     scope: 'ui',
     schema: '\'en\' | \'cs\'.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.navigationVisibility.v1',
+    purpose: 'Top navigation section visibility preferences.',
+    scope: 'ui',
+    schema: 'Record of configurable navigation section IDs to booleans.',
   },
   {
     backup: 'never',
