@@ -78,8 +78,8 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="max-w-[15rem] space-y-4 justify-self-center xl:justify-self-stretch">
               <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-800 shadow-panel">
                 <div className="aspect-[2/3] bg-ink-700">
                   {activeCoverSource ? (
@@ -87,7 +87,7 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
                       {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
                       <img
                         alt=""
-                        className={`h-full w-full object-cover transition-opacity duration-300 ${
+                        className={`h-full w-full object-contain bg-ink-950 transition-opacity duration-300 ${
                           isCoverLoaded ? 'opacity-100' : 'opacity-0'
                         }`}
                         decoding="async"

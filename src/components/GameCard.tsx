@@ -222,7 +222,7 @@ export function GameCard({
                 <div className="absolute bottom-11 right-0 z-20 w-48 overflow-hidden rounded-md border border-skyglass/15 bg-ink-950 shadow-panel">
                   {onAddToQueue ? (
                     <ActionMenuButton
-                      label="Add to Platforms"
+                      label="Add to Backlog"
                       onClick={() => {
                         onAddToQueue(game);
                         setIsActionMenuOpen(false);

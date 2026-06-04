@@ -14,6 +14,7 @@ export type ArtworkSource = (typeof artworkSourcePriority)[number];
 
 const generatedPlaceholderMarkers = ['placeholder', 'placehold.co', 'data:image/svg+xml'];
 const generatedFallbackMarker = 'data:image/svg+xml';
+const generatedFallbackCoverCache = new Map<string, string>();
 
 export function getGameCoverSources(game: Game) {
   return getArtworkCandidates(game).map((candidate) => candidate.url);
@@ -122,11 +123,18 @@ export function getStoredArtworkSource(game: Game): ArtworkSource | undefined {
 }
 
 export function getGeneratedFallbackCover(game: Game) {
+  const cacheKey = `${game.id}:${game.title}:${game.platform}:${game.collectionType}`;
+  const cachedCover = generatedFallbackCoverCache.get(cacheKey);
+  if (cachedCover) {
+    return cachedCover;
+  }
+
   const seed = hashString(`${game.id}:${game.title}:${game.platform}`);
   const palette = fallbackPalettes[seed % fallbackPalettes.length];
   const accentAngle = 18 + (seed % 42);
   const initials = getInitials(game.title);
   const title = escapeSvgText(game.title);
+  const titleLines = wrapSvgTitle(game.title, 15).map(escapeSvgText);
   const platform = escapeSvgText(game.platform);
   const subtitle = game.collectionType === 'wishlist' ? 'WISHLIST' : 'LOCAL LIBRARY';
 
@@ -158,13 +166,15 @@ export function getGeneratedFallbackCover(game: Game) {
     <text x="300" y="310" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="70" font-weight="800" fill="#39f7e2" letter-spacing="4">${initials}</text>
   </g>
   <rect x="82" y="470" width="436" height="2" fill="#39f7e2" opacity="0.72"/>
-  <text x="82" y="532" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="48" font-weight="800" fill="#ffffff">${wrapSvgTitle(title, 14).join('</text><text x="82" dy="58" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="48" font-weight="800" fill="#ffffff">')}</text>
+  <text x="82" y="526" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="46" font-weight="800" fill="#ffffff">${titleLines.map((line, index) => `<tspan x="82" dy="${index === 0 ? 0 : 56}">${line}</tspan>`).join('')}</text>
   <rect x="82" y="742" width="${Math.min(390, 96 + platform.length * 11)}" height="50" rx="25" fill="#39f7e2" fill-opacity="0.14" stroke="#39f7e2" stroke-opacity="0.64"/>
   <text x="110" y="774" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#9ffcf2" letter-spacing="2">${platform.toUpperCase()}</text>
   <text x="82" y="824" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800" fill="#94a3b8" letter-spacing="4">${subtitle}</text>
 </svg>`;
 
-  return `${generatedFallbackMarker};utf8,${encodeURIComponent(svg)}`;
+  const cover = `${generatedFallbackMarker};utf8,${encodeURIComponent(svg)}`;
+  generatedFallbackCoverCache.set(cacheKey, cover);
+  return cover;
 }
 
 function dedupeCandidates(candidates: Array<{ source: ArtworkSource; url: string }>) {
@@ -209,7 +219,8 @@ function escapeSvgText(value: string) {
 }
 
 function wrapSvgTitle(title: string, maxLineLength: number) {
-  const words = title.split(/\s+/).filter(Boolean);
+  const normalizedTitle = title.replace(/\s+/g, ' ').trim() || 'Untitled Game';
+  const words = normalizedTitle.split(' ').flatMap((word) => splitLongWord(word, maxLineLength)).filter(Boolean);
   const lines: string[] = [];
   let currentLine = '';
 
@@ -231,11 +242,24 @@ function wrapSvgTitle(title: string, maxLineLength: number) {
 
   return lines.slice(0, 3).map((line, index, slicedLines) => {
     if (index === slicedLines.length - 1 && lines.length > slicedLines.length) {
-      return `${line.replace(/\s+\S*$/, '')}…`;
+      const trimmedLine = line.replace(/\s+\S*$/, '').trim() || line;
+      return `${trimmedLine.slice(0, Math.max(1, maxLineLength - 1))}…`;
     }
 
     return line;
   });
+}
+
+function splitLongWord(word: string, maxLineLength: number) {
+  if (word.length <= maxLineLength) {
+    return [word];
+  }
+
+  const chunks: string[] = [];
+  for (let index = 0; index < word.length; index += maxLineLength) {
+    chunks.push(word.slice(index, index + maxLineLength));
+  }
+  return chunks;
 }
 
 const fallbackPalettes = [

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { ViewportModal } from './ViewportModal';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
@@ -18,6 +19,7 @@ export type ReviewModeAction =
   | 'note';
 
 type ReviewModePanelProps = {
+  controllerLayout: ControllerLayoutPreference;
   games: Game[];
   ignoredGameIds: Set<string>;
   queuePlatforms: GamePlatform[];
@@ -38,9 +40,9 @@ const negativeActions: Array<{
   label: string;
   tone: 'danger' | 'quiet';
 }> = [
-  { action: 'ignore', hint: 'D-pad ←', icon: '🚫', label: 'Ignore', tone: 'danger' },
-  { action: 'dropped', hint: 'D-pad ←', icon: '🗑️', label: 'Drop', tone: 'danger' },
-  { action: 'skip', hint: 'B', icon: '⏭️', label: 'Skip', tone: 'quiet' },
+  { action: 'ignore', hint: '', icon: '🚫', label: 'Ignore', tone: 'danger' },
+  { action: 'dropped', hint: '', icon: '🗑️', label: 'Drop', tone: 'danger' },
+  { action: 'skip', hint: 'cancel', icon: '⏭️', label: 'Skip', tone: 'quiet' },
 ];
 
 const positiveActions: Array<{
@@ -50,10 +52,10 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'A', icon: '📌', label: 'Plan', tone: 'accent' },
-  { action: 'playing', hint: 'Y', icon: '🎮', label: 'Playing', tone: 'accent' },
-  { action: 'wishlist', hint: 'X', icon: '💖', label: 'Wishlist', tone: 'neutral' },
-  { action: 'finished', hint: 'D-pad →', icon: '🏆', label: 'Finished', tone: 'neutral' },
+  { action: 'queue', hint: 'primary', icon: '📌', label: 'Plan', tone: 'accent' },
+  { action: 'playing', hint: 'topFace', icon: '🎮', label: 'Playing', tone: 'accent' },
+  { action: 'wishlist', hint: 'leftFace', icon: '💖', label: 'Wishlist', tone: 'neutral' },
+  { action: 'finished', hint: '', icon: '🏆', label: 'Finished', tone: 'neutral' },
 ];
 
 const decisionActions = [...negativeActions, ...positiveActions];
@@ -83,6 +85,7 @@ const secondaryActions: Array<{ action: ReviewModeAction; label: string }> = [
 ];
 
 export function ReviewModePanel({
+  controllerLayout,
   games,
   ignoredGameIds,
   queuePlatforms,
@@ -93,6 +96,7 @@ export function ReviewModePanel({
   onRestoreIgnored,
   onSourceChange,
 }: ReviewModePanelProps) {
+  const buttonLabels = getControllerButtonLabels(controllerLayout);
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
   const [actionStats, setActionStats] = useState<ReviewActionStats>(emptyReviewActionStats);
@@ -418,6 +422,7 @@ export function ReviewModePanel({
               onHighlight={setHighlightedActionIndex}
               onNoteDraftChange={setNoteDraft}
               onSubmitNote={submitNote}
+              buttonLabels={buttonLabels}
               queueButtonRef={queueButtonRef}
               queuePlatforms={queuePlatforms}
             />
@@ -436,7 +441,7 @@ export function ReviewModePanel({
 
       {activeGame && isQueuePickerOpen ? (
         <ViewportModal
-          ariaLabel={`Choose platform plan for ${activeGame.title}`}
+          ariaLabel={`Choose platform backlog for ${activeGame.title}`}
           initialFocusRef={firstQueuePlatformButtonRef}
           placement="center"
           restoreFocusRef={queueButtonRef}
@@ -446,7 +451,7 @@ export function ReviewModePanel({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose platform</div>
-                <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Platforms</h2>
+                <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Backlog</h2>
                 <p className="mt-1 line-clamp-2 text-sm text-slate-400">{activeGame.title}</p>
               </div>
               <button
@@ -470,7 +475,7 @@ export function ReviewModePanel({
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-slate-500">Single tap adds this game to Platforms, closes the picker, and advances Quest Queue. Press Escape or B to cancel.</p>
+            <p className="mt-3 text-xs text-slate-500">Single tap adds this game to the selected platform backlog, closes the picker, and advances Quest Queue. Press Escape or your cancel button to cancel.</p>
           </div>
         </ViewportModal>
       ) : null}
@@ -487,6 +492,7 @@ function FocusedReviewCard({
   onHighlight,
   onNoteDraftChange,
   onSubmitNote,
+  buttonLabels,
   queueButtonRef,
   queuePlatforms,
 }: {
@@ -498,6 +504,7 @@ function FocusedReviewCard({
   onHighlight: (index: number) => void;
   onNoteDraftChange: (value: string) => void;
   onSubmitNote: () => void;
+  buttonLabels: ReturnType<typeof getControllerButtonLabels>;
   queueButtonRef: RefObject<HTMLButtonElement | null>;
   queuePlatforms: GamePlatform[];
 }) {
@@ -551,7 +558,7 @@ function FocusedReviewCard({
               </div>
               {action.hint && (
                 <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
-                  {action.hint}
+                  {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                 </span>
               )}
             </button>
@@ -606,9 +613,9 @@ function FocusedReviewCard({
           <span>•</span>
           <span>R2 Next</span>
           <span>•</span>
-          <span>D-pad Left discard</span>
+          <span>D-pad focus only</span>
           <span>•</span>
-          <span>D-pad Right keep</span>
+          <span>{buttonLabels.primary} Plan</span>
         </div>
 
 
@@ -726,7 +733,7 @@ function FocusedReviewCard({
                 </div>
                 {action.hint && (
                   <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
-                    {action.hint}
+                    {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                   </span>
                 )}
               </button>

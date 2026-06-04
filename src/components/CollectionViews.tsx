@@ -201,7 +201,7 @@ export function CollectionShelf({
           </button>
         ) : null}
       </div>
-      <p className="text-xs text-slate-500">Use D-pad / arrow keys to move across covers. Press A or Enter to open.</p>
+      <p className="text-xs text-slate-500">Use D-pad / arrow keys to move across covers. Press the confirm button or Enter to open.</p>
     </div>
   );
 }
@@ -436,7 +436,7 @@ function CompactGameRow({
               </option>
             ))}
           </select>
-          {onAddToQueue ? <RowAction label="Platforms" onClick={() => onAddToQueue(game)} /> : null}
+          {onAddToQueue ? <RowAction label="Backlog" onClick={() => onAddToQueue(game)} /> : null}
           {game.collectionType === 'wishlist' ? (
             <RowAction label="Library" onClick={() => onMoveToLibrary?.(game)} />
           ) : (
