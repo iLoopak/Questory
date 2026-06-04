@@ -2,16 +2,34 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
-import { gameStatuses } from '../types/game';
 
 type GameDetailViewProps = {
   game: Game;
   onAddToQueue?: (game: Game) => void;
+  onAddToWishlist?: (game: Game) => void;
   onBack: () => void;
+  onIgnore?: (game: Game) => void;
+  onStatusChange?: (gameId: string, status: GameStatus) => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
 };
 
-export function GameDetailView({ game, onAddToQueue, onBack, onTrackingChange }: GameDetailViewProps) {
+type GameDetailAction = {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  tone: 'accent' | 'neutral' | 'danger';
+  disabled?: boolean;
+};
+
+export function GameDetailView({
+  game,
+  onAddToQueue,
+  onAddToWishlist,
+  onBack,
+  onIgnore,
+  onStatusChange,
+  onTrackingChange,
+}: GameDetailViewProps) {
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
@@ -53,37 +71,95 @@ export function GameDetailView({ game, onAddToQueue, onBack, onTrackingChange }:
     });
   }
 
+  const primaryActions: GameDetailAction[] = [
+    {
+      icon: '📌',
+      label: 'Add to Backlog',
+      onClick: () => onAddToQueue?.(game),
+      tone: 'accent',
+      disabled: !onAddToQueue,
+    },
+    {
+      icon: '🎮',
+      label: 'Playing',
+      onClick: () => onStatusChange?.(game.id, 'Playing'),
+      tone: 'accent',
+      disabled: !onStatusChange,
+    },
+    {
+      icon: '💖',
+      label: 'Wishlist',
+      onClick: () => onAddToWishlist?.(game),
+      tone: 'neutral',
+      disabled: !onAddToWishlist,
+    },
+    {
+      icon: '🏆',
+      label: 'Finished',
+      onClick: () => onStatusChange?.(game.id, 'Finished'),
+      tone: 'neutral',
+      disabled: !onStatusChange,
+    },
+  ];
+  const destructiveActions: GameDetailAction[] = [
+    {
+      icon: '🗑️',
+      label: 'Drop',
+      onClick: () => onStatusChange?.(game.id, 'Dropped'),
+      tone: 'danger',
+      disabled: !onStatusChange,
+    },
+    {
+      icon: '🚫',
+      label: 'Ignore',
+      onClick: () => onIgnore?.(game),
+      tone: 'danger',
+      disabled: !onIgnore || typeof game.steamAppId !== 'number',
+    },
+  ];
+
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex flex-col gap-3 border-b border-white/10 bg-ink-950/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <button
-              className="mb-2 text-sm font-medium text-mint transition hover:text-white"
-              onClick={onBack}
-              type="button"
-            >
-              Back to library
-            </button>
-            <h2 className="truncate text-2xl font-semibold text-white">{game.title}</h2>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {onAddToQueue ? (
+        <div className="border-b border-white/10 bg-ink-950/70 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <button
-                className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
-                onClick={() => onAddToQueue(game)}
+                className="mb-2 text-sm font-medium text-mint transition hover:text-white"
+                onClick={onBack}
                 type="button"
               >
-                Add to Backlog
+                Back to library
               </button>
-            ) : null}
-            <span className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
-              {game.platform}
-            </span>
-            <span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-medium text-mint">
-              {game.status}
-            </span>
+              <h2 className="truncate text-2xl font-semibold text-white">{game.title}</h2>
+            </div>
+
+            <div className="flex flex-wrap gap-2" aria-label="Current game summary">
+              <span className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+                {game.platform}
+              </span>
+              <span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-medium text-mint">
+                {game.status}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-white/10 bg-ink-900/70 p-3" aria-label="Game decision actions">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Actions</div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {primaryActions.map((action) => (
+                <GameDetailActionButton key={action.label} action={action} />
+              ))}
+            </div>
+
+            <div className="mt-3 border-t border-red-400/20 pt-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-red-200/70">Destructive</div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:max-w-md">
+                {destructiveActions.map((action) => (
+                  <GameDetailActionButton key={action.label} action={action} />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -143,20 +219,7 @@ export function GameDetailView({ game, onAddToQueue, onBack, onTrackingChange }:
                 <div className="grid gap-3 sm:grid-cols-3">
                   <ReadOnlyField label="Playtime" value={`${game.playtimeHours}h`} />
                   <ReadOnlyField label="Last played" value={formatDate(game.lastPlayedAt)} />
-                  <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Status</span>
-                    <select
-                      className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
-                      value={game.status}
-                      onChange={(event) => updateTracking({ status: event.target.value as GameStatus })}
-                    >
-                      {gameStatuses.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <ReadOnlyField label="Status" value={game.status} />
                 </div>
 
                 <label className="block">
@@ -259,6 +322,39 @@ export function GameDetailView({ game, onAddToQueue, onBack, onTrackingChange }:
       </div>
     </section>
   );
+}
+
+
+function GameDetailActionButton({ action }: { action: GameDetailAction }) {
+  return (
+    <button
+      className={`min-h-12 rounded-xl border px-3 py-2 text-left text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${getGameDetailActionClassName(
+        action.tone,
+      )}`}
+      disabled={action.disabled}
+      onClick={action.onClick}
+      type="button"
+    >
+      <span className="flex items-center gap-2">
+        <span aria-hidden="true" className="text-base leading-none">
+          {action.icon}
+        </span>
+        <span>{action.label}</span>
+      </span>
+    </button>
+  );
+}
+
+function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
+  if (tone === 'accent') {
+    return 'border-mint/30 bg-mint/10 text-mint hover:bg-mint/20 hover:shadow-glow';
+  }
+
+  if (tone === 'danger') {
+    return 'border-red-400/30 bg-red-500/10 text-red-100 hover:bg-red-500/20';
+  }
+
+  return 'border-skyglass/15 bg-ink-950/70 text-slate-200 hover:bg-mint/10 hover:text-white';
 }
 
 type DetailSectionProps = {

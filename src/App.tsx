@@ -1103,7 +1103,7 @@ function App() {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
       description: `Remove ${game.title} from ${platform} backlog and restore positions`,
-    }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(game.id)] });
+    }, undefined, { actions: [getUndoAction()] });
 
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
   }
@@ -1446,7 +1446,10 @@ function App() {
             <GameDetailView
               game={selectedGame}
               onAddToQueue={openBacklogPicker}
+              onAddToWishlist={addToWishlist}
               onBack={() => setSelectedGameId(null)}
+              onIgnore={removeAndIgnoreSteamGame}
+              onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
             />
           ) : activeNavItem === 'Home' ? (
