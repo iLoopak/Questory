@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { PlatformQueueSummary } from '../lib/platformQueueStorage';
 import type { Game } from '../types/game';
+import { useI18n } from '../i18n';
 import { getQuestShelfStats, statsScopeOptions, type QuestShelfStats, type StatsBarItem, type StatsScope } from '../utils/stats';
 
 type StatsPanelProps = {
@@ -11,6 +12,7 @@ type StatsPanelProps = {
 };
 
 export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelProps) {
+  const { t } = useI18n();
   const [scope, setScope] = useState<StatsScope>('library');
   const stats = useMemo(() => getQuestShelfStats(games, scope), [games, scope]);
 
@@ -20,9 +22,9 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
         <div className="border-b border-white/10 bg-ink-950/70 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-white">Stats</h2>
+              <h2 className="text-xl font-semibold text-white">{t('stats.title')}</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Local backlog, progress, and playtime overview from this device only.
+                {t('stats.subtitle')}
               </p>
             </div>
 
@@ -53,12 +55,12 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
               <div className="grid gap-4 xl:grid-cols-2">
                 <BreakdownPanel
                   items={stats.platformBreakdown}
-                  label="games"
+                  label={t('common.games')}
                   secondaryLabel="hours"
-                  title="Platform breakdown"
+                  title={t('stats.platformBreakdown')}
                 />
-                <BreakdownPanel items={stats.statusBreakdown} label="games" title="Status breakdown" />
-                <BreakdownPanel items={stats.sourceBreakdown} label="games" title="Source breakdown" />
+                <BreakdownPanel items={stats.statusBreakdown} label={t('common.games')} title={t('stats.statusBreakdown')} />
+                <BreakdownPanel items={stats.sourceBreakdown} label={t('common.games')} title={t('stats.sourceBreakdown')} />
                 <EnrichmentPanel stats={stats} />
               </div>
 
@@ -68,42 +70,42 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
                   games={stats.topPlayedGames}
                   metric={(game) => `${game.playtimeHours}h`}
                   onOpenDetails={onOpenDetails}
-                  title="Top 10 most played"
+                  title={t('stats.topPlayed')}
                 />
                 <GameListPanel
                   emptyText="No recent play dates yet."
                   games={stats.recentlyPlayedGames}
                   metric={(game) => formatDate(game.lastPlayedAt)}
                   onOpenDetails={onOpenDetails}
-                  title="Recently played"
+                  title={t('stats.recentlyPlayed')}
                 />
                 <GameListPanel
                   emptyText="No paused games in this scope."
                   games={stats.longestPausedGames}
                   metric={(game) => formatDate(game.lastPlayedAt) || 'No play date'}
                   onOpenDetails={onOpenDetails}
-                  title="Longest paused"
+                  title={t('stats.longestPaused')}
                 />
                 <GameListPanel
                   emptyText="No import timestamps yet."
                   games={stats.recentlyImportedGames}
                   metric={(game) => formatDate(game.importedAt ?? game.wishlistImportedAt ?? game.wishlistSyncedAt)}
                   onOpenDetails={onOpenDetails}
-                  title="Recently imported"
+                  title={t('stats.recentlyImported')}
                 />
                 <GameListPanel
                   emptyText="All games in this scope are enriched or manually managed."
                   games={stats.gamesMissingMetadata}
                   metric={(game) => game.platform}
                   onOpenDetails={onOpenDetails}
-                  title="Missing metadata"
+                  title={t('stats.missingMetadata')}
                 />
               </div>
             </div>
           ) : (
             <div className="grid min-h-64 place-items-center rounded-lg border border-dashed border-white/15 bg-ink-950/50 p-8 text-center">
               <div>
-                <h3 className="text-lg font-semibold text-white">No stats yet</h3>
+                <h3 className="text-lg font-semibold text-white">{t('stats.noStats')}</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                   Add games, import Steam titles, or switch the scope to see available local data.
                 </p>

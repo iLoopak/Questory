@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useI18n } from '../i18n';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
 import { ViewportModal } from './ViewportModal';
@@ -47,6 +48,7 @@ export function RecommendationPanel({
   onStartReview,
   onStatusChange,
 }: RecommendationPanelProps) {
+  const { t } = useI18n();
   const [availableTime, setAvailableTime] = useState<AvailableTime>('30 min');
   const [mood, setMood] = useState<RecommendationMood>('comfort');
   const [preferredPlatform, setPreferredPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
@@ -127,19 +129,19 @@ export function RecommendationPanel({
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
-        title="Recommendations"
+        title={t('recommendations.title')}
         searchValue={recommendationSearchTerm}
-        searchPlaceholder="Find title"
+        searchPlaceholder={t('toolbar.findTitle')}
         onSearchChange={setRecommendationSearchTerm}
         selects={[
           {
-            label: 'Status',
+            label: t('toolbar.status'),
             value: availableTime,
             options: availableTimeOptions,
             onChange: (value) => updatePreference(() => setAvailableTime(value as AvailableTime)),
           },
           {
-            label: 'Platform',
+            label: t('toolbar.platform'),
             value: preferredPlatform,
             options: [anyPlatform, ...platformOptions],
             onChange: (value) => updatePreference(() => setPreferredPlatform(value as GamePlatform | typeof anyPlatform)),
@@ -150,7 +152,7 @@ export function RecommendationPanel({
         moreFiltersButtonRef={moreFiltersButtonRef}
         onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
         viewMode={{
-          label: 'Recommendations view mode',
+          label: `${t('recommendations.title')} ${t('toolbar.viewMode')}`,
           options: recommendationViewModes,
           value: viewMode,
           onChange: (mode) => setViewMode(mode as RecommendationViewMode),
@@ -287,8 +289,8 @@ export function RecommendationPanel({
       ) : (
         <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
           <div>
-            <h3 className="text-lg font-semibold text-white">No recommendation available</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">Adjust search, platform, or filters to bring games back into the recommendation pool.</p>
+            <h3 className="text-lg font-semibold text-white">{t('recommendations.emptyTitle')}</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{t('recommendations.emptyText')}</p>
           </div>
         </div>
       )}

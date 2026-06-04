@@ -20,6 +20,8 @@ import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModeP
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
+import { I18nProvider, createTranslator, languageOptions, useI18n, translateSettingsCategory, type AppLanguage } from './i18n';
+import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -117,15 +119,15 @@ import type { RawgMetadata } from './types/rawg';
 import type { SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
 const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Recommendation', 'Stats', 'Settings'] as const;
-const navItemLabels: Record<(typeof navItems)[number], string> = {
-  Artwork: 'Artwork',
-  Library: 'Library',
-  Queue: 'Queue',
-  Recommendation: 'Recommendations',
-  'Review Mode': 'Review Mode',
-  Settings: 'Settings',
-  Stats: 'Stats',
-  Wishlist: 'Wishlist',
+const navItemLabelKeys: Record<(typeof navItems)[number], Parameters<ReturnType<typeof createTranslator>>[0]> = {
+  Artwork: 'nav.artwork',
+  Library: 'nav.library',
+  Queue: 'nav.queue',
+  Recommendation: 'nav.recommendations',
+  'Review Mode': 'nav.reviewMode',
+  Settings: 'nav.settings',
+  Stats: 'nav.stats',
+  Wishlist: 'nav.wishlist',
 };
 const allNavItems = ['Home', ...navItems, 'Metadata'] as const;
 type NavItem = (typeof allNavItems)[number];
@@ -252,6 +254,7 @@ function App() {
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
+  const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => applyThemePreference(loadThemePreference()));
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
@@ -277,6 +280,7 @@ function App() {
   );
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
+  const t = useMemo(() => createTranslator(language), [language]);
 
   useEffect(() => {
     saveGames(games);
@@ -285,6 +289,10 @@ function App() {
   useEffect(() => {
     saveIgnoredSteamGames(ignoredSteamGames);
   }, [ignoredSteamGames]);
+
+  useEffect(() => {
+    saveLanguagePreference(language);
+  }, [language]);
 
   useEffect(() => {
     saveOnboardingState(onboardingState);
@@ -1647,6 +1655,7 @@ function App() {
   }
 
   return (
+    <I18nProvider language={language}>
     <main className="min-h-screen bg-ink-950 text-slate-100">
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
@@ -1672,7 +1681,7 @@ function App() {
                 }}
                 type="button"
               >
-                {navItemLabels[item]}
+                {t(navItemLabelKeys[item])}
               </button>
             ))}
           </nav>
@@ -1882,6 +1891,7 @@ function App() {
               resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
+              language={language}
               platformQueueState={platformQueueState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
@@ -1908,6 +1918,7 @@ function App() {
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onThemePreferenceChange={setThemePreferenceState}
+              onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
             />
@@ -1978,6 +1989,7 @@ function App() {
         )
       ) : null}
     </main>
+    </I18nProvider>
   );
 }
 
@@ -2180,12 +2192,13 @@ function CollectionPanel({
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
-  const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
-  const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
+  const { t } = useI18n();
+  const title = collectionType === 'wishlist' ? t('collection.wishlist') : t('collection.library');
+  const emptyTitle = collectionType === 'wishlist' ? t('collection.emptyWishlistTitle') : t('collection.emptyLibraryTitle');
   const emptyText =
     collectionType === 'wishlist'
-      ? 'Add manual wishlist entries or save library games here for later.'
-      : 'Adjust the search or filters to bring titles back into view.';
+      ? t('collection.emptyWishlistText')
+      : t('collection.emptyLibraryText');
   const progressiveResetKey = useMemo(
     () =>
       JSON.stringify({
@@ -2421,17 +2434,17 @@ function CollectionPanel({
       <CollectionToolbar
         title={title}
         searchValue={filters.searchTerm}
-        searchPlaceholder="Find title"
+        searchPlaceholder={t('toolbar.findTitle')}
         onSearchChange={(value) => onFiltersChange({ searchTerm: value })}
         selects={[
           {
-            label: 'Status',
+            label: t('toolbar.status'),
             value: filters.status,
             options: [allOption, ...gameStatuses],
             onChange: (value) => onFiltersChange({ status: value as GameStatus | typeof allOption }),
           },
           {
-            label: 'Platform',
+            label: t('toolbar.platform'),
             value: filters.platform,
             options: [allOption, ...platformOptions],
             onChange: (value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption }),
@@ -2443,7 +2456,7 @@ function CollectionPanel({
         onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
         viewMode={{
-          label: `${title} view mode`,
+          label: `${title} ${t('toolbar.viewMode')}`,
           options: collectionViewModes,
           value: viewMode,
           onChange: (mode) => setViewMode(mode as CollectionViewMode),
@@ -2454,7 +2467,7 @@ function CollectionPanel({
             onClick={onAddGame}
             type="button"
           >
-            Add
+            {t('toolbar.add')}
           </button>
         }
         actionMenu={
@@ -2464,7 +2477,7 @@ function CollectionPanel({
               onClick={() => onStartReview(collectionType === 'wishlist' ? 'wishlist' : 'backlog')}
               type="button"
             >
-              Review Mode {collectionType === 'wishlist' ? 'wishlist' : 'queue'}
+              {collectionType === 'wishlist' ? t('collection.reviewWishlist') : t('collection.reviewQueue')}
             </button>
             {collectionType === 'wishlist' && onSyncSteamWishlist ? (
               <button
@@ -2473,7 +2486,7 @@ function CollectionPanel({
                 onClick={onSyncSteamWishlist}
                 type="button"
               >
-                {steamWishlistSyncState?.status === 'loading' ? 'Syncing Steam...' : 'Sync Steam'}
+                {steamWishlistSyncState?.status === 'loading' ? t('collection.syncingSteam') : t('collection.syncSteamWishlist')}
               </button>
             ) : null}
             {collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
@@ -2488,7 +2501,7 @@ function CollectionPanel({
                 }
                 type="button"
               >
-                {isSteamPlaytimeSyncing ? 'Syncing Steam playtime...' : 'Sync Steam playtime'}
+                {isSteamPlaytimeSyncing ? t('collection.syncingSteamPlaytime') : t('collection.syncSteamPlaytime')}
               </button>
             ) : null}
             <button
@@ -3179,6 +3192,7 @@ type SettingsPanelProps = {
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  language: AppLanguage;
   platformQueueState: PlatformQueueState;
   steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
@@ -3202,6 +3216,7 @@ type SettingsPanelProps = {
   onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
   onReviewRetroImportedGames: () => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
+  onLanguageChange: (language: AppLanguage) => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
@@ -3225,6 +3240,7 @@ function SettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  language,
   platformQueueState,
   steamPlaytimeRefreshState,
   onAddRetroImportedToQueue,
@@ -3248,6 +3264,7 @@ function SettingsPanel({
   onRefreshSteamPlaytime,
   onReviewRetroImportedGames,
   onThemePreferenceChange,
+  onLanguageChange,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
@@ -3256,6 +3273,7 @@ function SettingsPanel({
 }: SettingsPanelProps) {
   const [isCategoryListOpen, setIsCategoryListOpen] = useState(false);
   const activeCategoryMeta = getSettingsCategoryMeta(activeCategory);
+  const t = useMemo(() => createTranslator(language), [language]);
 
   function selectCategory(category: SettingsCategory) {
     onCategoryChange(category);
@@ -3267,11 +3285,11 @@ function SettingsPanel({
       <div className="border-b border-skyglass/15 bg-ink-950/80 px-3 py-3 sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Settings</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('settings.title')}</div>
             <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-slate-400">
-              <span>Settings</span>
+              <span>{t('settings.title')}</span>
               <span className="text-slate-600">/</span>
-              <span className="truncate font-semibold text-white">{activeCategoryMeta.label}</span>
+              <span className="truncate font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</span>
             </div>
           </div>
           <button
@@ -3279,7 +3297,7 @@ function SettingsPanel({
             onClick={() => setIsCategoryListOpen((currentValue) => !currentValue)}
             type="button"
           >
-            {isCategoryListOpen ? 'Show detail' : 'Back to categories'}
+            {isCategoryListOpen ? t('settings.showDetail') : t('settings.backToCategories')}
           </button>
         </div>
       </div>
@@ -3309,7 +3327,7 @@ function SettingsPanel({
                 <SettingsCategoryIcon category={activeCategory} />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold text-white">{activeCategoryMeta.label}</h2>
+                <h2 className="text-xl font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</h2>
               </div>
             </div>
           </header>
@@ -3375,10 +3393,12 @@ function SettingsPanel({
               resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
+              language={language}
               onControllerDebugChange={onControllerDebugChange}
               onControllerLayoutChange={onControllerLayoutChange}
               onLandscapeLockChange={onLandscapeLockChange}
               onThemePreferenceChange={onThemePreferenceChange}
+              onLanguageChange={onLanguageChange}
             />
           ) : null}
 
@@ -3420,6 +3440,7 @@ function SettingsCategoryButton({
   onSelect: (category: SettingsCategory) => void;
 }) {
   const meta = getSettingsCategoryMeta(category);
+  const { t } = useI18n();
 
   return (
     <button
@@ -3440,7 +3461,7 @@ function SettingsCategoryButton({
         <SettingsCategoryIcon category={category} />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold">{meta.label}</span>
+        <span className="block truncate text-sm font-semibold">{translateSettingsCategory(meta.label, t)}</span>
       </span>
     </button>
   );
@@ -3907,10 +3928,12 @@ function AppearanceSettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  language,
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
   onThemePreferenceChange,
+  onLanguageChange,
 }: {
   controllerLayoutPreference: ControllerLayoutPreference;
   isControllerDebugEnabled: boolean;
@@ -3918,25 +3941,28 @@ function AppearanceSettingsPanel({
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  language: AppLanguage;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
+  onLanguageChange: (language: AppLanguage) => void;
 }) {
+  const t = useMemo(() => createTranslator(language), [language]);
   const themeOptions: Array<{ description: string; label: string; value: ThemePreference }> = [
     {
       description: 'Bright cards and dark text tuned for outdoor handheld sessions.',
-      label: 'Light',
+      label: t('settings.light'),
       value: 'light',
     },
     {
       description: 'The classic QuestShelf neon teal glow on dark gaming panels.',
-      label: 'Dark',
+      label: t('settings.dark'),
       value: 'dark',
     },
     {
       description: 'Automatically follows Android, PWA, browser, and desktop OS theme changes.',
-      label: 'Follow Device',
+      label: t('settings.followDevice'),
       value: 'system',
     },
   ];
@@ -3952,19 +3978,19 @@ function AppearanceSettingsPanel({
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Appearance</h2>
+          <h2 className="text-xl font-semibold text-white">{t('settings.appearanceTitle')}</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Choose how QuestShelf renders across browser, PWA, and Android handheld sessions.
+            {t('settings.appearanceHelp')}
           </p>
         </div>
         <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
-          {resolvedTheme} active
+          {resolvedTheme} {t('settings.active')}
         </span>
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme</div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Theme">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.theme')}</div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t('settings.theme')}>
           {themeOptions.map((option) => {
             const isSelected = themePreference === option.value;
 
@@ -3995,6 +4021,25 @@ function AppearanceSettingsPanel({
         <p className="mt-3 text-xs leading-5 text-slate-500">
           Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
         </p>
+      </div>
+
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <label className="block">
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.language')}</span>
+          <select
+            className="mt-3 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+            onChange={(event) => onLanguageChange(event.target.value as AppLanguage)}
+            value={language}
+          >
+            {languageOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-2 block text-xs leading-5 text-slate-500">{t('settings.languageHelp')}</span>
+        </label>
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
@@ -4063,9 +4108,11 @@ function AppearanceSettingsPanel({
 }
 
 function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment> }) {
+  const { t } = useI18n();
+
   return (
     <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">About QuestShelf</h2>
+      <h2 className="text-xl font-semibold text-white">{t('settings.about')}</h2>
       <p className="mt-2 text-sm text-slate-400">
         Version 0.1.0 · {runtimeEnvironment.isNative ? 'Native' : 'Web'} · {runtimeEnvironment.platform}
       </p>
@@ -4090,11 +4137,13 @@ function OnboardingSettingsPanel({
   isComplete: boolean;
   onOpenOnboarding: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">{isComplete ? 'Setup complete' : 'Setup assistant'}</h2>
+          <h2 className="text-xl font-semibold text-white">{isComplete ? t('settings.setupComplete') : t('settings.setupAssistant')}</h2>
         </div>
 
         <button
@@ -4102,7 +4151,7 @@ function OnboardingSettingsPanel({
           onClick={onOpenOnboarding}
           type="button"
         >
-          Reopen setup
+          {t('settings.reopenSetup')}
         </button>
       </div>
     </section>
@@ -4117,7 +4166,7 @@ function AppStartupScreen() {
           <QuestShelfLogo className="h-12 w-12 rounded-lg border border-mint/30" fallbackClassName="text-sm" />
           <div>
             <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
-            <h1 className="mt-1 text-2xl font-semibold text-white">Loading library</h1>
+            <h1 className="mt-1 text-2xl font-semibold text-white">{createTranslator(loadLanguagePreference())('common.loadingLibrary')}</h1>
           </div>
         </div>
         <div className="mt-5 space-y-3">

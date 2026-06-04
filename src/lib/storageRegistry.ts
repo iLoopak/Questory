@@ -14,6 +14,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.landscapeLock.v1'
   | 'questshelf.settingsCategory.v1'
   | 'questshelf.themePreference.v1'
+  | 'questshelf.languagePreference.v1'
   | 'questshelf.storageIssues.v1';
 
 export type StorageKeyScope = 'core' | 'integration' | 'device' | 'ui' | 'recovery';
@@ -131,6 +132,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Light, Dark, or System appearance preference.',
     scope: 'ui',
     schema: '\'light\' | \'dark\' | \'system\'.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.languagePreference.v1',
+    purpose: 'Selected app language.',
+    scope: 'ui',
+    schema: '\'en\' | \'cs\'.',
   },
   {
     backup: 'never',

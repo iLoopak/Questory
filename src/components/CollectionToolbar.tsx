@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { translateOption, useI18n } from '../i18n';
 
 type ToolbarOption = string;
 
@@ -49,9 +50,10 @@ export function CollectionToolbar({
   title,
   viewMode,
 }: CollectionToolbarProps) {
+  const { t } = useI18n();
   const hasSearch = searchValue !== undefined && onSearchChange;
   const hasMoreFilters = Boolean(onMoreFiltersClick);
-  const selectedViewLabel = viewMode?.value.replace(' View', '') ?? 'View';
+  const selectedViewLabel = viewMode ? translateOption(viewMode.value, t) : t('toolbar.view');
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const viewMenuRef = useRef<HTMLDetailsElement | null>(null);
@@ -101,7 +103,7 @@ export function CollectionToolbar({
       <div className="qs-collection-toolbar-row">
         {hasSearch ? (
           <label className="qs-collection-toolbar-search min-w-0">
-            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{t('toolbar.search')}</span>
             <input
               className="mt-1 h-9 w-full min-w-0 rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
               onChange={(event) => onSearchChange(event.target.value)}
@@ -123,7 +125,7 @@ export function CollectionToolbar({
             >
               {select.options.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {translateOption(option, t)}
                 </option>
               ))}
             </select>
@@ -142,8 +144,8 @@ export function CollectionToolbar({
             onClick={onMoreFiltersClick}
             type="button"
           >
-            <span className="qs-wide-label">More Filters</span>
-            <span className="qs-short-label">Filters</span>
+            <span className="qs-wide-label">{t('toolbar.moreFilters')}</span>
+            <span className="qs-short-label">{t('toolbar.filters')}</span>
             {moreFiltersActiveCount > 0 ? ` (${moreFiltersActiveCount})` : ''}
           </button>
         ) : null}
@@ -156,17 +158,17 @@ export function CollectionToolbar({
             onToggle={(event) => setIsViewMenuOpen(event.currentTarget.open)}
           >
             <summary
-              aria-label={`${viewMode.label ?? 'View mode'}: ${selectedViewLabel}`}
+              aria-label={`${viewMode.label ?? t('toolbar.viewMode')}: ${selectedViewLabel}`}
               className="qs-collection-toolbar-button grid h-9 cursor-pointer place-items-center rounded-md border border-skyglass/15 bg-ink-900/70 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10 hover:text-white"
             >
               <span>
-                View <span aria-hidden="true">▾</span>
+                {t('toolbar.view')} <span aria-hidden="true">▾</span>
               </span>
             </summary>
-            <div className="qs-toolbar-menu-panel" role="menu" aria-label={viewMode.label ?? 'View mode'}>
+            <div className="qs-toolbar-menu-panel" role="menu" aria-label={viewMode.label ?? t('toolbar.viewMode')}>
               {viewMode.options.map((mode) => {
                 const isActive = viewMode.value === mode;
-                const modeLabel = mode.replace(' View', '');
+                const modeLabel = translateOption(mode, t);
 
                 return (
                   <button
@@ -201,7 +203,7 @@ export function CollectionToolbar({
           >
             <summary className="qs-collection-toolbar-button grid h-9 cursor-pointer place-items-center rounded-md border border-skyglass/15 bg-ink-900/70 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10 hover:text-white">
               <span>
-                Actions <span aria-hidden="true">▾</span>
+                {t('toolbar.actions')} <span aria-hidden="true">▾</span>
               </span>
             </summary>
             <div className="qs-toolbar-menu-panel" role="menu" aria-label={`${title} actions`}>
@@ -212,7 +214,7 @@ export function CollectionToolbar({
                   onClick={onClearFilters}
                   type="button"
                 >
-                  Clear filters
+                  {t('toolbar.clearFilters')}
                 </button>
               ) : null}
             </div>
@@ -225,7 +227,7 @@ export function CollectionToolbar({
             onClick={onClearFilters}
             type="button"
           >
-            Clear
+            {t('toolbar.clear')}
           </button>
         ) : null}
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
+import { useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -102,6 +103,7 @@ export function ReviewModePanel({
   onRestoreIgnored,
   onSourceChange,
 }: ReviewModePanelProps) {
+  const { t } = useI18n();
   const buttonLabels = getControllerButtonLabels(controllerLayout);
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
@@ -361,7 +363,7 @@ export function ReviewModePanel({
           {isReviewOptionsOpen ? (
             <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-2xl border border-skyglass/15 bg-ink-950/95 p-3 text-left shadow-panel backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-bold text-white">Review Mode Options</h2>
+                <h2 className="text-sm font-bold text-white">{t('review.options')}</h2>
                 <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
                   {sourceLabel}
                 </span>
@@ -401,7 +403,7 @@ export function ReviewModePanel({
                 </label>
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Batch options</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{t('review.batchOptions')}</div>
                   <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current Review Mode without leaving this flow.</p>
                 </div>
 
@@ -493,6 +495,7 @@ function FocusedReviewCard({
   queuePlatforms: GamePlatform[];
   queueState?: PlatformQueueState;
 }) {
+  const { t } = useI18n();
   const coverSources = getGameCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -524,7 +527,7 @@ function FocusedReviewCard({
   return (
     <article className="qs-review-stage min-h-full" data-swipe-left="negative" data-swipe-right="positive">
       <section className="qs-review-zone qs-review-zone-negative" aria-label="Negative review actions">
-        <div className="qs-review-zone-label">Discard</div>
+        <div className="qs-review-zone-label">{t('review.discard')}</div>
         <div className="grid gap-2">
           {negativeActions.map((action, index) => (
             <button
@@ -607,10 +610,10 @@ function FocusedReviewCard({
 
 
         <details className="qs-review-details mt-3 rounded-2xl border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300 w-full">
-          <summary className="cursor-pointer select-none font-semibold text-slate-100">Details</summary>
+          <summary className="cursor-pointer select-none font-semibold text-slate-100">{t('review.details')}</summary>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Metadata</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.metadata')}</div>
               <dl className="mt-2 grid gap-1 text-xs text-slate-400">
                 {metadataRows.map(([label, value]) => (
                   <div key={label} className="grid grid-cols-[6.5rem_1fr] gap-2">
@@ -621,7 +624,7 @@ function FocusedReviewCard({
               </dl>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Release information</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.releaseInfo')}</div>
               <dl className="mt-2 grid gap-1 text-xs text-slate-400">
                 {releaseRows.length ? (
                   releaseRows.map(([label, value]) => (
@@ -631,12 +634,12 @@ function FocusedReviewCard({
                     </div>
                   ))
                 ) : (
-                  <div>No release information yet.</div>
+                  <div>{t('review.noReleaseInfo')}</div>
                 )}
               </dl>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Genres and tags</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.genresTags')}</div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {genreLabels.length ? (
                   genreLabels.slice(0, 16).map((label) => (
@@ -645,12 +648,12 @@ function FocusedReviewCard({
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-slate-500">No genre data yet.</span>
+                  <span className="text-xs text-slate-500">{t('review.noGenreData')}</span>
                 )}
               </div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notes</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.notes')}</div>
               <p className="mt-2 whitespace-pre-wrap rounded-xl border border-white/10 bg-ink-950/70 p-3 text-xs text-slate-300">
                 {game.notes || 'No notes yet.'}
               </p>
@@ -675,7 +678,7 @@ function FocusedReviewCard({
           {isNoteOpen ? (
             <div className="mt-3 rounded-xl border border-mint/20 bg-ink-950/80 p-3">
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Quick note</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('review.quickNote')}</span>
                 <textarea
                   className="mt-2 min-h-24 w-full rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                   onChange={(event) => onNoteDraftChange(event.target.value)}
@@ -697,7 +700,7 @@ function FocusedReviewCard({
       </section>
 
       <section className="qs-review-zone qs-review-zone-positive" aria-label="Positive review actions">
-        <div className="qs-review-zone-label">Keep</div>
+        <div className="qs-review-zone-label">{t('review.keep')}</div>
         <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
@@ -747,12 +750,13 @@ function ReviewComplete({
   onReturnToLibrary: () => void;
   onReviewAnother: () => void;
 }) {
+  const { t } = useI18n();
   void actionStats;
 
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review Mode complete</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('review.complete')}</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
         <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer platform decisions. Analytics stay in Stats.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">

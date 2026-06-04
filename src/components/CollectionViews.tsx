@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
@@ -103,6 +104,7 @@ export function CollectionShelf({
   onToggleSelected,
   platformQueueState,
 }: CollectionViewProps) {
+  const { t } = useI18n();
   const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
   const shelfCardRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -235,7 +237,7 @@ export function CollectionShelf({
             type="button"
           >
             Load more covers
-            <span className="mt-2 block text-xs font-medium text-slate-500">{games.length - renderedShelfGames.length} still hidden for performance</span>
+            <span className="mt-2 block text-xs font-medium text-slate-500">{games.length - renderedShelfGames.length} {t('collection.hiddenForPerformance')}</span>
           </button>
         ) : null}
       </div>
@@ -337,6 +339,7 @@ function ShelfGameCard({
   platformLabel,
   platformQueueState,
 }: ShelfGameCardProps) {
+  const { t } = useI18n();
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -369,7 +372,7 @@ function ShelfGameCard({
   return (
     <div
       ref={refCallback}
-      aria-label={`${isMultiSelectMode ? 'Select' : 'Open'} ${game.title}`}
+      aria-label={`${isMultiSelectMode ? t('collection.select') : 'Open'} ${game.title}`}
       aria-posinset={index + 1}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
       className={`qs-shelf-card group relative flex w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center flex-col rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
@@ -507,6 +510,7 @@ function CompactGameRow({
   platformLabel,
   platformQueueState,
 }: CompactGameRowProps) {
+  const { t } = useI18n();
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -555,7 +559,7 @@ function CompactGameRow({
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <PlatformBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
             <span>{game.status}</span>
-            {game.collectionType === 'wishlist' ? <span>Wishlist</span> : null}
+            {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
           </span>
         </span>
       </button>
@@ -607,13 +611,15 @@ function RowAction({ label, onClick, primary = false, tone }: { label: string; o
 }
 
 function MissingCover({ title }: { title: string }) {
+  const { t } = useI18n();
+
   return (
     <span className="grid h-full place-items-center bg-ink-700 px-3 text-center">
       <span>
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-md border border-mint/20 bg-ink-900 text-lg font-semibold text-mint shadow-glow">
           {title.slice(0, 1).toUpperCase()}
         </span>
-        <span className="mt-2 block text-[0.65rem] font-medium uppercase tracking-[0.14em] text-slate-500">No cover</span>
+        <span className="mt-2 block text-[0.65rem] font-medium uppercase tracking-[0.14em] text-slate-500">{t('collection.noCover')}</span>
       </span>
     </span>
   );
