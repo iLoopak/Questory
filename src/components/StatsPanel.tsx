@@ -43,7 +43,7 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+        <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           {stats.scopedGames.length > 0 ? (
             <div className="space-y-4">
               <SummaryGrid stats={stats} />

@@ -1676,6 +1676,8 @@ function App() {
               </button>
             ))}
           </nav>
+
+          <BackToTopButton />
         </header>
 
         <div className="pt-2">
@@ -1927,8 +1929,6 @@ function App() {
         onUndo={undoAction}
         onViewGame={viewGameFromToast}
       />
-
-      <BackToTopButton />
 
       {isAddGameOpen ? (
         <AddGameDialog
