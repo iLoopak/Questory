@@ -442,6 +442,35 @@ img {
   color: var(--text-secondary);
 }
 
+.qs-platform-playing-link {
+  color: var(--text-primary);
+}
+
+.qs-platform-playing-meta {
+  color: var(--text-muted);
+}
+
+.qs-platform-playing-secondary-action {
+  border-color: color-mix(in srgb, var(--text-muted) 24%, var(--border));
+  color: var(--text-secondary);
+}
+
+.qs-platform-playing-secondary-action:hover,
+.qs-platform-playing-secondary-action:focus-visible {
+  background: rgb(var(--text-primary-rgb) / 0.08);
+  color: var(--text-primary);
+}
+
+.qs-platform-playing-drop-action {
+  border-color: rgb(var(--warning-rgb) / 0.36);
+  color: var(--warning-text-rgb);
+}
+
+.qs-platform-playing-drop-action:hover,
+.qs-platform-playing-drop-action:focus-visible {
+  background: rgb(var(--warning-rgb) / 0.12);
+}
+
 .qs-platform-playing-row:hover,
 .qs-platform-playing-row:focus-within {
   border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 52%, var(--border));
