@@ -340,7 +340,8 @@ function PlatformQueueColumn({
 }) {
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
-  const accentStyle = { '--platform-accent': accentColor, borderColor: isHighlighted || hasGames ? accentColor : undefined } as CSSProperties;
+  const platformAccentColor = accentColor || 'var(--accent)';
+  const accentStyle = { '--platform-accent': platformAccentColor, borderColor: isHighlighted || hasGames ? platformAccentColor : undefined } as CSSProperties;
 
   function renamePlatform() {
     const nextName = window.prompt('Rename platform', platform);
@@ -362,7 +363,7 @@ function PlatformQueueColumn({
       ) : null}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          {!artworkUrl ? <h3 className="truncate text-lg font-semibold text-white" style={{ color: accentColor }}>{platform}</h3> : null}
+          {!artworkUrl ? <h3 className="truncate text-lg font-semibold text-white" style={{ color: platformAccentColor }}>{platform}</h3> : null}
           {platformTag ? <div className="mt-1 text-xs text-slate-500">Tag: {platformTag}</div> : null}
         </div>
         <details className="relative">
@@ -392,13 +393,13 @@ function PlatformQueueColumn({
 
       {currentlyPlaying.length > 0 ? (
         <div className="mb-3 grid gap-2 border-b border-skyglass/15 pb-3">
-          <div className="rounded-xl border border-mint/30 bg-gradient-to-br from-mint/15 via-ink-900 to-ink-950 p-3 shadow-panel">
+          <div className="qs-platform-playing-panel rounded-xl border p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">Playing Now</h4>
+                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.18em]">Playing Now</h4>
                 <p className="mt-1 text-xs text-slate-400">{currentlyPlaying.length} active {currentlyPlaying.length === 1 ? 'game' : 'games'} on {platform}</p>
               </div>
-              <span className="rounded-full border px-2 py-1 text-xs font-semibold" style={{ borderColor: 'var(--platform-accent)', color: 'var(--platform-accent)' }}>Active list</span>
+              <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">Active list</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {currentlyPlaying.map((game) => (
@@ -554,19 +555,19 @@ function QueueGameRow({
   onOpenDetails: (gameId: string) => void;
 }) {
   return (
-    <article className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-mint/25 bg-ink-950/80 p-2 text-sm text-mint transition hover:border-mint/45 hover:bg-mint/10">
+    <article className="qs-platform-playing-row group grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border p-2 text-sm transition">
       <button className="text-left" onClick={() => onOpenDetails(game.id)} type="button">
         <QueueCoverThumbnail game={game} size="playing" />
       </button>
       <div className="min-w-0">
-        <button className="block max-w-full truncate text-left text-base font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(game.id)} type="button">
+        <button className="qs-platform-playing-link block max-w-full truncate text-left text-base font-semibold text-white" onClick={() => onOpenDetails(game.id)} type="button">
           {game.title}
         </button>
-        <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--platform-accent)' }}>Playing Now</span>
+        <span className="qs-platform-playing-label mt-1 block text-xs font-semibold uppercase tracking-[0.14em]">Playing Now</span>
         <span className="mt-1 block truncate text-xs text-slate-400">{game.platform}</span>
         <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} currently playing actions`}>
           <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-100 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Queue</button>
-          <button className="h-8 rounded-md border border-mint/30 px-2 text-xs text-mint hover:bg-mint/10" onClick={() => onAction(game.id, platform, 'finished')} type="button">Finished</button>
+          <button className="qs-platform-playing-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'finished')} type="button">Finished</button>
           <button className="h-8 rounded-md border border-amber-300/30 px-2 text-xs text-amber-100 hover:bg-amber-500/10" onClick={() => onAction(game.id, platform, 'drop')} type="button">Drop</button>
           <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-300 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">Remove from Playing</button>
         </div>
@@ -591,7 +592,7 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
     <span
       aria-hidden="true"
       className={`relative block shrink-0 overflow-hidden rounded-md border bg-ink-800 ${
-        isPlayingSize ? 'h-20 w-[3.75rem] border-mint/30 shadow-panel' : 'h-11 w-[2.0625rem] border-skyglass/15'
+        isPlayingSize ? 'qs-platform-playing-cover h-20 w-[3.75rem] shadow-panel' : 'h-11 w-[2.0625rem] border-skyglass/15'
       }`}
     >
       {activeCoverSource ? (
@@ -613,7 +614,7 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
           />
         </>
       ) : (
-        <span className={`grid h-full w-full place-items-center font-semibold text-mint/80 ${isPlayingSize ? 'text-xl' : 'text-xs'}`}>
+        <span className={`grid h-full w-full place-items-center font-semibold ${isPlayingSize ? 'qs-platform-playing-cover-fallback text-xl' : 'text-mint/80 text-xs'}`}>
           {game.title.slice(0, 1).toUpperCase()}
         </span>
       )}
