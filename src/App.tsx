@@ -3918,11 +3918,11 @@ function QueuePlatformManagementRow({
             </label>
             <div>
               <span className="text-xs font-semibold text-slate-400">Preset image</span>
-              <div className="mt-1 flex flex-wrap gap-1">
+              <div className="mt-1 flex flex-wrap gap-1.5">
                 {platformArtworkPresetOptions.map((preset) => (
-                  <button key={preset} className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onPresetArtwork(preset)} type="button">{preset}</button>
+                  <button key={preset} className="min-h-9 rounded-md border border-white/10 px-3 py-1 text-xs text-slate-200 hover:bg-white/10" onClick={() => onPresetArtwork(preset)} type="button">{preset}</button>
                 ))}
-                <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onArtworkUrlChange('')} type="button">Clear</button>
+                <button className="min-h-9 rounded-md border border-red-300/30 px-3 py-1 text-xs font-semibold text-red-100 hover:bg-red-500/10" onClick={() => onArtworkUrlChange('')} type="button">Clear</button>
               </div>
             </div>
             <label className="grid gap-1">

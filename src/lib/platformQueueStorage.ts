@@ -107,7 +107,19 @@ const defaultPlatformAccentColors = new Map<GamePlatform, string>([
   ['Android', '#3ddc84'],
 ]);
 
-export const platformArtworkPresetOptions = ['Aurora', 'Grid', 'Glow'] as const;
+export const platformArtworkPresetOptions = [
+  'Aurora',
+  'Grid',
+  'Glow',
+  'Waves',
+  'Neon',
+  'Stars',
+  'Circuit',
+  'Horizon',
+  'Pixel',
+  'Rings',
+  'Diagonal',
+] as const;
 export type PlatformArtworkPreset = (typeof platformArtworkPresetOptions)[number];
 
 const defaultActiveGameLimit = 3;
@@ -394,10 +406,29 @@ export function updatePlatformQueueVisualSettings(
   return upsertPlatformQueueSetting(state, platform, changes);
 }
 
+const platformArtworkPresetPatterns: Record<PlatformArtworkPreset, string> = {
+  Aurora: '<path d="M0 95C80 40 140 150 230 55C285 0 330 20 360 10V120H0Z" fill="white" fill-opacity="0.14"/><path d="M0 42C64 6 126 67 184 34C249 -3 288 2 360 36" fill="none" stroke="white" stroke-opacity="0.16" stroke-width="10" stroke-linecap="round"/>',
+  Grid: '<path d="M0 42H360M0 84H360M90 0V120M180 0V120M270 0V120" stroke="white" stroke-opacity="0.12" stroke-width="2"/><path d="M0 60H360M180 0V120" stroke="white" stroke-opacity="0.18" stroke-width="1"/>',
+  Glow: '<circle cx="280" cy="35" r="110" fill="white" fill-opacity="0.16"/><circle cx="78" cy="100" r="72" fill="white" fill-opacity="0.08"/>',
+  Waves: '<path d="M-12 78C28 54 58 54 98 78S168 102 208 78S278 54 318 78S388 102 428 78" fill="none" stroke="white" stroke-opacity="0.22" stroke-width="8"/><path d="M-12 101C28 77 58 77 98 101S168 125 208 101S278 77 318 101S388 125 428 101" fill="none" stroke="white" stroke-opacity="0.12" stroke-width="6"/>',
+  Neon: '<path d="M36 98L122 30L185 72L276 18L334 50" fill="none" stroke="white" stroke-opacity="0.34" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 98L122 30L185 72L276 18L334 50" fill="none" stroke="white" stroke-opacity="0.16" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>',
+  Stars: '<g fill="white" fill-opacity="0.42"><circle cx="46" cy="24" r="2"/><circle cx="82" cy="88" r="1.6"/><circle cx="132" cy="42" r="1.8"/><circle cx="196" cy="24" r="1.4"/><circle cx="236" cy="84" r="2.2"/><circle cx="306" cy="46" r="1.7"/><circle cx="334" cy="96" r="1.3"/></g><path d="M280 18L286 29L298 31L289 39L291 51L280 45L269 51L271 39L262 31L274 29Z" fill="white" fill-opacity="0.16"/>',
+  Circuit: '<path d="M18 94H82V66H148V36H236V74H342" fill="none" stroke="white" stroke-opacity="0.18" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g fill="white" fill-opacity="0.24"><circle cx="82" cy="94" r="5"/><circle cx="148" cy="66" r="5"/><circle cx="236" cy="36" r="5"/><circle cx="342" cy="74" r="5"/></g>',
+  Horizon: '<path d="M0 78H360V120H0Z" fill="#020617" fill-opacity="0.26"/><circle cx="286" cy="78" r="37" fill="white" fill-opacity="0.18"/><path d="M0 78H360" stroke="white" stroke-opacity="0.2" stroke-width="2"/><path d="M0 104C60 86 112 91 174 105C239 120 295 114 360 96" fill="none" stroke="white" stroke-opacity="0.15" stroke-width="5"/>',
+  Pixel: '<path d="M248 18H270V40H248ZM292 18H314V40H292ZM270 40H292V62H270ZM226 62H248V84H226ZM314 62H336V84H314ZM270 84H292V106H270ZM58 26H74V42H58ZM90 58H106V74H90ZM42 82H58V98H42Z" fill="white" fill-opacity="0.16"/>',
+  Rings: '<circle cx="282" cy="60" r="24" fill="none" stroke="white" stroke-opacity="0.26" stroke-width="5"/><circle cx="282" cy="60" r="46" fill="none" stroke="white" stroke-opacity="0.16" stroke-width="5"/><circle cx="282" cy="60" r="68" fill="none" stroke="white" stroke-opacity="0.09" stroke-width="5"/>',
+  Diagonal: '<path d="M-28 126L88 10M28 134L144 18M84 142L200 26M140 150L256 34M196 158L312 42M252 166L368 50" stroke="white" stroke-opacity="0.16" stroke-width="10"/><path d="M-16 24L48 -40M286 148L396 38" stroke="white" stroke-opacity="0.1" stroke-width="22"/>',
+};
+
+function getSafePlatformArtworkAccentColor(accentColor: string) {
+  return /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : '#2563eb';
+}
+
 export function createPlatformArtworkPreset(platform: GamePlatform, accentColor: string, preset: PlatformArtworkPreset) {
   const safePlatform = platform.replace(/[<&>"]/g, '');
-  const pattern = preset === 'Grid' ? '<path d="M0 42H360M0 84H360M90 0V120M180 0V120M270 0V120" stroke="white" stroke-opacity="0.12" stroke-width="2"/>' : preset === 'Glow' ? '<circle cx="280" cy="35" r="110" fill="white" fill-opacity="0.16"/>' : '<path d="M0 95C80 40 140 150 230 55C285 0 330 20 360 10V120H0Z" fill="white" fill-opacity="0.14"/>';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120"><rect width="360" height="120" fill="${accentColor}"/><rect width="360" height="120" fill="url(#g)"/><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#020617" stop-opacity="0.15"/><stop offset="1" stop-color="#020617" stop-opacity="0.65"/></linearGradient></defs>${pattern}<text x="18" y="74" fill="white" fill-opacity="0.9" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="800">${safePlatform}</text></svg>`;
+  const safeAccentColor = getSafePlatformArtworkAccentColor(accentColor);
+  const pattern = platformArtworkPresetPatterns[preset] ?? platformArtworkPresetPatterns.Aurora;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#020617" stop-opacity="0.15"/><stop offset="1" stop-color="#020617" stop-opacity="0.68"/></linearGradient><radialGradient id="v" cx="78%" cy="10%" r="75%"><stop stop-color="white" stop-opacity="0.16"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient></defs><rect width="360" height="120" fill="${safeAccentColor}"/><rect width="360" height="120" fill="url(#v)"/><rect width="360" height="120" fill="url(#g)"/>${pattern}<rect x="12" y="22" width="230" height="60" rx="18" fill="#020617" fill-opacity="0.18"/><text x="18" y="64" fill="white" fill-opacity="0.92" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="800">${safePlatform}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
