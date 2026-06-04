@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { getPlatformAccentColor, getPlatformArtworkUrl, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { ViewportModal } from './ViewportModal';
+import { useI18n } from '../i18n';
 
 type BacklogPlatformPickerProps = {
   game: Game;
@@ -24,6 +25,7 @@ export function BacklogPlatformPicker({
   onClose,
   onSelectPlatform,
 }: BacklogPlatformPickerProps) {
+  const { t } = useI18n();
   const [isPlatformCreationOpen, setIsPlatformCreationOpen] = useState(false);
   const [platformNameDraft, setPlatformNameDraft] = useState('');
   const firstPlatformButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -82,7 +84,7 @@ export function BacklogPlatformPicker({
 
   return (
     <ViewportModal
-      ariaLabel={`Choose platform backlog for ${game.title}`}
+      ariaLabel={`${t('backlog.choosePlatformA11y')} ${game.title}`}
       initialFocusRef={platforms.length > 0 ? firstPlatformButtonRef : addPlatformButtonRef}
       placement="center"
       restoreFocusRef={restoreFocusRef}
@@ -91,8 +93,8 @@ export function BacklogPlatformPicker({
       <div className="qs-review-queue-modal p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose platform</div>
-            <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Queue</h2>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 {t('backlog.choosePlatform')}</div>
+            <h2 className="mt-1 text-xl font-bold leading-tight text-white">{t('backlog.addToQueue')}</h2>
             <p className="mt-1 line-clamp-2 text-sm text-slate-400">{game.title}</p>
           </div>
           <button
@@ -126,8 +128,8 @@ export function BacklogPlatformPicker({
           </div>
         ) : (
           <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-ink-950/60 p-4 text-center">
-            <div className="text-base font-semibold text-white">No platforms yet.</div>
-            <p className="mt-1 text-sm text-slate-400">Add your first platform to start building a backlog.</p>
+            <div className="text-base font-semibold text-white">{t('backlog.noPlatforms')}</div>
+            <p className="mt-1 text-sm text-slate-400">{t('backlog.noPlatformsText')}</p>
           </div>
         )}
 
@@ -160,7 +162,7 @@ export function BacklogPlatformPicker({
                 Back
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">This creates an active Platform destination without changing supported import or metadata platforms.</p>
+            <p className="mt-2 text-xs text-slate-500">{t('backlog.creationHelp')}</p>
           </form>
         ) : (
           <div className="mt-4 border-t border-white/10 pt-3">
@@ -175,7 +177,7 @@ export function BacklogPlatformPicker({
           </div>
         )}
 
-        <p className="mt-3 text-xs text-slate-500">Single tap adds this game to an active platform backlog and closes the picker. Supported platforms remain available internally for imports and metadata. Press Escape to cancel.</p>
+        <p className="mt-3 text-xs text-slate-500">{t('backlog.tapHelp')}</p>
       </div>
     </ViewportModal>
   );

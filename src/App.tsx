@@ -20,7 +20,7 @@ import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModeP
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
-import { I18nProvider, createTranslator, languageOptions, useI18n, translateSettingsCategory, type AppLanguage } from './i18n';
+import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
 import {
   configurableNavigationItems,
@@ -2564,7 +2564,7 @@ function CollectionPanel({
               onClick={toggleMultiSelectMode}
               type="button"
             >
-              {isMultiSelectMode ? 'Exit select' : 'Select'}
+              {isMultiSelectMode ? t('collection.cancelSelection') : t('collection.select')}
             </button>
           </>
         }
@@ -2587,8 +2587,8 @@ function CollectionPanel({
         >
           <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
               <div>
-                <h3 className="text-base font-semibold text-white">Advanced filters</h3>
-                <p className="mt-0.5 text-xs text-slate-400">Sort, source, info, tags, collection scope, and quick activity filters.</p>
+                <h3 className="text-base font-semibold text-white">{t('app.advancedFilters')}</h3>
+                <p className="mt-0.5 text-xs text-slate-400">{t('app.advancedFiltersHelp')}</p>
               </div>
               <button
                 ref={advancedFiltersCloseRef}
@@ -2603,28 +2603,28 @@ function CollectionPanel({
             <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <FilterSelect
-                  label="Sort / activity"
+                  label={t('sort.status')}
                   value={filters.sortBy}
                   options={[...librarySortOptions]}
                   onChange={(value) => onFiltersChange({ sortBy: value as LibrarySortOption })}
                 />
 
                 <FilterSelect
-                  label="Source / scope"
+                  label={t('toolbar.source')}
                   value={filters.source}
                   options={[...sourceFilterOptions]}
                   onChange={(value) => onFiltersChange({ source: value as SourceFilter })}
                 />
 
                 <FilterSelect
-                  label="Enrichment status"
+                  label={t('toolbar.enrichment')}
                   value={filters.enrichment}
                   options={[...enrichmentFilterOptions]}
                   onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
                 />
 
                 <FilterSelect
-                  label="Tags"
+                  label={t('addGame.tags')}
                   value={filters.tag}
                   options={[allOption, ...tags]}
                   onChange={(value) => onFiltersChange({ tag: value })}
@@ -2634,10 +2634,10 @@ function CollectionPanel({
               <div className="mt-4 rounded-md border border-skyglass/10 bg-ink-950/60 p-3">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h4 className="text-sm font-semibold text-white">Quick filters</h4>
-                    <p className="text-xs text-slate-500">Includes playtime, recently playable backlog states, and missing metadata shortcuts.</p>
+                    <h4 className="text-sm font-semibold text-white">{t('app.quickFilters')}</h4>
+                    <p className="text-xs text-slate-500">{t('app.quickFiltersHelp')}</p>
                   </div>
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Touch / D-pad friendly</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('app.touchDpadFriendly')}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {quickFilterOptions.map((quickFilter) => {
@@ -2645,7 +2645,7 @@ function CollectionPanel({
 
                     return (
                       <button
-                        key={quickFilter}
+                        key={translateOption(quickFilter, t)}
                         aria-pressed={isActive}
                         className={`min-h-10 rounded-full border px-3 text-xs font-semibold transition ${
                           isActive
@@ -2655,7 +2655,7 @@ function CollectionPanel({
                         onClick={() => toggleQuickFilter(quickFilter)}
                         type="button"
                       >
-                        {quickFilter}
+                        {translateOption(quickFilter, t)}
                       </button>
                     );
                   })}
@@ -2694,7 +2694,7 @@ function CollectionPanel({
           <span>
             Rendered {renderedCount} of {games.length} {games.length === 1 ? 'game' : 'games'}
           </span>
-          {hasMoreGames ? <span>More load automatically as you scroll.</span> : null}
+          {hasMoreGames ? <span>{t('app.moreLoadAutomatically')}</span> : null}
         </div>
       ) : null}
 
@@ -2723,7 +2723,7 @@ function CollectionPanel({
                 </button>
               ) : null}
               <select
-                aria-label="Change selected status"
+                aria-label={t('app.changeSelectedStatus')}
                 className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-3 text-sm text-slate-100 outline-none transition focus:border-mint disabled:cursor-not-allowed disabled:text-slate-500"
                 disabled={selectedCount === 0}
                 onChange={(event) => {
@@ -2734,7 +2734,7 @@ function CollectionPanel({
                 }}
                 value=""
               >
-                <option value="">Change status</option>
+                <option value="">{t('app.changeStatus')}</option>
                 {gameStatuses.map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -2849,6 +2849,7 @@ function NoticeStat({ label, value }: { label: string; value: string }) {
 }
 
 function SteamPlaytimeRefreshNotice({ refreshState }: { refreshState: SteamPlaytimeRefreshState }) {
+  const { t } = useI18n();
   const statusStyles = {
     idle: 'border-skyglass/15 bg-ink-950/70 text-slate-400',
     loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
@@ -2865,7 +2866,7 @@ function SteamPlaytimeRefreshNotice({ refreshState }: { refreshState: SteamPlayt
       {refreshState.status === 'loading' ? (
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
-            <span>Progress</span>
+            <span>{t('app.progress')}</span>
             <span>{refreshState.progress.completed}/{refreshState.progress.total}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -2920,6 +2921,7 @@ function SyncStat({ label, value }: { label: string; value: number }) {
 }
 
 function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps) {
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [collectionType, setCollectionType] = useState<GameCollectionType>('library');
   const [platform, setPlatform] = useState<GamePlatform>('Steam');
@@ -3008,8 +3010,8 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
       <section aria-modal="true" className="qs-modal-panel qs-glass max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel" role="dialog">
         <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
-            <h2 className="text-xl font-semibold text-white">Add game</h2>
-            <p className="mt-1 text-sm text-slate-400">Manual entries stay local and can start in Library or Wishlist.</p>
+            <h2 className="text-xl font-semibold text-white">{t('addGame.title')}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t('addGame.help')}</p>
           </div>
           <button
             className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
@@ -3023,30 +3025,30 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
         <form className="max-h-[calc(92dvh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add to</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.addTo')}</span>
               <select
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                 onChange={(event) => setCollectionType(event.target.value as GameCollectionType)}
                 value={collectionType}
               >
-                <option value="library">Library</option>
-                <option value="wishlist">Wishlist</option>
+                <option value="library">{t('collection.library')}</option>
+                <option value="wishlist">{t('wishlist.title')}</option>
               </select>
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Title</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.titleLabel')}</span>
               <input
                 autoFocus
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Game title"
+                placeholder={t('addGame.titlePlaceholder')}
                 value={title}
               />
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.platform')}</span>
               <select
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                 onChange={(event) => setPlatform(event.target.value as GamePlatform)}
@@ -3062,18 +3064,18 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
             {platform === 'Other' ? (
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Custom platform</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.customPlatform')}</span>
                 <input
                   className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                   onChange={(event) => setCustomPlatform(event.target.value)}
-                  placeholder="Dreamcast, 3DS, Arcade"
+                  placeholder={t('addGame.customPlatformPlaceholder')}
                   value={customPlatform}
                 />
               </label>
             ) : null}
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Status</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.status')}</span>
               <select
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                 onChange={(event) => setStatus(event.target.value as GameStatus)}
@@ -3088,7 +3090,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Playtime hours</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.playtimeHours')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 min="0"
@@ -3100,7 +3102,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Cover image URL</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.coverUrl')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setCoverImage(event.target.value)}
@@ -3111,7 +3113,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Tags</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.tags')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setTagText(event.target.value)}
@@ -3121,11 +3123,11 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notes</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.notes')}</span>
               <textarea
                 className="mt-2 min-h-28 w-full resize-y rounded-md border border-white/10 bg-ink-950 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Physical copy, save file notes, platform details..."
+                placeholder={t('addGame.notesPlaceholder')}
                 value={notes}
               />
             </label>
@@ -3133,7 +3135,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             {collectionType === 'wishlist' ? (
               <>
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Priority</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.priority')}</span>
                   <select
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                     onChange={(event) => setPriority(event.target.value as WishlistPriority)}
@@ -3148,12 +3150,12 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Expected playtime</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.expectedPlaytime')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     min="0"
                     onChange={(event) => setExpectedPlaytime(event.target.value)}
-                    placeholder="Hours"
+                    placeholder={t('addGame.hours')}
                     step="0.1"
                     type="number"
                     value={expectedPlaytime}
@@ -3161,7 +3163,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Price target</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.priceTarget')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setPriceTarget(event.target.value)}
@@ -3171,7 +3173,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Release date</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.releaseDate')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setReleaseDate(event.target.value)}
@@ -3181,7 +3183,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block md:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Store URL</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.storeUrl')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setStoreUrl(event.target.value)}
@@ -3677,10 +3679,12 @@ function LibrarySettingsSummary() {
 }
 
 function WishlistSettingsPanel() {
+  const { t } = useI18n();
+
   return (
     <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">Wishlist settings</h2>
-      <p className="mt-1 text-sm text-slate-400">Wishlist sync lives on the Wishlist screen.</p>
+      <h2 className="text-xl font-semibold text-white">{t('settings.wishlistTitle')}</h2>
+      <p className="mt-1 text-sm text-slate-400">{t('settings.wishlistHelp')}</p>
     </section>
   );
 }
@@ -3694,6 +3698,7 @@ function QueuePlatformsSettingsPanel({
   queueState: PlatformQueueState;
   onQueueStateChange: (state: PlatformQueueState) => void;
 }) {
+  const { t } = useI18n();
   const [customPlatformName, setCustomPlatformName] = useState('');
   const allQueuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
@@ -3721,7 +3726,7 @@ function QueuePlatformsSettingsPanel({
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Platforms</h2>
+          <h2 className="text-xl font-semibold text-white">{t('settings.platformsTitle')}</h2>
           <p className="mt-1 text-sm text-slate-400">
             Supported platforms remain available for imports and metadata. Active platforms are the only ones shown in Platforms.
           </p>
@@ -3750,7 +3755,7 @@ function QueuePlatformsSettingsPanel({
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-          <h3 className="font-semibold text-white">Active platforms</h3>
+          <h3 className="font-semibold text-white">{t('settings.activePlatforms')}</h3>
           <div className="mt-3 grid gap-2">
             {activeQueuePlatforms.length > 0 ? (
               activeQueuePlatforms.map((platform) => (
@@ -3782,7 +3787,7 @@ function QueuePlatformsSettingsPanel({
         </div>
 
         <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-          <h3 className="font-semibold text-white">Available / hidden</h3>
+          <h3 className="font-semibold text-white">{t('settings.availableHidden')}</h3>
           <div className="mt-3 grid gap-2">
             {hiddenQueuePlatforms.map((platform) => (
               <QueuePlatformManagementRow
@@ -3809,7 +3814,7 @@ function QueuePlatformsSettingsPanel({
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-        <h3 className="font-semibold text-white">Bulk management</h3>
+        <h3 className="font-semibold text-white">{t('settings.bulkManagement')}</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10" onClick={() => onQueueStateChange(setActiveQueuePlatforms(queueState, allQueuePlatforms))} type="button">
             Enable multiple
@@ -3859,10 +3864,11 @@ function QueuePlatformManagementRow({
   onRename: (platform: GamePlatform) => void;
   onToggle: (isEnabled: boolean) => void;
 }) {
+  const { t } = useI18n();
   const accentStyle = { '--platform-accent': accentColor, borderColor: accentColor } as CSSProperties;
 
   function renamePlatform() {
-    const nextPlatform = window.prompt('Rename platform', platform);
+    const nextPlatform = window.prompt(t('settings.rename'), platform);
     if (nextPlatform?.trim()) {
       onRename(nextPlatform.trim() as GamePlatform);
     }
@@ -3897,10 +3903,10 @@ function QueuePlatformManagementRow({
           </div>
         ) : null}
         <details className="mt-2 rounded-md border border-white/10 bg-ink-950/60 p-2">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Identity</summary>
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('settings.identity')}</summary>
           <div className="mt-3 grid gap-3">
             <label className="grid gap-1">
-              <span className="text-xs font-semibold text-slate-400">Accent Color</span>
+              <span className="text-xs font-semibold text-slate-400">{t('settings.accentColor')}</span>
               <div className="flex flex-wrap items-center gap-2">
                 <input className="h-9 w-12 rounded border border-white/10 bg-transparent" type="color" value={accentColor} onChange={(event) => onAccentColorChange(event.target.value)} />
                 {platformAccentPalette.map((color) => (
@@ -3909,24 +3915,24 @@ function QueuePlatformManagementRow({
               </div>
             </label>
             <label className="grid gap-1">
-              <span className="text-xs font-semibold text-slate-400">Platform Artwork URL</span>
+              <span className="text-xs font-semibold text-slate-400">{t('settings.platformArtworkUrl')}</span>
               <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="https://..." value={artworkUrl} onChange={(event) => onArtworkUrlChange(event.target.value)} />
             </label>
             <label className="grid gap-1">
-              <span className="text-xs font-semibold text-slate-400">Upload image</span>
+              <span className="text-xs font-semibold text-slate-400">{t('settings.uploadImage')}</span>
               <input className="text-xs text-slate-300 file:mr-2 file:h-8 file:rounded file:border-0 file:bg-mint file:px-2 file:text-xs file:font-semibold file:text-ink-950" accept="image/*" type="file" onChange={(event) => uploadArtwork(event.target.files?.[0] ?? null)} />
             </label>
             <div>
-              <span className="text-xs font-semibold text-slate-400">Preset image</span>
+              <span className="text-xs font-semibold text-slate-400">{t('settings.presetImage')}</span>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {platformArtworkPresetOptions.map((preset) => (
                   <button key={preset} className="min-h-9 rounded-md border border-white/10 px-3 py-1 text-xs text-slate-200 hover:bg-white/10" onClick={() => onPresetArtwork(preset)} type="button">{preset}</button>
                 ))}
-                <button className="min-h-9 rounded-md border border-red-300/30 px-3 py-1 text-xs font-semibold text-red-100 hover:bg-red-500/10" onClick={() => onArtworkUrlChange('')} type="button">Clear</button>
+                <button className="min-h-9 rounded-md border border-red-300/30 px-3 py-1 text-xs font-semibold text-red-100 hover:bg-red-500/10" onClick={() => onArtworkUrlChange('')} type="button">{t('toolbar.clear')}</button>
               </div>
             </div>
             <label className="grid gap-1">
-              <span className="text-xs font-semibold text-slate-400">Platform tag</span>
+              <span className="text-xs font-semibold text-slate-400">{t('settings.platformTag')}</span>
               <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="handheld, pc, retro..." value={platformTag} onChange={(event) => onPlatformTagChange(event.target.value)} />
               <span className="text-xs text-slate-500">Games added to this backlog inherit this existing custom tag. History is preserved by each game’s own tag list.</span>
             </label>
@@ -3934,17 +3940,18 @@ function QueuePlatformManagementRow({
         </details>
       </div>
       <div className="flex flex-wrap gap-1">
-        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveUp} type="button">Up</button>
-        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveDown} type="button">Down</button>
-        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">Rename</button>
-        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onHide} type="button">Hide</button>
-        <button className="h-8 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={onRemove} type="button">Remove</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveUp} type="button">{t('settings.up')}</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onMoveDown} type="button">{t('settings.down')}</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">{t('settings.rename')}</button>
+        <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" disabled={!isActive} onClick={onHide} type="button">{t('settings.hide')}</button>
+        <button className="h-8 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={onRemove} type="button">{t('action.remove')}</button>
       </div>
     </div>
   );
 }
 
 function RetroSettingsPlaceholders() {
+  const { t } = useI18n();
   return null;
 }
 
@@ -3958,11 +3965,13 @@ function SettingsMiniCard({ title, value }: { title: string; value: string }) {
 }
 
 function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: DemoDataPanelProps) {
+  const { t } = useI18n();
+
   return (
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Library data</h2>
+          <h2 className="text-xl font-semibold text-white">{t('settings.libraryData')}</h2>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -4240,7 +4249,7 @@ function AppearanceSettingsPanel({
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme coverage checklist</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.themeChecklist')}</div>
         <ul className="mt-3 grid gap-2 text-sm text-slate-300">
           {themeCoverageChecklist.map((item) => (
             <li className="flex gap-2" key={item}>
@@ -4253,7 +4262,7 @@ function AppearanceSettingsPanel({
 
       {runtimeEnvironment.isAndroid ? (
         <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
-          <span className="block font-semibold text-white">Android integration</span>
+          <span className="block font-semibold text-white">{t('settings.androidIntegration')}</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">
             QuestShelf respects Android light/dark mode when Follow Device is selected and refreshes system chrome after resume.
           </span>
@@ -4268,22 +4277,22 @@ function AppearanceSettingsPanel({
           type="checkbox"
         />
         <span>
-          <span className="block font-semibold text-white">Prefer landscape orientation</span>
+          <span className="block font-semibold text-white">{t('settings.preferLandscape')}</span>
         </span>
       </label>
 
       <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
         <label className="block">
-          <span className="block font-semibold text-white">Controller button layout</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">Auto uses Nintendo labels on Android handhelds and Xbox labels on web. This remaps controller face buttons without affecting keyboard or touch.</span>
+          <span className="block font-semibold text-white">{t('settings.controllerLayout')}</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">{t('settings.controllerLayoutHelp')}</span>
           <select
             className="mt-3 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
             value={controllerLayoutPreference}
             onChange={(event) => onControllerLayoutChange(event.target.value as ControllerLayoutPreference)}
           >
-            <option value="auto">Auto / Android default</option>
+            <option value="auto">{t('settings.controllerAuto')}</option>
             <option value="xbox">Xbox</option>
-            <option value="nintendo">Nintendo / Retroid</option>
+            <option value="nintendo">{t('settings.controllerNintendo')}</option>
           </select>
         </label>
       </div>
@@ -4296,8 +4305,8 @@ function AppearanceSettingsPanel({
           type="checkbox"
         />
         <span>
-          <span className="block font-semibold text-white">Developer controller debug overlay</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">Shows detected buttons, axes, and the currently focused element while a controller is connected.</span>
+          <span className="block font-semibold text-white">{t('settings.controllerDebug')}</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">{t('settings.controllerDebugHelp')}</span>
         </span>
       </label>
     </section>

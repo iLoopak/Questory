@@ -4,6 +4,7 @@ import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState }
 import { scoreGame } from '../lib/recommendationEngine';
 import type { ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
+import { useI18n } from '../i18n';
 import { PlatformBadge } from './PlatformBadge';
 
 type HomePanelProps = {
@@ -35,6 +36,7 @@ export function HomePanel({
   onOpenReviewMode,
   onOpenWishlist,
 }: HomePanelProps) {
+  const { t } = useI18n();
   const queueEntries = queueState.entries;
   const shellRef = useRef<HTMLElement | null>(null);
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
@@ -125,9 +127,9 @@ export function HomePanel({
         return {
           ...scoredGame,
           reasons: [
-            queuedGameIds.has(game.id) ? 'Next in Platforms' : null,
-            game.status === 'Playing' ? 'Already in progress' : null,
-            activePlatforms.has(game.platform) ? `Fits active ${game.platform} play` : null,
+            queuedGameIds.has(game.id) ? t('home.nextInPlatforms') : null,
+            game.status === 'Playing' ? t('home.alreadyInProgress') : null,
+            activePlatforms.has(game.platform) ? `${t('home.fitsActivePlay')}: ${game.platform}` : null,
             ...scoredGame.reasons,
           ].filter((reason): reason is string => Boolean(reason)).slice(0, 3),
           score: scoredGame.score + queueBoost + playingBoost + activePlatformBoost,
@@ -135,7 +137,7 @@ export function HomePanel({
       })
       .sort((first, second) => second.score - first.score)
       .slice(0, 3);
-  }, [continuePlayingGames, libraryGames, queueEntries]);
+  }, [continuePlayingGames, libraryGames, queueEntries, t]);
 
   useEffect(() => {
     function handleHomeKeyDown(event: KeyboardEvent) {
@@ -203,37 +205,37 @@ export function HomePanel({
         <section className="rounded-2xl border border-mint/18 bg-gradient-to-br from-ink-900 via-ink-900/95 to-ink-950 p-4 shadow-panel">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">Home</div>
-              <h2 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">What should I play next?</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-400">A focused launch view for handheld play: continue, pick the next planned game, or process what needs attention.</p>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">{t('home.kicker')}</div>
+              <h2 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{t('home.title')}</h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-400">{t('home.subtitle')}</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-              <span>Confirm Open</span>
-              <span>Face buttons: Queue / Review Mode</span>
-              <span>Cancel Library</span>
+              <span>{t('home.confirmOpen')}</span>
+              <span>{t('home.faceButtons')}</span>
+              <span>{t('home.cancelLibrary')}</span>
             </div>
           </div>
         </section>
 
-        <HomeSection title="Continue Playing" actionLabel="Library" onAction={onOpenLibrary}>
+        <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
           {continuePlayingGames.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {continuePlayingGames.map((game) => (
-                <GamePosterButton key={game.id} game={game} eyebrow="Currently playing" onClick={() => onOpenDetails(game)} queueState={queueState} />
+                <GamePosterButton key={game.id} game={game} eyebrow={t('home.currentlyPlaying')} onClick={() => onOpenDetails(game)} queueState={queueState} />
               ))}
             </div>
           ) : (
-            <EmptyState title="No Active Games" text="Choose a game and start playing." actionLabel="Browse Library" onAction={onOpenLibrary} />
+            <EmptyState title={t('home.noActiveGames')} text={t('home.noActiveGamesText')} actionLabel={t('home.browseLibrary')} onAction={onOpenLibrary} />
           )}
         </HomeSection>
 
-        <HomeSection title="Next Up" actionLabel="Open Queue" onAction={() => onOpenQueue()}>
+        <HomeSection title={t('home.nextUp')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()}>
           {activeQueuePreviews.length > 0 ? (
             <div className="grid gap-3 xl:grid-cols-3">
               {activeQueuePreviews.map((queue) => (
                 <article key={queue.platform} className="rounded-xl border border-skyglass/15 bg-ink-950/72 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <h4 className="text-base font-semibold text-white">{queue.platform} Plan</h4>
+                    <h4 className="text-base font-semibold text-white">{queue.platform} {t('home.planSuffix')}</h4>
                     <button
                       className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
                       data-home-focus="true"
@@ -265,11 +267,11 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Platform Plan Yet" text="Build your first Queue plan in Review Mode." actionLabel="Open Review Mode" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title={t('home.noPlatformPlan')} text={t('home.noPlatformPlanText')} actionLabel={t('review.title')} onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
-        <HomeSection title="Recommended Today" actionLabel="Process" onAction={() => onOpenReviewMode('backlog')}>
+        <HomeSection title={t('home.recommendedToday')} actionLabel={t('home.process')} onAction={() => onOpenReviewMode('backlog')}>
           {recommendedToday.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-3">
               {recommendedToday.map((recommendation) => (
@@ -291,13 +293,13 @@ export function HomePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="No Recommendations Yet" text="Add a game to Queue or mark something as Playing Now first." actionLabel="Open Queue" onAction={() => onOpenQueue()} />
+            <EmptyState title={t('home.noRecommendations')} text={t('home.noRecommendationsText')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()} />
           )}
         </HomeSection>
       </div>
 
       <aside className="min-w-0 space-y-4 lg:overflow-y-auto lg:pl-1">
-        <HomeSection compact title="Your Platforms" actionLabel="All Platforms" onAction={() => onOpenQueue()}>
+        <HomeSection compact title={t('home.yourPlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
           {queueSnapshot.length > 0 ? (
             <div className="grid gap-2">
               {queueSnapshot.map((queue) => (
@@ -310,26 +312,26 @@ export function HomePanel({
                 >
                   <span>
                     <span className="block font-semibold text-white">{queue.platform}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">Open Queue</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{t('home.openQueue')}</span>
                   </span>
-                  <span className="text-sm font-semibold text-mint">{queue.count} {queue.count === 1 ? 'game' : 'games'} planned</span>
+                  <span className="text-sm font-semibold text-mint">{queue.count} {queue.count === 1 ? t('home.gamePlanned') : t('home.gamesPlanned')}</span>
                 </button>
               ))}
             </div>
           ) : (
-            <EmptyState title="No Platform Plan Yet" text="Build your first Queue plan in Review Mode." actionLabel="Build Plan" onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title={t('home.noPlatformPlan')} text={t('home.noPlatformPlanText')} actionLabel={t('home.buildPlan')} onAction={() => onOpenReviewMode('backlog')} />
           )}
         </HomeSection>
 
-        <HomeSection compact title="Wishlist Highlight" actionLabel="Wishlist" onAction={onOpenWishlist}>
+        <HomeSection compact title={t('home.wishlistHighlight')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
           {wishlistHighlight ? (
-            <GamePosterButton game={wishlistHighlight} eyebrow={wishlistHighlight.priority === 'high' ? 'High priority' : 'Wishlist pick'} wide onClick={() => onOpenDetails(wishlistHighlight)} queueState={queueState} />
+            <GamePosterButton game={wishlistHighlight} eyebrow={wishlistHighlight.priority === 'high' ? t('home.highPriority') : t('home.wishlistPick')} wide onClick={() => onOpenDetails(wishlistHighlight)} queueState={queueState} />
           ) : (
-            <EmptyState title="No Wishlist Yet" text="Add games you want to play later." actionLabel="Open Wishlist" onAction={onOpenWishlist} />
+            <EmptyState title={t('home.noWishlist')} text={t('home.noWishlistText')} actionLabel={t('home.openWishlist')} onAction={onOpenWishlist} />
           )}
         </HomeSection>
 
-        <HomeSection compact title="Recently Added" actionLabel="Library" onAction={onOpenLibrary}>
+        <HomeSection compact title={t('home.recentlyAdded')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
           {recentlyAddedGames.length > 0 ? (
             <div className="grid gap-2">
               {recentlyAddedGames.map((game) => (
@@ -342,21 +344,21 @@ export function HomePanel({
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-semibold text-white">{game.title}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">{getSourceLabel(game)}</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{getSourceLabel(game, t)}</span>
                   </span>
                   <PlatformBadge className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em]" platform={getGamePlatformLabel(game, queueState)} queueState={queueState} />
                 </button>
               ))}
             </div>
           ) : (
-            <EmptyState title="Nothing Added Yet" text="Import Steam, Retro, or add a manual game." actionLabel="Open Library" onAction={onOpenLibrary} />
+            <EmptyState title={t('home.nothingAdded')} text={t('home.nothingAddedText')} actionLabel={t('home.openLibrary')} onAction={onOpenLibrary} />
           )}
         </HomeSection>
 
         <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Review Mode Remaining</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
           <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
-          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? 'game ready for Review Mode' : 'games ready for Review Mode'}</p>
+          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}</p>
           <button
             className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             data-home-focus="true"
@@ -494,18 +496,18 @@ function getTime(value: string | null | undefined) {
   return value ? new Date(value).getTime() || 0 : 0;
 }
 
-function getSourceLabel(game: Game) {
+function getSourceLabel(game: Game, t: ReturnType<typeof useI18n>['t']) {
   if (game.externalSource === 'steam') {
-    return 'Steam import';
+    return t('home.steamImport');
   }
 
   if (game.externalSource === 'retro-rom') {
-    return 'Retro import';
+    return t('home.retroImport');
   }
 
   if (game.externalSource === 'manual') {
-    return 'Manual add';
+    return t('home.manualAdd');
   }
 
-  return 'Recently added';
+  return t('home.recentlyAddedSource');
 }

@@ -200,7 +200,7 @@ export function CollectionShelf({
     <div>
       <div
         ref={shelfScrollerRef}
-        aria-label="Collection shelf"
+        aria-label={t('collection.shelfA11y')}
         className="qs-shelf-scroller -mx-2 flex snap-x gap-2 overflow-x-auto px-2 pb-3 pt-1 sm:-mx-3 sm:px-3"
         onScroll={handleShelfScroll}
       >
@@ -241,7 +241,7 @@ export function CollectionShelf({
           </button>
         ) : null}
       </div>
-      <p className="text-xs text-slate-500">Use D-pad / arrow keys to move across covers. Press the confirm button or Enter to open.</p>
+      <p className="text-xs text-slate-500">{t('collection.shelfHelp')}</p>
     </div>
   );
 }

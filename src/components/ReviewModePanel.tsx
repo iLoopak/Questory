@@ -352,7 +352,7 @@ export function ReviewModePanel({
         <div className="relative">
           <button
             aria-expanded={isReviewOptionsOpen}
-            aria-label="Review Mode Options"
+            aria-label={t('review.options')}
             className="grid h-9 w-9 place-items-center rounded-full border border-skyglass/20 bg-ink-950/85 text-lg text-slate-100 shadow-panel backdrop-blur-md transition hover:border-mint/45 hover:text-white focus-visible:border-mint"
             onClick={() => setIsReviewOptionsOpen((isOpen) => !isOpen)}
             type="button"
@@ -404,7 +404,7 @@ export function ReviewModePanel({
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{t('review.batchOptions')}</div>
-                  <p className="mt-1 text-xs text-slate-400">Switch status batches or narrow the current Review Mode without leaving this flow.</p>
+                  <p className="mt-1 text-xs text-slate-400">{t('review.switchHelp')}</p>
                 </div>
 
                 {ignoredGameIds.size > 0 ? (
@@ -526,7 +526,7 @@ function FocusedReviewCard({
 
   return (
     <article className="qs-review-stage min-h-full" data-swipe-left="negative" data-swipe-right="positive">
-      <section className="qs-review-zone qs-review-zone-negative" aria-label="Negative review actions">
+      <section className="qs-review-zone qs-review-zone-negative" aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
         <div className="grid gap-2">
           {negativeActions.map((action, index) => (
@@ -599,13 +599,13 @@ function FocusedReviewCard({
         </div>
 
         <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-          <span>L2 Previous</span>
+          <span>{t('review.previous')}</span>
           <span>•</span>
-          <span>R2 Next</span>
+          <span>{t('review.next')}</span>
           <span>•</span>
-          <span>D-pad focus only</span>
+          <span>{t('review.dpadFocus')}</span>
           <span>•</span>
-          <span>{buttonLabels.primary} Add to Queue</span>
+          <span>{buttonLabels.primary} {t('review.addToQueue')}</span>
         </div>
 
 
@@ -655,11 +655,11 @@ function FocusedReviewCard({
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.notes')}</div>
               <p className="mt-2 whitespace-pre-wrap rounded-xl border border-white/10 bg-ink-950/70 p-3 text-xs text-slate-300">
-                {game.notes || 'No notes yet.'}
+                {game.notes || t('review.noNotes')}
               </p>
             </div>
             <div className="md:col-span-2">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Enrich and edit</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.enrichEdit')}</div>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {secondaryActions.map((action) => (
                   <button
@@ -682,7 +682,7 @@ function FocusedReviewCard({
                 <textarea
                   className="mt-2 min-h-24 w-full rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                   onChange={(event) => onNoteDraftChange(event.target.value)}
-                  placeholder="First impression, backlog reason, drop reason..."
+                  placeholder={t('review.notePlaceholder')}
                   value={noteDraft}
                 />
               </label>
@@ -699,7 +699,7 @@ function FocusedReviewCard({
         </details>
       </section>
 
-      <section className="qs-review-zone qs-review-zone-positive" aria-label="Positive review actions">
+      <section className="qs-review-zone qs-review-zone-positive" aria-label={t('review.positiveActions')}>
         <div className="qs-review-zone-label">{t('review.keep')}</div>
         <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {

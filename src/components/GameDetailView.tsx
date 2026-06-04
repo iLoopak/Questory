@@ -4,6 +4,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { PlatformBadge } from './PlatformBadge';
+import { useI18n } from '../i18n';
 
 type GameDetailViewProps = {
   game: Game;
@@ -36,6 +37,7 @@ export function GameDetailView({
   onTrackingChange,
   platformQueueState,
 }: GameDetailViewProps) {
+  const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
@@ -83,28 +85,28 @@ export function GameDetailView({
   const primaryActions: GameDetailAction[] = [
     {
       icon: '📌',
-      label: 'Queue',
+      label: 'Quest Queue',
       onClick: () => onAddToQueue?.(game),
       tone: 'accent',
       disabled: !onAddToQueue,
     },
     {
       icon: '🎮',
-      label: 'Playing',
+      label: t('status.playing'),
       onClick: () => onStatusChange?.(game.id, 'Playing'),
       tone: 'accent',
       disabled: !onStatusChange,
     },
     {
       icon: '💖',
-      label: 'Wishlist',
+      label: t('wishlist.title'),
       onClick: () => onAddToWishlist?.(game),
       tone: 'neutral',
       disabled: !onAddToWishlist,
     },
     {
       icon: '🏆',
-      label: 'Finished',
+      label: t('action.finished'),
       onClick: () => onStatusChange?.(game.id, 'Finished'),
       tone: 'neutral',
       disabled: !onStatusChange,
@@ -113,7 +115,7 @@ export function GameDetailView({
   const steamActions: GameDetailAction[] = [
     {
       icon: '⏱️',
-      label: 'Refresh Playtime',
+      label: t('detail.refreshPlaytime'),
       onClick: () => onRefreshSteamPlaytime?.(game),
       tone: 'neutral',
       disabled: !onRefreshSteamPlaytime || !isSteamLibraryGame,
@@ -123,14 +125,14 @@ export function GameDetailView({
   const destructiveActions: GameDetailAction[] = [
     {
       icon: '🗑️',
-      label: 'Drop',
+      label: t('queue.drop'),
       onClick: () => onStatusChange?.(game.id, 'Dropped'),
       tone: 'danger',
       disabled: !onStatusChange,
     },
     {
       icon: '🚫',
-      label: 'Ignore',
+      label: t('action.ignore'),
       onClick: () => onIgnore?.(game),
       tone: 'danger',
       disabled: !onIgnore || typeof game.steamAppId !== 'number',
@@ -177,7 +179,7 @@ export function GameDetailView({
                           <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
                             {game.title.slice(0, 1).toUpperCase()}
                           </div>
-                          <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">No cover</div>
+                          <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{t('common.noCover')}</div>
                         </div>
                       </div>
                     )}
@@ -189,20 +191,20 @@ export function GameDetailView({
                     Back to library
                   </button>
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">My game dashboard</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
                     <h2 className="mt-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{game.title}</h2>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
-                    <HeroStat label="Platform / source" value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
-                    <HeroStat label="Current status" value={game.status} accent />
-                    {hasPlaytime ? <HeroStat label="Playtime" value={`${game.playtimeHours}h`} /> : null}
+                    <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
+                    <HeroStat label={t('detail.currentStatus')} value={game.status} accent />
+                    {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
                   </div>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-ink-950/80 p-3" aria-label="Game decision actions">
+            <section className="rounded-2xl border border-white/10 bg-ink-950/80 p-3" aria-label={t('detail.actionsA11y')}>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex flex-wrap gap-2">
                   {destructiveActions.map((action) => (
@@ -223,16 +225,16 @@ export function GameDetailView({
               </div>
             </section>
 
-            <DetailSection kicker="Editable" title="My information" description="Notes, tags, and tracking fields you control.">
+            <DetailSection kicker={t('detail.editable')} title={t('detail.myInformation')} description={t('detail.myInformationHelp')}>
               <div className="grid gap-3 md:grid-cols-3">
-                <PersonalStatField label="Playtime" value={`${game.playtimeHours}h`} />
-                <PersonalStatField label="Last played" value={formatDate(game.lastPlayedAt)} />
-                <PersonalStatField label="Status" value={game.status} />
+                <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} />
+                <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt)} />
+                <PersonalStatField label={t('toolbar.status')} value={game.status} />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Custom tags</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.customTags')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={tagText}
@@ -256,22 +258,22 @@ export function GameDetailView({
                 </label>
 
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Notes</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('review.notes')}</span>
                   <textarea
                     className="mt-2 min-h-28 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20 xl:min-h-24"
                     value={game.notes}
                     onChange={(event) => updateTracking({ notes: event.target.value })}
-                    placeholder="What matters about this game? Why keep it on your shelf?"
+                    placeholder={t('detail.notesPlaceholder')}
                   />
                 </label>
               </div>
             </DetailSection>
 
-            <section className="space-y-2" aria-label="Imported metadata">
-              <div className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Imported metadata</div>
+            <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
+              <div className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.importedMetadata')}</div>
 
               {game.collectionType === 'wishlist' ? (
-                <MetadataAccordion title="Wishlist planning" summary="Read-only store and wishlist sync fields">
+                <MetadataAccordion title={t('detail.wishlistPlanning')} summary={t('detail.wishlistPlanningSummary')}>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <ReadOnlyField label="Priority" value={game.priority ?? 'medium'} />
                     <ReadOnlyField label="Expected playtime" value={formatHours(game.expectedPlaytime)} />
@@ -287,7 +289,7 @@ export function GameDetailView({
                 </MetadataAccordion>
               ) : null}
 
-              <MetadataAccordion title="Steam data" summary="App ID, external source, and import links">
+              <MetadataAccordion title={t('detail.steamData')} summary={t('detail.steamDataSummary')}>
                 {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? 'n/a'} />
@@ -296,11 +298,11 @@ export function GameDetailView({
                     <ReadOnlyLink label="External URL" value={game.externalUrl} />
                   </div>
                 ) : (
-                  <EmptyState text="No Steam metadata is attached to this game yet." />
+                  <EmptyState text={t('detail.noSteamMetadata')} />
                 )}
               </MetadataAccordion>
 
-              <MetadataAccordion title="RAWG metadata" summary="Release, ratings, genres, and publisher metadata">
+              <MetadataAccordion title={t('detail.rawgMetadata')} summary={t('detail.rawgSummary')}>
                 {game.metadataSource === 'rawg' ? (
                   <div className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -325,7 +327,7 @@ export function GameDetailView({
                     ) : null}
                   </div>
                 ) : (
-                  <EmptyState text="No RAWG metadata is attached to this game yet." />
+                  <EmptyState text={t('detail.noRawgMetadata')} />
                 )}
               </MetadataAccordion>
             </section>

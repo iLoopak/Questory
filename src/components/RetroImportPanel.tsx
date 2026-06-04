@@ -11,6 +11,7 @@ import {
 } from '../lib/retroRomImport';
 import { getRuntimeEnvironment } from '../lib/capacitorEnvironment';
 import type { Game } from '../types/game';
+import { useI18n } from '../i18n';
 
 type RetroImportPanelProps = {
   games?: Game[];
@@ -50,6 +51,7 @@ export function RetroImportPanel({
   onReviewImportedGames,
   onViewImportedGames,
 }: RetroImportPanelProps) {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const runtimeEnvironment = getRuntimeEnvironment();
@@ -287,7 +289,7 @@ export function RetroImportPanel({
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Retro ROM Import</h2>
+          <h2 className="text-xl font-semibold text-white">{t('retro.importTitle')}</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
             Import emulator library entries from files you explicitly select. QuestShelf reads filenames only and never uploads or copies ROM data.
           </p>
@@ -316,7 +318,7 @@ export function RetroImportPanel({
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform override</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('retro.platformOverride')}</span>
           <select
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
             onChange={(event) => setPlatformOverride(event.target.value as RetroPlatformOverride)}
@@ -346,7 +348,7 @@ export function RetroImportPanel({
 
       {scanSummary.scanIssues.length > 0 ? (
         <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
-          <div className="font-semibold">Scan notes</div>
+          <div className="font-semibold">{t('retro.scanNotes')}</div>
           <ul className="mt-2 space-y-1">
             {scanSummary.scanIssues.slice(0, 6).map((issue) => (
               <li key={`${issue.type}-${issue.fileName}-${issue.reason}`}>

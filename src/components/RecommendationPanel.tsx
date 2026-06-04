@@ -186,8 +186,8 @@ export function RecommendationPanel({
         >
           <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/90 p-3">
               <div>
-                <h3 className="text-base font-semibold text-white">Recommendations filters</h3>
-                <p className="mt-0.5 text-xs text-slate-400">Tune the same result list without switching to a custom recommendation layout.</p>
+                <h3 className="text-base font-semibold text-white">{t('recommendations.filters')}</h3>
+                <p className="mt-0.5 text-xs text-slate-400">{t('recommendations.filtersHelp')}</p>
               </div>
               <button
                 ref={moreFiltersCloseRef}
@@ -201,7 +201,7 @@ export function RecommendationPanel({
 
             <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Mood</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('recommendations.mood')}</div>
                 <div className="mt-2 flex gap-1 overflow-x-auto rounded-md border border-white/10 bg-ink-900 p-1">
                   {moodOptions.map((option) => (
                     <button
