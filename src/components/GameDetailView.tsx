@@ -47,6 +47,7 @@ export function GameDetailView({
   const activeCoverSource = coverSources[coverSourceIndex];
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
   const canApplyRawgCover = canUseRawgImageAsCover(game);
+  const hasPlaytime = game.playtimeHours > 0;
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -74,7 +75,7 @@ export function GameDetailView({
   const primaryActions: GameDetailAction[] = [
     {
       icon: '📌',
-      label: 'Add to Backlog',
+      label: 'Backlog',
       onClick: () => onAddToQueue?.(game),
       tone: 'accent',
       disabled: !onAddToQueue,
@@ -121,111 +122,96 @@ export function GameDetailView({
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="border-b border-white/10 bg-ink-950/70 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <button
-                className="mb-2 text-sm font-medium text-mint transition hover:text-white"
-                onClick={onBack}
-                type="button"
-              >
-                Back to library
-              </button>
-              <h2 className="truncate text-2xl font-semibold text-white">{game.title}</h2>
-            </div>
-
-            <div className="flex flex-wrap gap-2" aria-label="Current game summary">
-              <span className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
-                {game.platform}
-              </span>
-              <span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-medium text-mint">
-                {game.status}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-white/10 bg-ink-900/70 p-3" aria-label="Game decision actions">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Actions</div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {primaryActions.map((action) => (
-                <GameDetailActionButton key={action.label} action={action} />
-              ))}
-            </div>
-
-            <div className="mt-3 border-t border-red-400/20 pt-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-red-200/70">Destructive</div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:max-w-md">
-                {destructiveActions.map((action) => (
-                  <GameDetailActionButton key={action.label} action={action} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-          <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
-            <div className="max-w-[15rem] space-y-4 justify-self-center xl:justify-self-stretch">
-              <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-800 shadow-panel">
-                <div className="aspect-[2/3] bg-ink-700">
-                  {activeCoverSource ? (
-                    <div className="relative h-full">
-                      {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-                      <img
-                        alt=""
-                        className={`h-full w-full object-contain bg-ink-950 transition-opacity duration-300 ${
-                          isCoverLoaded ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        decoding="async"
-                        loading="lazy"
-                        onError={() => {
-                          setIsCoverLoaded(false);
-                          setCoverSourceIndex((currentIndex) => currentIndex + 1);
-                        }}
-                        onLoad={() => setIsCoverLoaded(true)}
-                        src={activeCoverSource}
-                      />
-                    </div>
-                  ) : (
-                    <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
-                      <div>
-                        <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
-                          {game.title.slice(0, 1).toUpperCase()}
-                        </div>
-                        <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-                          No cover
+          <div className="space-y-3 sm:space-y-4">
+            <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
+              {game.backgroundImage ? (
+                <div className="absolute inset-0 opacity-20 blur-sm" aria-hidden="true">
+                  <img className="h-full w-full object-cover" src={game.backgroundImage} alt="" />
+                </div>
+              ) : null}
+              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/95 to-ink-900/75" aria-hidden="true" />
+
+              <div className="relative grid gap-4 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center xl:grid-cols-[150px_minmax(0,1fr)] xl:p-5">
+                <div className="mx-auto w-32 overflow-hidden rounded-xl border border-white/10 bg-ink-800 shadow-panel sm:mx-0 sm:w-full">
+                  <div className="aspect-[2/3] bg-ink-700">
+                    {activeCoverSource ? (
+                      <div className="relative h-full">
+                        {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+                        <img
+                          alt=""
+                          className={`h-full w-full bg-ink-950 object-contain transition-opacity duration-300 ${
+                            isCoverLoaded ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          decoding="async"
+                          loading="lazy"
+                          onError={() => {
+                            setIsCoverLoaded(false);
+                            setCoverSourceIndex((currentIndex) => currentIndex + 1);
+                          }}
+                          onLoad={() => setIsCoverLoaded(true)}
+                          src={activeCoverSource}
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
+                        <div>
+                          <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
+                            {game.title.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">No cover</div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                </div>
+
+                <div className="min-w-0 space-y-4">
+                  <button className="text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
+                    Back to library
+                  </button>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">My game dashboard</div>
+                    <h2 className="mt-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{game.title}</h2>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
+                    <HeroStat label="Platform / source" value={formatPlatformSource(game)} />
+                    <HeroStat label="Current status" value={game.status} accent />
+                    {hasPlaytime ? <HeroStat label="Playtime" value={`${game.playtimeHours}h`} /> : null}
+                  </div>
                 </div>
               </div>
+            </section>
 
-              {game.backgroundImage ? (
-                <section className="overflow-hidden rounded-lg border border-white/10 bg-ink-800">
-                  <img
-                    alt=""
-                    className="aspect-video w-full bg-ink-700 object-cover"
-                    decoding="async"
-                    loading="lazy"
-                    src={game.backgroundImage}
-                  />
-                </section>
-              ) : null}
-            </div>
-
-            <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
-              <DetailSection kicker="Editable" title="My tracking">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <ReadOnlyField label="Playtime" value={`${game.playtimeHours}h`} />
-                  <ReadOnlyField label="Last played" value={formatDate(game.lastPlayedAt)} />
-                  <ReadOnlyField label="Status" value={game.status} />
+            <section className="rounded-2xl border border-white/10 bg-ink-950/80 p-3" aria-label="Game decision actions">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {destructiveActions.map((action) => (
+                    <GameDetailActionButton key={action.label} action={action} />
+                  ))}
                 </div>
+                <div className="min-w-4 flex-1" aria-hidden="true" />
+                <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
+                  {primaryActions.map((action) => (
+                    <GameDetailActionButton key={action.label} action={action} />
+                  ))}
+                </div>
+              </div>
+            </section>
 
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Custom tags</span>
+            <DetailSection kicker="Editable" title="My information" description="Notes, tags, and tracking fields you control.">
+              <div className="grid gap-3 md:grid-cols-3">
+                <PersonalStatField label="Playtime" value={`${game.playtimeHours}h`} />
+                <PersonalStatField label="Last played" value={formatDate(game.lastPlayedAt)} />
+                <PersonalStatField label="Status" value={game.status} />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
+                <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Custom tags</span>
                   <input
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={tagText}
                     onBlur={() => {
                       setTagText(parsedTags.join(', '));
@@ -235,32 +221,35 @@ export function GameDetailView({
                     placeholder="cozy, backlog, handheld"
                     type="text"
                   />
+                  {parsedTags.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {parsedTags.map((tag) => (
+                        <span key={tag} className="rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </label>
 
-                {parsedTags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {parsedTags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-300">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notes</span>
+                <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Notes</span>
                   <textarea
-                    className="mt-2 min-h-32 w-full resize-y rounded-md border border-white/10 bg-ink-950 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                    className="mt-2 min-h-28 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20 xl:min-h-24"
                     value={game.notes}
                     onChange={(event) => updateTracking({ notes: event.target.value })}
-                    placeholder="What matters about this game?"
+                    placeholder="What matters about this game? Why keep it on your shelf?"
                   />
                 </label>
-              </DetailSection>
+              </div>
+            </DetailSection>
+
+            <section className="space-y-2" aria-label="Imported metadata">
+              <div className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Imported metadata</div>
 
               {game.collectionType === 'wishlist' ? (
-                <DetailSection kicker="Wishlist" title="Wishlist planning">
-                  <div className="grid gap-3 sm:grid-cols-2">
+                <MetadataAccordion title="Wishlist planning" summary="Read-only store and wishlist sync fields">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <ReadOnlyField label="Priority" value={game.priority ?? 'medium'} />
                     <ReadOnlyField label="Expected playtime" value={formatHours(game.expectedPlaytime)} />
                     <ReadOnlyField label="Price target" value={game.priceTarget || 'n/a'} />
@@ -272,12 +261,12 @@ export function GameDetailView({
                     <ReadOnlyField label="Wishlist synced" value={formatDateTime(game.wishlistSyncedAt)} />
                     <ReadOnlyLink label="Store URL" value={game.storeUrl} />
                   </div>
-                </DetailSection>
+                </MetadataAccordion>
               ) : null}
 
-              <DetailSection kicker="Read-only" title="Steam data">
+              <MetadataAccordion title="Steam data" summary="App ID, external source, and import links">
                 {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? 'n/a'} />
                     <ReadOnlyField label="Imported" value={formatDateTime(game.importedAt)} />
                     <ReadOnlyField label="Source" value={game.externalSource ?? 'n/a'} />
@@ -286,12 +275,12 @@ export function GameDetailView({
                 ) : (
                   <EmptyState text="No Steam metadata is attached to this game yet." />
                 )}
-              </DetailSection>
+              </MetadataAccordion>
 
-              <DetailSection kicker="Read-only" title="RAWG metadata">
+              <MetadataAccordion title="RAWG metadata" summary="Release, ratings, genres, and publisher metadata">
                 {game.metadataSource === 'rawg' ? (
                   <div className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <ReadOnlyField label="Released" value={game.released ?? 'Unknown'} />
                       <ReadOnlyField label="Metacritic" value={game.metacritic?.toString() ?? 'n/a'} />
                       <ReadOnlyField label="Average playtime" value={formatHours(game.averagePlaytime)} />
@@ -315,8 +304,8 @@ export function GameDetailView({
                 ) : (
                   <EmptyState text="No RAWG metadata is attached to this game yet." />
                 )}
-              </DetailSection>
-            </div>
+              </MetadataAccordion>
+            </section>
           </div>
         </div>
       </div>
@@ -324,11 +313,19 @@ export function GameDetailView({
   );
 }
 
+function HeroStat({ accent, label, value }: { accent?: boolean; label: string; value: string }) {
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'}`}>
+      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
+    </div>
+  );
+}
 
 function GameDetailActionButton({ action }: { action: GameDetailAction }) {
   return (
     <button
-      className={`min-h-12 rounded-xl border px-3 py-2 text-left text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${getGameDetailActionClassName(
+      className={`min-h-10 rounded-xl border px-3 py-2 text-left text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${getGameDetailActionClassName(
         action.tone,
       )}`}
       disabled={action.disabled}
@@ -359,21 +356,61 @@ function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
 
 type DetailSectionProps = {
   children: ReactNode;
+  description?: string;
   kicker: string;
   title: string;
 };
 
-function DetailSection({ children, kicker, title }: DetailSectionProps) {
+function DetailSection({ children, description, kicker, title }: DetailSectionProps) {
   return (
-    <section className="rounded-lg border border-white/10 bg-ink-800 p-4">
+    <section className="rounded-2xl border border-mint/20 bg-ink-800 p-4 shadow-panel">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{kicker}</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{kicker}</div>
           <h3 className="mt-1 text-lg font-semibold text-white">{title}</h3>
+          {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
         </div>
       </div>
       <div className="space-y-4">{children}</div>
     </section>
+  );
+}
+
+function PersonalStatField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-mint/20 bg-ink-950/80 px-3 py-2 shadow-inner shadow-mint/5">
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-mint">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+type MetadataAccordionProps = {
+  children: ReactNode;
+  summary: string;
+  title: string;
+};
+
+function MetadataAccordion({ children, summary, title }: MetadataAccordionProps) {
+  return (
+    <details className="group rounded-xl border border-white/10 bg-ink-950/65 text-slate-300">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
+        <span className="text-slate-500 transition group-open:rotate-90" aria-hidden="true">
+          ▶
+        </span>
+        <span className="text-slate-500" aria-hidden="true">
+          🔒
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold text-slate-200">{title}</span>
+          <span className="block truncate text-xs text-slate-500">{summary}</span>
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          Read-only
+        </span>
+      </summary>
+      <div className="border-t border-white/10 p-4">{children}</div>
+    </details>
   );
 }
 
@@ -384,9 +421,12 @@ type ReadOnlyFieldProps = {
 
 function ReadOnlyField({ label, value }: ReadOnlyFieldProps) {
   return (
-    <div className="min-w-0 rounded-md border border-white/10 bg-ink-950 px-3 py-2">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
-      <div className="mt-1 truncate text-sm text-slate-200">{value}</div>
+    <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+        <span aria-hidden="true">🔒</span>
+        <span>{label}</span>
+      </div>
+      <div className="mt-1 truncate text-sm text-slate-300">{value}</div>
     </div>
   );
 }
@@ -398,14 +438,17 @@ type ReadOnlyLinkProps = {
 
 function ReadOnlyLink({ label, value }: ReadOnlyLinkProps) {
   return (
-    <div className="min-w-0 rounded-md border border-white/10 bg-ink-950 px-3 py-2 sm:col-span-2">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+    <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2 sm:col-span-2 lg:col-span-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+        <span aria-hidden="true">🔒</span>
+        <span>{label}</span>
+      </div>
       {value ? (
         <a className="mt-1 block truncate text-sm text-mint transition hover:text-white" href={value} rel="noreferrer" target="_blank">
           {value}
         </a>
       ) : (
-        <div className="mt-1 text-sm text-slate-200">n/a</div>
+        <div className="mt-1 text-sm text-slate-300">n/a</div>
       )}
     </div>
   );
@@ -424,7 +467,10 @@ function ChipGroup({ accent, label, values }: ChipGroupProps) {
 
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+        <span aria-hidden="true">🔒</span>
+        <span>{label}</span>
+      </div>
       <div className="mt-2 flex flex-wrap gap-2">
         {values.map((value) => (
           <span
@@ -442,7 +488,7 @@ function ChipGroup({ accent, label, values }: ChipGroupProps) {
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-dashed border-white/15 bg-ink-950/60 p-4 text-sm text-slate-400">{text}</div>;
+  return <div className="rounded-md border border-dashed border-white/15 bg-ink-900/50 p-4 text-sm text-slate-400">{text}</div>;
 }
 
 function parseTags(value: string) {
@@ -454,6 +500,14 @@ function parseTags(value: string) {
         .filter(Boolean),
     ),
   );
+}
+
+function formatPlatformSource(game: Game) {
+  if (game.externalSource && game.externalSource !== 'manual') {
+    return `${game.platform} · ${game.externalSource}`;
+  }
+
+  return game.platform;
 }
 
 function formatDate(value: string | null) {
