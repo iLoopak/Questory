@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { ViewportModal } from './ViewportModal';
 import type { IgnoredSteamGame } from '../lib/steamIgnoredGamesStorage';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
 import {
@@ -57,6 +58,7 @@ export function SteamSettingsPanel({
   const [connectionState, setConnectionState] = useState<SteamConnectionState>(initialConnectionState);
   const [selectedAppIds, setSelectedAppIds] = useState<Set<number>>(() => new Set());
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [helpTopic, setHelpTopic] = useState<'steam-api-key' | 'steam-id64' | null>(null);
 
   useEffect(() => {
     saveSteamSettings(settings);
@@ -237,7 +239,7 @@ export function SteamSettingsPanel({
           <div className="space-y-4">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Steam Web API key
+                Steam Web API key <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-api-key'); }} type="button" aria-label="Steam API key help">?</button>
               </span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
@@ -250,7 +252,7 @@ export function SteamSettingsPanel({
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SteamID64</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SteamID64 <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-id64'); }} type="button" aria-label="SteamID64 help">?</button></span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 value={settings.steamId64}
@@ -317,6 +319,8 @@ export function SteamSettingsPanel({
       </div>
 
       <IgnoredSteamGamesSection ignoredSteamGames={ignoredSteamGames} onUnignoreSteamGame={onUnignoreSteamGame} />
+
+      {helpTopic ? <SteamHelpModal topic={helpTopic} onClose={() => setHelpTopic(null)} /> : null}
 
       <SteamImportSection
         existingSteamAppIds={existingSteamAppIds}
@@ -523,15 +527,21 @@ type IgnoredSteamGamesSectionProps = {
 };
 
 function IgnoredSteamGamesSection({ ignoredSteamGames, onUnignoreSteamGame }: IgnoredSteamGamesSectionProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <section className="mt-4 rounded-lg border border-white/10 bg-ink-950 p-4">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Ignored Steam games</h3>
-        </div>
-      </div>
+      <button
+        className="flex w-full items-center justify-between gap-3 text-left"
+        onClick={() => setIsOpen((currentValue) => !currentValue)}
+        type="button"
+        aria-expanded={isOpen}
+      >
+        <h3 className="text-lg font-semibold text-white">Ignored Steam games ({ignoredSteamGames.length})</h3>
+        <span className="text-sm font-semibold text-mint">{isOpen ? 'Collapse' : 'Expand'}</span>
+      </button>
 
-      {ignoredSteamGames.length > 0 ? (
+      {isOpen && ignoredSteamGames.length > 0 ? (
         <div className="grid gap-2">
           {ignoredSteamGames.map((game) => (
             <div
@@ -554,12 +564,33 @@ function IgnoredSteamGamesSection({ ignoredSteamGames, onUnignoreSteamGame }: Ig
             </div>
           ))}
         </div>
-      ) : (
-        <div className="rounded-md border border-dashed border-white/15 bg-black/20 p-4 text-sm text-slate-400">
+      ) : isOpen ? (
+        <div className="mt-4 rounded-md border border-dashed border-white/15 bg-black/20 p-4 text-sm text-slate-400">
           No ignored Steam games yet.
         </div>
-      )}
+      ) : null}
     </section>
+  );
+}
+
+function SteamHelpModal({ topic, onClose }: { topic: 'steam-api-key' | 'steam-id64'; onClose: () => void }) {
+  const isApiKey = topic === 'steam-api-key';
+  const url = isApiKey ? 'https://steamcommunity.com/dev/apikey' : 'https://steamid.io';
+
+  return (
+    <ViewportModal ariaLabel={isApiKey ? 'Steam API key help' : 'SteamID64 help'} placement="center" onClose={onClose}>
+      <div className="max-w-md p-4 text-sm text-slate-300">
+        <h3 className="text-lg font-semibold text-white">{isApiKey ? 'Steam Web API key' : 'SteamID64 lookup'}</h3>
+        <p className="mt-2 leading-6">
+          {isApiKey
+            ? 'QuestShelf uses your Steam Web API key to read your owned games from Steam. Generate a key from Steam Community and paste it here.'
+            : 'SteamID64 is the long numeric ID for your Steam account. Use a lookup site if your profile URL uses a custom name.'}
+        </p>
+        <a className="mt-4 inline-flex h-10 items-center rounded-md bg-mint px-4 font-semibold text-ink-950" href={url} target="_blank" rel="noreferrer">
+          {isApiKey ? 'Open Steam API key page' : 'Open SteamID64 lookup'}
+        </a>
+      </div>
+    </ViewportModal>
   );
 }
 

@@ -206,10 +206,9 @@ export function HomePanel({
               <p className="mt-2 max-w-2xl text-sm text-slate-400">A focused launch view for handheld play: continue, pick the next planned game, or process what needs attention.</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-              <span>A Open</span>
-              <span>Y Platforms</span>
-              <span>X Quest Queue</span>
-              <span>B Library</span>
+              <span>Confirm Open</span>
+              <span>Face buttons: Platforms / Quest Queue</span>
+              <span>Cancel Library</span>
             </div>
           </div>
         </section>

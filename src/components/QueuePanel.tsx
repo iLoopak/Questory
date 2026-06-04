@@ -424,7 +424,7 @@ function QueueEntryRow({
 
   return (
     <article
-      aria-label={`${game.title} platform plan entry. A opens details, X moves up, Y moves down.`}
+      aria-label={`${game.title} platform backlog entry. Confirm opens details. Face buttons move entries up or down.`}
       className="rounded-md border border-skyglass/15 bg-ink-950 p-2"
       onKeyDown={handleQueueEntryKeyDown}
       role="group"

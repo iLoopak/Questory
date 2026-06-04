@@ -22,6 +22,7 @@ import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
+import { loadControllerLayoutPreference, saveControllerLayoutPreference, type ControllerLayoutPreference } from './lib/controllerLayoutPreferences';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
   loadOnboardingState,
@@ -229,6 +230,7 @@ function App() {
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => applyThemePreference(loadThemePreference()));
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
+  const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
@@ -411,6 +413,10 @@ function App() {
   }, [isControllerDebugEnabled]);
 
   useEffect(() => {
+    saveControllerLayoutPreference(controllerLayoutPreference);
+  }, [controllerLayoutPreference]);
+
+  useEffect(() => {
     saveLandscapeLockPreference(isLandscapeLockEnabled);
     window.dispatchEvent(new CustomEvent('questshelf:landscape-lock-change', { detail: isLandscapeLockEnabled }));
   }, [isLandscapeLockEnabled]);
@@ -540,7 +546,7 @@ function App() {
       actions: notification.actions ?? [getUndoAction()],
       category: notification.category ?? 'success',
       createdAt,
-      dedupeKey: notification.dedupeKey ?? getToastDedupeKey(historyEntry.actionType, historyEntry.affectedGameIds),
+      dedupeKey: notification.dedupeKey ?? (activeNavItem === 'Review Mode' ? 'quest-queue-action' : getToastDedupeKey(historyEntry.actionType, historyEntry.affectedGameIds)),
       expiresAt: createdAt + undoActionTimeoutMs,
       historyEntry: {
         ...historyEntry,
@@ -552,7 +558,8 @@ function App() {
     };
 
     setPendingUndoActions((currentActions) => {
-      const nextActions = mergeToastNotifications(currentActions, action);
+      const scopedActions = activeNavItem === 'Review Mode' ? currentActions.filter((currentAction) => currentAction.dedupeKey !== 'quest-queue-action') : currentActions;
+      const nextActions = mergeToastNotifications(scopedActions, action);
       pendingUndoActionsRef.current = nextActions;
       return nextActions;
     });
@@ -1084,7 +1091,7 @@ function App() {
     addUndoAction(getQueueToastMessage(game, platform), {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
-        description: `Remove ${game.title} from ${platform} Platforms plan and restore positions`,
+        description: `Remove ${game.title} from ${platform} backlog and restore positions`,
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(game.id)] });
 
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
@@ -1228,7 +1235,7 @@ function App() {
       addUndoAction(getMoveQueueToastMessage(game, platform), {
         actionType: 'move-between-collections',
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to ${currentEntry.targetPlatform} Platforms plan`,
+        description: `Restore ${game.title} to ${currentEntry.targetPlatform} backlog`,
       }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
@@ -1265,6 +1272,15 @@ function App() {
   }
 
   function unignoreSteamGame(steamAppId: number) {
+    const ignoredGame = ignoredSteamGames.find((game) => game.steamAppId === steamAppId);
+    if (ignoredGame) {
+      addUndoAction('Restored from ignore list', {
+        actionType: 'restore-ignored-steam-game',
+        affectedGameIds: [String(steamAppId)],
+        description: `Re-ignore ${ignoredGame.title || `Steam app ${steamAppId}`}`,
+      }, undefined, { dedupeKey: `restore-ignored-steam-game:${steamAppId}` });
+    }
+
     setIgnoredSteamGames((currentIgnoredGames) => removeIgnoredSteamGame(currentIgnoredGames, steamAppId));
   }
 
@@ -1511,6 +1527,7 @@ function App() {
               games={games}
               ignoredGameIds={reviewIgnoredGameIds}
               queuePlatforms={queuePlatforms}
+              controllerLayout={controllerLayoutPreference}
               source={activeReviewSource}
               onAction={handleReviewAction}
               onOpenQueue={() => setActiveNavItem('Queue')}
@@ -1573,6 +1590,7 @@ function App() {
               demoGameCount={games.filter(isMockGame).length}
               games={games}
               ignoredSteamGames={ignoredSteamGames}
+              controllerLayoutPreference={controllerLayoutPreference}
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               isOnboardingOpen={isOnboardingOpen}
@@ -1591,6 +1609,7 @@ function App() {
               onImportGames={importGames}
               onImportRetroGames={handleRetroImportGames}
               onControllerDebugChange={setIsControllerDebugEnabled}
+              onControllerLayoutChange={setControllerLayoutPreference}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
               onLoadDemoData={loadDemoData}
               onOnboardingAction={handleOnboardingAction}
@@ -1695,7 +1714,7 @@ function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastS
     <aside
       aria-label="QuestShelf notifications"
       aria-live="polite"
-      className="pointer-events-none fixed right-3 top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1100] grid max-w-[min(calc(100vw-1.5rem),20rem)] justify-items-end gap-2 sm:right-5 sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))]"
+      className="pointer-events-none fixed right-3 top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1100] grid w-[min(calc(100vw-1.5rem),20rem)] justify-items-end gap-2 overflow-visible sm:right-5 sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))]"
       role="status"
     >
       {visibleActions.map((action) => {
@@ -1707,7 +1726,7 @@ function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastS
         return (
           <div
             key={action.id}
-            className={`qs-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-full border px-3 py-2 shadow-glow ${categoryStyles.container}`}
+            className={`qs-toast pointer-events-auto flex max-w-full translate-x-0 items-center gap-3 rounded-full border px-3 py-2 shadow-glow ${categoryStyles.container}`}
           >
             <span className="min-w-0 truncate text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
               {action.message}
@@ -2632,6 +2651,7 @@ type SettingsPanelProps = {
   demoGameCount: number;
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
+  controllerLayoutPreference: ControllerLayoutPreference;
   isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
   isOnboardingComplete: boolean;
@@ -2650,6 +2670,7 @@ type SettingsPanelProps = {
   onImportGames: (games: Game[]) => void;
   onImportRetroGames: (games: Game[]) => Game[];
   onControllerDebugChange: (isEnabled: boolean) => void;
+  onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onLoadDemoData: () => void;
   onOnboardingAction: (itemId: OnboardingItemId) => void;
@@ -2674,6 +2695,7 @@ function SettingsPanel({
   demoGameCount,
   games,
   ignoredSteamGames,
+  controllerLayoutPreference,
   isControllerDebugEnabled,
   isLandscapeLockEnabled,
   isOnboardingComplete,
@@ -2692,6 +2714,7 @@ function SettingsPanel({
   onImportGames,
   onImportRetroGames,
   onControllerDebugChange,
+  onControllerLayoutChange,
   onLandscapeLockChange,
   onLoadDemoData,
   onOnboardingAction,
@@ -2821,12 +2844,14 @@ function SettingsPanel({
 
           {activeCategory === 'Appearance' ? (
             <AppearanceSettingsPanel
+              controllerLayoutPreference={controllerLayoutPreference}
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
               onControllerDebugChange={onControllerDebugChange}
+              onControllerLayoutChange={onControllerLayoutChange}
               onLandscapeLockChange={onLandscapeLockChange}
               onThemePreferenceChange={onThemePreferenceChange}
             />
@@ -3263,21 +3288,25 @@ function DemoDataPanel({ demoGameCount, onLoadDemoData, onRemoveDemoGames }: Dem
 }
 
 function AppearanceSettingsPanel({
+  controllerLayoutPreference,
   isControllerDebugEnabled,
   isLandscapeLockEnabled,
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
   onControllerDebugChange,
+  onControllerLayoutChange,
   onLandscapeLockChange,
   onThemePreferenceChange,
 }: {
+  controllerLayoutPreference: ControllerLayoutPreference;
   isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
   onControllerDebugChange: (isEnabled: boolean) => void;
+  onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
 }) {
@@ -3388,6 +3417,22 @@ function AppearanceSettingsPanel({
         </span>
       </label>
 
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
+        <label className="block">
+          <span className="block font-semibold text-white">Controller button layout</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Auto uses Nintendo labels on Android handhelds and Xbox labels on web. This remaps controller face buttons without affecting keyboard or touch.</span>
+          <select
+            className="mt-3 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+            value={controllerLayoutPreference}
+            onChange={(event) => onControllerLayoutChange(event.target.value as ControllerLayoutPreference)}
+          >
+            <option value="auto">Auto / Android default</option>
+            <option value="xbox">Xbox</option>
+            <option value="nintendo">Nintendo / Retroid</option>
+          </select>
+        </label>
+      </div>
+
       <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
         <input
           checked={isControllerDebugEnabled}
@@ -3411,6 +3456,14 @@ function AboutSettingsPanel({ runtimeEnvironment }: { runtimeEnvironment: Return
       <p className="mt-2 text-sm text-slate-400">
         Version 0.1.0 · {runtimeEnvironment.isNative ? 'Native' : 'Web'} · {runtimeEnvironment.platform}
       </p>
+      <a
+        className="mt-4 inline-flex h-10 items-center rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+        href="https://github.com/Loopak/QuestShelf"
+        target="_blank"
+        rel="noreferrer"
+      >
+        GitHub Repository
+      </a>
     </section>
   );
 }

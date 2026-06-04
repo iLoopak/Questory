@@ -1,3 +1,5 @@
+import { loadControllerLayoutPreference, resolveControllerLayout, type ControllerLayoutPreference } from './controllerLayoutPreferences';
+
 const gamepadPollIntervalMs = 80;
 const axisRepeatInitialMs = 240;
 const axisRepeatMs = 150;
@@ -73,10 +75,12 @@ export function configureAndroidGamepadShortcuts() {
   let latestDebugState: ControllerDebugState = createEmptyDebugState();
   let debugOverlay: HTMLDivElement | null = null;
   let isDebugEnabled = loadControllerDebugEnabled();
+  let controllerLayoutPreference = loadControllerLayoutPreference();
 
   const removeFocusGuard = installFocusGuard();
   updateControllerActive(false);
   window.addEventListener('questshelf:controller-debug-change', handleDebugChange);
+  window.addEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
   window.addEventListener('keydown', handleKeyboardFallback, true);
 
   const intervalId = window.setInterval(() => {
@@ -104,10 +108,18 @@ export function configureAndroidGamepadShortcuts() {
     handlePressedButton('D-pad Right', nextState, lastState, () => moveFocus('right'));
     handleAxisNavigation(axisDirection);
 
-    handlePressedButton('A', nextState, lastState, () => activatePrimaryButton());
-    handlePressedButton('B', nextState, lastState, () => dispatchKeyboard('Escape'));
-    handlePressedButton('X', nextState, lastState, () => dispatchKeyboard('x'));
-    handlePressedButton('Y', nextState, lastState, () => dispatchKeyboard('y'));
+    const resolvedLayout = resolveControllerLayout(controllerLayoutPreference);
+    if (resolvedLayout === 'nintendo') {
+      handlePressedButton('A', nextState, lastState, () => dispatchKeyboard('Escape'));
+      handlePressedButton('B', nextState, lastState, () => activatePrimaryButton());
+      handlePressedButton('X', nextState, lastState, () => dispatchKeyboard('x'));
+      handlePressedButton('Y', nextState, lastState, () => dispatchKeyboard('y'));
+    } else {
+      handlePressedButton('A', nextState, lastState, () => activatePrimaryButton());
+      handlePressedButton('B', nextState, lastState, () => dispatchKeyboard('Escape'));
+      handlePressedButton('X', nextState, lastState, () => dispatchKeyboard('x'));
+      handlePressedButton('Y', nextState, lastState, () => dispatchKeyboard('y'));
+    }
     // Shoulder buttons remain global tab navigation across Retroid, Android gamepads, and browser Gamepad API.
     handlePressedButton('L1', nextState, lastState, () => dispatchKeyboard('PageUp'));
     handlePressedButton('R1', nextState, lastState, () => dispatchKeyboard('PageDown'));
@@ -154,6 +166,10 @@ export function configureAndroidGamepadShortcuts() {
     renderDebugOverlay();
   }
 
+  function handleControllerLayoutChange(event: CustomEvent<ControllerLayoutPreference>) {
+    controllerLayoutPreference = event.detail;
+  }
+
   function renderDebugOverlay() {
     if (!isDebugEnabled) {
       debugOverlay?.remove();
@@ -182,6 +198,7 @@ export function configureAndroidGamepadShortcuts() {
   return () => {
     window.clearInterval(intervalId);
     window.removeEventListener('questshelf:controller-debug-change', handleDebugChange);
+    window.removeEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
     window.removeEventListener('keydown', handleKeyboardFallback, true);
     removeFocusGuard();
     debugOverlay?.remove();

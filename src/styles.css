@@ -1207,8 +1207,10 @@ textarea,
 }
 
 .qs-back-to-top:hover,
-.qs-back-to-top:focus-visible {
-  transform: translateY(-2px);
+.qs-back-to-top:focus-visible,
+.qs-back-to-top:active {
+  right: max(1rem, var(--qs-safe-right));
+  transform: none;
 }
 
 @media (max-width: 760px) {
@@ -1253,7 +1255,10 @@ textarea,
     font-size: 0.8rem;
   }
 
-  .qs-back-to-top {
+  .qs-back-to-top,
+  .qs-back-to-top:hover,
+  .qs-back-to-top:focus-visible,
+  .qs-back-to-top:active {
     right: max(0.65rem, var(--qs-safe-right));
     bottom: calc(max(0.65rem, var(--qs-safe-bottom)) + 4rem);
     width: 3rem;

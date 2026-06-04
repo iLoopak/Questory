@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 
 const scrollablePanelSelector = '.qs-content-panel, .qs-queue-shell, .qs-review-shell, .qs-settings-detail, .qs-settings-list';
 const scrollThresholdPx = 300;
@@ -41,7 +42,8 @@ export function BackToTopButton() {
     };
   }, []);
 
-  function scrollToTop() {
+  function scrollToTop(event?: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) {
+    event?.preventDefault();
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const behavior: ScrollBehavior = motionPreference ? 'auto' : 'smooth';
 
@@ -57,14 +59,16 @@ export function BackToTopButton() {
     return null;
   }
 
-  return (
+  return createPortal(
     <button
       aria-label="Back to top"
       className="qs-back-to-top"
       onClick={scrollToTop}
+      onPointerDown={(event) => event.preventDefault()}
       type="button"
     >
       <span aria-hidden="true">↑</span>
-    </button>
+    </button>,
+    document.body,
   );
 }

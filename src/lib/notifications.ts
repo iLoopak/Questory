@@ -44,15 +44,15 @@ export function getBulkWishlistToastMessage(count: number) {
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `📌 Added to ${platform} Platforms`;
+  return `📌 Added to ${platform} backlog`;
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return '📌 Moved in Platforms';
+  return `📌 Moved to ${platform} backlog`;
 }
 
 export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return 'Removed from Platforms';
+  return `Removed from ${platform} backlog`;
 }
 
 export function getViewGameAction(gameId: string): ToastAction {
@@ -85,8 +85,8 @@ export function mergeToastNotifications<TNotification extends MergeableNotificat
     const existingNotification = nextNotifications[duplicateIndex];
     nextNotifications[duplicateIndex] = {
       ...existingNotification,
-      actions: nextNotification.actions,
-      category: nextNotification.category,
+      ...nextNotification,
+      createdAt: existingNotification.createdAt,
       expiresAt: nextNotification.expiresAt,
       message: nextNotification.message,
       repeatCount: (existingNotification.repeatCount ?? 1) + 1,
