@@ -18,6 +18,7 @@ import type {
   SteamDebugResult,
   SteamOwnedGame,
   SteamRecentlyPlayedGame,
+  SteamPlaytimeRefreshState,
   SteamSettings,
 } from '../types/steam';
 
@@ -41,6 +42,8 @@ type SteamSettingsPanelProps = {
   onSteamIdConfigured?: () => void;
   onImportGames: (games: Game[]) => void;
   onSteamLibraryImported?: () => void;
+  playtimeRefreshState: SteamPlaytimeRefreshState;
+  onRefreshSteamPlaytime: () => Promise<unknown>;
   onUnignoreSteamGame: (steamAppId: number) => void;
 };
 
@@ -52,6 +55,8 @@ export function SteamSettingsPanel({
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
+  playtimeRefreshState,
+  onRefreshSteamPlaytime,
   onUnignoreSteamGame,
 }: SteamSettingsPanelProps) {
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
@@ -299,6 +304,12 @@ export function SteamSettingsPanel({
                 {importSummary.skippedIgnoredCount} ignored games.
               </div>
             ) : null}
+
+            <SteamPlaytimeRefreshCard
+              librarySteamGameCount={existingSteamAppIds.size}
+              refreshState={playtimeRefreshState}
+              onRefresh={onRefreshSteamPlaytime}
+            />
           </div>
         </section>
 
@@ -334,6 +345,70 @@ export function SteamSettingsPanel({
         onSelectAll={selectAllImportableGames}
         onToggleSelected={toggleSelectedAppId}
       />
+    </section>
+  );
+}
+
+type SteamPlaytimeRefreshCardProps = {
+  librarySteamGameCount: number;
+  refreshState: SteamPlaytimeRefreshState;
+  onRefresh: () => Promise<unknown>;
+};
+
+function SteamPlaytimeRefreshCard({ librarySteamGameCount, refreshState, onRefresh }: SteamPlaytimeRefreshCardProps) {
+  const isLoading = refreshState.status === 'loading';
+  const progressPercent = refreshState.progress.total > 0
+    ? Math.round((refreshState.progress.completed / refreshState.progress.total) * 100)
+    : 0;
+  const statusStyles = {
+    idle: 'border-white/10 bg-ink-900/70 text-slate-300',
+    loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
+    success: 'border-mint/40 bg-mint/10 text-mint',
+    error: 'border-red-400/40 bg-red-500/10 text-red-200',
+  }[refreshState.status];
+
+  return (
+    <section className="rounded-md border border-white/10 bg-ink-900/80 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Refresh playtime for Steam games</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            Updates playtime and Steam last played dates for {librarySteamGameCount} Steam library game{librarySteamGameCount === 1 ? '' : 's'} without re-importing your library.
+          </p>
+        </div>
+        <button
+          className="h-10 shrink-0 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
+          disabled={isLoading || librarySteamGameCount === 0}
+          onClick={() => void onRefresh()}
+          type="button"
+        >
+          {isLoading ? 'Refreshing...' : 'Refresh playtime'}
+        </button>
+      </div>
+
+      {refreshState.status !== 'idle' ? (
+        <div className={`mt-3 rounded-md border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
+          <div>{refreshState.message}</div>
+          {isLoading ? (
+            <div className="mt-3">
+              <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
+                <span>Progress</span>
+                <span>{refreshState.progress.completed}/{refreshState.progress.total}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full bg-current transition-all" style={{ width: `${progressPercent}%` }} />
+              </div>
+            </div>
+          ) : null}
+          {refreshState.summary ? (
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+              <DebugStat label="Updated" value={refreshState.summary.updatedCount.toString()} />
+              <DebugStat label="Unchanged" value={refreshState.summary.unchangedCount.toString()} />
+              <DebugStat label="Failed" value={refreshState.summary.failedCount.toString()} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

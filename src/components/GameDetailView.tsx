@@ -9,6 +9,7 @@ type GameDetailViewProps = {
   onAddToWishlist?: (game: Game) => void;
   onBack: () => void;
   onIgnore?: (game: Game) => void;
+  onRefreshSteamPlaytime?: (game: Game) => void;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
 };
@@ -27,6 +28,7 @@ export function GameDetailView({
   onAddToWishlist,
   onBack,
   onIgnore,
+  onRefreshSteamPlaytime,
   onStatusChange,
   onTrackingChange,
 }: GameDetailViewProps) {
@@ -47,6 +49,7 @@ export function GameDetailView({
   const activeCoverSource = coverSources[coverSourceIndex];
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
   const canApplyRawgCover = canUseRawgImageAsCover(game);
+  const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
@@ -102,6 +105,16 @@ export function GameDetailView({
       disabled: !onStatusChange,
     },
   ];
+  const steamActions: GameDetailAction[] = [
+    {
+      icon: '⏱️',
+      label: 'Refresh Playtime',
+      onClick: () => onRefreshSteamPlaytime?.(game),
+      tone: 'neutral',
+      disabled: !onRefreshSteamPlaytime || !isSteamLibraryGame,
+    },
+  ];
+
   const destructiveActions: GameDetailAction[] = [
     {
       icon: '🗑️',
@@ -188,6 +201,11 @@ export function GameDetailView({
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex flex-wrap gap-2">
                   {destructiveActions.map((action) => (
+                    <GameDetailActionButton key={action.label} action={action} />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {steamActions.map((action) => (
                     <GameDetailActionButton key={action.label} action={action} />
                   ))}
                 </div>

@@ -70,3 +70,21 @@ export type SteamWishlistSyncState =
   | { status: 'loading'; message: string; summary: SteamWishlistSyncSummary | null }
   | { status: 'success'; message: string; summary: SteamWishlistSyncSummary }
   | { status: 'error'; message: string; summary: SteamWishlistSyncSummary | null };
+
+export type SteamPlaytimeRefreshSummary = {
+  failedCount: number;
+  skippedNonSteamCount: number;
+  unchangedCount: number;
+  updatedCount: number;
+};
+
+export type SteamPlaytimeRefreshProgress = {
+  completed: number;
+  total: number;
+};
+
+export type SteamPlaytimeRefreshState =
+  | { status: 'idle'; message: string; progress: SteamPlaytimeRefreshProgress; summary: SteamPlaytimeRefreshSummary | null }
+  | { status: 'loading'; message: string; progress: SteamPlaytimeRefreshProgress; summary: SteamPlaytimeRefreshSummary | null }
+  | { status: 'success'; message: string; progress: SteamPlaytimeRefreshProgress; summary: SteamPlaytimeRefreshSummary }
+  | { status: 'error'; message: string; progress: SteamPlaytimeRefreshProgress; summary: SteamPlaytimeRefreshSummary | null };
