@@ -22,6 +22,7 @@ export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remov
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformBadge } from './PlatformBadge';
+import { useI18n } from '../i18n';
 
 type QueuePanelProps = {
   games: Game[];
@@ -338,6 +339,8 @@ function PlatformQueueColumn({
   onOpenDetails: (gameId: string) => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
+  const { t } = useI18n();
+  const playingNowLabel = t('nav.playingNow');
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
   const platformAccentColor = accentColor || 'var(--accent)';
@@ -392,18 +395,18 @@ function PlatformQueueColumn({
       </div>
 
       {currentlyPlaying.length > 0 ? (
-        <div className="mb-3 grid gap-2 border-b border-skyglass/15 pb-3">
-          <div className="qs-platform-playing-panel rounded-xl border p-3 shadow-panel">
+        <div className="mb-3 grid w-full min-w-0 gap-2 border-b border-skyglass/15 pb-3">
+          <div className="qs-platform-playing-panel w-full min-w-0 rounded-xl border p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.18em]">Playing Now</h4>
-                <p className="mt-1 text-xs text-slate-400">{currentlyPlaying.length} active {currentlyPlaying.length === 1 ? 'game' : 'games'} on {platform}</p>
+                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.18em]">{playingNowLabel}</h4>
+                <p className="qs-platform-playing-meta mt-1 text-xs">{currentlyPlaying.length} active {currentlyPlaying.length === 1 ? 'game' : 'games'} on {platform}</p>
               </div>
               <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">Active list</span>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid w-full min-w-0 gap-2">
               {currentlyPlaying.map((game) => (
-                <QueueGameRow key={game.id} game={game} platform={platform} onAction={onPlayingAction} onOpenDetails={onOpenDetails} />
+                <QueueGameRow key={game.id} game={game} platform={platform} playingNowLabel={playingNowLabel} onAction={onPlayingAction} onOpenDetails={onOpenDetails} />
               ))}
             </div>
           </div>
@@ -546,30 +549,32 @@ function QueueEntryRow({
 function QueueGameRow({
   game,
   platform,
+  playingNowLabel,
   onAction,
   onOpenDetails,
 }: {
   game: Game;
   platform: GamePlatform;
+  playingNowLabel: string;
   onAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onOpenDetails: (gameId: string) => void;
 }) {
   return (
-    <article className="qs-platform-playing-row group grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border p-2 text-sm transition">
+    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border p-2 text-sm transition">
       <button className="text-left" onClick={() => onOpenDetails(game.id)} type="button">
         <QueueCoverThumbnail game={game} size="playing" />
       </button>
       <div className="min-w-0">
-        <button className="qs-platform-playing-link block max-w-full truncate text-left text-base font-semibold text-white" onClick={() => onOpenDetails(game.id)} type="button">
+        <button className="qs-platform-playing-link block max-w-full truncate text-left text-base font-semibold" onClick={() => onOpenDetails(game.id)} type="button">
           {game.title}
         </button>
-        <span className="qs-platform-playing-label mt-1 block text-xs font-semibold uppercase tracking-[0.14em]">Playing Now</span>
-        <span className="mt-1 block truncate text-xs text-slate-400">{game.platform}</span>
+        <span className="qs-platform-playing-label mt-1 block text-xs font-semibold uppercase tracking-[0.14em]">{playingNowLabel}</span>
+        <span className="qs-platform-playing-meta mt-1 block truncate text-xs">{game.platform}</span>
         <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} currently playing actions`}>
-          <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-100 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Queue</button>
+          <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Queue</button>
           <button className="qs-platform-playing-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'finished')} type="button">Finished</button>
-          <button className="h-8 rounded-md border border-amber-300/30 px-2 text-xs text-amber-100 hover:bg-amber-500/10" onClick={() => onAction(game.id, platform, 'drop')} type="button">Drop</button>
-          <button className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-300 hover:bg-white/10" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">Remove from Playing</button>
+          <button className="qs-platform-playing-drop-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'drop')} type="button">Drop</button>
+          <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">Remove from Playing</button>
         </div>
       </div>
     </article>
