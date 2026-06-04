@@ -2595,7 +2595,12 @@ function CollectionPanel({
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
           />

@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
+import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
 import { PlatformBadge } from './PlatformBadge';
 
@@ -34,6 +35,7 @@ type CollectionViewProps = CollectionActionHandlers &
   CollectionSelectionProps &
   CollectionHighlightProps & {
     games: Game[];
+    includeDetailsAction?: boolean;
     platformQueueState?: PlatformQueueState;
   };
 
@@ -43,6 +45,7 @@ const shelfRenderBatchSize = 48;
 export function CollectionGrid({
   games,
   getHighlightLabel,
+  includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
   onAddToQueue,
@@ -63,6 +66,7 @@ export function CollectionGrid({
           key={game.id}
           game={game}
           highlightLabel={getHighlightLabel?.(game)}
+          includeDetailsAction={includeDetailsAction}
           isMultiSelectMode={isMultiSelectMode}
           isSelected={selectedGameIds.has(game.id)}
           onAddToQueue={onAddToQueue}
@@ -85,13 +89,19 @@ export function CollectionGrid({
 export function CollectionShelf({
   games,
   getHighlightLabel,
+  includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
   onAddToQueue,
+  onAddToWishlist,
+  onMoveToLibrary,
   onOpenDetails,
+  onRemove,
+  onRemoveAndIgnore,
+  onStatusChange,
   onToggleSelected,
   platformQueueState,
-}: Pick<CollectionViewProps, 'games' | 'getHighlightLabel' | 'isMultiSelectMode' | 'onAddToQueue' | 'onOpenDetails' | 'onToggleSelected' | 'selectedGameIds' | 'platformQueueState'>) {
+}: CollectionViewProps) {
   const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
   const shelfCardRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -166,6 +176,13 @@ export function CollectionShelf({
       return;
     }
 
+    if (event.key === 'x' || event.key === 'X' || event.key === 'y' || event.key === 'Y') {
+      if (!isMultiSelectMode) {
+        event.preventDefault();
+        return;
+      }
+    }
+
     if (event.key === 'a' || event.key === 'A' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       if (isMultiSelectMode) {
@@ -192,12 +209,18 @@ export function CollectionShelf({
             }}
             game={game}
             highlightLabel={getHighlightLabel?.(game)}
+            includeDetailsAction={includeDetailsAction}
             index={index}
             isMultiSelectMode={isMultiSelectMode}
             isSelected={selectedGameIds.has(game.id)}
-            onAddToQueue={onAddToQueue ? () => onAddToQueue(game) : undefined}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
             onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
+            onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={() => onOpenDetails(game.id)}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
             onToggleSelected={() => onToggleSelected?.(game.id)}
             platformLabel={getGamePlatformLabel(game, platformQueueState)}
             platformQueueState={platformQueueState}
@@ -222,6 +245,7 @@ export function CollectionShelf({
 export function CollectionList({
   games,
   getHighlightLabel,
+  includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
   onAddToQueue,
@@ -244,6 +268,7 @@ export function CollectionList({
           key={game.id}
           game={game}
           highlightLabel={getHighlightLabel?.(game)}
+          includeDetailsAction={includeDetailsAction}
           isMultiSelectMode={isMultiSelectMode}
           isSelected={selectedGameIds.has(game.id)}
           onAddToQueue={onAddToQueue}
@@ -268,12 +293,18 @@ export function CollectionList({
 type ShelfGameCardProps = {
   game: Game;
   highlightLabel?: string;
+  includeDetailsAction: boolean;
   index: number;
   isMultiSelectMode: boolean;
   isSelected: boolean;
-  onAddToQueue?: () => void;
+  onAddToQueue?: (game: Game) => void;
+  onAddToWishlist?: (game: Game) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
+  onRemove: (gameId: string) => void;
+  onRemoveAndIgnore: (game: Game) => void;
+  onStatusChange: (gameId: string, status: GameStatus) => void;
   onToggleSelected: () => void;
   refCallback: (element: HTMLDivElement | null) => void;
   platformLabel: GamePlatform;
@@ -283,12 +314,18 @@ type ShelfGameCardProps = {
 function ShelfGameCard({
   game,
   highlightLabel,
+  includeDetailsAction,
   index,
   isMultiSelectMode,
   isSelected,
   onAddToQueue,
+  onAddToWishlist,
   onKeyDown,
+  onMoveToLibrary,
   onOpenDetails,
+  onRemove,
+  onRemoveAndIgnore,
+  onStatusChange,
   onToggleSelected,
   refCallback,
   platformLabel,
@@ -297,12 +334,31 @@ function ShelfGameCard({
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
 
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
   }, [coverSources]);
+
+  function handleShelfCardKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      setIsActionMenuOpen(false);
+      onKeyDown(event);
+      return;
+    }
+
+    if (event.key === 'x' || event.key === 'X' || event.key === 'y' || event.key === 'Y') {
+      if (!isMultiSelectMode) {
+        event.preventDefault();
+        setIsActionMenuOpen((currentValue) => !currentValue);
+        return;
+      }
+    }
+
+    onKeyDown(event);
+  }
 
   return (
     <div
@@ -314,7 +370,7 @@ function ShelfGameCard({
         isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : 'border-skyglass/18'
       }`}
       onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
-      onKeyDown={onKeyDown}
+      onKeyDown={handleShelfCardKeyDown}
       role="button"
       tabIndex={0}
     >
@@ -368,18 +424,34 @@ function ShelfGameCard({
         <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
       </span>
 
-      {!isMultiSelectMode && onAddToQueue ? (
-        <button
-          className="mt-3 min-h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow focus-visible:bg-mint focus-visible:text-ink-950"
-          onClick={(event) => {
-            event.stopPropagation();
-            onAddToQueue();
-          }}
-          onKeyDown={(event) => event.stopPropagation()}
-          type="button"
-        >
-          Add to Backlog
-        </button>
+      {!isMultiSelectMode ? (
+        <span className="mt-3 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+          {onAddToQueue ? (
+            <button
+              className="min-h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow focus-visible:bg-mint focus-visible:text-ink-950"
+              onClick={() => onAddToQueue(game)}
+              onKeyDown={(event) => event.stopPropagation()}
+              type="button"
+            >
+              Add to Backlog
+            </button>
+          ) : null}
+          <GameActionMenu
+            game={game}
+            includeDetails={includeDetailsAction}
+            isOpen={isActionMenuOpen}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onClose={() => setIsActionMenuOpen(false)}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenChange={setIsActionMenuOpen}
+            onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+            variant="shelf"
+          />
+        </span>
       ) : null}
     </div>
   );
@@ -388,6 +460,7 @@ function ShelfGameCard({
 type CompactGameRowProps = {
   game: Game;
   highlightLabel?: string;
+  includeDetailsAction: boolean;
   isMultiSelectMode: boolean;
   isSelected: boolean;
   onAddToQueue?: (game: Game) => void;
@@ -408,6 +481,7 @@ type CompactGameRowProps = {
 function CompactGameRow({
   game,
   highlightLabel,
+  includeDetailsAction,
   isMultiSelectMode,
   isSelected,
   onAddToQueue,
@@ -480,18 +554,19 @@ function CompactGameRow({
       {!isMultiSelectMode ? (
         <div className="flex flex-wrap gap-1.5 sm:justify-end" aria-label={`${game.title} quick actions`}>
           {onAddToQueue ? <RowAction label="Backlog" onClick={() => onAddToQueue(game)} /> : null}
-          <RowAction label="Playing" onClick={() => onPlayNow?.(game)} primary />
-          {game.collectionType === 'wishlist' ? (
-            <RowAction label="Library" onClick={() => onMoveToLibrary?.(game)} />
-          ) : (
-            <RowAction label="Wishlist" onClick={() => onAddToWishlist?.(game)} />
-          )}
-          <RowAction label="Finished" onClick={() => onFinish?.(game) ?? onStatusChange('Finished')} />
-          <RowAction label="Details" onClick={onOpenDetails} />
-          <span className="flex gap-1.5 border-l border-skyglass/15 pl-1" aria-label={`${game.title} destructive actions`}>
-            <RowAction label="Ignore" onClick={onRemoveAndIgnore} tone="danger" />
-            <RowAction label={game.collectionType === 'wishlist' ? 'Remove' : 'Drop'} onClick={game.collectionType === 'wishlist' ? onRemove : () => onDrop?.(game) ?? onStatusChange('Dropped')} tone="danger" />
-          </span>
+          <RowAction label="Details" onClick={onOpenDetails} primary />
+          <GameActionMenu
+            game={game}
+            includeDetails={includeDetailsAction}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={onOpenDetails}
+            onRemove={() => onRemove()}
+            onRemoveAndIgnore={() => onRemoveAndIgnore()}
+            onStatusChange={(gameId, status) => onStatusChange(status)}
+            variant="compact"
+          />
         </div>
       ) : null}
     </article>
