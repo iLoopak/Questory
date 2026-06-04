@@ -55,6 +55,7 @@ export function QueuePanel({
   onRemoveEntry,
   onStartReview,
 }: QueuePanelProps) {
+  const { t } = useI18n();
   const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | ''>(initialPlatform ?? queueState.activePlatforms[0] ?? '');
   const [customPlatformName, setCustomPlatformName] = useState('');
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
@@ -136,19 +137,19 @@ export function QueuePanel({
   return (
     <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
-        title="Platforms"
+        title={t('queue.platforms')}
         searchValue={queueSearchTerm}
-        searchPlaceholder="Find platform game"
+        searchPlaceholder={t('queue.findGame')}
         onSearchChange={setQueueSearchTerm}
         selects={[
           {
-            label: 'Status',
+            label: t('toolbar.status'),
             value: 'Planned',
             options: ['Planned'],
             onChange: () => undefined,
           },
           {
-            label: 'Platform',
+            label: t('toolbar.platform'),
             value: platformFilter,
             options: ['All', ...activeQueuePlatforms],
             onChange: (value) => setPlatformFilter(value as GamePlatform | 'All'),
@@ -161,19 +162,19 @@ export function QueuePanel({
             onClick={addSelectedGame}
             type="button"
           >
-            Add
+            {t('toolbar.add')}
           </button>
         }
         actionMenu={
           <>
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Add game</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.addGame')}</span>
               <select
                 className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
                 value={selectedGameId}
                 onChange={(event) => setSelectedGameId(event.target.value)}
               >
-                <option value="">Choose a Library game</option>
+                <option value="">{t('queue.chooseLibraryGame')}</option>
                 {addableGames.map((game) => (
                   <option key={game.id} value={game.id}>
                     {game.title} - {game.platform}
@@ -182,7 +183,7 @@ export function QueuePanel({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Target platform</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.targetPlatform')}</span>
               <select
                 className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
                 value={selectedPlatform}
@@ -200,10 +201,10 @@ export function QueuePanel({
               onClick={onStartReview}
               type="button"
             >
-              Build in Review Mode
+              {t('queue.buildReview')}
             </button>
             <details className="rounded-md border border-white/10 bg-ink-900 p-2">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-300">Manage platforms</summary>
+              <summary className="cursor-pointer text-sm font-semibold text-slate-300">{t('queue.managePlatforms')}</summary>
               <div className="mt-2 grid gap-2">
                 {queuePlatforms
                   .filter((platform) => !activeQueuePlatforms.includes(platform))
@@ -219,10 +220,10 @@ export function QueuePanel({
                     </button>
                   ))}
                 <label className="grid gap-2">
-                  <span className="sr-only">Custom platform</span>
+                  <span className="sr-only">{t('queue.customPlatform')}</span>
                   <input
                     className="h-8 min-w-0 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-                    placeholder="Custom Platform"
+                    placeholder={t('queue.customPlatform')}
                     value={customPlatformName}
                     onChange={(event) => setCustomPlatformName(event.target.value)}
                   />
@@ -232,7 +233,7 @@ export function QueuePanel({
                     onClick={addCustomQueuePlatform}
                     type="button"
                   >
-                    Add platform
+                    {t('queue.addPlatform')}
                   </button>
                 </label>
               </div>
@@ -347,7 +348,7 @@ function PlatformQueueColumn({
   const accentStyle = { '--platform-accent': platformAccentColor, borderColor: isHighlighted || hasGames ? platformAccentColor : undefined } as CSSProperties;
 
   function renamePlatform() {
-    const nextName = window.prompt('Rename platform', platform);
+    const nextName = window.prompt(t('queue.renamePlatform'), platform);
     if (!nextName?.trim()) {
       return;
     }
@@ -371,11 +372,11 @@ function PlatformQueueColumn({
         </div>
         <details className="relative">
           <summary className="cursor-pointer rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10">
-            Options
+            {t('queue.options')}
           </summary>
           <div className="absolute right-0 z-20 mt-2 grid w-48 gap-2 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel">
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Future active limit</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.futureActiveLimit')}</span>
               <input
                 className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
                 min={1}
@@ -385,11 +386,11 @@ function PlatformQueueColumn({
                 onChange={(event) => onLimitChange(platform, Number(event.target.value))}
               />
             </label>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onHidePlatform(platform)} type="button">Hide Platform</button>
-            <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemovePlatform(platform)} type="button">Remove Platform</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">Rename Platform</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'up')} type="button">Move Up</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'down')} type="button">Move Down</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onHidePlatform(platform)} type="button">{t('queue.hidePlatform')}</button>
+            <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemovePlatform(platform)} type="button">{t('queue.removePlatform')}</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">{t('queue.renamePlatform')}</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'up')} type="button">{t('queue.moveUp')}</button>
+            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'down')} type="button">{t('queue.moveDown')}</button>
           </div>
         </details>
       </div>
@@ -400,9 +401,9 @@ function PlatformQueueColumn({
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.18em]">{playingNowLabel}</h4>
-                <p className="qs-platform-playing-meta mt-1 text-xs">{currentlyPlaying.length} active {currentlyPlaying.length === 1 ? 'game' : 'games'} on {platform}</p>
+                <p className="qs-platform-playing-meta mt-1 text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} · {platform}</p>
               </div>
-              <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">Active list</span>
+              <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">{t('queue.activeList')}</span>
             </div>
             <div className="grid w-full min-w-0 gap-2">
               {currentlyPlaying.map((game) => (
@@ -438,7 +439,7 @@ function PlatformQueueColumn({
           })
         ) : (
           <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
-            No Queue yet. Add games above or use Review Mode.
+            {t('queue.noQueue')}
           </div>
         )}
       </div>
@@ -467,6 +468,8 @@ function QueueEntryRow({
   onPlayNow: () => void;
   onRemoveEntry: (gameId: string) => void;
 }) {
+  const { t } = useI18n();
+
   function handleQueueEntryKeyDown(event: KeyboardEvent<HTMLElement>) {
     const target = event.target;
     if (target instanceof HTMLButtonElement || target instanceof HTMLSelectElement) {
@@ -493,7 +496,7 @@ function QueueEntryRow({
 
   return (
     <article
-      aria-label={`${game.title} platform backlog entry. Confirm opens details. Face buttons move entries up or down.`}
+      aria-label={`${game.title} ${t('queue.entryA11y')}`}
       className="rounded-md border border-skyglass/15 bg-ink-950 p-2"
       onKeyDown={handleQueueEntryKeyDown}
       role="group"
@@ -512,24 +515,24 @@ function QueueEntryRow({
         </div>
         <div className="col-span-3 flex flex-wrap gap-1 sm:col-auto">
           <button className="h-9 rounded-md border px-2 text-xs font-semibold text-slate-100 hover:bg-white/10" style={{ borderColor: 'var(--platform-accent)', backgroundColor: 'color-mix(in srgb, var(--platform-accent) 14%, transparent)' }} onClick={onPlayNow} type="button">
-            ▶ Play Now
+            ▶ {t('queue.playNow')}
           </button>
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">
-            Top
+            {t('queue.top')}
           </button>
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'up')} type="button">
-            Up
+            {t('settings.up')}
           </button>
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'down')} type="button">
-            Down
+            {t('settings.down')}
           </button>
           <button className="h-9 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemoveEntry(game.id)} type="button">
-            Remove
+            {t('action.remove')}
           </button>
         </div>
       </div>
       <details className="mt-2">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Move platform</summary>
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.movePlatform')}</summary>
         <select
           className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
           value={entry.targetPlatform}
@@ -559,6 +562,8 @@ function QueueGameRow({
   onAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onOpenDetails: (gameId: string) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border p-2 text-sm transition">
       <button className="text-left" onClick={() => onOpenDetails(game.id)} type="button">
@@ -570,11 +575,11 @@ function QueueGameRow({
         </button>
         <span className="qs-platform-playing-label mt-1 block text-xs font-semibold uppercase tracking-[0.14em]">{playingNowLabel}</span>
         <span className="qs-platform-playing-meta mt-1 block truncate text-xs">{game.platform}</span>
-        <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} currently playing actions`}>
-          <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">Move to Queue</button>
-          <button className="qs-platform-playing-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'finished')} type="button">Finished</button>
-          <button className="qs-platform-playing-drop-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'drop')} type="button">Drop</button>
-          <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">Remove from Playing</button>
+        <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} ${t('queue.currentlyPlayingActions')}`}>
+          <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">{t('queue.moveToQueue')}</button>
+          <button className="qs-platform-playing-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'finished')} type="button">{t('action.finished')}</button>
+          <button className="qs-platform-playing-drop-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'drop')} type="button">{t('queue.drop')}</button>
+          <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'remove-from-playing')} type="button">{t('queue.removeFromPlaying')}</button>
         </div>
       </div>
     </article>

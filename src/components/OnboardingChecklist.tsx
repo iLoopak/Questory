@@ -6,6 +6,7 @@ import { searchGameByName, RawgApiError } from '../services/rawgApi';
 import { getOwnedGames, getRecentlyPlayedGames, SteamApiError } from '../services/steamApi';
 import type { RawgSettings } from '../types/rawg';
 import type { SteamSettings } from '../types/steam';
+import { useI18n } from '../i18n';
 
 type OnboardingChecklistItem = {
   actionLabel?: string;
@@ -108,6 +109,7 @@ export function OnboardingChecklist({
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
 }: OnboardingChecklistProps) {
+  const { t } = useI18n();
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedSetup, setExpandedSetup] = useState<'steam' | 'rawg' | null>(() => {
     if (!completedItemIds.has('steam-test')) {
@@ -223,8 +225,8 @@ export function OnboardingChecklist({
     <section className={`qs-setup-card rounded-lg border p-4 ${isSettingsPanel ? '' : 'shadow-panel'}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Setup assistant</div>
-          <h2 className="mt-1 text-lg font-semibold text-white">Set up QuestShelf</h2>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('onboarding.assistant')}</div>
+          <h2 className="mt-1 text-lg font-semibold text-white">{t('onboarding.setupTitle')}</h2>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -280,8 +282,8 @@ export function OnboardingChecklist({
             onClick={() => setShowCompleted((currentValue) => !currentValue)}
             type="button"
           >
-            <span>Completed</span>
-            <span className="text-xs font-medium text-mint">{showCompleted ? 'Hide completed' : 'Show completed'}</span>
+            <span>{t('onboarding.completed')}</span>
+            <span className="text-xs font-medium text-mint">{showCompleted ? t('onboarding.hideCompleted') : t('onboarding.showCompleted')}</span>
           </button>
 
           {showCompleted ? (
@@ -308,6 +310,8 @@ function OnboardingStep({
   onAction: (itemId: OnboardingItemId) => void;
   onExpandSetup: (setup: 'steam' | 'rawg') => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <article className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -361,16 +365,18 @@ function InlineSteamSetup({
   onSettingChange: (field: keyof SteamSettings, value: string) => void;
   onTestConnection: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="mt-4 rounded-md border border-mint/25 bg-mint/10 p-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Steam API key</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('onboarding.steamApiKey')}</span>
           <input
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
             value={settings.apiKey}
             onChange={(event) => onSettingChange('apiKey', event.target.value)}
-            placeholder="Paste Steam API key"
+            placeholder={t('onboarding.pasteSteamKey')}
             spellCheck={false}
             type="password"
           />
@@ -396,7 +402,7 @@ function InlineSteamSetup({
           onClick={onTestConnection}
           type="button"
         >
-          {status.tone === 'loading' ? 'Testing...' : 'Test connection'}
+          {status.tone === 'loading' ? t('onboarding.testing') : t('onboarding.testConnection')}
         </button>
         <SetupStatusMessage status={status} />
       </div>
@@ -415,15 +421,17 @@ function InlineRawgSetup({
   onKeyChange: (value: string) => void;
   onTestConnection: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="mt-4 rounded-md border border-mint/25 bg-mint/10 p-3">
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Game info API key</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('onboarding.gameInfoApiKey')}</span>
         <input
           className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
           value={settings.apiKey}
           onChange={(event) => onKeyChange(event.target.value)}
-          placeholder="Paste Game info API key"
+          placeholder={t('onboarding.pasteGameInfoKey')}
           spellCheck={false}
           type="password"
         />
@@ -436,7 +444,7 @@ function InlineRawgSetup({
           onClick={onTestConnection}
           type="button"
         >
-          {status.tone === 'loading' ? 'Testing...' : 'Test connection'}
+          {status.tone === 'loading' ? t('onboarding.testing') : t('onboarding.testConnection')}
         </button>
         <SetupStatusMessage status={status} />
       </div>

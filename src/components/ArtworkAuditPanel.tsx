@@ -10,6 +10,7 @@ import {
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import { CollectionToolbar } from './CollectionToolbar';
 import type { Game } from '../types/game';
+import { useI18n } from '../i18n';
 
 type ArtworkAuditPanelProps = {
   games: Game[];
@@ -42,6 +43,7 @@ const emptySummary: ArtworkBulkSummary = {
 const progressDelayMs = 120;
 
 export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, onOpenDetails }: ArtworkAuditPanelProps) {
+  const { t } = useI18n();
   const [summary, setSummary] = useState<ArtworkBulkSummary | null>(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [isFindingArtwork, setIsFindingArtwork] = useState(false);
@@ -154,7 +156,7 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
       <div className="flex h-full min-h-0 flex-col">
         <header className="border-b border-skyglass/15 bg-ink-950/70 p-2 sm:p-3">
           <CollectionToolbar
-            title="Artwork"
+            title={t('nav.artwork')}
             primaryAction={
               <button
                 className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
@@ -200,7 +202,7 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
           {isFindingArtwork ? (
             <div className="mt-4">
               <div className="mb-2 flex justify-between text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-                <span>Finding artwork</span>
+                <span>{t('artwork.finding')}</span>
                 <span>{progress.completed}/{progress.total}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-ink-800">
@@ -221,9 +223,9 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
 
         <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           <div className="grid gap-4 xl:grid-cols-3">
-            <ArtworkBucket title="Missing artwork" bucket="missing" games={audit.missingArtwork} onOpenDetails={onOpenDetails} />
-            <ArtworkBucket title="Poor / fallback artwork" bucket="fallback" games={audit.fallbackArtwork} onOpenDetails={onOpenDetails} />
-            <ArtworkBucket title="Enriched but cover not applied" bucket="enriched" games={audit.enrichedWithoutAppliedCover} onOpenDetails={onOpenDetails} />
+            <ArtworkBucket title={t('artwork.missing')} bucket="missing" games={audit.missingArtwork} onOpenDetails={onOpenDetails} />
+            <ArtworkBucket title={t('artwork.fallback')} bucket="fallback" games={audit.fallbackArtwork} onOpenDetails={onOpenDetails} />
+            <ArtworkBucket title={t('artwork.enrichedNotApplied')} bucket="enriched" games={audit.enrichedWithoutAppliedCover} onOpenDetails={onOpenDetails} />
           </div>
         </div>
       </div>
@@ -317,6 +319,7 @@ function AuditActionButton({ children, disabled, onClick }: { children: string; 
 }
 
 function ArtworkBucket({ bucket, games, onOpenDetails, title }: { bucket: AuditBucket; games: Game[]; onOpenDetails: (gameId: string) => void; title: string }) {
+  const { t } = useI18n();
   return (
     <section className="rounded-xl border border-white/10 bg-ink-950/60 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -341,7 +344,7 @@ function ArtworkBucket({ bucket, games, onOpenDetails, title }: { bucket: AuditB
             </div>
           </button>
         )) : (
-          <div className="rounded-lg border border-dashed border-white/10 p-4 text-sm text-slate-500">No games in this bucket.</div>
+          <div className="rounded-lg border border-dashed border-white/10 p-4 text-sm text-slate-500">{t('artwork.emptyBucket')}</div>
         )}
       </div>
     </section>

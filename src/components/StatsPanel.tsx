@@ -38,7 +38,7 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
                   onClick={() => setScope(option)}
                   type="button"
                 >
-                  {option === 'all' ? 'All' : `${option} only`}
+                  {option === 'all' ? t('stats.scopeAll') : `${option} ${t('stats.scopeOnly')}`}
                 </button>
               ))}
             </div>
@@ -56,7 +56,7 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
                 <BreakdownPanel
                   items={stats.platformBreakdown}
                   label={t('common.games')}
-                  secondaryLabel="hours"
+                  secondaryLabel={t('common.hours')}
                   title={t('stats.platformBreakdown')}
                 />
                 <BreakdownPanel items={stats.statusBreakdown} label={t('common.games')} title={t('stats.statusBreakdown')} />
@@ -66,14 +66,14 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <GameListPanel
-                  emptyText="No tracked playtime yet."
+                  emptyText={t('stats.noTrackedPlaytime')}
                   games={stats.topPlayedGames}
                   metric={(game) => `${game.playtimeHours}h`}
                   onOpenDetails={onOpenDetails}
                   title={t('stats.topPlayed')}
                 />
                 <GameListPanel
-                  emptyText="No recent play dates yet."
+                  emptyText={t('stats.noRecentPlayDates')}
                   games={stats.recentlyPlayedGames}
                   metric={(game) => formatDate(game.lastPlayedAt)}
                   onOpenDetails={onOpenDetails}
@@ -119,12 +119,14 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
 }
 
 function QueueStatsPanel({ queueSummary }: { queueSummary: PlatformQueueSummary }) {
+  const { t } = useI18n();
+
   return (
     <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-semibold text-white">Platforms planning</h3>
-          <p className="mt-1 text-sm text-slate-400">Platforms is the focused layer above the full Library.</p>
+          <h3 className="font-semibold text-white">{t('stats.platformsPlanning')}</h3>
+          <p className="mt-1 text-sm text-slate-400">{t('stats.platformsPlanningHelp')}</p>
         </div>
         <span className="rounded-md border border-mint/30 bg-mint/10 px-2.5 py-1 text-sm font-semibold text-mint">
           {queueSummary.queuedCount} planned
@@ -171,12 +173,14 @@ function ProgressGrid({ stats }: { stats: QuestShelfStats }) {
 }
 
 function EnrichmentPanel({ stats }: { stats: QuestShelfStats }) {
+  const { t } = useI18n();
+
   return (
     <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-white">RAWG enrichment</h3>
-          <p className="mt-1 text-sm text-slate-400">Metadata coverage in the selected scope.</p>
+          <h3 className="font-semibold text-white">{t('stats.rawgEnrichment')}</h3>
+          <p className="mt-1 text-sm text-slate-400">{t('stats.metadataCoverage')}</p>
         </div>
         <span className="rounded-md border border-mint/30 bg-mint/10 px-2.5 py-1 text-sm font-semibold text-mint">
           {stats.enrichmentCompletionPercent}%
@@ -201,6 +205,7 @@ type BreakdownPanelProps = {
 };
 
 function BreakdownPanel({ items, label, secondaryLabel, title }: BreakdownPanelProps) {
+  const { t } = useI18n();
   const maxCount = Math.max(...items.map((item) => item.count), 1);
 
   return (
@@ -223,7 +228,7 @@ function BreakdownPanel({ items, label, secondaryLabel, title }: BreakdownPanelP
             </div>
           ))
         ) : (
-          <p className="text-sm text-slate-400">No data in this scope.</p>
+          <p className="text-sm text-slate-400">{t('stats.noData')}</p>
         )}
       </div>
     </section>

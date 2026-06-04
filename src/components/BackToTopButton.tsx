@@ -1,4 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useI18n } from '../i18n';
 
 const scrollablePanelSelector =
   '.qs-content-panel, .qs-queue-shell, .qs-review-shell, .qs-settings-detail, .qs-settings-list, .qs-scroll-panel';
@@ -19,6 +20,7 @@ function shouldShowBackToTop() {
 }
 
 export function BackToTopButton() {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -58,15 +60,15 @@ export function BackToTopButton() {
   return (
     <button
       aria-hidden={!isVisible}
-      aria-label="Back to top"
+      aria-label={t('common.backToTop')}
       className={`qs-header-back-to-top ${isVisible ? 'qs-header-back-to-top-visible' : ''}`}
       disabled={!isVisible}
       onClick={scrollToTop}
-      title="Back to top"
+      title={t('common.backToTop')}
       type="button"
     >
       <span aria-hidden="true">↑</span>
-      <span>Top</span>
+      <span>{t('common.top')}</span>
     </button>
   );
 }

@@ -31,6 +31,7 @@ import {
   saveSyncFolderSettings,
   type SyncFolderSettings,
 } from '../lib/syncFolderStorage';
+import { useI18n } from '../i18n';
 
 type DataManagementPanelProps = {
   autoBackupSignal?: string;
@@ -40,6 +41,7 @@ type DataManagementPanelProps = {
 type ImportMode = 'merge' | 'replace';
 
 export function DataManagementPanel({ autoBackupSignal, onBackupExported }: DataManagementPanelProps) {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [includeIntegrationSettings, setIncludeIntegrationSettings] = useState(false);
   const [importMode, setImportMode] = useState<ImportMode>('merge');
@@ -319,9 +321,9 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Data management</h2>
+          <h2 className="text-xl font-semibold text-white">{t('data.title')}</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-            Export or import portable QuestShelf backups for device moves, synced folders, and safe cleanup.
+            {t('data.subtitle')}
           </p>
         </div>
         <button
@@ -329,7 +331,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
           onClick={downloadBackup}
           type="button"
         >
-          Export backup
+          {t('data.exportBackup')}
         </button>
       </div>
 
@@ -348,9 +350,9 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
             type="checkbox"
           />
           <span>
-            <span className="block font-medium text-white">Include integration settings</span>
+            <span className="block font-medium text-white">{t('data.includeIntegrations')}</span>
             <span className="mt-1 block text-slate-500">
-              Disabled by default. Enables Steam and RAWG settings in the backup, including API keys.
+              {t('data.includeIntegrationsHelp')}
             </span>
           </span>
         </label>
@@ -358,7 +360,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
         <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3">
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              QuestShelf backup JSON
+              {t('data.backupJson')}
             </span>
             <input
               ref={fileInputRef}
@@ -381,13 +383,13 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
             onClick={restoreBackup}
             type="button"
           >
-            {importMode === 'merge' ? 'Merge backup' : 'Replace from backup'}
+            {importMode === 'merge' ? t('data.mergeBackup') : t('data.replaceBackup')}
           </button>
         </div>
       </div>
 
       <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
-        <div className="font-medium text-white">Portable sync foundation</div>
+        <div className="font-medium text-white">{t('data.portableSync')}</div>
         <div className="mt-1">
           QuestShelf currently uses {portableSyncProviders[0].label.toLowerCase()} export/import.{' '}
           {portableSyncProviders[1].label} support is planned for user-owned cloud folders without accounts.
@@ -410,7 +412,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
                 onChange={() => setImportMode('merge')}
                 type="radio"
               />
-              <span>Merge with local data</span>
+              <span>{t('data.mergeLocal')}</span>
             </label>
             <label className="flex items-center gap-2 rounded-md border border-skyglass/15 px-3 py-2">
               <input
@@ -419,7 +421,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
                 onChange={() => setImportMode('replace')}
                 type="radio"
               />
-              <span>Replace local data</span>
+              <span>{t('data.replaceLocal')}</span>
             </label>
           </div>
         </div>
@@ -428,7 +430,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
       <section className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">Sync Folder / Auto Backup</h3>
+            <h3 className="text-lg font-semibold text-white">{t('data.syncFolder')}</h3>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
               For simple multi-device sync, choose a backup file inside your Google Drive / OneDrive / Dropbox / Syncthing folder.
             </p>
@@ -480,14 +482,14 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
                 type="checkbox"
               />
               <span>
-                <span className="block font-medium text-white">Include integration settings in auto-backup</span>
-                <span className="mt-1 block text-slate-500">Off by default so Steam and RAWG API keys are not written unless you choose it.</span>
+                <span className="block font-medium text-white">{t('data.includeAutoBackup')}</span>
+                <span className="mt-1 block text-slate-500">{t('data.includeAutoBackupHelp')}</span>
               </span>
             </label>
           </>
         ) : (
           <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
-            This device cannot keep a persistent backup file handle yet. Use Export backup and QuestShelf backup JSON above, then save/load that file from your synced folder manually. Android APK builds can add a native file picker later for direct auto-backup writes.
+            This device cannot keep a persistent backup file handle yet. Use {t('data.exportBackup')} and {t('data.backupJson')} above, then save/load that file from your synced folder manually. Android APK builds can add a native file picker later for direct auto-backup writes.
           </div>
         )}
       </section>
@@ -510,7 +512,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
           onClick={() => void resetLocalData()}
           type="button"
         >
-          Reset local data
+          {t('data.resetLocal')}
         </button>
         <p className="mt-2 text-xs leading-5 text-slate-500">
           Reset removes only known QuestShelf local data from this device. It does not touch data from other apps.
@@ -538,6 +540,8 @@ function StorageRecoveryPanel({
   onClearWarnings: () => void;
   onExportRawData: () => void;
 }) {
+  const { t } = useI18n();
+
   if (issues.length === 0) {
     return null;
   }
@@ -546,7 +550,7 @@ function StorageRecoveryPanel({
     <section className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-4 text-amber-100">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Storage recovery available</h3>
+          <h3 className="text-lg font-semibold text-white">{t('data.storageRecovery')}</h3>
           <p className="mt-1 max-w-2xl text-sm leading-6">
             QuestShelf found local data it could not read safely. The app used fallback defaults and did not delete the
             original raw values.

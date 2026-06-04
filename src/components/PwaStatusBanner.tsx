@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isNativeAndroidRuntime } from '../lib/capacitorEnvironment';
+import { useI18n } from '../i18n';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -9,6 +10,7 @@ type BeforeInstallPromptEvent = Event & {
 const installDismissedKey = 'questshelf.installHintDismissed.v1';
 
 export function PwaStatusBanner() {
+  const { t } = useI18n();
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [isNativeAndroid] = useState(() => isNativeAndroidRuntime());
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -76,7 +78,7 @@ export function PwaStatusBanner() {
   if (!isOnline) {
     return (
       <div className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
-        Offline mode: your local library stays available. Steam and RAWG requests will wait for a connection.
+        {t('pwa.offline')}
       </div>
     );
   }
@@ -87,7 +89,7 @@ export function PwaStatusBanner() {
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-      <span>Add QuestShelf to your device for a standalone library experience.</span>
+      <span>{t('pwa.installHint')}</span>
       <div className="flex gap-2">
         <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint" onClick={installApp} type="button">
           Install QuestShelf

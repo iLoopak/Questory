@@ -5,6 +5,7 @@ import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameActionMenu } from './GameActionMenu';
 import { PlatformBadge } from './PlatformBadge';
+import { useI18n } from '../i18n';
 
 type GameCardProps = {
   game: Game;
@@ -43,6 +44,7 @@ export function GameCard({
   platformQueueState,
   platformLabel,
 }: GameCardProps) {
+  const { t } = useI18n();
   const coverSources = useMemo(() => {
     return getGameCoverSources(game);
   }, [game]);
@@ -160,7 +162,7 @@ export function GameCard({
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border border-mint/20 bg-ink-900 text-xl font-semibold text-mint shadow-glow">
                 {game.title.slice(0, 1).toUpperCase()}
               </div>
-              <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">No cover</div>
+              <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{t('common.noCover')}</div>
             </div>
           </div>
         )}

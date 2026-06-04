@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import { ViewportModal } from './ViewportModal';
+import { useI18n } from '../i18n';
 import type { IgnoredSteamGame } from '../lib/steamIgnoredGamesStorage';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
 import {
@@ -59,6 +60,7 @@ export function SteamSettingsPanel({
   onRefreshSteamPlaytime,
   onUnignoreSteamGame,
 }: SteamSettingsPanelProps) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
   const [connectionState, setConnectionState] = useState<SteamConnectionState>(initialConnectionState);
   const [selectedAppIds, setSelectedAppIds] = useState<Set<number>>(() => new Set());
@@ -234,7 +236,7 @@ export function SteamSettingsPanel({
     <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-4">
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Steam integration</h2>
+          <h2 className="text-xl font-semibold text-white">{t('steam.integration')}</h2>
 
         </div>
       </div>
@@ -244,20 +246,20 @@ export function SteamSettingsPanel({
           <div className="space-y-4">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Steam Web API key <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-api-key'); }} type="button" aria-label="Steam API key help">?</button>
+                Steam Web API key <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-api-key'); }} type="button" aria-label={t('steam.apiKeyHelp')}>?</button>
               </span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 value={settings.apiKey}
                 onChange={(event) => updateSetting('apiKey', event.target.value)}
-                placeholder="Paste API key"
+                placeholder={t('integrations.pasteApiKey')}
                 spellCheck={false}
                 type="password"
               />
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SteamID64 <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-id64'); }} type="button" aria-label="SteamID64 help">?</button></span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SteamID64 <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-id64'); }} type="button" aria-label={t('steam.idHelp')}>?</button></span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 value={settings.steamId64}
@@ -314,7 +316,7 @@ export function SteamSettingsPanel({
         </section>
 
         <details className="rounded-lg border border-white/10 bg-ink-950 p-4">
-          <summary className="cursor-pointer font-semibold text-white">Connection details</summary>
+          <summary className="cursor-pointer font-semibold text-white">{t('steam.connectionDetails')}</summary>
           <div className="mt-3">
             <SteamApiDebugSummary
               entries={apiDebugEntries}
@@ -356,6 +358,7 @@ type SteamPlaytimeRefreshCardProps = {
 };
 
 function SteamPlaytimeRefreshCard({ librarySteamGameCount, refreshState, onRefresh }: SteamPlaytimeRefreshCardProps) {
+  const { t } = useI18n();
   const isLoading = refreshState.status === 'loading';
   const progressPercent = refreshState.progress.total > 0
     ? Math.round((refreshState.progress.completed / refreshState.progress.total) * 100)
@@ -371,7 +374,7 @@ function SteamPlaytimeRefreshCard({ librarySteamGameCount, refreshState, onRefre
     <section className="rounded-md border border-white/10 bg-ink-900/80 p-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white">Refresh playtime for Steam games</h3>
+          <h3 className="text-sm font-semibold text-white">{t('steam.refreshPlaytime')}</h3>
           <p className="mt-1 text-xs leading-5 text-slate-400">
             Updates playtime and Steam last played dates for {librarySteamGameCount} Steam library game{librarySteamGameCount === 1 ? '' : 's'} without re-importing your library.
           </p>
@@ -392,7 +395,7 @@ function SteamPlaytimeRefreshCard({ librarySteamGameCount, refreshState, onRefre
           {isLoading ? (
             <div className="mt-3">
               <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
-                <span>Progress</span>
+                <span>{t('app.progress')}</span>
                 <span>{refreshState.progress.completed}/{refreshState.progress.total}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -420,12 +423,13 @@ type SteamApiDebugSummaryProps = {
 };
 
 function SteamApiDebugSummary({ entries, latestEntry, steamId64 }: SteamApiDebugSummaryProps) {
+  const { t } = useI18n();
   const parsedGameCount = latestEntry?.parsedGameCount;
 
   return (
     <div className="mb-4 rounded-md border border-white/10 bg-ink-900 p-3">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <h4 className="text-sm font-semibold text-white">Temporary Steam API debug</h4>
+        <h4 className="text-sm font-semibold text-white">{t('steam.debug')}</h4>
         <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
           API key redacted
         </span>
@@ -480,11 +484,13 @@ function SteamImportSection({
   onSelectAll,
   onToggleSelected,
 }: SteamImportSectionProps) {
+  const { t } = useI18n();
+
   return (
     <section className="mt-4 rounded-lg border border-white/10 bg-ink-950 p-4">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Steam import</h3>
+          <h3 className="text-lg font-semibold text-white">{t('steam.import')}</h3>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -547,6 +553,7 @@ type SteamImportRowProps = {
 };
 
 function SteamImportRow({ game, isDuplicate, isIgnored, isSelected, recentGame, onToggleSelected }: SteamImportRowProps) {
+  const { t } = useI18n();
   const artworkUrls = getSteamArtworkUrls(game.appid);
   const isDisabled = isDuplicate || isIgnored;
 
@@ -585,11 +592,11 @@ function SteamImportRow({ game, isDuplicate, isIgnored, isSelected, recentGame, 
 
       <div className="text-sm font-medium text-slate-300">
         {isDuplicate ? (
-          <span className="text-skyglass">Already in library</span>
+          <span className="text-skyglass">{t('steam.alreadyInLibrary')}</span>
         ) : isIgnored ? (
-          <span className="text-red-200">Ignored</span>
+          <span className="text-red-200">{t('steam.ignored')}</span>
         ) : (
-          <span>Ready</span>
+          <span>{t('steam.ready')}</span>
         )}
       </div>
     </label>

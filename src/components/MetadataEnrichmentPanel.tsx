@@ -14,6 +14,7 @@ import { getGameDetails, mapRawgDetailsToMetadata, RawgApiError, searchGameByNam
 import type { Game, GamePlatform } from '../types/game';
 import { CollectionToolbar } from './CollectionToolbar';
 import type { RawgMetadata, RawgSearchResult } from '../types/rawg';
+import { useI18n } from '../i18n';
 
 type MetadataEnrichmentPanelProps = {
   games: Game[];
@@ -60,6 +61,7 @@ export function MetadataEnrichmentPanel({
   onMetadataUpdate,
   selectionRequestId,
 }: MetadataEnrichmentPanelProps) {
+  const { t } = useI18n();
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [enrichmentStateByGameId, setEnrichmentStateByGameId] = useState<Record<string, EnrichmentState>>({});
   const [manualPicker, setManualPicker] = useState<ManualPickerState | null>(null);
@@ -319,7 +321,7 @@ export function MetadataEnrichmentPanel({
       <div className="flex h-full min-h-0 flex-col">
         <div className="border-b border-skyglass/15 bg-ink-950/70 p-2 sm:p-3">
           <CollectionToolbar
-            title="Game info"
+            title={t('metadata.title')}
             searchValue={metadataSearchTerm}
             searchPlaceholder="Find metadata target"
             onSearchChange={setMetadataSearchTerm}
@@ -374,7 +376,7 @@ export function MetadataEnrichmentPanel({
           {isQueueRunning ? (
             <div className="mt-2">
               <div className="mb-1 flex justify-between text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-                <span>Progress</span>
+                <span>{t('app.progress')}</span>
                 <span>
                   {progress.completed}/{progress.total}
                 </span>
@@ -391,7 +393,7 @@ export function MetadataEnrichmentPanel({
           {!isQueueRunning && reviewGames.length > 0 ? (
             <details className="mt-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
               <summary className="cursor-pointer font-semibold">{reviewGames.length} need review</summary>
-              <p className="mt-1 text-xs text-amber-100/80">Open matching rows below to choose the correct metadata result.</p>
+              <p className="mt-1 text-xs text-amber-100/80">{t('metadata.progressHelp')}</p>
             </details>
           ) : null}
         </div>
@@ -419,7 +421,7 @@ export function MetadataEnrichmentPanel({
           ) : (
             <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
               <div>
-                <h3 className="text-lg font-semibold text-white">Game info is complete</h3>
+                <h3 className="text-lg font-semibold text-white">{t('metadata.complete')}</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                   Every local game has info attached.
                 </p>
@@ -593,13 +595,15 @@ type ManualMatchDialogProps = {
 };
 
 function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps) {
+  const { t } = useI18n();
+
   return (
     <div className="fixed inset-0 z-20 grid place-items-center bg-black/70 p-4">
       <section className="qs-glass max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
         <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">Pick RAWG match</h3>
-            <p className="mt-1 text-sm text-slate-400">Suggested and low-confidence results need a human choice before saving.</p>
+            <h3 className="text-lg font-semibold text-white">{t('metadata.pickRawg')}</h3>
+            <p className="mt-1 text-sm text-slate-400">{t('metadata.pickRawgHelp')}</p>
           </div>
           <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={onClose} type="button">
             Close
