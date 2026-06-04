@@ -237,11 +237,24 @@ export function RecommendationPanel({
 
       {recommendationResults.length > 0 ? (
         viewMode === 'Shelf View' ? (
-          <CollectionShelf games={recommendationResults} getHighlightLabel={getHighlightLabel} onAddToQueue={onAddToQueue} onOpenDetails={onOpenDetails} platformQueueState={queueState} />
+          <CollectionShelf
+            games={recommendationResults}
+            getHighlightLabel={getHighlightLabel}
+            includeDetailsAction
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={onOpenDetails}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+            platformQueueState={queueState}
+          />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
+            includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
             onMoveToLibrary={onMoveToLibrary}
@@ -255,6 +268,7 @@ export function RecommendationPanel({
           <CollectionGrid
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
+            includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
             onMoveToLibrary={onMoveToLibrary}

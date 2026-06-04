@@ -3,11 +3,13 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
+import { GameActionMenu } from './GameActionMenu';
 import { PlatformBadge } from './PlatformBadge';
 
 type GameCardProps = {
   game: Game;
   highlightLabel?: string;
+  includeDetailsAction?: boolean;
   isMultiSelectMode?: boolean;
   onAddToQueue?: (game: Game) => void;
   isSelected?: boolean;
@@ -26,6 +28,7 @@ type GameCardProps = {
 export function GameCard({
   game,
   highlightLabel,
+  includeDetailsAction = false,
   isMultiSelectMode = false,
   isSelected = false,
   onAddToQueue,
@@ -198,145 +201,25 @@ export function GameCard({
             >
               Details
             </button>
-            <div className="relative" onClick={stopCardAction}>
-              <button
-                aria-expanded={isActionMenuOpen}
-                aria-label={`More actions for ${game.title}`}
-                data-controller-action="context-menu"
-                className="grid h-10 w-11 place-items-center rounded-md border border-skyglass/15 text-lg font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-                onClick={() => setIsActionMenuOpen((currentValue) => !currentValue)}
-                type="button"
-              >
-                ...
-              </button>
-              {isActionMenuOpen ? (
-                <div className="absolute bottom-11 right-0 z-20 w-48 overflow-hidden rounded-md border border-skyglass/15 bg-ink-950 shadow-panel">
-                  {onAddToQueue ? (
-                    <ActionMenuButton
-                      label="Add to Backlog"
-                      onClick={() => {
-                        onAddToQueue(game);
-                        setIsActionMenuOpen(false);
-                      }}
-                    />
-                  ) : null}
-                  {game.collectionType === 'wishlist' ? (
-                    <ActionMenuButton
-                      label="Move to Library"
-                      onClick={() => {
-                        onMoveToLibrary?.(game);
-                        setIsActionMenuOpen(false);
-                      }}
-                    />
-                  ) : (
-                    <ActionMenuButton
-                      label="Add to Wishlist"
-                      onClick={() => {
-                        onAddToWishlist?.(game);
-                        setIsActionMenuOpen(false);
-                      }}
-                    />
-                  )}
-                  {onFindMetadata ? (
-                    <ActionMenuButton
-                      label="Find info"
-                      onClick={() => {
-                        onFindMetadata(game);
-                        setIsActionMenuOpen(false);
-                      }}
-                    />
-                  ) : null}
-                  {game.collectionType === 'library' ? (
-                    <ActionMenuButton
-                      label="Playing"
-                      onClick={() => {
-                        onStatusChange(game.id, 'Playing');
-                        setIsActionMenuOpen(false);
-                      }}
-                    />
-                  ) : null}
-                  {game.collectionType === 'library' ? (
-                    <ActionMenuButton
-                      label="Finished"
-                      onClick={() => {
-                        onStatusChange(game.id, 'Finished');
-                        setIsActionMenuOpen(false);
-                      }}
-                    />
-                  ) : null}
-                  {game.storeUrl || game.externalUrl ? (
-                    <ActionMenuLink label="Open Steam store" url={game.storeUrl ?? game.externalUrl ?? ''} />
-                  ) : null}
-                  <ActionMenuButton
-                    label={game.collectionType === 'wishlist' ? 'Remove Wishlist' : 'Remove'}
-                    onClick={() => {
-                      onRemove(game.id);
-                      setIsActionMenuOpen(false);
-                    }}
-                    tone="danger"
-                  />
-                  {game.collectionType === 'library' ? (
-                    <ActionMenuButton
-                      label="Drop"
-                      onClick={() => {
-                        onStatusChange(game.id, 'Dropped');
-                        setIsActionMenuOpen(false);
-                      }}
-                      tone="danger"
-                    />
-                  ) : null}
-                  {game.collectionType === 'library' ? (
-                    <ActionMenuButton
-                      disabled={typeof game.steamAppId !== 'number'}
-                      label="Ignore"
-                      onClick={() => {
-                        onRemoveAndIgnore(game);
-                        setIsActionMenuOpen(false);
-                      }}
-                      tone="danger"
-                    />
-                  ) : null}
-                </div>
-              ) : null}
+            <div onClick={stopCardAction}>
+              <GameActionMenu
+                game={game}
+                includeDetails={includeDetailsAction}
+                isOpen={isActionMenuOpen}
+                onAddToQueue={onAddToQueue}
+                onAddToWishlist={onAddToWishlist}
+                onClose={() => setIsActionMenuOpen(false)}
+                onMoveToLibrary={onMoveToLibrary}
+                onOpenChange={setIsActionMenuOpen}
+                onOpenDetails={onOpenDetails}
+                onRemove={onRemove}
+                onRemoveAndIgnore={onRemoveAndIgnore}
+                onStatusChange={onStatusChange}
+              />
             </div>
           </div>
         </div>
       </div>
     </article>
-  );
-}
-
-function ActionMenuLink({ label, url }: { label: string; url: string }) {
-  return (
-    <a
-      className="block h-10 w-full px-3 py-2.5 text-left text-sm text-slate-200 transition hover:bg-mint/10"
-      href={url}
-      rel="noreferrer"
-      target="_blank"
-    >
-      {label}
-    </a>
-  );
-}
-
-type ActionMenuButtonProps = {
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-  tone?: 'danger';
-};
-
-function ActionMenuButton({ disabled = false, label, onClick, tone }: ActionMenuButtonProps) {
-  return (
-    <button
-      className={`block h-10 w-full px-3 text-left text-sm transition hover:bg-mint/10 disabled:cursor-not-allowed disabled:text-slate-600 ${
-        tone === 'danger' ? 'text-red-200' : 'text-slate-200'
-      }`}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
   );
 }
