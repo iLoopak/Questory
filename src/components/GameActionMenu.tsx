@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n, type TFunction } from '../i18n';
 import type { Game, GameStatus } from '../types/game';
 
 type GameActionMenuProps = {
@@ -21,6 +22,7 @@ type GameActionMenuProps = {
 };
 
 type GameActionMenuOverlayProps = Omit<GameActionMenuProps, 'variant' | 'isOpen' | 'onOpenChange'> & {
+  t: TFunction;
   anchorRef: RefObject<HTMLButtonElement | null>;
   menuId: string;
   onClose: () => void;
@@ -50,6 +52,7 @@ export function GameActionMenu({
   onRemoveAndIgnore,
   onStatusChange,
 }: GameActionMenuProps) {
+  const { t } = useI18n();
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuId = useId();
@@ -102,7 +105,7 @@ export function GameActionMenu({
         aria-controls={isOpen ? menuId : undefined}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        aria-label={`More actions for ${game.title}`}
+        aria-label={`${t('action.moreActions')} ${game.title}`}
         className={getActionButtonClass(variant)}
         data-controller-action="context-menu"
         onClick={handleToggle}
@@ -126,6 +129,7 @@ export function GameActionMenu({
           onRemove={onRemove}
           onRemoveAndIgnore={onRemoveAndIgnore}
           onStatusChange={onStatusChange}
+          t={t}
         />
       ) : null}
     </>
@@ -146,6 +150,7 @@ function GameActionMenuOverlay({
   onRemove,
   onRemoveAndIgnore,
   onStatusChange,
+  t,
 }: GameActionMenuOverlayProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const actions = useMemo(
@@ -162,8 +167,9 @@ function GameActionMenuOverlay({
         onRemove,
         onRemoveAndIgnore,
         onStatusChange,
+        t,
       }),
-    [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange],
+    [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange, t],
   );
 
   const primaryActions = actions.filter((action) => action.tone !== 'danger');
@@ -219,7 +225,7 @@ function GameActionMenuOverlay({
       <div
         ref={menuRef}
         id={menuId}
-        aria-label={`Actions for ${game.title}`}
+        aria-label={`${t('action.actions')} ${game.title}`}
         aria-modal="true"
         className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-2xl border border-skyglass/20 bg-ink-950/98 shadow-panel ring-1 ring-white/10 backdrop-blur-md sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -229,7 +235,7 @@ function GameActionMenuOverlay({
       >
         <div className="flex items-start justify-between gap-3 border-b border-skyglass/15 bg-white/[0.03] px-4 py-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Actions</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('action.actions')}</p>
             <h3 className="mt-1 truncate text-base font-semibold text-white">{game.title}</h3>
           </div>
           <button
@@ -237,16 +243,16 @@ function GameActionMenuOverlay({
             onClick={onClose}
             type="button"
           >
-            Close
+            {t('action.close')}
           </button>
         </div>
         <div className="max-h-[min(74dvh,34rem)] overflow-y-auto py-2 pb-[max(1rem,calc(var(--qs-safe-bottom)+0.75rem))]">
-          <div role="menu" aria-label={`Actions for ${game.title}`}>
+          <div role="menu" aria-label={`${t('action.actions')} ${game.title}`}>
             {primaryActions.map((action) => (
               <GameActionMenuItemButton key={action.label} action={action} />
             ))}
             {destructiveActions.length > 0 ? (
-              <div className="mt-2 border-t border-red-400/20 pt-2" aria-label={`${game.title} destructive actions`}>
+              <div className="mt-2 border-t border-red-400/20 pt-2" aria-label={`${game.title} ${t('toolbar.actions')}`}>
                 {destructiveActions.map((action) => (
                   <GameActionMenuItemButton key={action.label} action={action} />
                 ))}
@@ -308,6 +314,7 @@ function buildGameActionMenuItems({
   onRemove,
   onRemoveAndIgnore,
   onStatusChange,
+  t,
 }: Omit<GameActionMenuOverlayProps, 'anchorRef' | 'menuId'>): GameActionMenuItem[] {
   const items: GameActionMenuItem[] = [];
 
@@ -337,36 +344,36 @@ function buildGameActionMenuItems({
   };
 
   if (includeDetails && onOpenDetails) {
-    addAction({ label: 'Details / Edit', onSelect: onOpenDetails });
+    addAction({ label: t('action.detailsEdit'), onSelect: onOpenDetails });
   }
 
   if (onFindMetadata) {
-    addAction({ label: 'Refresh metadata', onSelect: () => onFindMetadata(game) });
+    addAction({ label: t('action.refreshMetadata'), onSelect: () => onFindMetadata(game) });
   }
 
   if (onAddToQueue) {
-    addAction({ label: 'Add to Queue', onSelect: () => onAddToQueue(game) });
+    addAction({ label: t('action.addToQueue'), onSelect: () => onAddToQueue(game) });
   }
 
-  addAction({ label: 'Playing Now', onSelect: () => onStatusChange(game.id, 'Playing') });
+  addAction({ label: t('action.playingNow'), onSelect: () => onStatusChange(game.id, 'Playing') });
 
   if (game.collectionType === 'wishlist') {
-    addAction({ label: 'Move to Library', onSelect: () => onMoveToLibrary?.(game), disabled: !onMoveToLibrary });
+    addAction({ label: t('action.moveToLibrary'), onSelect: () => onMoveToLibrary?.(game), disabled: !onMoveToLibrary });
   } else if (onAddToWishlist) {
-    addAction({ label: 'Wishlist', onSelect: () => onAddToWishlist(game) });
+    addAction({ label: t('action.wishlist'), onSelect: () => onAddToWishlist(game) });
   }
 
-  addAction({ label: 'Finished', onSelect: () => onStatusChange(game.id, 'Finished') });
+  addAction({ label: t('action.finished'), onSelect: () => onStatusChange(game.id, 'Finished') });
 
   if (game.storeUrl || game.externalUrl) {
-    addAction({ label: 'Open Store', href: game.storeUrl ?? game.externalUrl });
+    addAction({ label: t('action.openStore'), href: game.storeUrl ?? game.externalUrl });
   }
 
-  addAction({ label: game.collectionType === 'wishlist' ? 'Remove from Wishlist' : 'Remove', onSelect: () => onRemove(game.id), tone: 'danger' });
-  addAction({ label: 'Dropped', onSelect: () => onStatusChange(game.id, 'Dropped'), tone: 'danger' });
+  addAction({ label: game.collectionType === 'wishlist' ? t('action.removeFromWishlist') : t('action.remove'), onSelect: () => onRemove(game.id), tone: 'danger' });
+  addAction({ label: t('action.dropped'), onSelect: () => onStatusChange(game.id, 'Dropped'), tone: 'danger' });
   addAction({
     disabled: typeof game.steamAppId !== 'number',
-    label: 'Ignore',
+    label: t('action.ignore'),
     onSelect: () => onRemoveAndIgnore(game),
     tone: 'danger',
   });
