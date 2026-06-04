@@ -391,6 +391,7 @@ function App() {
   const reviewIgnoredGameIds = useMemo(() => new Set(reviewModeState.ignoredGameIds), [reviewModeState.ignoredGameIds]);
   const queueSummary = useMemo(() => getQueueSummary(platformQueueState, games), [games, platformQueueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, platformQueueState), [games, platformQueueState]);
+  const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(platformQueueState), [platformQueueState]);
   const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
   const lastRetroImportedGames = useMemo(
     () =>
@@ -1087,6 +1088,10 @@ function App() {
     }));
   }
 
+  function addReviewQueuePlatform(platform: GamePlatform) {
+    setPlatformQueueState((currentState) => addActiveQueuePlatform(currentState, platform));
+  }
+
   function addGameToQueue(game: Game, platform: GamePlatform) {
     addUndoAction(getQueueToastMessage(game, platform), {
       actionType: 'add-to-queue',
@@ -1526,10 +1531,11 @@ function App() {
             <ReviewModePanel
               games={games}
               ignoredGameIds={reviewIgnoredGameIds}
-              queuePlatforms={queuePlatforms}
+              queuePlatforms={activeQueuePlatforms}
               controllerLayout={controllerLayoutPreference}
               source={activeReviewSource}
               onAction={handleReviewAction}
+              onAddPlatform={addReviewQueuePlatform}
               onOpenQueue={() => setActiveNavItem('Queue')}
               onRestoreIgnored={restoreReviewIgnoredGames}
               onReturnToLibrary={() => setActiveNavItem('Library')}
