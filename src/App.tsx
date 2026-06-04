@@ -97,10 +97,16 @@ import {
 } from './lib/reviewModeStorage';
 import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
+  applyAccentColorPreference,
   applyThemePreference,
+  defaultAccentColor,
+  loadAccentColorPreference,
   loadThemePreference,
+  normalizeAccentColor,
+  saveAccentColorPreference,
   saveThemePreference,
   watchSystemTheme,
+  type AccentColorPreference,
   type ResolvedTheme,
   type ThemePreference,
 } from './lib/themePreferences';
@@ -272,6 +278,7 @@ function App() {
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
+  const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
   const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
     loadNavigationVisibilityPreferences(),
@@ -344,6 +351,12 @@ function App() {
       setResolvedTheme(applyThemePreference('system'));
     });
   }, [themePreference]);
+
+
+  useEffect(() => {
+    applyAccentColorPreference(accentColorPreference);
+    saveAccentColorPreference(accentColorPreference);
+  }, [accentColorPreference]);
 
   useEffect(() => {
     pendingUndoActionsRef.current = pendingUndoActions;
@@ -1925,6 +1938,7 @@ function App() {
               resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
+              accentColorPreference={accentColorPreference}
               language={language}
               navigationVisibility={navigationVisibility}
               platformQueueState={platformQueueState}
@@ -1954,6 +1968,7 @@ function App() {
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onThemePreferenceChange={setThemePreferenceState}
+              onAccentColorChange={setAccentColorPreference}
               onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
@@ -3228,6 +3243,7 @@ type SettingsPanelProps = {
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  accentColorPreference: AccentColorPreference;
   language: AppLanguage;
   navigationVisibility: NavigationVisibilityPreferences;
   platformQueueState: PlatformQueueState;
@@ -3254,6 +3270,7 @@ type SettingsPanelProps = {
   onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
   onReviewRetroImportedGames: () => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
+  onAccentColorChange: (color: AccentColorPreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
@@ -3278,6 +3295,7 @@ function SettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  accentColorPreference,
   language,
   navigationVisibility,
   platformQueueState,
@@ -3304,6 +3322,7 @@ function SettingsPanel({
   onRefreshSteamPlaytime,
   onReviewRetroImportedGames,
   onThemePreferenceChange,
+  onAccentColorChange,
   onLanguageChange,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
@@ -3439,11 +3458,13 @@ function SettingsPanel({
                 resolvedTheme={resolvedTheme}
                 runtimeEnvironment={runtimeEnvironment}
                 themePreference={themePreference}
+                accentColorPreference={accentColorPreference}
                 language={language}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
                 onLandscapeLockChange={onLandscapeLockChange}
                 onThemePreferenceChange={onThemePreferenceChange}
+                onAccentColorChange={onAccentColorChange}
                 onLanguageChange={onLanguageChange}
               />
             </div>
@@ -4021,11 +4042,13 @@ function AppearanceSettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  accentColorPreference,
   language,
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
   onThemePreferenceChange,
+  onAccentColorChange,
   onLanguageChange,
 }: {
   controllerLayoutPreference: ControllerLayoutPreference;
@@ -4034,11 +4057,13 @@ function AppearanceSettingsPanel({
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  accentColorPreference: AccentColorPreference;
   language: AppLanguage;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
+  onAccentColorChange: (color: AccentColorPreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
 }) {
   const t = useMemo(() => createTranslator(language), [language]);
@@ -4049,7 +4074,7 @@ function AppearanceSettingsPanel({
       value: 'light',
     },
     {
-      description: 'The classic QuestShelf neon teal glow on dark gaming panels.',
+      description: 'The classic QuestShelf brand glow on dark gaming panels.',
       label: t('settings.dark'),
       value: 'dark',
     },
@@ -4059,6 +4084,24 @@ function AppearanceSettingsPanel({
       value: 'system',
     },
   ];
+  const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
+  const isDefaultAccentColor = accentColorPreference === null;
+  const accentColorPresets = [
+    { color: defaultAccentColor, label: t('settings.defaultAccentColor') },
+    { color: '#1b75d0', label: 'Steam blue' },
+    { color: '#006fdb', label: 'PlayStation blue' },
+    { color: '#107c10', label: 'Xbox green' },
+    { color: '#e60012', label: 'Nintendo red' },
+    { color: '#8b5cf6', label: 'Purple' },
+    { color: '#14b8a6', label: 'Teal' },
+  ];
+  const selectAccentColor = (color: string) => {
+    const normalizedColor = normalizeAccentColor(color);
+    if (normalizedColor) {
+      onAccentColorChange(normalizedColor === defaultAccentColor ? null : normalizedColor);
+    }
+  };
+
   const themeCoverageChecklist = [
     'Light, Dark, and Follow Device all resolve through the same CSS theme tokens.',
     'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
@@ -4114,6 +4157,67 @@ function AppearanceSettingsPanel({
         <p className="mt-3 text-xs leading-5 text-slate-500">
           Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
         </p>
+      </div>
+
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.accentColor')}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{t('settings.accentColorHelp')}</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2">
+            <span
+              aria-hidden="true"
+              className="h-8 w-8 rounded-full border border-white/20 shadow-glow"
+              style={{ backgroundColor: selectedAccentColor }}
+            />
+            <span className="text-xs font-semibold text-mint">{t('settings.currentAccentColor')} · {selectedAccentColor}</span>
+          </div>
+        </div>
+
+        <label className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+          <span className="font-semibold text-white">{t('settings.customAccentColor')}</span>
+          <input
+            aria-label={t('settings.customAccentColor')}
+            className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
+            onChange={(event) => selectAccentColor(event.target.value)}
+            type="color"
+            value={selectedAccentColor}
+          />
+        </label>
+
+        <div className="mt-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.recommendedAccents')}</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {accentColorPresets.map((preset) => {
+              const isSelected = selectedAccentColor === preset.color && (preset.color !== defaultAccentColor || isDefaultAccentColor);
+
+              return (
+                <button
+                  aria-pressed={isSelected}
+                  className={`qs-accent-swatch grid min-h-11 min-w-11 place-items-center rounded-md border p-1 transition ${
+                    isSelected ? 'border-mint/60 shadow-glow' : 'border-skyglass/20 hover:border-mint/45 hover:shadow-glow'
+                  }`}
+                  key={preset.color}
+                  onClick={() => selectAccentColor(preset.color)}
+                  title={preset.label}
+                  type="button"
+                >
+                  <span className="sr-only">{preset.label}</span>
+                  <span className="h-8 w-8 rounded-full border border-white/25" style={{ backgroundColor: preset.color }} />
+                </button>
+              );
+            })}
+            <button
+              className="min-h-11 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/45 hover:bg-mint/10 hover:text-white"
+              onClick={() => onAccentColorChange(null)}
+              type="button"
+            >
+              {t('settings.resetAccentColor')}
+            </button>
+          </div>
+        </div>
       </div>
 
 

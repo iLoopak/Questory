@@ -14,6 +14,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.landscapeLock.v1'
   | 'questshelf.settingsCategory.v1'
   | 'questshelf.themePreference.v1'
+  | 'questshelf.accentColor.v1'
   | 'questshelf.languagePreference.v1'
   | 'questshelf.navigationVisibility.v1'
   | 'questshelf.storageIssues.v1';
@@ -133,6 +134,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Light, Dark, or System appearance preference.',
     scope: 'ui',
     schema: '\'light\' | \'dark\' | \'system\'.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.accentColor.v1',
+    purpose: 'Custom app-wide accent color preference.',
+    scope: 'ui',
+    schema: 'Lowercase #rrggbb string or empty for default.',
   },
   {
     backup: 'never',

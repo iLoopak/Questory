@@ -1,13 +1,17 @@
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
+export type AccentColorPreference = string | null;
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
+export const accentColorStorageKey = 'questshelf.accentColor.v1';
+export const defaultAccentColor = '#ff5a2c';
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 
 const preferenceModuleName = '@capacitor/preferences';
 const darkThemeQuery = '(prefers-color-scheme: dark)';
 const darkThemeColor = '#0d0c0c';
 const lightThemeColor = '#FAF7F5';
+const hexColorPattern = /^#[0-9a-f]{6}$/i;
 
 type PreferencesPlugin = {
   Preferences: {
@@ -17,6 +21,15 @@ type PreferencesPlugin = {
 
 export function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && themePreferences.includes(value as ThemePreference);
+}
+
+export function isAccentColor(value: unknown): value is string {
+  return typeof value === 'string' && hexColorPattern.test(value);
+}
+
+export function normalizeAccentColor(value: string): string | null {
+  const trimmedValue = value.trim();
+  return isAccentColor(trimmedValue) ? trimmedValue.toLowerCase() : null;
 }
 
 export function loadThemePreference(): ThemePreference {
@@ -46,6 +59,36 @@ export function saveThemePreference(preference: ThemePreference) {
   void saveThemePreferenceToNativeStorage(preference);
 }
 
+export function loadAccentColorPreference(): AccentColorPreference {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return normalizeAccentColor(window.localStorage.getItem(accentColorStorageKey) ?? '');
+  } catch {
+    return null;
+  }
+}
+
+export function saveAccentColorPreference(color: AccentColorPreference) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (color) {
+      window.localStorage.setItem(accentColorStorageKey, color);
+    } else {
+      window.localStorage.removeItem(accentColorStorageKey);
+    }
+  } catch {
+    // Accent selection should stay responsive even when storage is unavailable.
+  }
+
+  void saveAccentColorPreferenceToNativeStorage(color);
+}
+
 export function resolveThemePreference(preference: ThemePreference): ResolvedTheme {
   if (preference !== 'system') {
     return preference;
@@ -56,6 +99,26 @@ export function resolveThemePreference(preference: ThemePreference): ResolvedThe
   }
 
   return window.matchMedia(darkThemeQuery).matches ? 'dark' : 'light';
+}
+
+export function applyAccentColorPreference(color: AccentColorPreference) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const root = document.documentElement;
+
+  if (!color) {
+    root.style.removeProperty('--accent-rgb');
+    root.style.removeProperty('--accent-contrast');
+    root.dataset.accentColor = 'default';
+    return;
+  }
+
+  const rgb = hexToRgb(color);
+  root.style.setProperty('--accent-rgb', `${rgb.r} ${rgb.g} ${rgb.b}`);
+  root.style.setProperty('--accent-contrast', getReadableTextColor(rgb));
+  root.dataset.accentColor = color;
 }
 
 export function applyThemePreference(preference: ThemePreference): ResolvedTheme {
@@ -111,6 +174,49 @@ async function saveThemePreferenceToNativeStorage(preference: ThemePreference) {
   try {
     const preferences = (await import(/* @vite-ignore */ preferenceModuleName)) as PreferencesPlugin;
     await preferences.Preferences.set({ key: themePreferenceStorageKey, value: preference });
+  } catch {
+    // Capacitor Preferences mirrors localStorage when available; browsers continue with localStorage only.
+  }
+}
+
+function hexToRgb(color: string) {
+  const normalizedColor = normalizeAccentColor(color) ?? defaultAccentColor;
+  return {
+    r: Number.parseInt(normalizedColor.slice(1, 3), 16),
+    g: Number.parseInt(normalizedColor.slice(3, 5), 16),
+    b: Number.parseInt(normalizedColor.slice(5, 7), 16),
+  };
+}
+
+function getReadableTextColor(rgb: { r: number; g: number; b: number }) {
+  const black = { r: 17, g: 24, b: 39 };
+  const white = { r: 255, g: 255, b: 255 };
+  return getContrastRatio(rgb, black) >= getContrastRatio(rgb, white) ? 'rgb(17 24 39)' : 'rgb(255 255 255)';
+}
+
+function getContrastRatio(firstColor: { r: number; g: number; b: number }, secondColor: { r: number; g: number; b: number }) {
+  const firstLuminance = getRelativeLuminance(firstColor);
+  const secondLuminance = getRelativeLuminance(secondColor);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getRelativeLuminance({ r, g, b }: { r: number; g: number; b: number }) {
+  const [red, green, blue] = [r, g, b].map((channel) => {
+    const normalizedChannel = channel / 255;
+    return normalizedChannel <= 0.03928
+      ? normalizedChannel / 12.92
+      : ((normalizedChannel + 0.055) / 1.055) ** 2.4;
+  });
+
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+async function saveAccentColorPreferenceToNativeStorage(color: AccentColorPreference) {
+  try {
+    const preferences = (await import(/* @vite-ignore */ preferenceModuleName)) as PreferencesPlugin;
+    await preferences.Preferences.set({ key: accentColorStorageKey, value: color ?? '' });
   } catch {
     // Capacitor Preferences mirrors localStorage when available; browsers continue with localStorage only.
   }

@@ -76,7 +76,7 @@
   --ink-800-rgb: 245 240 236;
   --ink-700-rgb: 236 229 223;
   --ink-500-rgb: 120 110 102;
-  --accent-rgb: 194 65 12;
+  --accent-rgb: 255 90 44;
   --skyglass-rgb: 41 33 28;
   --overlay-rgb: 28 22 18;
   --text-primary-rgb: 17 24 39;
@@ -97,11 +97,11 @@
   --surface-primary: rgb(var(--ink-950-rgb) / 0.94);
   --surface-secondary: rgb(var(--ink-900-rgb) / 0.96);
   --surface-raised: rgb(var(--ink-950-rgb) / 0.98);
-  --accent-contrast: rgb(255 255 255);
+  --accent-contrast: rgb(17 24 39);
   --accent-soft: rgb(var(--accent-rgb) / 0.12);
   --border: rgb(var(--skyglass-rgb) / 0.14);
   --border-strong: rgb(var(--accent-rgb) / 0.5);
-  --focus: rgb(180 58 10);
+  --focus: var(--accent);
   --focus-ring-inner: rgb(var(--ink-950-rgb) / 0.98);
   --focus-ring-outer: rgb(var(--accent-rgb) / 0.54);
   --shadow-panel: 0 18px 52px rgb(var(--overlay-rgb) / 0.12), 0 0 0 1px rgb(var(--overlay-rgb) / 0.03);
@@ -200,6 +200,25 @@ label:focus-within {
 
 img {
   display: block;
+}
+
+
+.bg-mint.text-ink-950,
+.bg-mint .text-ink-950,
+.border-mint.bg-mint.text-ink-950 {
+  color: var(--accent-contrast) !important;
+}
+
+.accent-mint {
+  accent-color: var(--accent);
+}
+
+.qs-accent-color-input {
+  color: var(--accent);
+}
+
+.qs-accent-swatch[aria-pressed='true'] {
+  background: rgb(var(--accent-rgb) / 0.14);
 }
 
 .qs-app-shell {
