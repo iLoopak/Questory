@@ -6,11 +6,12 @@ import { gameStatuses } from '../types/game';
 
 type GameDetailViewProps = {
   game: Game;
+  onAddToQueue?: (game: Game) => void;
   onBack: () => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
 };
 
-export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailViewProps) {
+export function GameDetailView({ game, onAddToQueue, onBack, onTrackingChange }: GameDetailViewProps) {
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
@@ -68,6 +69,15 @@ export function GameDetailView({ game, onBack, onTrackingChange }: GameDetailVie
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {onAddToQueue ? (
+              <button
+                className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+                onClick={() => onAddToQueue(game)}
+                type="button"
+              >
+                Add to Backlog
+              </button>
+            ) : null}
             <span className="rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
               {game.platform}
             </span>

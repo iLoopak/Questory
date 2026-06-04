@@ -44,7 +44,7 @@ export function getBulkWishlistToastMessage(count: number) {
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `📌 Added to ${platform} backlog`;
+  return `Added to ${platform} backlog`;
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {

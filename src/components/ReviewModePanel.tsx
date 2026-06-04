@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import { ViewportModal } from './ViewportModal';
+import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 
@@ -105,15 +105,10 @@ export function ReviewModePanel({
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);
   const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
   const [isQueuePickerOpen, setIsQueuePickerOpen] = useState(false);
-  const [isPlatformCreationOpen, setIsPlatformCreationOpen] = useState(false);
-  const [platformNameDraft, setPlatformNameDraft] = useState('');
   const [isReviewOptionsOpen, setIsReviewOptionsOpen] = useState(false);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const queueButtonRef = useRef<HTMLButtonElement | null>(null);
-  const firstQueuePlatformButtonRef = useRef<HTMLButtonElement | null>(null);
-  const addPlatformButtonRef = useRef<HTMLButtonElement | null>(null);
-  const platformNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const platformOptions = useMemo(() => {
     return Array.from(new Set(games.map((game) => game.platform))).sort((first, second) =>
@@ -145,8 +140,6 @@ export function ReviewModePanel({
     setActionStats(emptyReviewActionStats);
     setHighlightedActionIndex(firstPositiveActionIndex);
     setIsQueuePickerOpen(false);
-    setIsPlatformCreationOpen(false);
-    setPlatformNameDraft('');
     setIsReviewOptionsOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
@@ -178,12 +171,7 @@ export function ReviewModePanel({
       if (isQueuePickerOpen) {
         if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
           event.preventDefault();
-          if (isPlatformCreationOpen) {
-            setIsPlatformCreationOpen(false);
-            setPlatformNameDraft('');
-          } else {
-            setIsQueuePickerOpen(false);
-          }
+          setIsQueuePickerOpen(false);
         }
         return;
       }
@@ -273,7 +261,7 @@ export function ReviewModePanel({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeGame, highlightedActionIndex, isNoteOpen, isPlatformCreationOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
+  }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     onAction(game, action, note, targetPlatform);
@@ -282,8 +270,6 @@ export function ReviewModePanel({
     setActionStats((currentStats) => getNextActionStats(currentStats, action));
     setHighlightedActionIndex(firstPositiveActionIndex);
     setIsQueuePickerOpen(false);
-    setIsPlatformCreationOpen(false);
-    setPlatformNameDraft('');
     setIsReviewOptionsOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
@@ -345,42 +331,8 @@ export function ReviewModePanel({
 
   function closeQueuePicker() {
     setIsQueuePickerOpen(false);
-    setIsPlatformCreationOpen(false);
-    setPlatformNameDraft('');
   }
 
-  function handleQueuePickerClose() {
-    if (isPlatformCreationOpen) {
-      closePlatformCreation();
-      return;
-    }
-
-    closeQueuePicker();
-  }
-
-  function openPlatformCreation() {
-    setIsPlatformCreationOpen(true);
-    window.setTimeout(() => platformNameInputRef.current?.focus({ preventScroll: true }), 0);
-  }
-
-  function closePlatformCreation() {
-    setIsPlatformCreationOpen(false);
-    setPlatformNameDraft('');
-    window.setTimeout(() => addPlatformButtonRef.current?.focus({ preventScroll: true }), 0);
-  }
-
-  function submitPlatformCreation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const platform = platformNameDraft.trim() as GamePlatform;
-
-    if (!platform) {
-      return;
-    }
-
-    onAddPlatform(platform);
-    setPlatformNameDraft('');
-    setIsPlatformCreationOpen(false);
-  }
 
   return (
     <section className="qs-review-shell relative overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-74px)]">
@@ -493,97 +445,16 @@ export function ReviewModePanel({
         </div>
       </div>
 
-      {activeGame && isQueuePickerOpen ? (
-        <ViewportModal
-          ariaLabel={`Choose platform backlog for ${activeGame.title}`}
-          initialFocusRef={queuePlatforms.length > 0 ? firstQueuePlatformButtonRef : addPlatformButtonRef}
-          placement="center"
+      {activeGame ? (
+        <BacklogPlatformPicker
+          game={activeGame}
+          isOpen={isQueuePickerOpen}
+          platforms={queuePlatforms}
           restoreFocusRef={queueButtonRef}
-          onClose={handleQueuePickerClose}
-        >
-          <div className="qs-review-queue-modal p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 Choose platform</div>
-                <h2 className="mt-1 text-xl font-bold leading-tight text-white">Add to Backlog</h2>
-                <p className="mt-1 line-clamp-2 text-sm text-slate-400">{activeGame.title}</p>
-              </div>
-              <button
-                className="min-h-10 rounded-lg border border-white/10 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
-                onClick={closeQueuePicker}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-            {queuePlatforms.length > 0 ? (
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {queuePlatforms.map((platform, index) => (
-                  <button
-                    key={platform}
-                    className="min-h-14 rounded-xl border border-mint/35 bg-mint/10 px-4 text-left text-base font-bold text-mint transition hover:bg-mint hover:text-ink-950 focus-visible:bg-mint focus-visible:text-ink-950"
-                    onClick={() => addToQueue(platform)}
-                    ref={index === 0 ? firstQueuePlatformButtonRef : undefined}
-                    type="button"
-                  >
-                    {platform}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-ink-950/60 p-4 text-center">
-                <div className="text-base font-semibold text-white">No platforms yet.</div>
-                <p className="mt-1 text-sm text-slate-400">Add your first platform to start building a backlog.</p>
-              </div>
-            )}
-
-            {isPlatformCreationOpen ? (
-              <form className="mt-4 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3" onSubmit={submitPlatformCreation}>
-                <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500" htmlFor="review-platform-name">
-                  New active platform
-                </label>
-                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <input
-                    className="h-10 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
-                    id="review-platform-name"
-                    onChange={(event) => setPlatformNameDraft(event.target.value)}
-                    placeholder="Legion Go S, Switch, Steam..."
-                    ref={platformNameInputRef}
-                    value={platformNameDraft}
-                  />
-                  <button
-                    className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90 disabled:bg-slate-600 disabled:text-slate-300"
-                    disabled={!platformNameDraft.trim()}
-                    type="submit"
-                  >
-                    Add
-                  </button>
-                  <button
-                    className="h-10 rounded-md border border-white/10 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
-                    onClick={closePlatformCreation}
-                    type="button"
-                  >
-                    Back
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">This creates an active Platform destination without changing supported import or metadata platforms.</p>
-              </form>
-            ) : (
-              <div className="mt-4 border-t border-white/10 pt-3">
-                <button
-                  className="w-full min-h-11 rounded-xl border border-white/10 px-4 text-sm font-bold text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:bg-white/10"
-                  onClick={openPlatformCreation}
-                  ref={addPlatformButtonRef}
-                  type="button"
-                >
-                  + Add Platform
-                </button>
-              </div>
-            )}
-
-            <p className="mt-3 text-xs text-slate-500">Single tap adds this game to an active platform backlog, closes the picker, and advances Quest Queue. Supported platforms remain available internally for imports and metadata. Press Escape or your cancel button to cancel.</p>
-          </div>
-        </ViewportModal>
+          onAddPlatform={onAddPlatform}
+          onClose={closeQueuePicker}
+          onSelectPlatform={addToQueue}
+        />
       ) : null}
     </section>
   );

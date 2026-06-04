@@ -79,12 +79,13 @@ export function CollectionShelf({
   getHighlightLabel,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
+  onAddToQueue,
   onOpenDetails,
   onToggleSelected,
-}: Pick<CollectionViewProps, 'games' | 'getHighlightLabel' | 'isMultiSelectMode' | 'onOpenDetails' | 'onToggleSelected' | 'selectedGameIds'>) {
+}: Pick<CollectionViewProps, 'games' | 'getHighlightLabel' | 'isMultiSelectMode' | 'onAddToQueue' | 'onOpenDetails' | 'onToggleSelected' | 'selectedGameIds'>) {
   const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
-  const shelfCardRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const shelfCardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const renderedShelfGames = games.slice(0, shelfRenderCount);
   const hasMoreShelfGames = shelfRenderCount < games.length;
 
@@ -120,7 +121,7 @@ export function CollectionShelf({
     targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
-  function handleShelfKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, index: number, game: Game) {
+  function handleShelfKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, index: number, game: Game) {
     if (event.key === 'ArrowRight' || event.key === 'DPadRight') {
       event.preventDefault();
 
@@ -185,6 +186,7 @@ export function CollectionShelf({
             index={index}
             isMultiSelectMode={isMultiSelectMode}
             isSelected={selectedGameIds.has(game.id)}
+            onAddToQueue={onAddToQueue ? () => onAddToQueue(game) : undefined}
             onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
             onOpenDetails={() => onOpenDetails(game.id)}
             onToggleSelected={() => onToggleSelected?.(game.id)}
@@ -249,10 +251,11 @@ type ShelfGameCardProps = {
   index: number;
   isMultiSelectMode: boolean;
   isSelected: boolean;
-  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
+  onAddToQueue?: () => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   onOpenDetails: () => void;
   onToggleSelected: () => void;
-  refCallback: (element: HTMLButtonElement | null) => void;
+  refCallback: (element: HTMLDivElement | null) => void;
 };
 
 function ShelfGameCard({
@@ -261,6 +264,7 @@ function ShelfGameCard({
   index,
   isMultiSelectMode,
   isSelected,
+  onAddToQueue,
   onKeyDown,
   onOpenDetails,
   onToggleSelected,
@@ -277,7 +281,7 @@ function ShelfGameCard({
   }, [coverSources]);
 
   return (
-    <button
+    <div
       ref={refCallback}
       aria-label={`${isMultiSelectMode ? 'Select' : 'Open'} ${game.title}`}
       aria-posinset={index + 1}
@@ -287,7 +291,8 @@ function ShelfGameCard({
       }`}
       onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails}
       onKeyDown={onKeyDown}
-      type="button"
+      role="button"
+      tabIndex={0}
     >
       {isMultiSelectMode ? (
         <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
@@ -336,7 +341,21 @@ function ShelfGameCard({
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
         <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
       </span>
-    </button>
+
+      {!isMultiSelectMode && onAddToQueue ? (
+        <button
+          className="mt-3 min-h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow focus-visible:bg-mint focus-visible:text-ink-950"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddToQueue();
+          }}
+          onKeyDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          Add to Backlog
+        </button>
+      ) : null}
+    </div>
   );
 }
 
