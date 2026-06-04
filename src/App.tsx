@@ -59,10 +59,13 @@ import {
   type PlatformQueueState,
 } from './lib/platformQueueStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
+import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
 import {
   getBulkWishlistToastMessage,
+  getDismissAction,
   getMoveQueueToastMessage,
   getOpenQueueAction,
+  getOpenSteamSettingsAction,
   getQueueToastMessage,
   getRemoveQueueToastMessage,
   getStatusToastMessage,
@@ -107,11 +110,11 @@ import {
   saveIgnoredSteamGames,
   type IgnoredSteamGame,
 } from './lib/steamIgnoredGamesStorage';
-import { getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamWishlistError } from './services/steamApi';
+import { getOwnedGames, getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamApiError, SteamWishlistError } from './services/steamApi';
 import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from './types/game';
 import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
-import type { SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
+import type { SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
 const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Recommendation', 'Stats', 'Settings'] as const;
 const navItemLabels: Record<(typeof navItems)[number], string> = {
@@ -208,9 +211,12 @@ type MetadataSelectionRequest = {
 };
 
 type BulkActionSummary = {
+  failedCount?: number;
   ignoredCount?: number;
   removedCount?: number;
   skippedCount?: number;
+  skippedNonSteamCount?: number;
+  unchangedCount?: number;
   updatedCount?: number;
   wishlistedCount?: number;
 };
@@ -218,6 +224,13 @@ type BulkActionSummary = {
 const initialSteamWishlistSyncState: SteamWishlistSyncState = {
   status: 'idle',
   message: 'Steam wishlist sync runs only when you start it.',
+  summary: null,
+};
+
+const initialSteamPlaytimeRefreshState: SteamPlaytimeRefreshState = {
+  status: 'idle',
+  message: 'Steam playtime refresh runs only when you start it.',
+  progress: { completed: 0, total: 0 },
   summary: null,
 };
 
@@ -255,6 +268,9 @@ function App() {
   const [metadataSelectionRequest, setMetadataSelectionRequest] = useState<MetadataSelectionRequest | null>(null);
   const [steamWishlistSyncState, setSteamWishlistSyncState] = useState<SteamWishlistSyncState>(
     initialSteamWishlistSyncState,
+  );
+  const [steamPlaytimeRefreshState, setSteamPlaytimeRefreshState] = useState<SteamPlaytimeRefreshState>(
+    initialSteamPlaytimeRefreshState,
   );
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
@@ -575,6 +591,32 @@ function App() {
     });
   }
 
+  function addToastNotification(notification: NotificationDraft) {
+    const createdAt = Date.now();
+    const action: PendingUndoAction = {
+      actions: notification.actions ?? [getDismissAction()],
+      category: notification.category,
+      createdAt,
+      dedupeKey: notification.dedupeKey,
+      expiresAt: createdAt + undoActionTimeoutMs,
+      historyEntry: {
+        actionType: 'notification',
+        affectedGameIds: [],
+        description: notification.message,
+        createdAt: new Date(createdAt).toISOString(),
+      },
+      id: createUndoActionId(),
+      message: notification.message,
+      snapshot: createUndoSnapshot(),
+    };
+
+    setPendingUndoActions((currentActions) => {
+      const nextActions = mergeToastNotifications(currentActions, action);
+      pendingUndoActionsRef.current = nextActions;
+      return nextActions;
+    });
+  }
+
   function undoAction(actionId: string) {
     const action = pendingUndoActionsRef.current.find((currentAction) => currentAction.id === actionId);
     if (!action) {
@@ -786,6 +828,92 @@ function App() {
         message,
         summary: currentState.summary,
       }));
+    }
+  }
+
+  async function refreshSteamPlaytime(gameIds?: string[], options: { showToast?: boolean } = {}) {
+    const targetGames = (gameIds ? games.filter((game) => gameIds.includes(game.id)) : games).filter(
+      (game) => game.collectionType === 'library',
+    );
+    const refreshableGames = targetGames.filter(isRefreshableSteamGame);
+    const total = refreshableGames.length;
+
+    if (total === 0) {
+      const summary: SteamPlaytimeRefreshSummary = {
+        failedCount: 0,
+        skippedNonSteamCount: targetGames.length,
+        unchangedCount: 0,
+        updatedCount: 0,
+      };
+      setSteamPlaytimeRefreshState({
+        status: 'success',
+        message: 'No Steam library games were selected for playtime refresh.',
+        progress: { completed: 0, total: 0 },
+        summary,
+      });
+      addToastNotification({
+        actions: [getDismissAction()],
+        category: 'warning',
+        dedupeKey: 'steam-playtime-refresh:no-steam-games',
+        message: 'Select Steam library games to refresh playtime.',
+      });
+      return summary;
+    }
+
+    setSteamPlaytimeRefreshState((currentState) => ({
+      status: 'loading',
+      message: `Fetching Steam playtime for ${total} game${total === 1 ? '' : 's'}...`,
+      progress: { completed: 0, total },
+      summary: currentState.summary,
+    }));
+
+    try {
+      const settings = loadSteamSettings();
+      const ownedGames = await getOwnedGames(settings);
+      const refreshedAt = new Date().toISOString();
+      const targetGameIds = new Set(refreshableGames.map((game) => game.id));
+      const result = refreshSteamPlaytimeForGames(games, targetGameIds, ownedGames, refreshedAt);
+      const completed = result.summary.updatedCount + result.summary.unchangedCount + result.summary.failedCount;
+
+      setGames(result.games);
+      setSteamPlaytimeRefreshState({
+        status: 'success',
+        message: `Steam playtime refresh complete. Updated ${result.summary.updatedCount}, unchanged ${result.summary.unchangedCount}, failed ${result.summary.failedCount}.`,
+        progress: { completed, total },
+        summary: result.summary,
+      });
+
+      if (options.showToast) {
+        addToastNotification({
+          actions: [getViewGameAction(refreshableGames[0].id)],
+          category: result.summary.failedCount > 0 ? 'warning' : 'success',
+          dedupeKey: `steam-playtime-refresh:${refreshableGames[0].id}`,
+          message: 'Playtime updated',
+        });
+      }
+
+      return result.summary;
+    } catch (error) {
+      const isCredentialError = error instanceof SteamApiError && ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
+      const message =
+        error instanceof SteamApiError
+          ? error.message
+          : 'Steam playtime refresh failed. Check your Steam credentials, profile privacy, and connection.';
+
+      setSteamPlaytimeRefreshState((currentState) => ({
+        status: 'error',
+        message,
+        progress: { completed: 0, total },
+        summary: currentState.summary,
+      }));
+      addToastNotification({
+        actions: isCredentialError ? [getOpenSteamSettingsAction()] : [getDismissAction()],
+        category: isCredentialError ? 'warning' : 'error',
+        dedupeKey: isCredentialError ? 'steam-playtime-refresh:credentials' : 'steam-playtime-refresh:error',
+        message: isCredentialError ? 'Add Steam credentials to refresh playtime.' : 'Steam playtime refresh failed.',
+      });
+
+      return null;
     }
   }
 
@@ -1544,6 +1672,7 @@ function App() {
               onAddToWishlist={addToWishlist}
               onBack={() => setSelectedGameId(null)}
               onIgnore={removeAndIgnoreSteamGame}
+              onRefreshSteamPlaytime={(game) => refreshSteamPlaytime([game.id], { showToast: true })}
               onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
             />
@@ -1568,6 +1697,7 @@ function App() {
             <CollectionPanel
               collectionType="library"
               filters={libraryFilters}
+              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               games={filteredLibraryGames}
               platformOptions={platformOptions}
               tags={tags}
@@ -1577,6 +1707,7 @@ function App() {
               onAddToQueue={openBacklogPicker}
               onBulkEnrich={startMetadataWorkflow}
               onBulkRemove={removeManyGames}
+              onBulkRefreshSteamPlaytime={(gameIds) => refreshSteamPlaytime(gameIds)}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
               onClearFilters={() => setLibraryFilters(initialCollectionFilters)}
@@ -1715,6 +1846,7 @@ function App() {
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
               platformQueueState={platformQueueState}
+              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -1733,6 +1865,7 @@ function App() {
               onPlatformQueueStateChange={setPlatformQueueState}
               onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
               onRemoveDemoGames={removeDemoGames}
+              onRefreshSteamPlaytime={() => refreshSteamPlaytime()}
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
@@ -1749,7 +1882,13 @@ function App() {
 
       <UndoToastStack
         actions={pendingUndoActions}
+        onDismiss={dismissUndoAction}
         onOpenQueue={openQueueFromToast}
+        onOpenSteamSettings={() => {
+          setActiveNavItem('Settings');
+          setActiveSettingsCategory('Integrations');
+          setSelectedGameId(null);
+        }}
         onUndo={undoAction}
         onViewGame={viewGameFromToast}
       />
@@ -1809,12 +1948,14 @@ function App() {
 
 type UndoToastStackProps = {
   actions: PendingUndoAction[];
+  onDismiss: (actionId: string) => void;
   onOpenQueue: () => void;
+  onOpenSteamSettings: () => void;
   onUndo: (actionId: string) => void;
   onViewGame: (gameId: string) => void;
 };
 
-function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastStackProps) {
+function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onUndo, onViewGame }: UndoToastStackProps) {
   if (actions.length === 0) {
     return null;
   }
@@ -1822,6 +1963,11 @@ function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastS
   const visibleActions = actions.slice(-maxVisibleToastCount).reverse();
 
   function runToastAction(actionId: string, toastAction: ToastAction) {
+    if (toastAction.kind === 'dismiss') {
+      onDismiss(actionId);
+      return;
+    }
+
     if (toastAction.kind === 'undo') {
       onUndo(actionId);
       return;
@@ -1829,11 +1975,19 @@ function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastS
 
     if (toastAction.kind === 'open-queue') {
       onOpenQueue();
+      onDismiss(actionId);
+      return;
+    }
+
+    if (toastAction.kind === 'open-steam-settings') {
+      onOpenSteamSettings();
+      onDismiss(actionId);
       return;
     }
 
     if (toastAction.kind === 'view-game' && toastAction.gameId) {
       onViewGame(toastAction.gameId);
+      onDismiss(actionId);
     }
   }
 
@@ -1847,8 +2001,7 @@ function UndoToastStack({ actions, onOpenQueue, onUndo, onViewGame }: UndoToastS
       {visibleActions.map((action) => {
         const category = action.category ?? 'success';
         const categoryStyles = getToastCategoryStyles(category);
-        const undoAction =
-          action.actions?.find((toastAction) => toastAction.kind === 'undo') ?? getUndoAction();
+        const undoAction = action.actions?.[0] ?? getDismissAction();
 
         return (
           <div
@@ -1922,6 +2075,7 @@ type CollectionPanelProps = {
   filters: CollectionFilters;
   games: Game[];
   platformOptions: GamePlatform[];
+  steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
   steamWishlistSyncState?: SteamWishlistSyncState;
   tags: string[];
   onAddGame: () => void;
@@ -1929,6 +2083,7 @@ type CollectionPanelProps = {
   onAddManyToWishlist: (games: Game[]) => void;
   onAddToQueue: (game: Game) => void;
   onBulkEnrich: (gameIds: string[]) => void;
+  onBulkRefreshSteamPlaytime?: (gameIds: string[]) => Promise<SteamPlaytimeRefreshSummary | null>;
   onBulkRemove: (gameIds: string[]) => void;
   onBulkRemoveAndIgnore: (games: Game[]) => void;
   onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
@@ -1949,6 +2104,7 @@ function CollectionPanel({
   filters,
   games,
   platformOptions,
+  steamPlaytimeRefreshState,
   steamWishlistSyncState,
   tags,
   onAddGame,
@@ -1956,6 +2112,7 @@ function CollectionPanel({
   onAddManyToWishlist,
   onAddToQueue,
   onBulkEnrich,
+  onBulkRefreshSteamPlaytime,
   onBulkRemove,
   onBulkRemoveAndIgnore,
   onBulkStatusChange,
@@ -1987,6 +2144,7 @@ function CollectionPanel({
   const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
+  const selectedRefreshableSteamCount = selectedGames.filter(isRefreshableSteamGame).length;
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
@@ -2130,6 +2288,19 @@ function CollectionPanel({
     onBulkEnrich(selectedGames.map((game) => game.id));
   }
 
+  async function refreshSelectedSteamPlaytime() {
+    if (selectedCount === 0 || !onBulkRefreshSteamPlaytime) {
+      return;
+    }
+
+    setBulkSummary(null);
+    const summary = await onBulkRefreshSteamPlaytime(selectedGames.map((game) => game.id));
+
+    if (summary) {
+      setBulkSummary(summary);
+    }
+  }
+
 
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
@@ -2205,6 +2376,10 @@ function CollectionPanel({
           </>
         }
       />
+
+      {collectionType === 'library' && steamPlaytimeRefreshState && steamPlaytimeRefreshState.status !== 'idle' ? (
+        <SteamPlaytimeRefreshNotice refreshState={steamPlaytimeRefreshState} />
+      ) : null}
 
       {collectionType === 'wishlist' && steamWishlistSyncState && steamWishlistSyncState.status !== 'idle' ? (
         <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
@@ -2340,6 +2515,11 @@ function CollectionPanel({
                   Add to Wishlist
                 </button>
               ) : null}
+              {collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
+                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedRefreshableSteamCount === 0} onClick={refreshSelectedSteamPlaytime} type="button">
+                  Refresh Steam Playtime
+                </button>
+              ) : null}
               <select
                 aria-label="Change selected status"
                 className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-3 text-sm text-slate-100 outline-none transition focus:border-mint disabled:cursor-not-allowed disabled:text-slate-500"
@@ -2427,6 +2607,52 @@ function CollectionPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function NoticeStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-current/20 bg-black/15 px-2 py-2">
+      <div className="text-base font-semibold text-white">{value}</div>
+      <div className="mt-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] opacity-75">{label}</div>
+    </div>
+  );
+}
+
+function SteamPlaytimeRefreshNotice({ refreshState }: { refreshState: SteamPlaytimeRefreshState }) {
+  const statusStyles = {
+    idle: 'border-skyglass/15 bg-ink-950/70 text-slate-400',
+    loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
+    success: 'border-mint/40 bg-mint/10 text-mint',
+    error: 'border-red-400/40 bg-red-500/10 text-red-200',
+  }[refreshState.status];
+  const progressPercent = refreshState.progress.total > 0
+    ? Math.round((refreshState.progress.completed / refreshState.progress.total) * 100)
+    : 0;
+
+  return (
+    <div className={`mb-4 rounded-lg border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
+      <div>{refreshState.message}</div>
+      {refreshState.status === 'loading' ? (
+        <div className="mt-3">
+          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
+            <span>Progress</span>
+            <span>{refreshState.progress.completed}/{refreshState.progress.total}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-current transition-all" style={{ width: `${progressPercent}%` }} />
+          </div>
+        </div>
+      ) : null}
+      {refreshState.summary ? (
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-4">
+          <NoticeStat label="Updated" value={refreshState.summary.updatedCount.toString()} />
+          <NoticeStat label="Unchanged" value={refreshState.summary.unchangedCount.toString()} />
+          <NoticeStat label="Failed" value={refreshState.summary.failedCount.toString()} />
+          <NoticeStat label="Non-Steam skipped" value={refreshState.summary.skippedNonSteamCount.toString()} />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -2789,6 +3015,7 @@ type SettingsPanelProps = {
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
   platformQueueState: PlatformQueueState;
+  steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -2807,6 +3034,7 @@ type SettingsPanelProps = {
   onPlatformQueueStateChange: (state: PlatformQueueState) => void;
   onRawgApiKeyConfigured: () => void;
   onRemoveDemoGames: () => void;
+  onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
   onReviewRetroImportedGames: () => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
   onSteamApiKeyConfigured: () => void;
@@ -2833,6 +3061,7 @@ function SettingsPanel({
   runtimeEnvironment,
   themePreference,
   platformQueueState,
+  steamPlaytimeRefreshState,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -2851,6 +3080,7 @@ function SettingsPanel({
   onPlatformQueueStateChange,
   onRawgApiKeyConfigured,
   onRemoveDemoGames,
+  onRefreshSteamPlaytime,
   onReviewRetroImportedGames,
   onThemePreferenceChange,
   onSteamApiKeyConfigured,
@@ -2930,6 +3160,8 @@ function SettingsPanel({
                 onSteamApiKeyConfigured={onSteamApiKeyConfigured}
                 onSteamIdConfigured={onSteamIdConfigured}
                 onSteamLibraryImported={onSteamLibraryImported}
+                playtimeRefreshState={steamPlaytimeRefreshState}
+                onRefreshSteamPlaytime={onRefreshSteamPlaytime}
                 onUnignoreSteamGame={onUnignoreSteamGame}
               />
             </div>

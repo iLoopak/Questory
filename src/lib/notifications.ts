@@ -2,12 +2,12 @@ import type { Game, GamePlatform, GameStatus } from '../types/game';
 
 export type ToastCategory = 'success' | 'warning' | 'error' | 'info';
 
-export type ToastActionKind = 'undo' | 'open-queue' | 'view-game';
+export type ToastActionKind = 'dismiss' | 'open-queue' | 'open-steam-settings' | 'undo' | 'view-game';
 
 export type ToastAction = {
   gameId?: string;
   kind: ToastActionKind;
-  label: 'Undo' | 'Open Platforms' | 'View Game';
+  label: 'Dismiss' | 'Open Platforms' | 'Open Steam Settings' | 'Undo' | 'View Game';
 };
 
 export type NotificationDraft = {
@@ -61,6 +61,14 @@ export function getViewGameAction(gameId: string): ToastAction {
 
 export function getOpenQueueAction(): ToastAction {
   return { kind: 'open-queue', label: 'Open Platforms' };
+}
+
+export function getOpenSteamSettingsAction(): ToastAction {
+  return { kind: 'open-steam-settings', label: 'Open Steam Settings' };
+}
+
+export function getDismissAction(): ToastAction {
+  return { kind: 'dismiss', label: 'Dismiss' };
 }
 
 export function getUndoAction(): ToastAction {
