@@ -160,6 +160,9 @@ const librarySortOptions = [
 ] as const;
 const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h'] as const;
 const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
+const collectionInitialRenderCount = 56;
+const collectionRenderBatchSize = 40;
+const collectionLoadAheadMargin = '720px 0px';
 
 type SourceFilter = (typeof sourceFilterOptions)[number];
 type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
@@ -2172,15 +2175,31 @@ function CollectionPanel({
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [renderedGameCount, setRenderedGameCount] = useState(collectionInitialRenderCount);
   const activeViewModeCollectionRef = useRef(collectionType);
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const title = collectionType === 'wishlist' ? 'Wishlist' : 'Library';
   const emptyTitle = collectionType === 'wishlist' ? 'Wishlist is empty' : 'No games found';
   const emptyText =
     collectionType === 'wishlist'
       ? 'Add manual wishlist entries or save library games here for later.'
       : 'Adjust the search or filters to bring titles back into view.';
+  const progressiveResetKey = useMemo(
+    () =>
+      JSON.stringify({
+        collectionType,
+        filters,
+        gameIds: games.map((game) => game.id),
+        viewMode,
+      }),
+    [collectionType, filters, games, viewMode],
+  );
+  const canLoadProgressively = viewMode !== 'Shelf View';
+  const visibleGames = canLoadProgressively ? games.slice(0, renderedGameCount) : games;
+  const renderedCount = visibleGames.length;
+  const hasMoreGames = canLoadProgressively && renderedCount < games.length;
   const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
@@ -2200,6 +2219,34 @@ function CollectionPanel({
     setViewMode(loadCollectionViewMode(collectionType));
   }, [collectionType]);
 
+  useEffect(() => {
+    setRenderedGameCount(collectionInitialRenderCount);
+  }, [progressiveResetKey]);
+
+  useEffect(() => {
+    if (!hasMoreGames) {
+      return undefined;
+    }
+
+    const sentinel = loadMoreSentinelRef.current;
+
+    if (!sentinel || typeof window.IntersectionObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreGames();
+        }
+      },
+      { root: null, rootMargin: collectionLoadAheadMargin, threshold: 0 },
+    );
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [hasMoreGames, renderedCount, games.length]);
 
   useEffect(() => {
     setSelectedGameIds((currentSelection) => {
@@ -2261,6 +2308,10 @@ function CollectionPanel({
 
   function selectAllVisible() {
     setSelectedGameIds(new Set(games.map((game) => game.id)));
+  }
+
+  function loadMoreGames() {
+    setRenderedGameCount((currentCount) => Math.min(games.length, currentCount + collectionRenderBatchSize));
   }
 
   function toggleQuickFilter(quickFilter: QuickFilter) {
@@ -2574,6 +2625,15 @@ function CollectionPanel({
         </ViewportModal>
       ) : null}
 
+      {games.length > 0 && canLoadProgressively ? (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-skyglass/10 bg-ink-950/50 px-3 py-2 text-xs text-slate-500">
+          <span>
+            Rendered {renderedCount} of {games.length} {games.length === 1 ? 'game' : 'games'}
+          </span>
+          {hasMoreGames ? <span>More load automatically as you scroll.</span> : null}
+        </div>
+      ) : null}
+
       {isMultiSelectMode ? (
         <div className="mb-2 rounded-md border border-mint/20 bg-ink-950/80 p-2 shadow-glow">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -2655,7 +2715,7 @@ function CollectionPanel({
           />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
-            games={games}
+            games={visibleGames}
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
@@ -2674,7 +2734,7 @@ function CollectionPanel({
           />
         ) : (
           <CollectionGrid
-            games={games}
+            games={visibleGames}
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
@@ -2697,6 +2757,20 @@ function CollectionPanel({
           </div>
         </div>
       )}
+
+      {hasMoreGames ? (
+        <div className="mt-3 grid place-items-center gap-2 rounded-md border border-dashed border-skyglass/15 bg-ink-950/40 px-3 py-4 text-center">
+          <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-1 w-full" />
+          <p className="text-xs font-medium text-slate-500">Loading more… {games.length - renderedCount} remaining.</p>
+          <button
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/30 hover:bg-mint/10 hover:text-white"
+            onClick={loadMoreGames}
+            type="button"
+          >
+            Load more
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
