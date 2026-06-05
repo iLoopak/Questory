@@ -65,20 +65,21 @@ export async function syncSteamAchievementsForGames(
   for (let batchStart = 0; batchStart < syncableGames.length; batchStart += STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE) {
     const batch = syncableGames.slice(batchStart, batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE);
     const batchResults = await Promise.all(
-      batch.map(async (game) => {
-        const result = await syncSteamAchievementsForGame({
-          failedAppIds,
-          game,
-          noAchievementAppIds,
-          settings,
-          summariesByAppId,
-        });
-
-        completed += 1;
-        onProgress?.({ completed, total: syncableGames.length });
-
-        return result;
-      }),
+      batch.map((game) =>
+        syncSteamAchievementsForGameWithProgress(
+          {
+            failedAppIds,
+            game,
+            noAchievementAppIds,
+            settings,
+            summariesByAppId,
+          },
+          () => {
+            completed = Math.min(completed + 1, syncableGames.length);
+            onProgress?.({ completed, total: syncableGames.length });
+          },
+        ),
+      ),
     );
 
     nextGames = mergeSteamAchievementBatch(nextGames, batchResults, summariesByAppId, syncedAt, summary);
@@ -92,6 +93,23 @@ export async function syncSteamAchievementsForGames(
   }
 
   return { games: nextGames, summary };
+}
+
+async function syncSteamAchievementsForGameWithProgress(
+  options: {
+    failedAppIds: Set<number>;
+    game: Game;
+    noAchievementAppIds: Set<number>;
+    settings: SteamSettings;
+    summariesByAppId: Map<number, SteamAchievementSummaryResult>;
+  },
+  onProcessed: () => void,
+): Promise<SteamAchievementGameSyncResult> {
+  try {
+    return await syncSteamAchievementsForGame(options);
+  } finally {
+    onProcessed();
+  }
 }
 
 async function syncSteamAchievementsForGame({
