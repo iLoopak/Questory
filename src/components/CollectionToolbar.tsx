@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { translateOption, useI18n } from '../i18n';
 
 type ToolbarOption = string;
@@ -63,6 +63,20 @@ export function CollectionToolbar({
     setIsViewMenuOpen(false);
     setIsActionsMenuOpen(false);
   }, [title]);
+
+  function closeActionMenuAfterClick(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const clickedButton = target.closest('button');
+
+    if (clickedButton && !clickedButton.disabled) {
+      setIsActionsMenuOpen(false);
+    }
+  }
 
   useEffect(() => {
     if (!isViewMenuOpen && !isActionsMenuOpen) {
@@ -206,7 +220,7 @@ export function CollectionToolbar({
                 {t('toolbar.actions')} <span aria-hidden="true">▾</span>
               </span>
             </summary>
-            <div className="qs-toolbar-menu-panel" role="menu" aria-label={`${title} actions`}>
+            <div className="qs-toolbar-menu-panel" role="menu" aria-label={`${title} actions`} onClick={closeActionMenuAfterClick}>
               {actionMenu}
               {onClearFilters ? (
                 <button
