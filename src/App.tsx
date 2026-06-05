@@ -1438,7 +1438,7 @@ function App() {
       addUndoAction('🚫 Ignored', {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
-      description: `Restore ${game.title} to Review Mode`,
+      description: `Restore ${game.title} to Quest Queue`,
       });
 
       setReviewModeState((currentState) => ({
@@ -4116,7 +4116,7 @@ function AppearanceSettingsPanel({
     'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
     'App shell, top navigation, home, library, wishlist, metadata, artwork, recommendations, stats, and settings panels use tokenized backgrounds, borders, shadows, and text.',
     'Cards, detail dialogs, modal overlays, toasts, tooltips, dropdown menus, forms, buttons, badges, and disabled states inherit theme tokens.',
-    'Review Mode panels, Queue panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
+    'Quest Queue panels, Queue panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
   ];
 
   return (
@@ -4407,7 +4407,7 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Review Mode') {
-    return 'Review Mode helps quickly process imported games into Queue plans, wishlist picks, status updates, or ignores.';
+    return 'Quest Queue helps quickly process imported games into Queue plans, wishlist picks, status updates, or ignores.';
   }
 
   if (activeNavItem === 'Stats') {
@@ -4460,7 +4460,7 @@ function getRetroDuplicateKey(game: Game) {
 
 function appendReviewNote(existingNotes: string, note: string) {
   const timestamp = new Date().toISOString().slice(0, 10);
-  const reviewNote = `[Review Mode ${timestamp}] ${note}`;
+  const reviewNote = `[Quest Queue ${timestamp}] ${note}`;
 
   return existingNotes.trim() ? `${existingNotes.trim()}\n\n${reviewNote}` : reviewNote;
 }

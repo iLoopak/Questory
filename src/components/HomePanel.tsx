@@ -365,7 +365,7 @@ export function HomePanel({
             onClick={() => onOpenReviewMode('backlog')}
             type="button"
           >
-            Open Review Mode
+            Open Quest Queue
           </button>
         </section>
       </aside>

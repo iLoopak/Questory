@@ -41,7 +41,7 @@ QuestShelf keeps analytics concentrated in the **Stats** section so handheld scr
 - **Stats** → analytics, trends, backlog progress, completion, playtime, platform/source breakdowns, and metadata coverage.
 - **Library** → collection management, filters, edits, status changes, and bulk actions.
 - **Queue** → planning what to play next, active games, queue order, and platform limits.
-- **Review Mode** → one-game-at-a-time decisions with artwork, title, platform, actions, and a lightweight progress indicator.
+- **Quest Queue** → one-game-at-a-time decisions with artwork, title, platform, actions, and a lightweight progress indicator.
 - **Wishlist** → discovery and future-game planning.
 - **Settings** → app configuration, integrations, backups, appearance, and onboarding controls.
 
@@ -92,7 +92,7 @@ Known storage keys:
 - `questshelf.wishlistFilters.v1`: Wishlist filters and sorting.
 - `questshelf.onboarding.v1`: setup assistant progress.
 - `questshelf.platformQueues.v1`: platform queue entries, positions, priorities, notes, and active-game limits.
-- `questshelf.reviewMode.v1`: Review Mode ignored games, last source, schema version, and stats.
+- `questshelf.reviewMode.v1`: Quest Queue ignored games, last source, schema version, and stats.
 - `questshelf.rawgSettings.v1`: RAWG API key, excluded from normal backups.
 - `questshelf.steamSettings.v1`: Steam API key, SteamID64, and wishlist URL, excluded from normal backups.
 - `questshelf.syncFolderSettings.v1`: device-specific auto-backup settings.
@@ -113,7 +113,7 @@ Migration behavior:
 - Older statuses such as `Completed` and `Backlog` migrate to current status values.
 - Missing notes, tags, playtime, cover art, wishlist fields, retro fields, queue fields, dropped/finished fields, and source fields receive safe defaults.
 - Valid user notes, tags, status, metadata, and tracking fields are preserved during migration.
-- Platform Queue and Review Mode states include a local schema version and tolerate older objects without one.
+- Platform Queue and Quest Queue states include a local schema version and tolerate older objects without one.
 
 Recovery behavior:
 
@@ -205,7 +205,7 @@ The active summary shows how many games are visible out of the full collection. 
 
 ## Artwork Priority, Fallback Covers, and Audit Tools
 
-QuestShelf treats artwork as a first-class local library field because Library, Review Mode, Shelf View, Queue, Home, Recommendation, and Stats all use cover-forward layouts.
+QuestShelf treats artwork as a first-class local library field because Library, Quest Queue, Shelf View, Queue, Home, Recommendation, and Stats all use cover-forward layouts.
 
 Artwork is resolved in this priority order:
 
@@ -227,7 +227,7 @@ Open **Artwork** to use the Artwork Coverage / Metadata Health audit:
 - Bulk actions report fixed, fallback generated, skipped, and failed counts.
 - **Find missing artwork** runs locally with progress and cancel support. It tries Steam artwork when `steamAppId` exists, then RAWG background artwork when available, then generates fallback covers for anything still missing.
 
-Review Mode uses the same artwork resolver, so games without real covers show generated fallback covers instead of blank or single-letter placeholders. The Review Mode details actions also include **Find Artwork**, which opens the artwork audit tools without uploading user data.
+Quest Queue uses the same artwork resolver, so games without real covers show generated fallback covers instead of blank or single-letter placeholders. The Quest Queue details actions also include **Find Artwork**, which opens the artwork audit tools without uploading user data.
 
 ## PWA Install and Offline Behavior
 
@@ -301,8 +301,8 @@ The UI theme follows the icon with tokenized app surfaces, restrained ember-oran
 ### Theme Coverage Checklist
 
 - Light, Dark, and Follow Device resolve through the shared CSS theme tokens in `src/styles.css` and Tailwind color aliases in `tailwind.config.js`.
-- App shell, top navigation, Home, Library, Wishlist, Queue, Review Mode, Artwork, Recommendation, Stats, Metadata, Settings, and Onboarding use tokenized surfaces, borders, text, shadows, and accents.
-- Cards, panels, modals, overlays, buttons, dropdowns, tooltips, detail dialogs, setup widgets, queue panels, and review mode panels should be checked after any new UI change.
+- App shell, top navigation, Home, Library, Wishlist, Queue, Quest Queue, Artwork, Recommendation, Stats, Metadata, Settings, and Onboarding use tokenized surfaces, borders, text, shadows, and accents.
+- Cards, panels, modals, overlays, buttons, dropdowns, tooltips, detail dialogs, setup widgets, queue panels, and Quest Queue panels should be checked after any new UI change.
 - Switching between Light, Dark, and Follow Device should update the current screen, browser theme color, native color-scheme, focus rings, scrollbars, and transient UI without a page reload.
 - Theme audits should include a raw-color scan of source UI files so fixed dark colors do not leak into Light Theme.
 

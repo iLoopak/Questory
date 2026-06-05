@@ -171,7 +171,7 @@ export function RecommendationPanel({
               onClick={() => onStartReview(includeWishlist ? 'wishlist' : 'backlog')}
               type="button"
             >
-              Send pool to Review Mode
+              Send pool to Quest Queue
             </button>
           </>
         }
