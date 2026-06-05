@@ -65,11 +65,37 @@ export type SteamWishlistSyncSummary = {
   updatedCount: number;
 };
 
+export type SteamAchievementSummary = {
+  total: number;
+  unlocked: number;
+  percent: number;
+  lastUnlockTime?: number;
+};
+
 export type SteamWishlistSyncState =
   | { status: 'idle'; message: string; summary: SteamWishlistSyncSummary | null }
   | { status: 'loading'; message: string; summary: SteamWishlistSyncSummary | null }
   | { status: 'success'; message: string; summary: SteamWishlistSyncSummary }
   | { status: 'error'; message: string; summary: SteamWishlistSyncSummary | null };
+
+export type SteamAchievementSyncSummary = {
+  failedCount: number;
+  noAchievementDataCount: number;
+  skippedNonSteamCount: number;
+  unchangedCount: number;
+  updatedCount: number;
+};
+
+export type SteamAchievementSyncProgress = {
+  completed: number;
+  total: number;
+};
+
+export type SteamAchievementSyncState =
+  | { status: 'idle'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null }
+  | { status: 'loading'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null }
+  | { status: 'success'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary }
+  | { status: 'error'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null };
 
 export type SteamPlaytimeRefreshSummary = {
   failedCount: number;
