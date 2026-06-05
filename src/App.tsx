@@ -21,7 +21,7 @@ import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModeP
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
-import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from './i18n';
+import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage, type TFunction } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
 import {
   configurableNavigationItems,
@@ -912,35 +912,47 @@ function App() {
   }
 
   async function syncSteamWishlist() {
-    setSteamWishlistSyncState((currentState) => ({
+    setSteamWishlistSyncState({
       status: 'loading',
-      message: 'Syncing Steam wishlist...',
-      summary: currentState.summary,
-    }));
-
-    let didSetTerminalAchievementState = false;
+      message: t('collection.syncingSteamWishlist'),
+      summary: null,
+    });
 
     try {
       const settings = loadSteamSettings();
       const wishlistItems = await getSteamWishlist(settings);
       const summary = importSteamWishlistItems(wishlistItems);
+      const message = formatSteamWishlistSyncSummary(summary, t);
 
       setSteamWishlistSyncState({
         status: 'success',
-        message: `Steam sync complete. Added ${summary.addedCount}, updated ${summary.updatedCount}, skipped ${summary.skippedAlreadyInLibraryCount + summary.skippedIgnoredCount}.`,
+        message,
         summary,
       });
+      addToastNotification({
+        actions: [getDismissAction()],
+        category: summary.failedCount > 0 ? 'warning' : 'success',
+        dedupeKey: 'steam-wishlist-sync:complete',
+        message,
+      });
     } catch (error) {
+      const isCredentialError = error instanceof SteamWishlistError && ['missing-profile', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
       const message =
         error instanceof SteamWishlistError
           ? error.message
-          : 'Steam wishlist sync failed. Check profile privacy, SteamID64, and connection.';
+          : 'Steam wishlist sync failed. Check profile privacy, Steam profile settings, and connection.';
 
-      setSteamWishlistSyncState((currentState) => ({
+      setSteamWishlistSyncState({
         status: 'error',
         message,
-        summary: currentState.summary,
-      }));
+        summary: null,
+      });
+      addToastNotification({
+        actions: isCredentialError ? [getOpenSteamSettingsAction()] : [getDismissAction()],
+        category: isCredentialError ? 'warning' : 'error',
+        dedupeKey: isCredentialError ? 'steam-wishlist-sync:settings' : 'steam-wishlist-sync:error',
+        message,
+      });
     }
   }
 
@@ -1346,18 +1358,30 @@ function App() {
         .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
     );
     const wishlistIndexBySteamAppId = new Map<number, number>();
+    const wishlistIndexByTitle = new Map<string, number>();
     const summary: SteamWishlistSyncSummary = {
       addedCount: 0,
       failedCount: 0,
       fetchedCount: wishlistItems.length,
       skippedAlreadyInLibraryCount: 0,
       skippedIgnoredCount: 0,
+      unchangedCount: 0,
       updatedCount: 0,
     };
 
     games.forEach((game, index) => {
-      if (game.collectionType === 'wishlist' && typeof game.steamAppId === 'number') {
+      if (game.collectionType !== 'wishlist') {
+        return;
+      }
+
+      if (typeof game.steamAppId === 'number') {
         wishlistIndexBySteamAppId.set(game.steamAppId, index);
+      }
+
+      const normalizedTitle = normalizeGameTitleForWishlistMatch(game.title);
+
+      if (normalizedTitle && !wishlistIndexByTitle.has(normalizedTitle)) {
+        wishlistIndexByTitle.set(normalizedTitle, index);
       }
     });
 
@@ -1377,22 +1401,41 @@ function App() {
         return;
       }
 
-      const existingWishlistIndex = wishlistIndexBySteamAppId.get(item.appid);
+      const normalizedTitle = normalizeGameTitleForWishlistMatch(item.name);
+      const existingWishlistIndex = wishlistIndexBySteamAppId.get(item.appid) ?? (normalizedTitle ? wishlistIndexByTitle.get(normalizedTitle) : undefined);
       const mappedGame = mapSteamWishlistItemToLocalGame(item, syncedAt);
 
       if (typeof existingWishlistIndex === 'number') {
         const existingGame = nextGames[existingWishlistIndex];
-        nextGames[existingWishlistIndex] = touchGameRecord(mergeSteamWishlistSync(existingGame, mappedGame, syncedAt));
-        summary.updatedCount += 1;
+        const mergedGame = touchGameRecord(mergeSteamWishlistSync(existingGame, mappedGame, syncedAt));
+        nextGames[existingWishlistIndex] = mergedGame;
+        wishlistIndexBySteamAppId.set(item.appid, existingWishlistIndex);
+
+        if (normalizedTitle) {
+          wishlistIndexByTitle.set(normalizedTitle, existingWishlistIndex);
+        }
+
+        if (areSteamWishlistSyncedFieldsEqual(existingGame, mergedGame)) {
+          summary.unchangedCount += 1;
+        } else {
+          summary.updatedCount += 1;
+        }
+
         return;
       }
 
       nextGames.push(touchGameRecord(mappedGame));
       wishlistIndexBySteamAppId.set(item.appid, nextGames.length - 1);
+
+      if (normalizedTitle) {
+        wishlistIndexByTitle.set(normalizedTitle, nextGames.length - 1);
+      }
+
       summary.addedCount += 1;
     });
 
     setGames(nextGames);
+    saveGames(nextGames);
     return summary;
   }
 
@@ -2958,7 +3001,7 @@ function CollectionPanel({
                 onClick={onSyncSteamWishlist}
                 type="button"
               >
-                {steamWishlistSyncState?.status === 'loading' ? t('collection.syncingSteam') : t('collection.syncSteamWishlist')}
+                {steamWishlistSyncState?.status === 'loading' ? t('collection.syncingSteamWishlist') : t('collection.syncSteamWishlist')}
               </button>
             ) : null}
             {collectionType === 'wishlist' && onSyncItadDeals ? (
@@ -3407,6 +3450,7 @@ function SteamWishlistSyncNotice({ syncState }: { syncState: SteamWishlistSyncSt
           <SyncStat label="Fetched" value={syncState.summary.fetchedCount} />
           <SyncStat label="Added" value={syncState.summary.addedCount} />
           <SyncStat label="Updated" value={syncState.summary.updatedCount} />
+          <SyncStat label="Unchanged" value={syncState.summary.unchangedCount} />
           <SyncStat label="In library" value={syncState.summary.skippedAlreadyInLibraryCount} />
           <SyncStat label="Ignored" value={syncState.summary.skippedIgnoredCount} />
           <SyncStat label="Failed" value={syncState.summary.failedCount} />
@@ -5187,6 +5231,40 @@ function formatBulkSummary(summary: BulkActionSummary) {
   ].filter(Boolean);
 
   return parts.length > 0 ? parts.join(' - ') : 'Bulk action complete';
+}
+
+
+function formatSteamWishlistSyncSummary(summary: SteamWishlistSyncSummary, t: TFunction) {
+  if (summary.fetchedCount === 0) {
+    return t('collection.noSteamWishlistGames');
+  }
+
+  return `${t('collection.steamWishlistSyncComplete')}. ${summary.addedCount} added · ${summary.updatedCount} updated · ${summary.unchangedCount} unchanged · ${summary.failedCount} failed.`;
+}
+
+function normalizeGameTitleForWishlistMatch(title: string) {
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/[™®©]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function areSteamWishlistSyncedFieldsEqual(previousGame: Game, nextGame: Game) {
+  return (
+    previousGame.title === nextGame.title &&
+    previousGame.coverImage === nextGame.coverImage &&
+    previousGame.steamAppId === nextGame.steamAppId &&
+    previousGame.externalSource === nextGame.externalSource &&
+    previousGame.externalUrl === nextGame.externalUrl &&
+    previousGame.storeUrl === nextGame.storeUrl &&
+    previousGame.releaseDate === nextGame.releaseDate &&
+    previousGame.steamPriceInfo === nextGame.steamPriceInfo &&
+    previousGame.steamDiscountInfo === nextGame.steamDiscountInfo &&
+    previousGame.steamReviewInfo === nextGame.steamReviewInfo
+  );
 }
 
 function mergeSteamWishlistSync(existingGame: Game, syncedGame: Game, syncedAt: string): Game {

@@ -24,6 +24,8 @@ const STEAM_STORE_BASE_URL = import.meta.env.DEV
   ? DEVELOPMENT_STEAM_STORE_BASE_URL
   : PRODUCTION_STEAM_STORE_BASE_URL;
 const STEAM_API_REQUEST_TIMEOUT_MS = 10_000;
+const STEAM_WISHLIST_RETRY_DELAY_MS = 750;
+const STEAM_WISHLIST_MAX_TRANSIENT_RETRIES = 1;
 
 type SteamApiResponse<T> = {
   response?: T;
@@ -99,6 +101,7 @@ export class SteamWishlistError extends Error {
   constructor(
     message: string,
     public code:
+      | 'missing-profile'
       | 'missing-steamid64'
       | 'invalid-steamid64'
       | 'private-wishlist'
@@ -468,16 +471,9 @@ export async function getSteamAchievementSummary(
 export async function getSteamWishlist(
   settings: Pick<SteamSettings, 'apiKey' | 'steamId64' | 'wishlistUrl'>,
 ): Promise<SteamWishlistItem[]> {
-  const steamId64 = settings.steamId64.trim();
-
-  if (!steamId64) {
-    throw new SteamWishlistError('Add a SteamID64 before syncing the Steam wishlist.', 'missing-steamid64');
-  }
-
-  if (!/^\d{17}$/.test(steamId64)) {
-    throw new SteamWishlistError('SteamID64 should be a 17-digit numeric ID, usually starting with 7656.', 'invalid-steamid64');
-  }
-
+  // Steam wishlist sync does not use an official Steam Web API method. It reads Steam's public
+  // store wishlistdata JSON endpoint (via the Vite /api/steam-store proxy in development) and
+  // falls back to parsing the public wishlist page's embedded g_rgWishlistData JSON.
   const profilePaths = await getSteamWishlistProfilePaths(settings);
   const wishlistItems: SteamWishlistItem[] = [];
 
@@ -497,16 +493,26 @@ export async function getSteamWishlist(
 async function getSteamWishlistProfilePaths(
   settings: Pick<SteamSettings, 'apiKey' | 'steamId64' | 'wishlistUrl'>,
 ): Promise<string[]> {
-  const paths = [`profiles/${settings.steamId64.trim()}`];
+  const steamId64 = settings.steamId64.trim();
   const profilePathFromUrl = getSteamWishlistProfilePathFromUrl(settings.wishlistUrl);
-  const vanityId = await getSteamVanityId(settings);
+  const paths = profilePathFromUrl ? [profilePathFromUrl] : [];
 
-  if (vanityId) {
-    paths.unshift(`id/${vanityId}`);
+  if (steamId64) {
+    if (!/^\d{17}$/.test(steamId64)) {
+      throw new SteamWishlistError('SteamID64 should be a 17-digit numeric ID, usually starting with 7656.', 'invalid-steamid64');
+    }
+
+    const vanityId = await getSteamVanityId(settings);
+
+    if (vanityId) {
+      paths.push(`id/${vanityId}`);
+    }
+
+    paths.push(`profiles/${steamId64}`);
   }
 
-  if (profilePathFromUrl) {
-    paths.unshift(profilePathFromUrl);
+  if (paths.length === 0) {
+    throw new SteamWishlistError('Add a SteamID64 or paste a public Steam profile/wishlist URL before syncing the Steam wishlist.', 'missing-profile');
   }
 
   return Array.from(new Set(paths));
@@ -519,8 +525,24 @@ function getSteamWishlistProfilePathFromUrl(value: string) {
     return null;
   }
 
-  const match = trimmedValue.match(/(?:^|\/)wishlist\/(id\/[^/?#]+|profiles\/\d{17})(?:[/?#]|$)/i);
-  return match?.[1] ?? null;
+  const wishlistMatch = trimmedValue.match(/(?:^|\/)wishlist\/(id\/[^/?#]+|profiles\/\d{17})(?:[/?#]|$)/i);
+
+  if (wishlistMatch?.[1]) {
+    return wishlistMatch[1];
+  }
+
+  const communityMatch = trimmedValue.match(/steamcommunity\.com\/(id\/[^/?#]+|profiles\/\d{17})(?:[/?#]|$)/i);
+
+  if (communityMatch?.[1]) {
+    return communityMatch[1];
+  }
+
+  if (/^\d{17}$/.test(trimmedValue)) {
+    return `profiles/${trimmedValue}`;
+  }
+
+  const vanityOnlyMatch = trimmedValue.match(/^[A-Za-z0-9_-]+$/);
+  return vanityOnlyMatch ? `id/${trimmedValue}` : null;
 }
 
 async function getSteamVanityId(settings: Pick<SteamSettings, 'apiKey' | 'steamId64'>) {
@@ -639,6 +661,10 @@ async function getSteamWishlistFromPublicPage(profilePath: string, page: number)
     throw new SteamWishlistError('Steam returned a wishlist page that could not be read.', 'malformed-response');
   }
 
+  if (isSteamPrivateWishlistPage(html)) {
+    throw new SteamWishlistError('Steam wishlist is private or unavailable. Make your Steam profile and wishlist public, then try again.', 'private-wishlist');
+  }
+
   const payload = parseSteamWishlistPageHtml(html);
   const items = parseSteamWishlistPayload(payload);
 
@@ -654,6 +680,10 @@ async function parseSteamWishlistResponseText(responseText: string, profilePath:
 
   if (!trimmedText) {
     throw new SteamWishlistError('Steam returned an empty wishlist response.', 'malformed-response');
+  }
+
+  if (isSteamPrivateWishlistPage(trimmedText)) {
+    throw new SteamWishlistError('Steam wishlist is private or unavailable. Make your Steam profile and wishlist public, then try again.', 'private-wishlist');
   }
 
   if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
@@ -692,23 +722,67 @@ function parseSteamWishlistPageHtml(html: string) {
   }
 }
 
+
+function isSteamPrivateWishlistPage(html: string) {
+  const normalizedHtml = html.toLowerCase();
+  return (
+    normalizedHtml.includes('profile is private') ||
+    normalizedHtml.includes('this profile is private') ||
+    normalizedHtml.includes('wishlist is currently private') ||
+    normalizedHtml.includes('there was a problem accessing')
+  );
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function isTransientWishlistStatus(status: number) {
+  return [500, 502, 503, 504].includes(status);
+}
+
 async function fetchSteamWishlistResponse(proxyUrl: URL, directUrl: URL) {
-  try {
-    return await fetch(proxyUrl, { redirect: 'manual' });
-  } catch (proxyError) {
+  let lastProxyError: unknown = null;
+  let lastDirectError: unknown = null;
+
+  for (let attempt = 0; attempt <= STEAM_WISHLIST_MAX_TRANSIENT_RETRIES; attempt += 1) {
+    if (attempt > 0) {
+      await wait(STEAM_WISHLIST_RETRY_DELAY_MS * attempt);
+    }
+
     try {
-      return await fetch(directUrl, { redirect: 'manual' });
-    } catch (directError) {
-      if (import.meta.env.DEV) {
-        throw new SteamWishlistError('Steam wishlist sync is unavailable right now. Check your connection and try again.', 'cors-proxy');
+      const response = await fetch(proxyUrl, { redirect: 'manual' });
+
+      if (attempt < STEAM_WISHLIST_MAX_TRANSIENT_RETRIES && isTransientWishlistStatus(response.status)) {
+        continue;
       }
 
-      throw new SteamWishlistError(
-        `Steam wishlist request failed. Direct error: ${formatFetchError(directError)}.`,
-        'endpoint-failure',
-      );
+      return response;
+    } catch (proxyError) {
+      lastProxyError = proxyError;
+    }
+
+    try {
+      const response = await fetch(directUrl, { redirect: 'manual' });
+
+      if (attempt < STEAM_WISHLIST_MAX_TRANSIENT_RETRIES && isTransientWishlistStatus(response.status)) {
+        continue;
+      }
+
+      return response;
+    } catch (directError) {
+      lastDirectError = directError;
     }
   }
+
+  if (import.meta.env.DEV) {
+    throw new SteamWishlistError('Steam wishlist sync is unavailable right now. Check your connection and try again.', 'cors-proxy');
+  }
+
+  throw new SteamWishlistError(
+    `Steam wishlist request failed. Proxy error: ${formatFetchError(lastProxyError)}. Direct error: ${formatFetchError(lastDirectError)}.`,
+    'endpoint-failure',
+  );
 }
 
 export function clearSteamApiDebugLog() {

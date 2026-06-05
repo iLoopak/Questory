@@ -62,6 +62,7 @@ export type SteamWishlistSyncSummary = {
   fetchedCount: number;
   skippedAlreadyInLibraryCount: number;
   skippedIgnoredCount: number;
+  unchangedCount: number;
   updatedCount: number;
 };
 

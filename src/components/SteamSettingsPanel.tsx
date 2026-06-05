@@ -272,18 +272,18 @@ export function SteamSettingsPanel({
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Steam wishlist URL
+                Steam profile / wishlist URL or vanity name
               </span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 value={settings.wishlistUrl}
                 onChange={(event) => updateSetting('wishlistUrl', event.target.value)}
-                placeholder="https://store.steampowered.com/wishlist/id/loopak/"
+                placeholder="https://steamcommunity.com/id/loopak or loopak"
                 spellCheck={false}
-                type="url"
+                type="text"
               />
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                Optional. Paste the public wishlist URL if Steam redirects your SteamID64 wishlist to a custom profile URL.
+                Optional for Steam playtime, but Steam Wishlist sync needs either this public profile/wishlist URL (or vanity name) or a SteamID64. The Steam profile and wishlist must be public.
               </p>
             </label>
 
