@@ -267,7 +267,6 @@ const initialSteamWishlistSyncState: SteamWishlistSyncState = {
 const initialSteamAchievementSyncState: SteamAchievementSyncState = {
   status: 'idle',
   message: 'Steam achievement sync runs only when you start it.',
-  progress: { completed: 0, total: 0 },
   summary: null,
 };
 
@@ -916,7 +915,7 @@ function App() {
 
   async function syncSteamAchievements(
     gameIds?: string[],
-    options: { completionToastMessage?: (summary: SteamAchievementSyncSummary) => string; emptyToastMessage?: string; showToast?: boolean } = {},
+    options: { completionToastMessage?: (summary: SteamAchievementSyncSummary) => string; emptyToastMessage?: string; force?: boolean; showToast?: boolean } = {},
   ) {
     const targetGames = (gameIds ? games.filter((game) => gameIds.includes(game.id)) : games).filter(
       (game) => game.collectionType === 'library',
@@ -937,7 +936,6 @@ function App() {
       setSteamAchievementSyncState({
         status: 'success',
         message,
-        progress: { completed: 0, total: 0 },
         summary,
       });
       addToastNotification({
@@ -951,8 +949,7 @@ function App() {
 
     setSteamAchievementSyncState((currentState) => ({
       status: 'loading',
-      message: `Syncing Steam achievements 0/${total}...`,
-      progress: { completed: 0, total },
+      message: total > 50 ? t('collection.syncingSteamAchievementsLong') : t('collection.syncingSteamAchievements'),
       summary: currentState.summary,
     }));
 
@@ -967,21 +964,7 @@ function App() {
         targetGameIds,
         settings,
         syncedAt,
-        (progress) => {
-          if (!isAppMountedRef.current) {
-            return;
-          }
-
-          setSteamAchievementSyncState((currentState) =>
-            currentState.status === 'loading'
-              ? {
-                  ...currentState,
-                  message: `Syncing Steam achievements ${progress.completed}/${progress.total}...`,
-                  progress,
-                }
-              : currentState,
-          );
-        },
+        undefined,
         (batchResult) => {
           if (!isAppMountedRef.current) {
             saveGames(batchResult.games);
@@ -997,16 +980,13 @@ function App() {
             currentState.status === 'loading'
               ? {
                   ...currentState,
-                  message: `Syncing Steam achievements ${batchResult.progress.completed}/${batchResult.progress.total}...`,
-                  progress: batchResult.progress,
                   summary: batchResult.summary,
                 }
               : currentState,
           );
         },
+        options.force,
       );
-      const completed = total;
-
       if (!isAppMountedRef.current) {
         return result.summary;
       }
@@ -1016,7 +996,6 @@ function App() {
       setSteamAchievementSyncState({
         status: 'success',
         message: formatSteamAchievementSyncSummary(result.summary),
-        progress: { completed, total },
         summary: result.summary,
       });
 
@@ -1046,7 +1025,6 @@ function App() {
       setSteamAchievementSyncState((currentState) => ({
         status: 'error',
         message,
-        progress: { completed: currentState.progress.completed, total },
         summary: currentState.summary,
       }));
       addToastNotification({
@@ -1064,7 +1042,6 @@ function App() {
             ? {
                 status: 'error',
                 message: 'Steam achievement sync stopped before it could finish. Try again.',
-                progress: currentState.progress,
                 summary: currentState.summary,
               }
             : currentState,
@@ -1093,7 +1070,7 @@ function App() {
       setSteamPlaytimeRefreshState({
         status: 'success',
         message: options.emptyToastMessage ?? 'No Steam library games were selected for playtime refresh.',
-        progress: { completed: 0, total: 0 },
+        progress: { completed: 0, total },
         summary,
       });
       addToastNotification({
@@ -1165,7 +1142,7 @@ function App() {
 
   async function syncSteamDataForGame(game: Game) {
     await refreshSteamPlaytime([game.id], { showToast: true });
-    return syncSteamAchievements([game.id], { showToast: true });
+    return syncSteamAchievements([game.id], { force: true, showToast: true });
   }
 
   function importSteamWishlistItems(wishlistItems: SteamWishlistItem[]): SteamWishlistSyncSummary {
@@ -2387,7 +2364,7 @@ type CollectionPanelProps = {
   onDrop: (game: Game) => void;
   onBulkEnrich: (gameIds: string[]) => void;
   onBulkRefreshSteamPlaytime?: (gameIds: string[], options?: { emptyToastMessage?: string }) => Promise<SteamPlaytimeRefreshSummary | null>;
-  onBulkSyncSteamAchievements?: (gameIds: string[], options?: { emptyToastMessage?: string }) => Promise<SteamAchievementSyncSummary | null>;
+  onBulkSyncSteamAchievements?: (gameIds: string[], options?: { emptyToastMessage?: string; force?: boolean }) => Promise<SteamAchievementSyncSummary | null>;
   onBulkRemove: (gameIds: string[]) => void;
   onBulkRemoveAndIgnore: (games: Game[]) => void;
   onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
@@ -3109,31 +3086,16 @@ function SteamAchievementSyncNotice({ syncState }: { syncState: SteamAchievement
     success: 'border-mint/40 bg-mint/10 text-mint',
     error: 'border-red-400/40 bg-red-500/10 text-red-200',
   }[syncState.status];
-  const progressPercent = syncState.progress.total > 0
-    ? Math.round((syncState.progress.completed / syncState.progress.total) * 100)
-    : 0;
-
   return (
     <div className={`mb-4 rounded-lg border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
       <div>{syncState.message}</div>
-      {syncState.status === 'loading' ? (
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
-            <span>{t('app.progress')}</span>
-            <span>{syncState.progress.completed}/{syncState.progress.total}</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-current transition-all" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </div>
-      ) : null}
       {syncState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-5">
-          <NoticeStat label="Updated" value={syncState.summary.updatedCount.toString()} />
+          <NoticeStat label={t('collection.steamAchievementsUpdated')} value={syncState.summary.updatedCount.toString()} />
           <NoticeStat label="Unchanged" value={syncState.summary.unchangedCount.toString()} />
-          <NoticeStat label="No achievements" value={syncState.summary.noAchievementDataCount.toString()} />
-          <NoticeStat label="Failed" value={syncState.summary.failedCount.toString()} />
-          <NoticeStat label="Non-Steam skipped" value={syncState.summary.skippedNonSteamCount.toString()} />
+          <NoticeStat label={t('collection.steamAchievementsNoAchievements')} value={syncState.summary.noAchievementDataCount.toString()} />
+          <NoticeStat label={t('collection.steamAchievementsFailed')} value={syncState.summary.failedCount.toString()} />
+          <NoticeStat label={t('collection.steamAchievementsNonSteamSkipped')} value={syncState.summary.skippedNonSteamCount.toString()} />
         </div>
       ) : null}
     </div>
@@ -4835,31 +4797,54 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
 
     const syncedGame = syncedGamesById.get(game.id);
 
-    if (!syncedGame || typeof syncedGame.steamAchievementsTotal !== 'number' || syncedGame.steamAchievementsTotal <= 0) {
+    if (!syncedGame) {
+      return game;
+    }
+
+    const hasAchievementSummary = typeof syncedGame.steamAchievementsTotal === 'number' && syncedGame.steamAchievementsTotal > 0;
+
+    if (!hasAchievementSummary && syncedGame.steamAchievementsUnsupported !== true) {
       return game;
     }
 
     return {
       ...game,
-      steamAchievementsTotal: syncedGame.steamAchievementsTotal,
-      steamAchievementsUnlocked: syncedGame.steamAchievementsUnlocked,
-      steamAchievementsPercent: syncedGame.steamAchievementsPercent,
-      steamLastAchievementUnlockTime: syncedGame.steamLastAchievementUnlockTime,
+      ...(hasAchievementSummary
+        ? {
+            steamAchievementsTotal: syncedGame.steamAchievementsTotal,
+            steamAchievementsUnlocked: syncedGame.steamAchievementsUnlocked,
+            steamAchievementsPercent: syncedGame.steamAchievementsPercent,
+            steamLastAchievementUnlockTime: syncedGame.steamLastAchievementUnlockTime,
+          }
+        : {}),
+      steamAchievementsUnsupported: syncedGame.steamAchievementsUnsupported,
+      steamAchievementsLastCheckedAt: syncedGame.steamAchievementsLastCheckedAt,
       updatedAt: syncedGame.updatedAt,
     };
   });
 }
 
 function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary) {
+  const completionPrefix = 'Steam achievements sync complete.';
+
+  if (
+    summary.updatedCount === 0 &&
+    summary.unchangedCount === 0 &&
+    summary.failedCount === 0 &&
+    summary.skippedNonSteamCount === 0 &&
+    summary.noAchievementDataCount > 0
+  ) {
+    return `${completionPrefix} ${summary.noAchievementDataCount} games had no achievements.`;
+  }
+
   const parts = [
     `${summary.updatedCount} updated`,
-    `${summary.unchangedCount} unchanged`,
     `${summary.noAchievementDataCount} no achievements`,
     `${summary.failedCount} failed`,
-    `${summary.skippedNonSteamCount} non-Steam skipped`,
-  ];
+    summary.skippedNonSteamCount > 0 ? `${summary.skippedNonSteamCount} non-Steam skipped` : null,
+  ].filter(Boolean);
 
-  return `Steam achievement sync complete: ${parts.join(' · ')}`;
+  return parts.length > 0 ? `${completionPrefix} ${parts.join(' · ')}` : completionPrefix;
 }
 
 function formatBulkSummary(summary: BulkActionSummary) {

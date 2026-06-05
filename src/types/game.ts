@@ -60,6 +60,8 @@ export type Game = {
   steamAchievementsUnlocked?: number;
   steamAchievementsPercent?: number;
   steamLastAchievementUnlockTime?: number;
+  steamAchievementsUnsupported?: boolean;
+  steamAchievementsLastCheckedAt?: number;
   externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
   externalUrl?: string;
   importedAt?: string;

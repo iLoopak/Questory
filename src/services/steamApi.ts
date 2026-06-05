@@ -376,16 +376,18 @@ export async function getSteamAchievementSummary(
   settings: SteamSettings,
   appId: number,
 ): Promise<SteamAchievementSummary | null> {
-  const [playerAchievements, gameSchema] = await Promise.all([
-    requestSteamStatsEndpoint<PlayerAchievementsResponse>('GetPlayerAchievements', settings, appId),
-    requestSteamStatsEndpoint<GameSchemaResponse>('GetSchemaForGame', settings, appId),
-  ]);
-
-  const achievementRows = Array.isArray(playerAchievements.playerstats?.achievements)
-    ? playerAchievements.playerstats.achievements
-    : [];
+  const gameSchema = await requestSteamStatsEndpoint<GameSchemaResponse>('GetSchemaForGame', settings, appId);
   const schemaRows = Array.isArray(gameSchema.game?.availableGameStats?.achievements)
     ? gameSchema.game.availableGameStats.achievements
+    : [];
+
+  if (schemaRows.length <= 0) {
+    return null;
+  }
+
+  const playerAchievements = await requestSteamStatsEndpoint<PlayerAchievementsResponse>('GetPlayerAchievements', settings, appId);
+  const achievementRows = Array.isArray(playerAchievements.playerstats?.achievements)
+    ? playerAchievements.playerstats.achievements
     : [];
   const total = Math.max(achievementRows.length, schemaRows.length);
 
@@ -742,14 +744,6 @@ function recordSteamApiDebug(entry: SteamApiDebugEntry) {
     steamApiDebugEntries.shift();
   }
 
-  console.debug('[QuestShelf Steam API]', {
-    endpoint: entry.endpoint,
-    httpStatus: entry.httpStatus,
-    parsedGameCount: entry.parsedGameCount,
-    requestUrl: entry.requestUrl,
-    responseSummary: entry.responseSummary,
-    steamId64: entry.steamId64,
-  });
 }
 
 function getSafeRequestUrl(url: URL) {

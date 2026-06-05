@@ -45,6 +45,7 @@ export async function syncSteamAchievementsForGames(
   syncedAt: string,
   onProgress?: (progress: SteamAchievementSyncProgress) => void,
   onBatchComplete?: (result: SteamAchievementSyncBatchResult) => void,
+  force = false,
 ): Promise<SteamAchievementSyncResult> {
   const targetGames = games.filter((game) => targetGameIds.has(game.id));
   const syncableGames = targetGames.filter(isSteamAchievementSyncableGame);
@@ -73,6 +74,7 @@ export async function syncSteamAchievementsForGames(
             noAchievementAppIds,
             settings,
             summariesByAppId,
+            force,
           },
           () => {
             completed = Math.min(completed + 1, syncableGames.length);
@@ -102,6 +104,7 @@ async function syncSteamAchievementsForGameWithProgress(
     noAchievementAppIds: Set<number>;
     settings: SteamSettings;
     summariesByAppId: Map<number, SteamAchievementSummaryResult>;
+    force: boolean;
   },
   onProcessed: () => void,
 ): Promise<SteamAchievementGameSyncResult> {
@@ -118,17 +121,24 @@ async function syncSteamAchievementsForGame({
   noAchievementAppIds,
   settings,
   summariesByAppId,
+  force,
 }: {
   failedAppIds: Set<number>;
   game: Game;
   noAchievementAppIds: Set<number>;
   settings: SteamSettings;
   summariesByAppId: Map<number, SteamAchievementSummaryResult>;
+  force: boolean;
 }): Promise<SteamAchievementGameSyncResult> {
   const steamAppId = game.steamAppId;
 
   if (typeof steamAppId !== 'number') {
     return { gameId: game.id, steamAppId: 0, status: 'skipped' };
+  }
+
+  if (!force && game.steamAchievementsUnsupported === true) {
+    noAchievementAppIds.add(steamAppId);
+    return { gameId: game.id, steamAppId, status: 'no-achievements' };
   }
 
   if (summariesByAppId.has(steamAppId)) {
@@ -211,7 +221,12 @@ function mergeSteamAchievementBatch(
 
     if (result.status === 'no-achievements') {
       summary.noAchievementDataCount += 1;
-      return game;
+      return {
+        ...game,
+        steamAchievementsUnsupported: true,
+        steamAchievementsLastCheckedAt: Date.parse(syncedAt),
+        updatedAt: syncedAt,
+      };
     }
 
     if (result.status === 'skipped') {
@@ -230,7 +245,8 @@ function mergeSteamAchievementBatch(
       game.steamAchievementsTotal !== achievementSummary.total ||
       game.steamAchievementsUnlocked !== achievementSummary.unlocked ||
       game.steamAchievementsPercent !== achievementSummary.percent ||
-      game.steamLastAchievementUnlockTime !== achievementSummary.lastUnlockTime;
+      game.steamLastAchievementUnlockTime !== achievementSummary.lastUnlockTime ||
+      game.steamAchievementsUnsupported === true;
 
     if (!hasChanged) {
       summary.unchangedCount += 1;
@@ -244,6 +260,8 @@ function mergeSteamAchievementBatch(
       steamAchievementsUnlocked: achievementSummary.unlocked,
       steamAchievementsPercent: achievementSummary.percent,
       steamLastAchievementUnlockTime: achievementSummary.lastUnlockTime,
+      steamAchievementsUnsupported: false,
+      steamAchievementsLastCheckedAt: Date.parse(syncedAt),
       updatedAt: syncedAt,
     };
   });
@@ -254,7 +272,14 @@ function isSteamCredentialError(error: unknown) {
 }
 
 function isPermanentNoAchievementError(error: unknown) {
-  return error instanceof SteamApiError && ['no-achievements', 'private-profile'].includes(error.code);
+  if (!(error instanceof SteamApiError)) {
+    return false;
+  }
+
+  return (
+    ['no-achievements', 'private-profile'].includes(error.code) ||
+    (error.code === 'api-failure' && error.httpStatus === 400 && error.isTransient !== true)
+  );
 }
 
 function isRetryableSteamAchievementError(error: unknown) {
