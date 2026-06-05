@@ -472,6 +472,7 @@ function ImportResultPanel({
   onReviewImportedGames?: (gameIds: string[]) => void;
   onViewImportedGames?: (gameIds: string[]) => void;
 }) {
+  const { t } = useI18n();
   const importedGameIds = importedGames.map((game) => game.id);
   const isSuccess = summary.importedGames > 0;
 
@@ -536,7 +537,7 @@ function ImportResultPanel({
               onClick={() => onAddImportedToQueue?.(importedGameIds)}
               type="button"
             >
-              Add to Queue
+              {t('action.addToQueue')}
             </button>
             {importedGamesHiddenByFilters ? (
               <button

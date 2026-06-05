@@ -442,7 +442,7 @@ function ShelfGameCard({
               onKeyDown={(event) => event.stopPropagation()}
               type="button"
             >
-              Add to Queue
+              {t('action.addToQueue')}
             </button>
           ) : null}
           <GameActionMenu
@@ -566,7 +566,7 @@ function CompactGameRow({
 
       {!isMultiSelectMode ? (
         <div className="flex flex-wrap gap-1.5 sm:justify-end" aria-label={`${game.title} quick actions`}>
-          {onAddToQueue ? <RowAction label="Queue" onClick={() => onAddToQueue(game)} /> : null}
+          {onAddToQueue ? <RowAction label={t('queue.platforms')} onClick={() => onAddToQueue(game)} /> : null}
           <RowAction label="Details" onClick={onOpenDetails} primary />
           <GameActionMenu
             game={game}
