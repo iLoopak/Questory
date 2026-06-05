@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
+import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
@@ -13,6 +13,8 @@ type GameDetailViewProps = {
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
   onBack: () => void;
+  onFindArtwork?: (game: Game) => void | Promise<unknown>;
+  isFindingArtwork?: boolean;
   onIgnore?: (game: Game) => void;
   onSyncSteamData?: (game: Game) => void;
   isSteamDataSyncing?: boolean;
@@ -34,6 +36,8 @@ export function GameDetailView({
   onAddToQueue,
   onAddToWishlist,
   onBack,
+  onFindArtwork,
+  isFindingArtwork = false,
   onIgnore,
   onSyncSteamData,
   isSteamDataSyncing = false,
@@ -63,6 +67,8 @@ export function GameDetailView({
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
   const platformLabel = getGamePlatformLabel(game, platformQueueState);
+  const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
+  const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -125,6 +131,23 @@ export function GameDetailView({
           onClick: () => onSyncSteamData?.(game),
           tone: 'neutral',
           disabled: !onSyncSteamData || isSteamDataSyncing,
+        },
+      ]
+    : [];
+
+
+  const artworkActions: GameDetailAction[] = canFindArtwork
+    ? [
+        {
+          icon: '🖼️',
+          label: isFindingArtwork
+            ? t('artwork.searching')
+            : (isArtworkMissing ? t('artwork.findArtwork') : t('artwork.enrichMetadata')),
+          onClick: () => {
+            void onFindArtwork?.(game);
+          },
+          tone: 'accent',
+          disabled: !onFindArtwork || isFindingArtwork,
         },
       ]
     : [];
@@ -195,7 +218,7 @@ export function GameDetailView({
 
                 <div className="min-w-0 space-y-4">
                   <button className="text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
-                    Back to library
+                    {t('detail.backToLibrary')}
                   </button>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
@@ -221,6 +244,9 @@ export function GameDetailView({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {steamActions.map((action) => (
+                    <GameDetailActionButton key={action.label} action={action} />
+                  ))}
+                  {artworkActions.map((action) => (
                     <GameDetailActionButton key={action.label} action={action} />
                   ))}
                 </div>
@@ -334,12 +360,24 @@ export function GameDetailView({
                         onClick={useRawgImageAsCover}
                         type="button"
                       >
-                        Use RAWG image as cover
+                        {t('detail.useRawgCover')}
                       </button>
                     ) : null}
                   </div>
                 ) : (
-                  <EmptyState text={t('detail.noRawgMetadata')} />
+                  <div className="space-y-3">
+                    <EmptyState text={t('detail.noRawgMetadata')} />
+                    {onFindArtwork ? (
+                      <button
+                        className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isFindingArtwork}
+                        onClick={() => void onFindArtwork(game)}
+                        type="button"
+                      >
+                        {isFindingArtwork ? t('artwork.searching') : t('artwork.enrichMetadata')}
+                      </button>
+                    ) : null}
+                  </div>
                 )}
               </MetadataAccordion>
             </section>

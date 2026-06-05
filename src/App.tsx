@@ -298,6 +298,10 @@ const initialItadDealSyncState: ItadDealSyncState = {
   summary: null,
 };
 
+type MetadataRefreshMode = 'metadata' | 'artwork';
+
+type MetadataRefreshResult = 'updated' | 'no-match' | 'error';
+
 function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
@@ -1661,31 +1665,32 @@ function App() {
     setActiveNavItem('Metadata');
   }
 
-  async function refreshGameMetadataFromActions(game: Game) {
+  async function refreshGameMetadataFromActions(game: Game, mode: MetadataRefreshMode = 'metadata'): Promise<MetadataRefreshResult> {
     const targetGame = games.find((currentGame) => currentGame.id === game.id)
       ?? (typeof game.steamAppId === 'number'
         ? games.find((currentGame) => currentGame.steamAppId === game.steamAppId && currentGame.collectionType === game.collectionType)
         : undefined);
-    const toastKey = `metadata-refresh:${game.id}`;
+    const toastKey = `${mode}-refresh:${game.id}`;
+    const isArtworkRefresh = mode === 'artwork';
 
     if (!targetGame) {
       addToastNotification({
         category: 'error',
         dedupeKey: toastKey,
-        message: 'Could not find that game to refresh metadata.',
+        message: isArtworkRefresh ? t('artwork.notFoundGame') : 'Could not find that game to refresh metadata.',
       });
-      return;
+      return 'error';
     }
 
     if (refreshingMetadataGameIds.has(targetGame.id)) {
-      return;
+      return 'error';
     }
 
     setRefreshingMetadataGameIds((currentGameIds) => new Set(currentGameIds).add(targetGame.id));
     addToastNotification({
       category: 'info',
       dedupeKey: toastKey,
-      message: 'Refreshing metadata...',
+      message: isArtworkRefresh ? t('artwork.searching') : 'Refreshing metadata...',
     });
 
     try {
@@ -1695,18 +1700,24 @@ function App() {
         addToastNotification({
           category: 'info',
           dedupeKey: toastKey,
-          message: 'No metadata found',
+          message: isArtworkRefresh ? t('artwork.noArtworkFound') : 'No metadata found',
         });
-        return;
+        return 'no-match';
       }
 
       updateGameMetadata(targetGame.id, result.metadata);
       markOnboardingItemComplete('metadata-enriched');
+
+      const foundArtwork = Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim());
       addToastNotification({
-        category: 'success',
+        category: foundArtwork || !isArtworkRefresh ? 'success' : 'info',
         dedupeKey: toastKey,
-        message: 'Metadata updated',
+        message: isArtworkRefresh
+          ? (foundArtwork ? t('artwork.updated') : t('artwork.noArtworkFound'))
+          : 'Metadata updated',
       });
+
+      return foundArtwork || !isArtworkRefresh ? 'updated' : 'no-match';
     } catch (error) {
       const message = error instanceof RawgApiError
         ? error.message
@@ -1716,6 +1727,7 @@ function App() {
         dedupeKey: toastKey,
         message,
       });
+      return 'error';
     } finally {
       setRefreshingMetadataGameIds((currentGameIds) => {
         const nextGameIds = new Set(currentGameIds);
@@ -2218,6 +2230,8 @@ function App() {
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onBack={() => setSelectedGameId(null)}
+              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+              isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
               onIgnore={removeAndIgnoreSteamGame}
               onSyncSteamData={syncSteamDataForGame}
               isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
@@ -2370,6 +2384,7 @@ function App() {
               games={games}
               onApplyArtworkUpdate={updateGameArtwork}
               onEnrichGames={startMetadataWorkflow}
+              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
