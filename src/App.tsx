@@ -268,6 +268,7 @@ const initialSteamWishlistSyncState: SteamWishlistSyncState = {
 const initialSteamAchievementSyncState: SteamAchievementSyncState = {
   status: 'idle',
   message: 'Steam achievement sync runs only when you start it.',
+  progress: { completed: 0, total: 0 },
   summary: null,
 };
 
@@ -937,6 +938,7 @@ function App() {
       setSteamAchievementSyncState({
         status: 'success',
         message,
+        progress: { completed: 0, total },
         summary,
       });
       addToastNotification({
@@ -951,10 +953,12 @@ function App() {
     setSteamAchievementSyncState({
       status: 'loading',
       message: total > 50 ? t('collection.syncingSteamAchievementsLong') : t('collection.syncingSteamAchievements'),
+      progress: { completed: 0, total },
       summary: null,
     });
 
-    let didSetTerminalAchievementState = false;
+    let terminalState: SteamAchievementSyncState | null = null;
+    let summaryToReturn: SteamAchievementSyncSummary | null = null;
 
     try {
       const settings = loadSteamSettings();
@@ -965,7 +969,21 @@ function App() {
         targetGameIds,
         settings,
         syncedAt,
-        undefined,
+        (progress) => {
+          if (!isAppMountedRef.current) {
+            return;
+          }
+
+          setSteamAchievementSyncState((currentState) =>
+            currentState.status === 'loading'
+              ? {
+                  ...currentState,
+                  progress,
+                  summary: null,
+                }
+              : currentState,
+          );
+        },
         (batchResult) => {
           if (!isAppMountedRef.current) {
             saveGames(batchResult.games);
@@ -981,6 +999,7 @@ function App() {
             currentState.status === 'loading'
               ? {
                   ...currentState,
+                  progress: batchResult.progress,
                   summary: null,
                 }
               : currentState,
@@ -988,17 +1007,20 @@ function App() {
         },
         options.force,
       );
+
+      summaryToReturn = result.summary;
+
       if (!isAppMountedRef.current) {
-        return result.summary;
+        return summaryToReturn;
       }
 
       setGames((currentGames) => mergeSteamAchievementUpdates(currentGames, result.games, targetGameIds));
-      didSetTerminalAchievementState = true;
-      setSteamAchievementSyncState({
+      terminalState = {
         status: 'success',
         message: formatSteamAchievementSyncSummary(result.summary),
+        progress: { completed: total, total },
         summary: result.summary,
-      });
+      };
 
       if (options.showToast) {
         const hasPartialFailures = result.summary.failedCount > 0;
@@ -1010,24 +1032,33 @@ function App() {
         });
       }
 
-      return result.summary;
+      return summaryToReturn;
     } catch (error) {
       const isCredentialError = error instanceof SteamApiError && ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
       const message =
         error instanceof SteamApiError
           ? error.message
           : 'Steam achievement sync failed. Check your Steam credentials, profile privacy, and connection.';
+      const failedSummary: SteamAchievementSyncSummary = {
+        failedCount: total,
+        noAchievementDataCount: 0,
+        skippedNonSteamCount: targetGames.length - total,
+        unchangedCount: 0,
+        updatedCount: 0,
+      };
+
+      summaryToReturn = failedSummary;
 
       if (!isAppMountedRef.current) {
-        return null;
+        return summaryToReturn;
       }
 
-      didSetTerminalAchievementState = true;
-      setSteamAchievementSyncState((currentState) => ({
+      terminalState = {
         status: 'error',
         message,
-        summary: currentState.summary,
-      }));
+        progress: { completed: total, total },
+        summary: failedSummary,
+      };
       addToastNotification({
         actions: isCredentialError ? [getOpenSteamSettingsAction()] : [getDismissAction()],
         category: isCredentialError ? 'warning' : 'error',
@@ -1035,21 +1066,21 @@ function App() {
         message: isCredentialError ? 'Add Steam credentials to sync achievements.' : 'Steam achievement sync failed.',
       });
 
-      return null;
+      return summaryToReturn;
     } finally {
-      if (isAppMountedRef.current && !didSetTerminalAchievementState) {
-        setSteamAchievementSyncState((currentState) =>
-          currentState.status === 'loading'
-            ? {
-                status: 'error',
-                message: 'Steam achievement sync stopped before it could finish. Try again.',
-                summary: currentState.summary,
-              }
-            : currentState,
+      if (isAppMountedRef.current) {
+        setSteamAchievementSyncState(
+          terminalState ?? {
+            status: 'error',
+            message: 'Steam achievement sync stopped before it could finish. Try again.',
+            progress: { completed: total, total },
+            summary: summaryToReturn,
+          },
         );
       }
     }
   }
+
 
   async function refreshSteamPlaytime(
     gameIds?: string[],
@@ -1977,6 +2008,7 @@ function App() {
                 syncSteamAchievements(gameIds, {
                   completionToastMessage: formatSteamAchievementSyncSummary,
                   emptyToastMessage: options?.emptyToastMessage,
+                  force: options?.force,
                   showToast: true,
                 })
               }
@@ -3101,10 +3133,25 @@ function SteamAchievementSyncNotice({ syncState }: { syncState: SteamAchievement
     success: 'border-mint/40 bg-mint/10 text-mint',
     error: 'border-red-400/40 bg-red-500/10 text-red-200',
   }[syncState.status];
+  const progressPercent = syncState.progress.total > 0
+    ? Math.round((syncState.progress.completed / syncState.progress.total) * 100)
+    : 0;
+
   return (
     <div className={`mb-4 rounded-lg border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
       <div>{syncState.message}</div>
-      {syncState.status !== 'loading' && syncState.summary ? (
+      {syncState.status === 'loading' ? (
+        <div className="mt-3">
+          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
+            <span>{t('app.progress')}</span>
+            <span>{syncState.progress.completed}/{syncState.progress.total}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-current transition-all" style={{ width: `${progressPercent}%` }} />
+          </div>
+        </div>
+      ) : null}
+      {syncState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-5">
           <NoticeStat label={t('collection.steamAchievementsUpdated')} value={syncState.summary.updatedCount.toString()} />
           <NoticeStat label="Unchanged" value={syncState.summary.unchangedCount.toString()} />
@@ -4858,25 +4905,15 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
 
 function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary) {
   const completionPrefix = 'Steam achievements sync complete.';
-
-  if (
-    summary.updatedCount === 0 &&
-    summary.unchangedCount === 0 &&
-    summary.failedCount === 0 &&
-    summary.skippedNonSteamCount === 0 &&
-    summary.noAchievementDataCount > 0
-  ) {
-    return `${completionPrefix} ${summary.noAchievementDataCount} no achievements.`;
-  }
-
   const parts = [
     `${summary.updatedCount} updated`,
+    summary.unchangedCount > 0 ? `${summary.unchangedCount} unchanged` : null,
     `${summary.noAchievementDataCount} no achievements`,
     `${summary.failedCount} failed`,
     summary.skippedNonSteamCount > 0 ? `${summary.skippedNonSteamCount} non-Steam skipped` : null,
   ].filter(Boolean);
 
-  return parts.length > 0 ? `${completionPrefix} ${parts.join(' · ')}` : completionPrefix;
+  return `${completionPrefix} ${parts.join(' · ')}.`;
 }
 
 function formatBulkSummary(summary: BulkActionSummary) {

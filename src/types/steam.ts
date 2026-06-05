@@ -86,11 +86,16 @@ export type SteamAchievementSyncSummary = {
   updatedCount: number;
 };
 
+export type SteamAchievementSyncProgress = {
+  completed: number;
+  total: number;
+};
+
 export type SteamAchievementSyncState =
-  | { status: 'idle'; message: string; summary: SteamAchievementSyncSummary | null }
-  | { status: 'loading'; message: string; summary: SteamAchievementSyncSummary | null }
-  | { status: 'success'; message: string; summary: SteamAchievementSyncSummary }
-  | { status: 'error'; message: string; summary: SteamAchievementSyncSummary | null };
+  | { status: 'idle'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null }
+  | { status: 'loading'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null }
+  | { status: 'success'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary }
+  | { status: 'error'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null };
 
 export type SteamPlaytimeRefreshSummary = {
   failedCount: number;
