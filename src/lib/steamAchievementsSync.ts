@@ -2,9 +2,31 @@ import { getSteamAchievementSummary, SteamApiError } from '../services/steamApi'
 import type { Game } from '../types/game';
 import type { SteamAchievementSyncSummary, SteamSettings } from '../types/steam';
 
+export const STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE = 4;
+export const STEAM_ACHIEVEMENT_SYNC_BATCH_DELAY_MS = 1000;
+export const STEAM_ACHIEVEMENT_SYNC_MAX_RETRIES = 2;
+export const STEAM_ACHIEVEMENT_SYNC_RETRY_DELAY_MS = 500;
+
+type SteamAchievementSummaryResult = Awaited<ReturnType<typeof getSteamAchievementSummary>>;
+
+type SteamAchievementGameSyncStatus = 'updated' | 'skipped' | 'no-achievements' | 'failed';
+
 export type SteamAchievementSyncProgress = {
   completed: number;
   total: number;
+};
+
+export type SteamAchievementGameSyncResult = {
+  gameId: string;
+  steamAppId: number;
+  status: SteamAchievementGameSyncStatus;
+};
+
+export type SteamAchievementSyncBatchResult = {
+  games: Game[];
+  progress: SteamAchievementSyncProgress;
+  summary: SteamAchievementSyncSummary;
+  batchResults: SteamAchievementGameSyncResult[];
 };
 
 export type SteamAchievementSyncResult = {
@@ -22,14 +44,14 @@ export async function syncSteamAchievementsForGames(
   settings: SteamSettings,
   syncedAt: string,
   onProgress?: (progress: SteamAchievementSyncProgress) => void,
+  onBatchComplete?: (result: SteamAchievementSyncBatchResult) => void,
 ): Promise<SteamAchievementSyncResult> {
   const targetGames = games.filter((game) => targetGameIds.has(game.id));
   const syncableGames = targetGames.filter(isSteamAchievementSyncableGame);
-  const summariesByAppId = new Map<
-    number,
-    Awaited<ReturnType<typeof getSteamAchievementSummary>>
-  >();
+  const summariesByAppId = new Map<number, SteamAchievementSummaryResult>();
+  const noAchievementAppIds = new Set<number>();
   const failedAppIds = new Set<number>();
+  let nextGames = games;
   let completed = 0;
 
   const summary: SteamAchievementSyncSummary = {
@@ -40,53 +62,143 @@ export async function syncSteamAchievementsForGames(
     updatedCount: 0,
   };
 
-  for (const game of syncableGames) {
-    const steamAppId = game.steamAppId;
+  for (let batchStart = 0; batchStart < syncableGames.length; batchStart += STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE) {
+    const batch = syncableGames.slice(batchStart, batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((game) =>
+        syncSteamAchievementsForGame({
+          failedAppIds,
+          game,
+          noAchievementAppIds,
+          settings,
+          summariesByAppId,
+        }),
+      ),
+    );
 
-    if (typeof steamAppId !== 'number') {
-      continue;
+    nextGames = mergeSteamAchievementBatch(nextGames, batchResults, summariesByAppId, syncedAt, summary);
+    completed += batch.length;
+
+    const progress = { completed, total: syncableGames.length };
+    onProgress?.(progress);
+    onBatchComplete?.({ games: nextGames, progress, summary: { ...summary }, batchResults });
+
+    if (batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE < syncableGames.length) {
+      await delay(STEAM_ACHIEVEMENT_SYNC_BATCH_DELAY_MS);
     }
-
-    if (!summariesByAppId.has(steamAppId) && !failedAppIds.has(steamAppId)) {
-      try {
-        summariesByAppId.set(steamAppId, await getSteamAchievementSummary(settings, steamAppId));
-      } catch (error) {
-        if (
-          error instanceof SteamApiError &&
-          ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code)
-        ) {
-          throw error;
-        }
-
-        failedAppIds.add(steamAppId);
-      }
-    }
-
-    completed += 1;
-    onProgress?.({ completed, total: syncableGames.length });
   }
 
-  const nextGames = games.map((game) => {
-    if (!targetGameIds.has(game.id)) {
+  return { games: nextGames, summary };
+}
+
+async function syncSteamAchievementsForGame({
+  failedAppIds,
+  game,
+  noAchievementAppIds,
+  settings,
+  summariesByAppId,
+}: {
+  failedAppIds: Set<number>;
+  game: Game;
+  noAchievementAppIds: Set<number>;
+  settings: SteamSettings;
+  summariesByAppId: Map<number, SteamAchievementSummaryResult>;
+}): Promise<SteamAchievementGameSyncResult> {
+  const steamAppId = game.steamAppId;
+
+  if (typeof steamAppId !== 'number') {
+    return { gameId: game.id, steamAppId: 0, status: 'skipped' };
+  }
+
+  if (summariesByAppId.has(steamAppId)) {
+    return { gameId: game.id, steamAppId, status: 'updated' };
+  }
+
+  if (noAchievementAppIds.has(steamAppId)) {
+    return { gameId: game.id, steamAppId, status: 'no-achievements' };
+  }
+
+  if (failedAppIds.has(steamAppId)) {
+    return { gameId: game.id, steamAppId, status: 'failed' };
+  }
+
+  try {
+    const achievementSummary = await getSteamAchievementSummaryWithRetry(settings, steamAppId);
+
+    if (achievementSummary) {
+      summariesByAppId.set(steamAppId, achievementSummary);
+      return { gameId: game.id, steamAppId, status: 'updated' };
+    }
+
+    noAchievementAppIds.add(steamAppId);
+    return { gameId: game.id, steamAppId, status: 'no-achievements' };
+  } catch (error) {
+    if (isSteamCredentialError(error)) {
+      throw error;
+    }
+
+    if (isPermanentNoAchievementError(error)) {
+      noAchievementAppIds.add(steamAppId);
+      return { gameId: game.id, steamAppId, status: 'no-achievements' };
+    }
+
+    failedAppIds.add(steamAppId);
+    return { gameId: game.id, steamAppId, status: 'failed' };
+  }
+}
+
+async function getSteamAchievementSummaryWithRetry(settings: SteamSettings, steamAppId: number) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= STEAM_ACHIEVEMENT_SYNC_MAX_RETRIES; attempt += 1) {
+    try {
+      return await getSteamAchievementSummary(settings, steamAppId);
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryableSteamAchievementError(error) || attempt >= STEAM_ACHIEVEMENT_SYNC_MAX_RETRIES) {
+        throw error;
+      }
+
+      await delay(STEAM_ACHIEVEMENT_SYNC_RETRY_DELAY_MS * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
+
+function mergeSteamAchievementBatch(
+  games: Game[],
+  batchResults: SteamAchievementGameSyncResult[],
+  summariesByAppId: Map<number, SteamAchievementSummaryResult>,
+  syncedAt: string,
+  summary: SteamAchievementSyncSummary,
+) {
+  const resultsByGameId = new Map(batchResults.map((result) => [result.gameId, result]));
+
+  return games.map((game) => {
+    const result = resultsByGameId.get(game.id);
+
+    if (!result) {
       return game;
     }
 
-    if (!isSteamAchievementSyncableGame(game)) {
-      return game;
-    }
-
-    const steamAppId = game.steamAppId;
-
-    if (typeof steamAppId !== 'number') {
-      return game;
-    }
-
-    if (failedAppIds.has(steamAppId)) {
+    if (result.status === 'failed') {
       summary.failedCount += 1;
       return game;
     }
 
-    const achievementSummary = summariesByAppId.get(steamAppId);
+    if (result.status === 'no-achievements') {
+      summary.noAchievementDataCount += 1;
+      return game;
+    }
+
+    if (result.status === 'skipped') {
+      summary.skippedNonSteamCount += 1;
+      return game;
+    }
+
+    const achievementSummary = summariesByAppId.get(result.steamAppId);
 
     if (!achievementSummary) {
       summary.noAchievementDataCount += 1;
@@ -114,6 +226,22 @@ export async function syncSteamAchievementsForGames(
       updatedAt: syncedAt,
     };
   });
+}
 
-  return { games: nextGames, summary };
+function isSteamCredentialError(error: unknown) {
+  return error instanceof SteamApiError && ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
+}
+
+function isPermanentNoAchievementError(error: unknown) {
+  return error instanceof SteamApiError && error.code === 'private-profile';
+}
+
+function isRetryableSteamAchievementError(error: unknown) {
+  return error instanceof SteamApiError && ['api-failure', 'cors-proxy', 'malformed-response'].includes(error.code);
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
 }
