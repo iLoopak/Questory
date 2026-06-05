@@ -1,9 +1,15 @@
-const CACHE_NAME = 'questshelf-app-shell-v4';
+const CACHE_NAME = 'questshelf-app-shell-v5';
 const APP_SHELL_ASSETS = [
   '/',
+  '/favicon.ico',
   '/index.html',
   '/manifest.webmanifest',
+  '/icons/favicon-32.png',
   '/icons/questshelf-icon.png',
+  '/icons/questshelf-icon-192.png',
+  '/icons/questshelf-icon-512.png',
+  '/icons/questshelf-maskable-512.png',
+  '/brand/questshelf-splash.png',
   '/covers/bloodborne.svg',
   '/covers/cyberpunk.svg',
   '/covers/forza.svg',

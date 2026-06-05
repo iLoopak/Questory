@@ -244,7 +244,7 @@ The PWA manifest uses:
 - App name and short name: `QuestShelf`
 - Display mode: `standalone`
 - Orientation: landscape-friendly
-- SVG app icons generated from the QuestShelf icon direction for favicon, app shell, and PWA manifest usage
+- PNG app icons generated from the QuestShelf source icon for favicon, app shell, and PWA manifest usage
 - Warm charcoal background and ember-orange theme color
 
 Offline support is intentionally app-shell focused:
@@ -284,17 +284,17 @@ Steam and RAWG API calls still require network access. The locally saved library
 
 ## Visual Branding
 
-QuestShelf uses the provided app icon direction as the source brand asset. The primary icon files live in `public/icons/`:
+QuestShelf uses the provided PNG app icon as the source brand asset. The primary icon files live in `public/icons/`:
 
-- `questshelf-new-icon.png` (1254×1254): source brand artwork used for the favicon, `apple-touch-icon`, header logo, and the PWA `any` + `maskable` icons in `manifest.webmanifest`.
-- `questshelf-icon.svg` / `questshelf-maskable.svg`: earlier vector artwork, retained for reference and no longer referenced by the app shell.
+- `questshelf-source.png` / `questshelf-icon.png` (892x892): source brand artwork used by the app header/logo path.
+- `favicon-16.png`, `favicon-32.png`, `favicon-48.png`: browser favicon outputs.
+- `questshelf-icon-180.png`: Apple touch icon output.
+- `questshelf-icon-192.png`, `questshelf-icon-512.png`, `questshelf-maskable-512.png`: PWA manifest outputs.
+- `public/brand/questshelf-splash.png`: PNG splash/brand image referenced by the PWA manifest.
 
-Android launcher resources are generated from the source PNG with `@capacitor/assets` and live in `resources/android/` (adaptive-icon XML in `mipmap-anydpi-v26/` plus per-density `mipmap-*` rasters). The adaptive icon pairs the new foreground artwork with the `@color/questshelf_launcher_background` brand background. Regenerate with:
+Android launcher resources are generated from the source PNG and live in `resources/android/` (adaptive-icon XML in `mipmap-anydpi-v26/` plus per-density `mipmap-*` rasters). The adaptive icon pairs the new foreground artwork with the `@color/questshelf_launcher_background` brand background. After `npx cap sync android`, run `npm run android:sync-icons` so the prepared resources overwrite the generated Android launcher icons before building the APK.
 
-```shell
-# place the source art at assets/icon-only.png and assets/icon-foreground.png, then:
-npx @capacitor/assets generate --android --iconBackgroundColor '#0D0C0C' --iconBackgroundColorDark '#0D0C0C'
-```
+The source PNG is also kept at `assets/icon.png`, `assets/icon-only.png`, `assets/icon-foreground.png`, and `assets/splash.png` for future Capacitor asset regeneration.
 
 The UI theme follows the icon with tokenized app surfaces, restrained ember-orange accents, warm charcoal borders, soft glow focus states, and glassy console-style panels. Ember orange is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens, while Light, Dark, and Follow Device can all transform the same screens without a reload.
 
