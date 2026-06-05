@@ -23,6 +23,7 @@ const STEAM_STATS_API_BASE_URL = import.meta.env.DEV
 const STEAM_STORE_BASE_URL = import.meta.env.DEV
   ? DEVELOPMENT_STEAM_STORE_BASE_URL
   : PRODUCTION_STEAM_STORE_BASE_URL;
+const STEAM_API_REQUEST_TIMEOUT_MS = 10_000;
 
 type SteamApiResponse<T> = {
   response?: T;
@@ -83,6 +84,7 @@ export class SteamApiError extends Error {
       | 'empty-library'
       | 'malformed-response'
       | 'cors-proxy'
+      | 'timeout'
       | 'api-failure',
     options: { httpStatus?: number; isTransient?: boolean } = {},
   ) {
@@ -108,6 +110,38 @@ export class SteamWishlistError extends Error {
     super(message);
     this.name = 'SteamWishlistError';
   }
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  options: RequestInit & { timeoutMs?: number; timeoutMessage?: string } = {},
+) {
+  const {
+    timeoutMs = STEAM_API_REQUEST_TIMEOUT_MS,
+    timeoutMessage = 'Steam API request timed out.',
+    ...fetchOptions
+  } = options;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(new DOMException(timeoutMessage, 'TimeoutError')), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new SteamApiError(timeoutMessage, 'timeout', { isTransient: true });
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError');
 }
 
 function validateSettings(settings: SteamSettings) {
@@ -141,22 +175,29 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
   const safeRequestUrl = getSafeRequestUrl(url);
 
   try {
-    response = await fetch(url);
-  } catch {
+    response = await fetchWithTimeout(url);
+  } catch (error) {
     recordSteamApiDebug({
       endpoint,
       httpStatus: null,
       parsedGameCount: null,
       requestUrl: safeRequestUrl,
-      responseSummary: 'Network request failed before an HTTP response was received.',
+      responseSummary:
+        error instanceof SteamApiError && error.code === 'timeout'
+          ? error.message
+          : 'Network request failed before an HTTP response was received.',
       steamId64: settings.steamId64,
     });
+
+    if (error instanceof SteamApiError) {
+      throw error;
+    }
 
     if (import.meta.env.DEV) {
       throw new SteamApiError('Steam sync is not available from this device right now. Try again later.', 'cors-proxy');
     }
 
-    throw new SteamApiError('Steam sync is unavailable right now. Check your connection and try again.', 'api-failure');
+    throw new SteamApiError('Steam sync is unavailable right now. Check your connection and try again.', 'api-failure', { isTransient: true });
   }
 
   if (!response.ok) {
@@ -233,16 +274,24 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
   const safeRequestUrl = getSafeRequestUrl(url);
 
   try {
-    response = await fetch(url);
-  } catch {
+    response = await fetchWithTimeout(url, { timeoutMessage: `Steam achievement request for app ${appId} timed out.` });
+  } catch (error) {
     recordSteamApiDebug({
       endpoint,
       httpStatus: null,
       parsedGameCount: null,
       requestUrl: safeRequestUrl,
-      responseSummary: `Steam achievement request for app ${appId} failed before an HTTP response was received.`,
+      responseSummary:
+        error instanceof SteamApiError && error.code === 'timeout'
+          ? error.message
+          : `Steam achievement request for app ${appId} failed before an HTTP response was received.`,
       steamId64: settings.steamId64,
     });
+
+    if (error instanceof SteamApiError) {
+      throw error;
+    }
+
     throw new SteamApiError('Steam achievement data is unavailable right now. Try again later.', import.meta.env.DEV ? 'cors-proxy' : 'api-failure', { isTransient: true });
   }
 
