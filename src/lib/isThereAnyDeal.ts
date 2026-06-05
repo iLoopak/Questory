@@ -1,12 +1,15 @@
 import type { Game } from '../types/game';
 import type { ItadMatchConfidence } from '../types/itad';
 
-const itadApiBaseUrl = 'https://api.isthereanydeal.com';
+const directItadApiBaseUrl = 'https://api.isthereanydeal.com';
+const developmentItadApiBaseUrl = '/api/itad';
+const itadApiBaseUrl = import.meta.env.VITE_ITAD_API_BASE_URL?.trim() || (import.meta.env.DEV ? developmentItadApiBaseUrl : directItadApiBaseUrl);
+const itadCorsProxyMessage = 'IsThereAnyDeal sync failed. The API may require a proxy in browser/PWA mode.';
 const defaultCountry = 'US';
 const maxOverviewBatchSize = 200;
 
 export class IsThereAnyDealError extends Error {
-  code: 'missing-api-key' | 'no-match' | 'rate-limit' | 'server-error' | 'network-error' | 'bad-response';
+  code: 'missing-api-key' | 'no-match' | 'rate-limit' | 'server-error' | 'network-error' | 'bad-response' | 'proxy-required';
   status?: number;
 
   constructor(code: IsThereAnyDealError['code'], message: string, status?: number) {
@@ -77,6 +80,7 @@ export async function syncItadDealsForWishlistGames(games: Game[], apiKey: strin
   assertApiKey(apiKey);
   const matches = new Map<string, ItadMatch>();
   const initialResults: ItadWishlistSyncResult[] = [];
+  let firstSyncFailure: IsThereAnyDealError | null = null;
 
   for (const game of games) {
     try {
@@ -94,9 +98,17 @@ export async function syncItadDealsForWishlistGames(games: Game[], apiKey: strin
       if (error instanceof IsThereAnyDealError && error.code === 'no-match') {
         initialResults.push({ gameId: game.id, status: 'no-match' });
       } else {
+        if (!firstSyncFailure && error instanceof IsThereAnyDealError) {
+          firstSyncFailure = error;
+        }
+
         initialResults.push({ gameId: game.id, status: 'failed' });
       }
     }
+  }
+
+  if (matches.size === 0 && firstSyncFailure && initialResults.every((result) => result.status === 'failed')) {
+    throw firstSyncFailure;
   }
 
   let dealResults = new Map<string, ItadDealSummary>();
@@ -104,8 +116,12 @@ export async function syncItadDealsForWishlistGames(games: Game[], apiKey: strin
 
   try {
     dealResults = await fetchOverviewForMatches(Array.from(matches.values()), apiKey);
-  } catch {
+  } catch (error) {
     overviewFailed = true;
+
+    if (error instanceof IsThereAnyDealError && isProxyOrNetworkError(error)) {
+      throw error;
+    }
   }
 
   const resultByGameId = new Map<string, ItadWishlistSyncResult>();
@@ -126,7 +142,7 @@ export async function syncItadDealsForWishlistGames(games: Game[], apiKey: strin
 }
 
 async function findItadGameByTitle(title: string, apiKey: string): Promise<ItadMatch | null> {
-  const url = new URL('/games/search/v1', itadApiBaseUrl);
+  const url = createItadUrl('/games/search/v1', apiKey);
   url.searchParams.set('title', title);
   url.searchParams.set('results', '5');
 
@@ -153,7 +169,7 @@ async function fetchOverviewForMatches(matches: ItadMatch[], apiKey: string) {
 
   for (let index = 0; index < matches.length; index += maxOverviewBatchSize) {
     const batch = matches.slice(index, index + maxOverviewBatchSize);
-    const url = new URL('/games/overview/v2', itadApiBaseUrl);
+    const url = createItadUrl('/games/overview/v2', apiKey);
     url.searchParams.set('country', defaultCountry);
     url.searchParams.set('vouchers', 'true');
 
@@ -199,18 +215,20 @@ async function itadFetch<T>(url: URL, apiKey: string, init: RequestInit = {}): P
   assertApiKey(apiKey);
 
   let response: Response;
+  const method = init.method?.toUpperCase() ?? 'GET';
+  const headers = new Headers(init.headers);
+
+  if (method !== 'GET' && init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   try {
     response = await fetch(url, {
       ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        'ITAD-API-Key': apiKey.trim(),
-        ...(init.headers ?? {}),
-      },
+      headers,
     });
   } catch (error) {
-    throw new IsThereAnyDealError('network-error', error instanceof Error ? error.message : 'Network request failed.');
+    throw createNetworkError(error);
   }
 
   if (response.status === 429) {
@@ -230,6 +248,31 @@ async function itadFetch<T>(url: URL, apiKey: string, init: RequestInit = {}): P
   } catch {
     throw new IsThereAnyDealError('bad-response', 'IsThereAnyDeal returned invalid JSON.', response.status);
   }
+}
+
+
+function createItadUrl(path: string, apiKey: string) {
+  assertApiKey(apiKey);
+
+  const baseUrl = isAbsoluteUrl(itadApiBaseUrl) ? itadApiBaseUrl : window.location.origin;
+  const url = new URL(`${itadApiBaseUrl.replace(/\/$/, '')}${path}`, baseUrl);
+  url.searchParams.set('key', apiKey.trim());
+
+  return url;
+}
+
+function isAbsoluteUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+
+function createNetworkError(error: unknown) {
+  const message = error instanceof Error && error.message ? `${itadCorsProxyMessage} ${error.message}` : itadCorsProxyMessage;
+
+  return new IsThereAnyDealError('proxy-required', message);
+}
+
+function isProxyOrNetworkError(error: IsThereAnyDealError) {
+  return error.code === 'network-error' || error.code === 'proxy-required';
 }
 
 function assertApiKey(apiKey: string) {

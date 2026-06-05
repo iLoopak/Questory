@@ -30,6 +30,18 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/steam/, ''),
       },
+      '/api/itad': {
+        target: 'https://api.isthereanydeal.com',
+        changeOrigin: true,
+        secure: true,
+        configure: (proxy) => {
+          proxy.on('error', (error) => {
+            const logger = Reflect.get(globalThis, 'console') as { error?: (...args: unknown[]) => void } | undefined;
+            logger?.error?.('[QuestShelf ITAD proxy]', error.message);
+          });
+        },
+        rewrite: (path) => path.replace(/^\/api\/itad/, ''),
+      },
     },
   },
 });
