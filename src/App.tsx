@@ -247,6 +247,7 @@ type MetadataSelectionRequest = {
 };
 
 type BulkActionSummary = {
+  message?: string;
   failedCount?: number;
   ignoredCount?: number;
   removedCount?: number;
@@ -947,11 +948,11 @@ function App() {
       return summary;
     }
 
-    setSteamAchievementSyncState((currentState) => ({
+    setSteamAchievementSyncState({
       status: 'loading',
       message: total > 50 ? t('collection.syncingSteamAchievementsLong') : t('collection.syncingSteamAchievements'),
-      summary: currentState.summary,
-    }));
+      summary: null,
+    });
 
     let didSetTerminalAchievementState = false;
 
@@ -980,7 +981,7 @@ function App() {
             currentState.status === 'loading'
               ? {
                   ...currentState,
-                  summary: batchResult.summary,
+                  summary: null,
                 }
               : currentState,
           );
@@ -2664,7 +2665,7 @@ function CollectionPanel({
     });
 
     if (summary) {
-      setBulkSummary(summary);
+      setBulkSummary({ ...summary, message: formatSteamAchievementSyncSummary(summary) });
     }
   }
 
@@ -2988,7 +2989,7 @@ function CollectionPanel({
         </div>
       ) : null}
 
-      {bulkSummary ? (
+      {bulkSummary && !isSteamAchievementSyncing && !isSteamPlaytimeSyncing ? (
         <div className="mb-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
           {formatBulkSummary(bulkSummary)}
         </div>
@@ -3093,7 +3094,7 @@ function SteamAchievementSyncNotice({ syncState }: { syncState: SteamAchievement
   return (
     <div className={`mb-4 rounded-lg border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
       <div>{syncState.message}</div>
-      {syncState.summary ? (
+      {syncState.status !== 'loading' && syncState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-5">
           <NoticeStat label={t('collection.steamAchievementsUpdated')} value={syncState.summary.updatedCount.toString()} />
           <NoticeStat label="Unchanged" value={syncState.summary.unchangedCount.toString()} />
@@ -4838,7 +4839,7 @@ function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary)
     summary.skippedNonSteamCount === 0 &&
     summary.noAchievementDataCount > 0
   ) {
-    return `${completionPrefix} ${summary.noAchievementDataCount} games had no achievements.`;
+    return `${completionPrefix} ${summary.noAchievementDataCount} no achievements.`;
   }
 
   const parts = [
@@ -4852,6 +4853,10 @@ function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary)
 }
 
 function formatBulkSummary(summary: BulkActionSummary) {
+  if (summary.message) {
+    return summary.message;
+  }
+
   const parts = [
     summary.updatedCount ? `${summary.updatedCount} updated` : null,
     summary.removedCount ? `${summary.removedCount} removed` : null,
