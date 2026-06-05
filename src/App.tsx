@@ -1142,8 +1142,19 @@ function App() {
 
 
   async function syncSteamDataForGame(game: Game) {
-    await refreshSteamPlaytime([game.id], { showToast: true });
-    return syncSteamAchievements([game.id], { force: true, showToast: true });
+    const playtimeSummary = await refreshSteamPlaytime([game.id], { showToast: false });
+    const achievementSummary = await syncSteamAchievements([game.id], { force: true, showToast: false });
+    const isFullyUpdated = didSteamPlaytimeSyncSucceed(playtimeSummary) && didSteamAchievementSyncSucceed(achievementSummary);
+    const message = isFullyUpdated ? t('detail.steamDataUpdated') : t('detail.steamDataPartiallyUpdated');
+
+    addToastNotification({
+      actions: [getViewGameAction(game.id)],
+      category: isFullyUpdated ? 'success' : 'warning',
+      dedupeKey: `steam-data:${game.id}`,
+      message,
+    });
+
+    return { achievementSummary, playtimeSummary };
   }
 
   function importSteamWishlistItems(wishlistItems: SteamWishlistItem[]): SteamWishlistSyncSummary {
@@ -1920,9 +1931,8 @@ function App() {
               onAddToWishlist={addToWishlist}
               onBack={() => setSelectedGameId(null)}
               onIgnore={removeAndIgnoreSteamGame}
-              onRefreshSteamPlaytime={(game) => refreshSteamPlaytime([game.id], { showToast: true })}
-              onSyncSteamAchievements={syncSteamDataForGame}
-              isSteamAchievementSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
+              onSyncSteamData={syncSteamDataForGame}
+              isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
               onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
               platformQueueState={platformQueueState}
@@ -4791,6 +4801,13 @@ function filterGames(games: Game[], filters: CollectionFilters) {
     .sort((firstGame, secondGame) => compareGames(firstGame, secondGame, filters.sortBy));
 }
 
+function didSteamPlaytimeSyncSucceed(summary: SteamPlaytimeRefreshSummary | null) {
+  return summary !== null && summary.failedCount === 0;
+}
+
+function didSteamAchievementSyncSucceed(summary: SteamAchievementSyncSummary | null) {
+  return summary !== null && summary.failedCount === 0;
+}
 
 function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[], targetGameIds: Set<string>) {
   const syncedGamesById = new Map(syncedGames.map((game) => [game.id, game]));
@@ -4807,8 +4824,18 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
     }
 
     const hasAchievementSummary = typeof syncedGame.steamAchievementsTotal === 'number' && syncedGame.steamAchievementsTotal > 0;
+    const hasCurrentAchievementSummary = typeof game.steamAchievementsTotal === 'number' && game.steamAchievementsTotal > 0;
 
-    if (!hasAchievementSummary && syncedGame.steamAchievementsUnsupported !== true) {
+    if (!hasAchievementSummary) {
+      if (syncedGame.steamAchievementsUnsupported === true && !hasCurrentAchievementSummary) {
+        return {
+          ...game,
+          steamAchievementsUnsupported: syncedGame.steamAchievementsUnsupported,
+          steamAchievementsLastCheckedAt: syncedGame.steamAchievementsLastCheckedAt,
+          updatedAt: syncedGame.updatedAt,
+        };
+      }
+
       return game;
     }
 

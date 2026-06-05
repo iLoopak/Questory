@@ -14,9 +14,8 @@ type GameDetailViewProps = {
   onAddToWishlist?: (game: Game) => void;
   onBack: () => void;
   onIgnore?: (game: Game) => void;
-  onRefreshSteamPlaytime?: (game: Game) => void;
-  onSyncSteamAchievements?: (game: Game) => void;
-  isSteamAchievementSyncing?: boolean;
+  onSyncSteamData?: (game: Game) => void;
+  isSteamDataSyncing?: boolean;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
   platformQueueState?: PlatformQueueState;
@@ -36,9 +35,8 @@ export function GameDetailView({
   onAddToWishlist,
   onBack,
   onIgnore,
-  onRefreshSteamPlaytime,
-  onSyncSteamAchievements,
-  isSteamAchievementSyncing = false,
+  onSyncSteamData,
+  isSteamDataSyncing = false,
   onStatusChange,
   onTrackingChange,
   platformQueueState,
@@ -119,22 +117,17 @@ export function GameDetailView({
       disabled: !onStatusChange,
     },
   ];
-  const steamActions: GameDetailAction[] = [
-    {
-      icon: '⏱️',
-      label: t('detail.refreshPlaytime'),
-      onClick: () => onRefreshSteamPlaytime?.(game),
-      tone: 'neutral',
-      disabled: !onRefreshSteamPlaytime || !isSteamLibraryGame,
-    },
-    {
-      icon: '🏆',
-      label: isSteamAchievementSyncing ? t('collection.syncingSteamAchievements') : t('detail.syncSteamData'),
-      onClick: () => onSyncSteamAchievements?.(game),
-      tone: 'neutral',
-      disabled: !onSyncSteamAchievements || !isSteamLibraryGame || isSteamAchievementSyncing,
-    },
-  ];
+  const steamActions: GameDetailAction[] = isSteamLibraryGame
+    ? [
+        {
+          icon: '🔄',
+          label: isSteamDataSyncing ? t('detail.syncingSteamData') : t('detail.syncSteamData'),
+          onClick: () => onSyncSteamData?.(game),
+          tone: 'neutral',
+          disabled: !onSyncSteamData || isSteamDataSyncing,
+        },
+      ]
+    : [];
 
   const destructiveActions: GameDetailAction[] = [
     {
