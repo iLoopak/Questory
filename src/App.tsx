@@ -320,8 +320,13 @@ function App() {
   );
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
+  const isAppMountedRef = useRef(true);
   const t = useMemo(() => createTranslator(language), [language]);
   const visibleNavItems = useMemo(() => getVisibleNavItems(navigationVisibility), [navigationVisibility]);
+
+  useEffect(() => () => {
+    isAppMountedRef.current = false;
+  }, []);
 
   useEffect(() => {
     saveGames(games);
@@ -938,7 +943,7 @@ function App() {
 
     setSteamAchievementSyncState((currentState) => ({
       status: 'loading',
-      message: `Fetching Steam achievements for ${total} game${total === 1 ? '' : 's'}...`,
+      message: `Syncing Steam achievements 0/${total}...`,
       progress: { completed: 0, total },
       summary: currentState.summary,
     }));
@@ -947,22 +952,52 @@ function App() {
       const settings = loadSteamSettings();
       const syncedAt = new Date().toISOString();
       const targetGameIds = new Set(targetGames.map((game) => game.id));
-      const result = await syncSteamAchievementsForGames(games, targetGameIds, settings, syncedAt, (progress) => {
-        setSteamAchievementSyncState((currentState) => ({
-          ...currentState,
-          progress,
-        }));
-      });
+      const result = await syncSteamAchievementsForGames(
+        games,
+        targetGameIds,
+        settings,
+        syncedAt,
+        (progress) => {
+          if (!isAppMountedRef.current) {
+            return;
+          }
+
+          setSteamAchievementSyncState((currentState) => ({
+            ...currentState,
+            message: `Syncing Steam achievements ${progress.completed}/${progress.total}...`,
+            progress,
+          }));
+        },
+        (batchResult) => {
+          saveGames(batchResult.games);
+
+          if (!isAppMountedRef.current) {
+            return;
+          }
+
+          setGames(batchResult.games);
+          setSteamAchievementSyncState((currentState) => ({
+            ...currentState,
+            message: `Syncing Steam achievements ${batchResult.progress.completed}/${batchResult.progress.total}...`,
+            progress: batchResult.progress,
+            summary: batchResult.summary,
+          }));
+        },
+      );
       const completed =
         result.summary.updatedCount +
         result.summary.unchangedCount +
         result.summary.failedCount +
         result.summary.noAchievementDataCount;
 
+      if (!isAppMountedRef.current) {
+        return result.summary;
+      }
+
       setGames(result.games);
       setSteamAchievementSyncState({
         status: 'success',
-        message: `Steam achievement sync complete. Updated ${result.summary.updatedCount}, unchanged ${result.summary.unchangedCount}, unavailable ${result.summary.noAchievementDataCount}, failed ${result.summary.failedCount}.`,
+        message: `Updated achievements for ${result.summary.updatedCount} games. ${result.summary.skippedNonSteamCount} skipped, ${result.summary.noAchievementDataCount} without achievement data, ${result.summary.failedCount} failed.`,
         progress: { completed, total },
         summary: result.summary,
       });
@@ -973,7 +1008,7 @@ function App() {
           actions: syncableGames[0] ? [getViewGameAction(syncableGames[0].id)] : [getDismissAction()],
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-achievements:${syncableGames.map((game) => game.id).join(',')}`,
-          message: options.completionToastMessage?.(result.summary) ?? `Updated achievements for ${result.summary.updatedCount} games`,
+          message: options.completionToastMessage?.(result.summary) ?? `Updated achievements for ${result.summary.updatedCount} games. ${result.summary.skippedNonSteamCount} skipped, ${result.summary.failedCount} failed.`,
         });
       }
 
@@ -984,6 +1019,10 @@ function App() {
         error instanceof SteamApiError
           ? error.message
           : 'Steam achievement sync failed. Check your Steam credentials, profile privacy, and connection.';
+
+      if (!isAppMountedRef.current) {
+        return null;
+      }
 
       setSteamAchievementSyncState((currentState) => ({
         status: 'error',
@@ -1904,7 +1943,7 @@ function App() {
               onBulkRemove={removeManyGames}
               onBulkSyncSteamAchievements={(gameIds, options) =>
                 syncSteamAchievements(gameIds, {
-                  completionToastMessage: (summary) => `Updated achievements for ${summary.updatedCount} games`,
+                  completionToastMessage: (summary) => `Updated achievements for ${summary.updatedCount} games. ${summary.skippedNonSteamCount} skipped, ${summary.failedCount} failed.`,
                   emptyToastMessage: options?.emptyToastMessage,
                   showToast: true,
                 })
