@@ -33,6 +33,7 @@ import {
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
+import { refreshRawgMetadataForGame } from './lib/rawgMetadataEnrichment';
 import { hasSteamAchievementSummary } from './lib/steamAchievementSummary';
 import { loadControllerLayoutPreference, saveControllerLayoutPreference, type ControllerLayoutPreference } from './lib/controllerLayoutPreferences';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
@@ -131,6 +132,7 @@ import {
   type IgnoredSteamGame,
 } from './lib/steamIgnoredGamesStorage';
 import { getOwnedGames, getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamApiError, SteamWishlistError } from './services/steamApi';
+import { RawgApiError } from './services/rawgApi';
 import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from './types/game';
 import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
@@ -343,6 +345,7 @@ function App() {
     initialSteamPlaytimeRefreshState,
   );
   const [itadDealSyncState, setItadDealSyncState] = useState<ItadDealSyncState>(initialItadDealSyncState);
+  const [refreshingMetadataGameIds, setRefreshingMetadataGameIds] = useState<Set<string>>(new Set());
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
   const isAppMountedRef = useRef(true);
@@ -1658,6 +1661,70 @@ function App() {
     setActiveNavItem('Metadata');
   }
 
+  async function refreshGameMetadataFromActions(game: Game) {
+    const targetGame = games.find((currentGame) => currentGame.id === game.id)
+      ?? (typeof game.steamAppId === 'number'
+        ? games.find((currentGame) => currentGame.steamAppId === game.steamAppId && currentGame.collectionType === game.collectionType)
+        : undefined);
+    const toastKey = `metadata-refresh:${game.id}`;
+
+    if (!targetGame) {
+      addToastNotification({
+        category: 'error',
+        dedupeKey: toastKey,
+        message: 'Could not find that game to refresh metadata.',
+      });
+      return;
+    }
+
+    if (refreshingMetadataGameIds.has(targetGame.id)) {
+      return;
+    }
+
+    setRefreshingMetadataGameIds((currentGameIds) => new Set(currentGameIds).add(targetGame.id));
+    addToastNotification({
+      category: 'info',
+      dedupeKey: toastKey,
+      message: 'Refreshing metadata...',
+    });
+
+    try {
+      const result = await refreshRawgMetadataForGame(targetGame);
+
+      if (result.status === 'no-match') {
+        addToastNotification({
+          category: 'info',
+          dedupeKey: toastKey,
+          message: 'No metadata found',
+        });
+        return;
+      }
+
+      updateGameMetadata(targetGame.id, result.metadata);
+      markOnboardingItemComplete('metadata-enriched');
+      addToastNotification({
+        category: 'success',
+        dedupeKey: toastKey,
+        message: 'Metadata updated',
+      });
+    } catch (error) {
+      const message = error instanceof RawgApiError
+        ? error.message
+        : 'Metadata refresh failed. Please check your connection and try again.';
+      addToastNotification({
+        category: error instanceof RawgApiError && error.code === 'missing-api-key' ? 'warning' : 'error',
+        dedupeKey: toastKey,
+        message,
+      });
+    } finally {
+      setRefreshingMetadataGameIds((currentGameIds) => {
+        const nextGameIds = new Set(currentGameIds);
+        nextGameIds.delete(targetGame.id);
+        return nextGameIds;
+      });
+    }
+  }
+
   function startReviewMode(source: ReviewSource) {
     setActiveReviewSource(source);
     setReviewModeState((currentState) => ({
@@ -2213,7 +2280,7 @@ function App() {
               onBulkStatusChange={updateManyGameStatuses}
               onClearFilters={() => setLibraryFilters(initialCollectionFilters)}
               onFiltersChange={(changes) => setLibraryFilters((currentFilters) => ({ ...currentFilters, ...changes }))}
-              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
+              onFindMetadata={refreshGameMetadataFromActions}
               onMoveToLibrary={moveToLibrary}
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
               onRemove={removeGame}
@@ -2244,7 +2311,7 @@ function App() {
               onBulkStatusChange={updateManyGameStatuses}
               onClearFilters={() => setWishlistFilters(initialCollectionFilters)}
               onFiltersChange={(changes) => setWishlistFilters((currentFilters) => ({ ...currentFilters, ...changes }))}
-              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
+              onFindMetadata={refreshGameMetadataFromActions}
               onMoveToLibrary={moveToLibrary}
               onOpenDetails={(gameId) => setSelectedGameId(gameId)}
               onRemove={removeGame}

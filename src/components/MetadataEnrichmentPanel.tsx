@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCachedRawgMetadata, saveRawgMetadataCacheEntry } from '../lib/rawgMetadataCache';
+import { searchRawgWithFallback } from '../lib/rawgMetadataEnrichment';
 import { getRawgMetadataWithCoverFallback } from '../lib/gameCoverImages';
 import {
   getHighConfidenceThreshold,
   getSuggestedConfidenceThreshold,
   isHighConfidenceMatch,
   isSuggestedMatch,
-  normalizeTitle,
   rankRawgMatches,
   type RawgMatchScore,
 } from '../lib/rawgMatchScoring';
-import { getGameDetails, mapRawgDetailsToMetadata, RawgApiError, searchGameByName } from '../services/rawgApi';
+import { getGameDetails, mapRawgDetailsToMetadata, RawgApiError } from '../services/rawgApi';
 import type { Game, GamePlatform } from '../types/game';
 import { CollectionToolbar } from './CollectionToolbar';
-import type { RawgMetadata, RawgSearchResult } from '../types/rawg';
+import type { RawgMetadata } from '../types/rawg';
 import { useI18n } from '../i18n';
 
 type MetadataEnrichmentPanelProps = {
@@ -681,36 +681,6 @@ function getDisplayStatus(game: Game, state?: EnrichmentState) {
 
 function getYearLabel(value: string | null) {
   return value ? value.slice(0, 4) : 'Unknown year';
-}
-
-async function searchRawgWithFallback(title: string) {
-  const queries = getRawgSearchQueries(title);
-  const resultsById = new Map<number, RawgSearchResult>();
-  let lastError: unknown = null;
-
-  for (const query of queries) {
-    try {
-      const results = await searchGameByName(query);
-      results.forEach((result) => resultsById.set(result.id, result));
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  const results = Array.from(resultsById.values());
-
-  if (results.length > 0) {
-    return results;
-  }
-
-  throw lastError ?? new RawgApiError('No RAWG matches found for this title.', 'no-match');
-}
-
-function getRawgSearchQueries(title: string) {
-  const normalizedTitle = normalizeTitle(title);
-  const titleWithoutSubtitle = title.split(/\s+[-:]\s+/)[0]?.trim() ?? title;
-
-  return Array.from(new Set([title.trim(), normalizedTitle, titleWithoutSubtitle].filter(Boolean)));
 }
 
 function delay(ms: number) {
