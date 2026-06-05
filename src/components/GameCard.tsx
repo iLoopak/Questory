@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameActionMenu } from './GameActionMenu';
+import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
 import { useI18n } from '../i18n';
 
@@ -59,7 +59,6 @@ export function GameCard({
   }, [coverSources]);
 
   const activeCoverSource = coverSources[coverSourceIndex];
-  const achievementSummary = formatSteamAchievementSummary(game);
 
   function handleCardClick() {
     if (isMultiSelectMode) {
@@ -191,11 +190,7 @@ export function GameCard({
           </h3>
 
           <div className="mt-2 text-sm text-slate-400">{game.status}</div>
-          {achievementSummary ? (
-            <div className="mt-2 w-fit rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-semibold text-mint">
-              {t('collection.achievements')}: {achievementSummary}
-            </div>
-          ) : null}
+          <AchievementProgressBadge className="mt-2 px-2.5 py-1" game={game} showLabel />
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-3">
