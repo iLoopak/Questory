@@ -202,6 +202,7 @@ export function GameCard({
 
           <div className="mt-2 text-sm text-slate-400">{game.status}</div>
           <AchievementProgressBadge className="mt-2 px-2.5 py-1" game={game} showLabel />
+          <WishlistDealCard game={game} />
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-3">
@@ -238,6 +239,43 @@ export function GameCard({
       </div>
     </article>
   );
+}
+
+
+function WishlistDealCard({ game }: { game: Game }) {
+  const { t } = useI18n();
+
+  if (game.collectionType !== 'wishlist' || typeof game.itadCurrentBestPrice !== 'number' || !game.itadCurrentBestCurrency) {
+    return null;
+  }
+
+  const discount = typeof game.itadDiscountPercent === 'number' && game.itadDiscountPercent > 0 ? `-${game.itadDiscountPercent}%` : null;
+
+  return (
+    <div className="mt-3 rounded-md border border-mint/20 bg-ink-950/60 p-2 text-xs" onClick={(event) => event.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-semibold text-mint">{t('itad.bestPrice')}: {formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)}</span>
+        {discount ? <span className="rounded-full bg-amber-300 px-1.5 py-0.5 font-bold text-ink-950">{discount}</span> : null}
+        {game.itadIsHistoricalLow ? <span className="rounded-full border border-fuchsia-300/35 px-1.5 py-0.5 font-semibold text-fuchsia-200">{t('itad.historicalLow')}</span> : null}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-slate-400">
+        {game.itadCurrentBestShop ? <span>{game.itadCurrentBestShop}</span> : null}
+        {game.itadCurrentBestUrl ? (
+          <a className="font-semibold text-skyglass hover:text-white" href={game.itadCurrentBestUrl} target="_blank" rel="noreferrer" data-card-action>
+            {t('itad.openDeal')}
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function formatDealPrice(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, { currency, style: 'currency' }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
 }
 
 function isInteractiveCardChild(target: EventTarget | null, cardElement: HTMLElement) {

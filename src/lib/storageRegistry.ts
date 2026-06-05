@@ -2,6 +2,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.games.v1'
   | 'questshelf.rawgMetadataCache.v1'
   | 'questshelf.rawgSettings.v1'
+  | 'questshelf.isThereAnyDealSettings.v1'
   | 'questshelf.steamIgnoredGames.v1'
   | 'questshelf.steamSettings.v1'
   | 'questshelf.libraryFilters.v1'
@@ -92,6 +93,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'RAWG API key.',
     scope: 'integration',
     schema: 'RawgSettings.',
+  },
+  {
+    backup: 'optional',
+    key: 'questshelf.isThereAnyDealSettings.v1',
+    purpose: 'IsThereAnyDeal API key.',
+    scope: 'integration',
+    schema: 'IsThereAnyDealSettings.',
   },
   {
     backup: 'optional',

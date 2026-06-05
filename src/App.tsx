@@ -13,6 +13,7 @@ import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { QueuePanel, type PlayingGameAction } from './components/QueuePanel';
+import { IsThereAnyDealSettingsPanel } from './components/IsThereAnyDealSettingsPanel';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { RetroImportPanel } from './components/RetroImportPanel';
@@ -68,7 +69,9 @@ import {
   platformArtworkPresetOptions,
   type PlatformQueueState,
 } from './lib/platformQueueStorage';
+import { loadIsThereAnyDealSettings } from './lib/isThereAnyDealSettingsStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
+import { IsThereAnyDealError, syncItadDealsForWishlistGames } from './lib/isThereAnyDeal';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from './lib/steamAchievementsSync';
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
 import {
@@ -186,8 +189,10 @@ const librarySortOptions = [
   'Missing info first',
   'Status',
   'Achievement completion %',
+  'Best discount',
+  'Lowest price',
 ] as const;
-const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h'] as const;
+const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h', 'On sale', 'Historical low', 'Deal synced', 'No deal match'] as const;
 const achievementFilterOptions = ['All', 'Has achievements', 'No achievements synced', 'Nearly completed', 'Completed', 'Started'] as const;
 const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
 const collectionInitialRenderCount = 56;
@@ -279,6 +284,18 @@ const initialSteamPlaytimeRefreshState: SteamPlaytimeRefreshState = {
   summary: null,
 };
 
+type ItadDealSyncState = {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  message: string;
+  summary: { updatedCount: number; noMatchCount: number; failedCount: number } | null;
+};
+
+const initialItadDealSyncState: ItadDealSyncState = {
+  status: 'idle',
+  message: 'Deal sync runs only when you start it.',
+  summary: null,
+};
+
 function App() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
@@ -325,6 +342,7 @@ function App() {
   const [steamPlaytimeRefreshState, setSteamPlaytimeRefreshState] = useState<SteamPlaytimeRefreshState>(
     initialSteamPlaytimeRefreshState,
   );
+  const [itadDealSyncState, setItadDealSyncState] = useState<ItadDealSyncState>(initialItadDealSyncState);
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
   const isAppMountedRef = useRef(true);
@@ -1225,6 +1243,98 @@ function App() {
     return { achievementSummary, playtimeSummary };
   }
 
+
+  async function syncWishlistDeals(gameIds: string[]) {
+    if (itadDealSyncState.status === 'loading') {
+      return null;
+    }
+
+    const settings = loadIsThereAnyDealSettings();
+    const targetGames = games.filter((game) => game.collectionType === 'wishlist' && gameIds.includes(game.id));
+
+    if (targetGames.length === 0) {
+      const message = 'No wishlist games are visible for deal sync.';
+      setItadDealSyncState({ status: 'error', message, summary: null });
+      addToastNotification({ category: 'info', dedupeKey: 'itad-deal-sync-empty', message });
+      return null;
+    }
+
+    const runningMessage = targetGames.length > 12 ? t('itad.syncingDealsLong') : t('itad.syncingDeals');
+    setItadDealSyncState({ status: 'loading', message: runningMessage, summary: null });
+
+    try {
+      const results = await syncItadDealsForWishlistGames(targetGames, settings.apiKey);
+      const syncedAt = new Date().toISOString();
+      const summary = results.reduce(
+        (currentSummary, result) => ({
+          updatedCount: currentSummary.updatedCount + (result.status === 'updated' ? 1 : 0),
+          noMatchCount: currentSummary.noMatchCount + (result.status === 'no-match' ? 1 : 0),
+          failedCount: currentSummary.failedCount + (result.status === 'failed' ? 1 : 0),
+        }),
+        { updatedCount: 0, noMatchCount: 0, failedCount: 0 },
+      );
+      const resultByGameId = new Map(results.map((result) => [result.gameId, result]));
+
+      setGames((currentGames) => currentGames.map((game) => {
+        const result = resultByGameId.get(game.id);
+
+        if (!result) {
+          return game;
+        }
+
+        if (result.status === 'no-match') {
+          return {
+            ...game,
+            itadCurrentBestCurrency: undefined,
+            itadCurrentBestPrice: undefined,
+            itadCurrentBestShop: undefined,
+            itadCurrentBestUrl: undefined,
+            itadDiscountPercent: undefined,
+            itadHistoricalLowCurrency: undefined,
+            itadHistoricalLowPrice: undefined,
+            itadIsHistoricalLow: undefined,
+            itadLastSyncedAt: syncedAt,
+          };
+        }
+
+        if (result.status !== 'updated' || !result.match || !result.deal) {
+          return { ...game, itadLastSyncedAt: syncedAt };
+        }
+
+        return {
+          ...game,
+          itadId: result.match.id,
+          itadPlain: result.match.slug,
+          itadSlug: result.match.slug,
+          itadMatchConfidence: result.match.confidence,
+          itadCurrentBestPrice: result.deal.currentBestPrice,
+          itadCurrentBestCurrency: result.deal.currentBestCurrency,
+          itadCurrentBestShop: result.deal.currentBestShop,
+          itadCurrentBestUrl: result.deal.currentBestUrl,
+          itadDiscountPercent: result.deal.discountPercent,
+          itadHistoricalLowPrice: result.deal.historicalLowPrice,
+          itadHistoricalLowCurrency: result.deal.historicalLowCurrency,
+          itadIsHistoricalLow: result.deal.isHistoricalLow,
+          itadLastSyncedAt: syncedAt,
+        };
+      }));
+
+      const message = `${t('itad.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed.`;
+      setItadDealSyncState({ status: summary.failedCount > 0 ? 'error' : 'success', message, summary });
+      addToastNotification({ category: summary.failedCount > 0 ? 'warning' : 'success', dedupeKey: 'itad-deal-sync-complete', message });
+      return summary;
+    } catch (error) {
+      const message = error instanceof IsThereAnyDealError && error.code === 'missing-api-key'
+        ? 'Add an IsThereAnyDeal API key in Settings before syncing deals.'
+        : error instanceof Error
+          ? error.message
+          : 'Deal sync failed.';
+      setItadDealSyncState({ status: 'error', message, summary: null });
+      addToastNotification({ category: 'error', dedupeKey: 'itad-deal-sync-error', message });
+      return null;
+    }
+  }
+
   function importSteamWishlistItems(wishlistItems: SteamWishlistItem[]): SteamWishlistSyncSummary {
     const syncedAt = new Date().toISOString();
     const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
@@ -2075,6 +2185,7 @@ function App() {
               games={filteredWishlistGames}
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
+              itadDealSyncState={itadDealSyncState}
               tags={tags}
               platformQueueState={platformQueueState}
               onAddGame={() => setIsAddGameOpen(true)}
@@ -2098,6 +2209,7 @@ function App() {
               onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
               onSyncSteamWishlist={syncSteamWishlist}
+              onSyncItadDeals={syncWishlistDeals}
             />
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
@@ -2462,6 +2574,8 @@ type CollectionPanelProps = {
   onStartReview: (source: ReviewSource) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncSteamWishlist?: () => void;
+  itadDealSyncState?: ItadDealSyncState;
+  onSyncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
 };
 
 function CollectionPanel({
@@ -2497,6 +2611,8 @@ function CollectionPanel({
   onStartReview,
   onStatusChange,
   onSyncSteamWishlist,
+  itadDealSyncState,
+  onSyncItadDeals,
 }: CollectionPanelProps) {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
@@ -2538,6 +2654,7 @@ function CollectionPanel({
   const visibleAchievementSteamCount = games.filter(isSteamAchievementSyncableGame).length;
   const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
   const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
+  const isItadDealSyncing = itadDealSyncState?.status === 'loading';
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
@@ -2768,6 +2885,22 @@ function CollectionPanel({
     }
   }
 
+
+  async function syncVisibleOrSelectedWishlistDeals() {
+    if (collectionType !== 'wishlist' || !onSyncItadDeals || isItadDealSyncing) {
+      return;
+    }
+
+    const hasSelection = selectedCount > 0;
+    const targetGames = hasSelection ? selectedGames : games;
+    setBulkSummary(null);
+    const summary = await onSyncItadDeals(targetGames.map((game) => game.id));
+
+    if (summary) {
+      setBulkSummary({ ...summary, message: `${t('itad.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed.` });
+    }
+  }
+
   return (
     <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
@@ -2828,6 +2961,16 @@ function CollectionPanel({
                 {steamWishlistSyncState?.status === 'loading' ? t('collection.syncingSteam') : t('collection.syncSteamWishlist')}
               </button>
             ) : null}
+            {collectionType === 'wishlist' && onSyncItadDeals ? (
+              <button
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
+                disabled={isItadDealSyncing}
+                onClick={syncVisibleOrSelectedWishlistDeals}
+                type="button"
+              >
+                {isItadDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
+              </button>
+            ) : null}
             {collectionType === 'library' && onBulkSyncSteamAchievements ? (
               <button
                 className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
@@ -2883,6 +3026,10 @@ function CollectionPanel({
 
       {collectionType === 'wishlist' && steamWishlistSyncState && steamWishlistSyncState.status !== 'idle' ? (
         <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
+      ) : null}
+
+      {collectionType === 'wishlist' && itadDealSyncState && itadDealSyncState.status !== 'idle' ? (
+        <ItadDealSyncNotice syncState={itadDealSyncState} />
       ) : null}
 
       {isAdvancedFiltersOpen ? (
@@ -3031,7 +3178,12 @@ function CollectionPanel({
                   Add to Wishlist
                 </button>
               ) : null}
-{collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
+              {collectionType === 'wishlist' && onSyncItadDeals ? (
+                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedCount === 0 || isItadDealSyncing} onClick={syncVisibleOrSelectedWishlistDeals} type="button">
+                  {isItadDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
+                </button>
+              ) : null}
+              {collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
                 <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedRefreshableSteamCount === 0 || isSteamPlaytimeSyncing} onClick={refreshSelectedSteamPlaytime} type="button">
                   Refresh Steam Playtime
                 </button>
@@ -3257,6 +3409,29 @@ function SteamWishlistSyncNotice({ syncState }: { syncState: SteamWishlistSyncSt
           <SyncStat label="Updated" value={syncState.summary.updatedCount} />
           <SyncStat label="In library" value={syncState.summary.skippedAlreadyInLibraryCount} />
           <SyncStat label="Ignored" value={syncState.summary.skippedIgnoredCount} />
+          <SyncStat label="Failed" value={syncState.summary.failedCount} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+function ItadDealSyncNotice({ syncState }: { syncState: ItadDealSyncState }) {
+  const statusStyles = {
+    idle: 'border-skyglass/15 bg-ink-950/70 text-slate-400',
+    loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
+    success: 'border-mint/40 bg-mint/10 text-mint',
+    error: 'border-red-400/40 bg-red-500/10 text-red-200',
+  }[syncState.status];
+
+  return (
+    <div className={`mb-4 rounded-lg border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
+      <div>{syncState.message}</div>
+      {syncState.summary ? (
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+          <SyncStat label="Updated" value={syncState.summary.updatedCount} />
+          <SyncStat label="No match" value={syncState.summary.noMatchCount} />
           <SyncStat label="Failed" value={syncState.summary.failedCount} />
         </div>
       ) : null}
@@ -3749,6 +3924,7 @@ function SettingsPanel({
           {activeCategory === 'Integrations' ? (
             <div className="space-y-4">
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
+              <IsThereAnyDealSettingsPanel />
               <SteamSettingsPanel
                 games={games}
                 ignoredSteamGames={ignoredSteamGames}
@@ -5117,6 +5293,22 @@ function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
     return isMissingRawgMetadata(game);
   }
 
+  if (quickFilter === 'On sale') {
+    return typeof game.itadDiscountPercent === 'number' && game.itadDiscountPercent > 0;
+  }
+
+  if (quickFilter === 'Historical low') {
+    return game.itadIsHistoricalLow === true;
+  }
+
+  if (quickFilter === 'Deal synced') {
+    return Boolean(game.itadId && game.itadLastSyncedAt);
+  }
+
+  if (quickFilter === 'No deal match') {
+    return Boolean(game.itadLastSyncedAt && !game.itadId);
+  }
+
   return game.playtimeHours > 0;
 }
 
@@ -5152,7 +5344,19 @@ function compareGames(firstGame: Game, secondGame: Game, sortBy: LibrarySortOpti
     return getAchievementSortValue(secondGame) - getAchievementSortValue(firstGame) || compareTitle(firstGame, secondGame);
   }
 
+  if (sortBy === 'Best discount') {
+    return (secondGame.itadDiscountPercent ?? -1) - (firstGame.itadDiscountPercent ?? -1) || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Lowest price') {
+    return getDealPriceSortValue(firstGame) - getDealPriceSortValue(secondGame) || compareTitle(firstGame, secondGame);
+  }
+
   return compareTitle(firstGame, secondGame);
+}
+
+function getDealPriceSortValue(game: Game) {
+  return typeof game.itadCurrentBestPrice === 'number' ? game.itadCurrentBestPrice : Number.POSITIVE_INFINITY;
 }
 
 function getAchievementSortValue(game: Game) {
