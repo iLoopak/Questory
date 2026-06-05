@@ -2836,7 +2836,7 @@ function CollectionPanel({
         }
       />
 
-      {collectionType === 'library' && steamAchievementSyncState && steamAchievementSyncState.status !== 'idle' ? (
+      {collectionType === 'library' && steamAchievementSyncState && steamAchievementSyncState.status === 'loading' ? (
         <SteamAchievementSyncNotice syncState={steamAchievementSyncState} />
       ) : null}
 
