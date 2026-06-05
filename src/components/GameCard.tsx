@@ -60,15 +60,25 @@ export function GameCard({
 
   const activeCoverSource = coverSources[coverSourceIndex];
 
-  function handleCardClick() {
+  function handleCardClick(event: MouseEvent<HTMLElement>) {
+    if (isInteractiveCardChild(event.target, event.currentTarget)) {
+      return;
+    }
+
     if (isMultiSelectMode) {
       onToggleSelected?.();
+    } else {
+      onOpenDetails();
     }
   }
 
   function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (event.key === 'Escape') {
       setIsActionMenuOpen(false);
+      return;
+    }
+
+    if (event.target !== event.currentTarget && isInteractiveCardChild(event.target, event.currentTarget)) {
       return;
     }
 
@@ -110,10 +120,11 @@ export function GameCard({
 
   return (
     <article
+      aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
       className={`qs-game-card qs-glass relative flex h-full min-h-[290px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[320px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
-      } ${highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : ''} ${isMultiSelectMode ? 'cursor-pointer' : ''}`}
+      } ${highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : ''} cursor-pointer`}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
       role="button"
@@ -227,4 +238,16 @@ export function GameCard({
       </div>
     </article>
   );
+}
+
+function isInteractiveCardChild(target: EventTarget | null, cardElement: HTMLElement) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const interactiveElement = target.closest(
+    'a, button, input, select, textarea, summary, [role="button"], [role="link"], [role="menuitem"], [data-card-action]',
+  );
+
+  return Boolean(interactiveElement && interactiveElement !== cardElement);
 }
