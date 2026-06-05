@@ -964,48 +964,51 @@ function App() {
       const settings = loadSteamSettings();
       const syncedAt = new Date().toISOString();
       const targetGameIds = new Set(targetGames.map((game) => game.id));
-      const result = await syncSteamAchievementsForGames(
-        games,
-        targetGameIds,
-        settings,
-        syncedAt,
-        (progress) => {
-          if (!isAppMountedRef.current) {
-            return;
-          }
+      const result = await withSteamAchievementSyncWatchdog(
+        syncSteamAchievementsForGames(
+          games,
+          targetGameIds,
+          settings,
+          syncedAt,
+          (progress) => {
+            if (!isAppMountedRef.current) {
+              return;
+            }
 
-          setSteamAchievementSyncState((currentState) =>
-            currentState.status === 'loading'
-              ? {
-                  ...currentState,
-                  progress,
-                  summary: null,
-                }
-              : currentState,
-          );
-        },
-        (batchResult) => {
-          if (!isAppMountedRef.current) {
-            saveGames(batchResult.games);
-            return;
-          }
+            setSteamAchievementSyncState((currentState) =>
+              currentState.status === 'loading'
+                ? {
+                    ...currentState,
+                    progress,
+                    summary: null,
+                  }
+                : currentState,
+            );
+          },
+          (batchResult) => {
+            if (!isAppMountedRef.current) {
+              saveGames(batchResult.games);
+              return;
+            }
 
-          setGames((currentGames) => {
-            const mergedGames = mergeSteamAchievementUpdates(currentGames, batchResult.games, targetGameIds);
-            saveGames(mergedGames);
-            return mergedGames;
-          });
-          setSteamAchievementSyncState((currentState) =>
-            currentState.status === 'loading'
-              ? {
-                  ...currentState,
-                  progress: batchResult.progress,
-                  summary: null,
-                }
-              : currentState,
-          );
-        },
-        options.force,
+            setGames((currentGames) => {
+              const mergedGames = mergeSteamAchievementUpdates(currentGames, batchResult.games, targetGameIds);
+              saveGames(mergedGames);
+              return mergedGames;
+            });
+            setSteamAchievementSyncState((currentState) =>
+              currentState.status === 'loading'
+                ? {
+                    ...currentState,
+                    progress: batchResult.progress,
+                    summary: null,
+                  }
+                : currentState,
+            );
+          },
+          options.force,
+        ),
+        total,
       );
 
       summaryToReturn = result.summary;
@@ -1038,7 +1041,9 @@ function App() {
       const message =
         error instanceof SteamApiError
           ? error.message
-          : 'Steam achievement sync failed. Check your Steam credentials, profile privacy, and connection.';
+          : error instanceof Error
+            ? error.message
+            : 'Steam achievement sync failed. Check your Steam credentials, profile privacy, and connection.';
       const failedSummary: SteamAchievementSyncSummary = {
         failedCount: total,
         noAchievementDataCount: 0,
@@ -1068,6 +1073,12 @@ function App() {
 
       return summaryToReturn;
     } finally {
+      debugSteamAchievementSyncFinalization('finally reached', {
+        total,
+        hasTerminalState: terminalState !== null,
+        hasSummary: summaryToReturn !== null,
+      });
+
       if (isAppMountedRef.current) {
         setSteamAchievementSyncState(
           terminalState ?? {
@@ -4854,6 +4865,39 @@ function didSteamPlaytimeSyncSucceed(summary: SteamPlaytimeRefreshSummary | null
 
 function didSteamAchievementSyncSucceed(summary: SteamAchievementSyncSummary | null) {
   return summary !== null && summary.failedCount === 0;
+}
+
+function withSteamAchievementSyncWatchdog<T>(promise: Promise<T>, total: number) {
+  const timeoutMs = getSteamAchievementSyncWatchdogTimeoutMs(total);
+  let timeoutId: number | undefined;
+
+  const watchdog = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(`Steam achievement sync timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, watchdog]).finally(() => {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  });
+}
+
+function getSteamAchievementSyncWatchdogTimeoutMs(total: number) {
+  if (total <= 2) {
+    return 60_000;
+  }
+
+  return Math.min(Math.max(60_000, total * 20_000), 10 * 60_000);
+}
+
+function debugSteamAchievementSyncFinalization(message: string, data?: Record<string, unknown>) {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  console.debug(`[SteamAchievementSync] ${message}`, data ?? {});
 }
 
 function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[], targetGameIds: Set<string>) {

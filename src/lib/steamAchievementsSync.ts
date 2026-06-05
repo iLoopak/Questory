@@ -9,7 +9,7 @@ export const STEAM_ACHIEVEMENT_SYNC_RETRY_DELAY_MS = 500;
 
 type SteamAchievementSummaryResult = Awaited<ReturnType<typeof getSteamAchievementSummary>>;
 
-type SteamAchievementGameSyncStatus = 'updated' | 'skipped' | 'no-achievements' | 'failed';
+type SteamAchievementGameSyncStatus = 'updated' | 'skipped' | 'no-achievements' | 'unavailable' | 'failed';
 
 export type SteamAchievementSyncProgress = {
   completed: number;
@@ -55,6 +55,8 @@ export async function syncSteamAchievementsForGames(
   let nextGames = games;
   let completed = 0;
 
+  debugSteamAchievementSync('start', { eligibleGameCount: syncableGames.length, targetGameCount: targetGames.length });
+
   const summary: SteamAchievementSyncSummary = {
     failedCount: 0,
     noAchievementDataCount: 0,
@@ -65,6 +67,10 @@ export async function syncSteamAchievementsForGames(
 
   for (let batchStart = 0; batchStart < syncableGames.length; batchStart += STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE) {
     const batch = syncableGames.slice(batchStart, batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE);
+    debugSteamAchievementSync('batch started', {
+      batchNumber: Math.floor(batchStart / STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE) + 1,
+      batchSize: batch.length,
+    });
     const batchResults = await Promise.all(
       batch.map((game) =>
         syncSteamAchievementsForGameWithProgress(
@@ -87,12 +93,20 @@ export async function syncSteamAchievementsForGames(
     nextGames = mergeSteamAchievementBatch(nextGames, batchResults, summariesByAppId, syncedAt, summary);
 
     const progress = { completed, total: syncableGames.length };
+    debugSteamAchievementSync('batch completed', {
+      batchNumber: Math.floor(batchStart / STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE) + 1,
+      completed: progress.completed,
+      total: progress.total,
+      results: batchResults.map(({ steamAppId, status }) => ({ steamAppId, status })),
+    });
     onBatchComplete?.({ games: nextGames, progress, summary: { ...summary }, batchResults });
 
     if (batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE < syncableGames.length) {
       await delay(STEAM_ACHIEVEMENT_SYNC_BATCH_DELAY_MS);
     }
   }
+
+  debugSteamAchievementSync('completed', { completed, total: syncableGames.length, summary });
 
   return { games: nextGames, summary };
 }
@@ -109,9 +123,19 @@ async function syncSteamAchievementsForGameWithProgress(
   onProcessed: () => void,
 ): Promise<SteamAchievementGameSyncResult> {
   try {
-    return await syncSteamAchievementsForGame(options);
+    const result = await syncSteamAchievementsForGame(options);
+    debugSteamAchievementSync('game result', {
+      appId: result.steamAppId,
+      gameId: result.gameId,
+      status: result.status,
+    });
+    return result;
   } finally {
-    onProcessed();
+    try {
+      onProcessed();
+    } catch (error) {
+      debugSteamAchievementSync('progress callback failed', { error });
+    }
   }
 }
 
@@ -131,6 +155,8 @@ async function syncSteamAchievementsForGame({
   force: boolean;
 }): Promise<SteamAchievementGameSyncResult> {
   const steamAppId = game.steamAppId;
+
+  debugSteamAchievementSync('game started', { appId: steamAppId, gameId: game.id, title: game.title });
 
   if (typeof steamAppId !== 'number') {
     return { gameId: game.id, steamAppId: 0, status: 'skipped' };
@@ -173,6 +199,10 @@ async function syncSteamAchievementsForGame({
       return { gameId: game.id, steamAppId, status: 'no-achievements' };
     }
 
+    if (isSteamUnavailableError(error)) {
+      return { gameId: game.id, steamAppId, status: 'unavailable' };
+    }
+
     failedAppIds.add(steamAppId);
     return { gameId: game.id, steamAppId, status: 'failed' };
   }
@@ -191,7 +221,14 @@ async function getSteamAchievementSummaryWithRetry(settings: SteamSettings, stea
         throw error;
       }
 
-      await delay(STEAM_ACHIEVEMENT_SYNC_RETRY_DELAY_MS * (attempt + 1));
+      const retryDelayMs = getSteamAchievementRetryDelayMs(attempt);
+      debugSteamAchievementSync('retry scheduled', {
+        appId: steamAppId,
+        attempt: attempt + 1,
+        retryDelayMs,
+        error: getSteamAchievementErrorDebugInfo(error),
+      });
+      await delay(retryDelayMs);
     }
   }
 
@@ -216,6 +253,11 @@ function mergeSteamAchievementBatch(
 
     if (result.status === 'failed') {
       summary.failedCount += 1;
+      return game;
+    }
+
+    if (result.status === 'unavailable') {
+      summary.noAchievementDataCount += 1;
       return game;
     }
 
@@ -271,13 +313,17 @@ function isSteamCredentialError(error: unknown) {
   return error instanceof SteamApiError && ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
 }
 
+function isSteamUnavailableError(error: unknown) {
+  return error instanceof SteamApiError && error.code === 'private-profile';
+}
+
 function isPermanentNoAchievementError(error: unknown) {
   if (!(error instanceof SteamApiError)) {
     return false;
   }
 
   return (
-    ['no-achievements', 'private-profile'].includes(error.code) ||
+    error.code === 'no-achievements' ||
     (error.code === 'api-failure' && error.httpStatus === 400 && error.isTransient !== true)
   );
 }
@@ -287,11 +333,36 @@ function isRetryableSteamAchievementError(error: unknown) {
     return false;
   }
 
-  if (['cors-proxy', 'malformed-response'].includes(error.code)) {
+  if (['cors-proxy', 'malformed-response', 'timeout'].includes(error.code)) {
     return true;
   }
 
   return error.code === 'api-failure' && error.isTransient === true;
+}
+
+function getSteamAchievementRetryDelayMs(attempt: number) {
+  return Math.min(STEAM_ACHIEVEMENT_SYNC_RETRY_DELAY_MS * (attempt + 1), 5_000);
+}
+
+function getSteamAchievementErrorDebugInfo(error: unknown) {
+  if (error instanceof SteamApiError) {
+    return {
+      code: error.code,
+      httpStatus: error.httpStatus,
+      isTransient: error.isTransient,
+      message: error.message,
+    };
+  }
+
+  return error instanceof Error ? { message: error.message } : { message: String(error) };
+}
+
+function debugSteamAchievementSync(message: string, data?: Record<string, unknown>) {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  console.debug(`[SteamAchievementSync] ${message}`, data ?? {});
 }
 
 function delay(milliseconds: number) {
