@@ -1360,7 +1360,7 @@ function App() {
     const now = new Date().toISOString();
     const nextStatus: GameStatus = action === 'finished' ? 'Finished' : action === 'drop' ? 'Dropped' : 'Want to play';
     const actionLabels: Record<PlayingGameAction, string> = {
-      'move-to-backlog': 'Moved to Queue',
+      'move-to-backlog': 'Moved to Platforms',
       finished: 'Marked Finished',
       drop: 'Dropped',
       'remove-from-playing': 'Removed from Playing Now',
@@ -4116,7 +4116,7 @@ function AppearanceSettingsPanel({
     'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
     'App shell, top navigation, home, library, wishlist, metadata, artwork, recommendations, stats, and settings panels use tokenized backgrounds, borders, shadows, and text.',
     'Cards, detail dialogs, modal overlays, toasts, tooltips, dropdown menus, forms, buttons, badges, and disabled states inherit theme tokens.',
-    'Quest Queue panels, Queue panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
+    'Quest Queue panels, Platforms panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
   ];
 
   return (
@@ -4407,7 +4407,7 @@ function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Review Mode') {
-    return 'Quest Queue helps quickly process imported games into Queue plans, wishlist picks, status updates, or ignores.';
+    return 'Quest Queue helps quickly process imported games into Platforms plans, wishlist picks, status updates, or ignores.';
   }
 
   if (activeNavItem === 'Stats') {

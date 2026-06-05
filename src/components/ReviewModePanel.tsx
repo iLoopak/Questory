@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
-import { useI18n } from '../i18n';
+import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -57,7 +57,7 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'primary', icon: '📌', label: 'Add to Queue', tone: 'accent' },
+  { action: 'queue', hint: 'primary', icon: '📌', label: 'Add to Platforms', tone: 'accent' },
   { action: 'playing', hint: 'topFace', icon: '🎮', label: 'Playing Now', tone: 'accent' },
   { action: 'wishlist', hint: 'leftFace', icon: '💖', label: 'Wishlist', tone: 'neutral' },
   { action: 'finished', hint: '', icon: '🏆', label: 'Finished', tone: 'neutral' },
@@ -542,7 +542,7 @@ function FocusedReviewCard({
             >
               <div className="flex items-center gap-1.5 justify-center">
                 <span className="text-base select-none leading-none">{action.icon}</span>
-                <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
+                <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
               </div>
               {action.hint && (
                 <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
@@ -719,7 +719,7 @@ function FocusedReviewCard({
               >
                 <div className="flex items-center gap-1.5 justify-center">
                   <span className="text-base select-none leading-none">{action.icon}</span>
-                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
+                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
                 {action.hint && (
                   <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
@@ -765,7 +765,7 @@ function ReviewComplete({
             onClick={onOpenQueue}
             type="button"
           >
-            Open Queue
+            Open Platforms
           </button>
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"
@@ -873,6 +873,10 @@ function compareReviewGames(firstGame: Game, secondGame: Game) {
 
 function getGameTime(value: string | null | undefined) {
   return value ? new Date(value).getTime() || 0 : 0;
+}
+
+function getReviewActionLabel(action: { action: ReviewModeAction; label: string }, t: TFunction) {
+  return action.action === 'queue' ? t('action.addToQueue') : action.label;
 }
 
 function getActionClassName(tone: 'accent' | 'neutral' | 'danger' | 'quiet', isHighlighted: boolean) {

@@ -221,7 +221,7 @@ export function RecommendationPanel({
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <RecommendationToggle checked={includeFinishedGames} label="Finished" onChange={(checked) => updatePreference(() => setIncludeFinishedGames(checked))} />
                 <RecommendationToggle checked={includeWishlist} label="Wishlist" onChange={(checked) => updatePreference(() => setIncludeWishlist(checked))} />
-                <RecommendationToggle checked={recommendFromQueueOnly} label="Queue only" onChange={(checked) => updatePreference(() => setRecommendFromQueueOnly(checked))} />
+                <RecommendationToggle checked={recommendFromQueueOnly} label="Platforms only" onChange={(checked) => updatePreference(() => setRecommendFromQueueOnly(checked))} />
                 <RecommendationToggle checked={recommendNextGame} label="Next planned" onChange={(checked) => updatePreference(() => setRecommendNextGame(checked))} />
               </div>
 

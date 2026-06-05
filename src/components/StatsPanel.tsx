@@ -165,7 +165,7 @@ function ProgressGrid({ stats }: { stats: QuestShelfStats }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       <ProgressCard label="Finished percentage" value={`${stats.finishedPercent}%`} percent={stats.finishedPercent} />
-      <MetricCard label="Active Queue" value={stats.activeBacklogCount.toString()} />
+      <MetricCard label="Active Platforms" value={stats.activeBacklogCount.toString()} />
       <MetricCard label="Played but not finished" value={stats.gamesWithPlaytimeNotFinished.toString()} />
       <MetricCard label="Never played" value={stats.gamesNeverPlayed.toString()} />
     </div>

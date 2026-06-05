@@ -40,7 +40,7 @@ QuestShelf keeps analytics concentrated in the **Stats** section so handheld scr
 
 - **Stats** → analytics, trends, backlog progress, completion, playtime, platform/source breakdowns, and metadata coverage.
 - **Library** → collection management, filters, edits, status changes, and bulk actions.
-- **Queue** → planning what to play next, active games, queue order, and platform limits.
+- **Platforms** → planning what to play next, active games, platform plan order, and platform limits.
 - **Quest Queue** → one-game-at-a-time decisions with artwork, title, platform, actions, and a lightweight progress indicator.
 - **Wishlist** → discovery and future-game planning.
 - **Settings** → app configuration, integrations, backups, appearance, and onboarding controls.
@@ -205,7 +205,7 @@ The active summary shows how many games are visible out of the full collection. 
 
 ## Artwork Priority, Fallback Covers, and Audit Tools
 
-QuestShelf treats artwork as a first-class local library field because Library, Quest Queue, Shelf View, Queue, Home, Recommendation, and Stats all use cover-forward layouts.
+QuestShelf treats artwork as a first-class local library field because Library, Quest Queue, Shelf View, Platforms, Home, Recommendation, and Stats all use cover-forward layouts.
 
 Artwork is resolved in this priority order:
 
@@ -301,8 +301,8 @@ The UI theme follows the icon with tokenized app surfaces, restrained ember-oran
 ### Theme Coverage Checklist
 
 - Light, Dark, and Follow Device resolve through the shared CSS theme tokens in `src/styles.css` and Tailwind color aliases in `tailwind.config.js`.
-- App shell, top navigation, Home, Library, Wishlist, Queue, Quest Queue, Artwork, Recommendation, Stats, Metadata, Settings, and Onboarding use tokenized surfaces, borders, text, shadows, and accents.
-- Cards, panels, modals, overlays, buttons, dropdowns, tooltips, detail dialogs, setup widgets, queue panels, and Quest Queue panels should be checked after any new UI change.
+- App shell, top navigation, Home, Library, Wishlist, Platforms, Quest Queue, Artwork, Recommendation, Stats, Metadata, Settings, and Onboarding use tokenized surfaces, borders, text, shadows, and accents.
+- Cards, panels, modals, overlays, buttons, dropdowns, tooltips, detail dialogs, setup widgets, Platforms panels, and Quest Queue panels should be checked after any new UI change.
 - Switching between Light, Dark, and Follow Device should update the current screen, browser theme color, native color-scheme, focus rings, scrollbars, and transient UI without a page reload.
 - Theme audits should include a raw-color scan of source UI files so fixed dark colors do not leak into Light Theme.
 
