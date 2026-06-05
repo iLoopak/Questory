@@ -344,7 +344,7 @@ export function ReviewModePanel({
     <section className="qs-review-shell relative overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-74px)]">
       <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
         <div
-          aria-label={`Review progress ${progressLabel}`}
+          aria-label={`Quest Queue progress ${progressLabel}`}
           className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-sm font-bold text-mint shadow-panel backdrop-blur-md"
         >
           {progressLabel}
@@ -554,7 +554,7 @@ function FocusedReviewCard({
         </div>
       </section>
 
-      <section className="qs-review-hero flex flex-col items-center" aria-label={`${game.title} review card`}>
+      <section className="qs-review-hero flex flex-col items-center" aria-label={`${game.title} Quest Queue card`}>
         <div className="qs-review-cover overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
           <div className="qs-review-artwork-frame relative h-full w-full">
             {activeCoverSource ? (
