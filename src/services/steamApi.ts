@@ -4,16 +4,22 @@ import type {
   SteamOwnedGame,
   SteamRecentlyPlayedGame,
   SteamSettings,
+  SteamAchievementSummary,
   SteamWishlistItem,
 } from '../types/steam';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 
 const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
+const DEVELOPMENT_STEAM_STATS_API_BASE_URL = '/api/steam/ISteamUserStats';
 const DEVELOPMENT_STEAM_STORE_BASE_URL = '/api/steam-store';
 // Production placeholder only. A deployed client will still need a safe proxy/backend before Steam sync is production-ready.
 const PRODUCTION_STEAM_API_BASE_URL = 'https://api.steampowered.com/IPlayerService';
+const PRODUCTION_STEAM_STATS_API_BASE_URL = 'https://api.steampowered.com/ISteamUserStats';
 const PRODUCTION_STEAM_STORE_BASE_URL = 'https://store.steampowered.com';
 const STEAM_API_BASE_URL = import.meta.env.DEV ? DEVELOPMENT_STEAM_API_BASE_URL : PRODUCTION_STEAM_API_BASE_URL;
+const STEAM_STATS_API_BASE_URL = import.meta.env.DEV
+  ? DEVELOPMENT_STEAM_STATS_API_BASE_URL
+  : PRODUCTION_STEAM_STATS_API_BASE_URL;
 const STEAM_STORE_BASE_URL = import.meta.env.DEV
   ? DEVELOPMENT_STEAM_STORE_BASE_URL
   : PRODUCTION_STEAM_STORE_BASE_URL;
@@ -30,6 +36,27 @@ type OwnedGamesResponse = {
 type RecentlyPlayedResponse = {
   total_count?: number;
   games?: SteamRecentlyPlayedGame[];
+};
+
+type PlayerAchievementsResponse = {
+  playerstats?: {
+    achievements?: Array<{
+      achieved?: number;
+      apiname?: string;
+      unlocktime?: number;
+    }>;
+    success?: boolean;
+  };
+};
+
+type GameSchemaResponse = {
+  game?: {
+    availableGameStats?: {
+      achievements?: Array<{
+        name?: string;
+      }>;
+    };
+  };
 };
 
 type PlayerSummaryResponse = {
@@ -181,6 +208,81 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
   return payload.response;
 }
 
+async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 'GetSchemaForGame', settings: SteamSettings, appId: number): Promise<T> {
+  validateSettings(settings);
+
+  const version = endpoint === 'GetSchemaForGame' ? 'v2' : 'v0001';
+  const url = new URL(`${STEAM_STATS_API_BASE_URL}/${endpoint}/${version}/`, window.location.origin);
+  url.searchParams.set('key', settings.apiKey.trim());
+  url.searchParams.set('appid', appId.toString());
+  url.searchParams.set('format', 'json');
+
+  if (endpoint === 'GetPlayerAchievements') {
+    url.searchParams.set('steamid', settings.steamId64);
+  }
+
+  let response: Response;
+  const safeRequestUrl = getSafeRequestUrl(url);
+
+  try {
+    response = await fetch(url);
+  } catch {
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: null,
+      parsedGameCount: null,
+      requestUrl: safeRequestUrl,
+      responseSummary: `Steam achievement request for app ${appId} failed before an HTTP response was received.`,
+      steamId64: settings.steamId64,
+    });
+    throw new SteamApiError('Steam achievement data is unavailable right now. Try again later.', import.meta.env.DEV ? 'cors-proxy' : 'api-failure');
+  }
+
+  if (!response.ok) {
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: response.status,
+      parsedGameCount: null,
+      requestUrl: safeRequestUrl,
+      responseSummary: `HTTP ${response.status} ${response.statusText} for app ${appId}`,
+      steamId64: settings.steamId64,
+    });
+
+    if (response.status === 400) {
+      throw new SteamApiError('Steam rejected the achievement request. Check the Steam App ID and SteamID64.', 'invalid-steamid64');
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new SteamApiError('Steam achievements are private or unavailable for this SteamID64.', 'private-profile');
+    }
+
+    throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure');
+  }
+
+  try {
+    const payload = (await response.json()) as T;
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: response.status,
+      parsedGameCount: getParsedGameCount(payload),
+      requestUrl: safeRequestUrl,
+      responseSummary: JSON.stringify(payload, null, 2),
+      steamId64: settings.steamId64,
+    });
+    return payload;
+  } catch {
+    recordSteamApiDebug({
+      endpoint,
+      httpStatus: response.status,
+      parsedGameCount: null,
+      requestUrl: safeRequestUrl,
+      responseSummary: `Steam returned achievement data for app ${appId} that could not be parsed as JSON.`,
+      steamId64: settings.steamId64,
+    });
+    throw new SteamApiError('Steam returned malformed achievement data. Try the request again.', 'malformed-response');
+  }
+}
+
 export async function getOwnedGames(settings: SteamSettings): Promise<SteamOwnedGame[]> {
   const response = await requestSteamEndpoint<OwnedGamesResponse>('GetOwnedGames', settings);
 
@@ -210,6 +312,48 @@ export async function getRecentlyPlayedGames(settings: SteamSettings): Promise<S
   const response = await requestSteamEndpoint<RecentlyPlayedResponse>('GetRecentlyPlayedGames', settings);
 
   return Array.isArray(response.games) ? response.games : [];
+}
+
+export async function getSteamAchievementSummary(
+  settings: SteamSettings,
+  appId: number,
+): Promise<SteamAchievementSummary | null> {
+  const [playerAchievements, gameSchema] = await Promise.all([
+    requestSteamStatsEndpoint<PlayerAchievementsResponse>('GetPlayerAchievements', settings, appId),
+    requestSteamStatsEndpoint<GameSchemaResponse>('GetSchemaForGame', settings, appId),
+  ]);
+
+  const achievementRows = Array.isArray(playerAchievements.playerstats?.achievements)
+    ? playerAchievements.playerstats.achievements
+    : [];
+  const schemaRows = Array.isArray(gameSchema.game?.availableGameStats?.achievements)
+    ? gameSchema.game.availableGameStats.achievements
+    : [];
+  const total = Math.max(achievementRows.length, schemaRows.length);
+
+  if (playerAchievements.playerstats?.success === false && achievementRows.length === 0) {
+    return null;
+  }
+
+  if (total <= 0) {
+    return null;
+  }
+
+  const unlocked = achievementRows.filter((achievement) => achievement.achieved === 1).length;
+  const lastUnlockTime = achievementRows.reduce<number | undefined>((latestUnlockTime, achievement) => {
+    if (achievement.achieved !== 1 || !achievement.unlocktime) {
+      return latestUnlockTime;
+    }
+
+    return Math.max(latestUnlockTime ?? 0, achievement.unlocktime);
+  }, undefined);
+
+  return {
+    total,
+    unlocked,
+    percent: total > 0 ? Math.round((unlocked / total) * 100) : 0,
+    lastUnlockTime,
+  };
 }
 
 export async function getSteamWishlist(

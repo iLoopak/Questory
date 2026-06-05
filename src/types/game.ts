@@ -56,6 +56,10 @@ export type Game = {
   notes: string;
   collectionType: GameCollectionType;
   steamAppId?: number;
+  steamAchievementsTotal?: number;
+  steamAchievementsUnlocked?: number;
+  steamAchievementsPercent?: number;
+  steamLastAchievementUnlockTime?: number;
   externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
   externalUrl?: string;
   importedAt?: string;

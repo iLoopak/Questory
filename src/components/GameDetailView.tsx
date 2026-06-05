@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
+import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
 import { useI18n } from '../i18n';
 
@@ -57,6 +58,7 @@ export function GameDetailView({
   const canApplyRawgCover = canUseRawgImageAsCover(game);
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
+  const achievementSummary = formatSteamAchievementSummary(game);
   const platformLabel = getGamePlatformLabel(game, platformQueueState);
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
@@ -199,6 +201,7 @@ export function GameDetailView({
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
                     <HeroStat label={t('detail.currentStatus')} value={game.status} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+                    {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} /> : null}
                   </div>
                 </div>
               </div>
@@ -295,6 +298,10 @@ export function GameDetailView({
                     <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? 'n/a'} />
                     <ReadOnlyField label="Imported" value={formatDateTime(game.importedAt)} />
                     <ReadOnlyField label="Source" value={game.externalSource ?? 'n/a'} />
+                    {achievementSummary ? <ReadOnlyField label={t('collection.achievements')} value={achievementSummary} /> : null}
+                    {game.steamLastAchievementUnlockTime ? (
+                      <ReadOnlyField label="Last achievement unlock" value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString())} />
+                    ) : null}
                     <ReadOnlyLink label="External URL" value={game.externalUrl} />
                   </div>
                 ) : (
