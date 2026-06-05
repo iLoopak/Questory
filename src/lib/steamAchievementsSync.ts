@@ -65,22 +65,25 @@ export async function syncSteamAchievementsForGames(
   for (let batchStart = 0; batchStart < syncableGames.length; batchStart += STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE) {
     const batch = syncableGames.slice(batchStart, batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE);
     const batchResults = await Promise.all(
-      batch.map((game) =>
-        syncSteamAchievementsForGame({
+      batch.map(async (game) => {
+        const result = await syncSteamAchievementsForGame({
           failedAppIds,
           game,
           noAchievementAppIds,
           settings,
           summariesByAppId,
-        }),
-      ),
+        });
+
+        completed += 1;
+        onProgress?.({ completed, total: syncableGames.length });
+
+        return result;
+      }),
     );
 
     nextGames = mergeSteamAchievementBatch(nextGames, batchResults, summariesByAppId, syncedAt, summary);
-    completed += batch.length;
 
     const progress = { completed, total: syncableGames.length };
-    onProgress?.(progress);
     onBatchComplete?.({ games: nextGames, progress, summary: { ...summary }, batchResults });
 
     if (batchStart + STEAM_ACHIEVEMENT_SYNC_BATCH_SIZE < syncableGames.length) {
@@ -237,7 +240,15 @@ function isPermanentNoAchievementError(error: unknown) {
 }
 
 function isRetryableSteamAchievementError(error: unknown) {
-  return error instanceof SteamApiError && ['cors-proxy', 'malformed-response'].includes(error.code);
+  if (!(error instanceof SteamApiError)) {
+    return false;
+  }
+
+  if (['cors-proxy', 'malformed-response'].includes(error.code)) {
+    return true;
+  }
+
+  return error.code === 'api-failure' && error.isTransient === true;
 }
 
 function delay(milliseconds: number) {
