@@ -51,6 +51,7 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
               <SummaryGrid stats={stats} />
               <QueueStatsPanel queueSummary={queueSummary} />
               <ProgressGrid stats={stats} />
+              <AchievementStatsPanel stats={stats} />
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <BreakdownPanel
@@ -169,6 +170,31 @@ function ProgressGrid({ stats }: { stats: QuestShelfStats }) {
       <MetricCard label="Played but not finished" value={stats.gamesWithPlaytimeNotFinished.toString()} />
       <MetricCard label="Never played" value={stats.gamesNeverPlayed.toString()} />
     </div>
+  );
+}
+
+function AchievementStatsPanel({ stats }: { stats: QuestShelfStats }) {
+  const { t } = useI18n();
+
+  return (
+    <section className="rounded-lg border border-mint/20 bg-mint/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-white">{t('collection.achievements')}</h3>
+          <p className="mt-1 text-sm text-slate-400">Lightweight Steam achievement overview from synced summaries.</p>
+        </div>
+        <span className="rounded-md border border-mint/30 bg-ink-950/60 px-2.5 py-1 text-sm font-semibold text-mint">
+          {stats.achievementAverageCompletionPercent}%
+        </span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <MetricCard label={t('stats.syncedAchievements')} value={stats.achievementSyncedSteamGameCount.toString()} compact />
+        <MetricCard label={t('stats.averageCompletion')} value={`${stats.achievementAverageCompletionPercent}%`} compact />
+        <MetricCard label={t('stats.completedAchievements')} value={stats.achievementCompleteCount.toString()} compact />
+        <MetricCard label={t('stats.nearlyCompleted')} value={stats.achievementNearlyCompleteCount.toString()} compact />
+        <MetricCard label={t('stats.totalUnlockedAchievements')} value={stats.achievementTotalUnlocked.toString()} compact />
+      </div>
+    </section>
   );
 }
 

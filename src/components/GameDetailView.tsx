@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
+import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
 import { useI18n } from '../i18n';
@@ -14,6 +15,8 @@ type GameDetailViewProps = {
   onBack: () => void;
   onIgnore?: (game: Game) => void;
   onRefreshSteamPlaytime?: (game: Game) => void;
+  onSyncSteamAchievements?: (game: Game) => void;
+  isSteamAchievementSyncing?: boolean;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
   platformQueueState?: PlatformQueueState;
@@ -34,6 +37,8 @@ export function GameDetailView({
   onBack,
   onIgnore,
   onRefreshSteamPlaytime,
+  onSyncSteamAchievements,
+  isSteamAchievementSyncing = false,
   onStatusChange,
   onTrackingChange,
   platformQueueState,
@@ -122,6 +127,13 @@ export function GameDetailView({
       tone: 'neutral',
       disabled: !onRefreshSteamPlaytime || !isSteamLibraryGame,
     },
+    {
+      icon: '🏆',
+      label: isSteamAchievementSyncing ? t('collection.syncingSteamAchievements') : t('detail.syncSteamData'),
+      onClick: () => onSyncSteamAchievements?.(game),
+      tone: 'neutral',
+      disabled: !onSyncSteamAchievements || !isSteamLibraryGame || isSteamAchievementSyncing,
+    },
   ];
 
   const destructiveActions: GameDetailAction[] = [
@@ -201,7 +213,7 @@ export function GameDetailView({
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
                     <HeroStat label={t('detail.currentStatus')} value={game.status} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                    {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} /> : null}
+                    {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} badge={<AchievementProgressBadge game={game} />} /> : null}
                   </div>
                 </div>
               </div>

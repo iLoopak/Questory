@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
+import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
 
 type CollectionActionHandlers = {
@@ -346,7 +346,6 @@ function ShelfGameCard({
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
-  const achievementSummary = formatSteamAchievementSummary(game);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -433,11 +432,7 @@ function ShelfGameCard({
       <span className="mt-3 block min-h-[3rem]">
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
         <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
-        {achievementSummary ? (
-          <span className="mt-2 block w-fit rounded-full border border-mint/20 bg-mint/10 px-2 py-0.5 text-[0.65rem] font-semibold text-mint">
-            {t('collection.achievements')}: {achievementSummary}
-          </span>
-        ) : null}
+        <AchievementProgressBadge className="mt-2 text-[0.65rem]" game={game} showLabel />
       </span>
 
       {!isMultiSelectMode ? (
@@ -522,7 +517,6 @@ function CompactGameRow({
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
-  const achievementSummary = formatSteamAchievementSummary(game);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -568,7 +562,7 @@ function CompactGameRow({
             <PlatformBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
             <span>{game.status}</span>
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
-            {achievementSummary ? <span>{t('collection.achievements')}: {achievementSummary}</span> : null}
+            <AchievementProgressBadge game={game} showLabel />
           </span>
         </span>
       </button>

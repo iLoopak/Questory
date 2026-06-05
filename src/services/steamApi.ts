@@ -40,6 +40,7 @@ type RecentlyPlayedResponse = {
 
 type PlayerAchievementsResponse = {
   playerstats?: {
+    error?: string;
     achievements?: Array<{
       achieved?: number;
       apiname?: string;
@@ -75,6 +76,7 @@ export class SteamApiError extends Error {
       | 'missing-steamid64'
       | 'invalid-steamid64'
       | 'private-profile'
+      | 'no-achievements'
       | 'empty-library'
       | 'malformed-response'
       | 'cors-proxy'
@@ -238,15 +240,48 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
     throw new SteamApiError('Steam achievement data is unavailable right now. Try again later.', import.meta.env.DEV ? 'cors-proxy' : 'api-failure');
   }
 
-  if (!response.ok) {
+  let payload: T;
+
+  try {
+    payload = (await response.json()) as T;
+  } catch {
     recordSteamApiDebug({
       endpoint,
       httpStatus: response.status,
       parsedGameCount: null,
       requestUrl: safeRequestUrl,
-      responseSummary: `HTTP ${response.status} ${response.statusText} for app ${appId}`,
+      responseSummary: response.ok
+        ? `Steam returned achievement data for app ${appId} that could not be parsed as JSON.`
+        : `HTTP ${response.status} ${response.statusText} for app ${appId}; response body was not valid JSON.`,
       steamId64: settings.steamId64,
     });
+
+    if (!response.ok) {
+      throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure');
+    }
+
+    throw new SteamApiError('Steam returned malformed achievement data. Try the request again.', 'malformed-response');
+  }
+
+  recordSteamApiDebug({
+    endpoint,
+    httpStatus: response.status,
+    parsedGameCount: getParsedGameCount(payload),
+    requestUrl: safeRequestUrl,
+    responseSummary: JSON.stringify(payload, null, 2),
+    steamId64: settings.steamId64,
+  });
+
+  if (!response.ok) {
+    const steamError = getSteamStatsResponseError(payload);
+
+    if (response.status === 400 && isSteamNoStatsError(steamError)) {
+      throw new SteamApiError('Steam reports this app has no achievement stats.', 'no-achievements');
+    }
+
+    if (response.status === 400 && steamError) {
+      throw new SteamApiError(`Steam rejected the achievement request: ${steamError}`, 'api-failure');
+    }
 
     if (response.status === 400) {
       throw new SteamApiError('Steam rejected the achievement request. Check the Steam App ID and SteamID64.', 'invalid-steamid64');
@@ -259,28 +294,20 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
     throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure');
   }
 
-  try {
-    const payload = (await response.json()) as T;
-    recordSteamApiDebug({
-      endpoint,
-      httpStatus: response.status,
-      parsedGameCount: getParsedGameCount(payload),
-      requestUrl: safeRequestUrl,
-      responseSummary: JSON.stringify(payload, null, 2),
-      steamId64: settings.steamId64,
-    });
-    return payload;
-  } catch {
-    recordSteamApiDebug({
-      endpoint,
-      httpStatus: response.status,
-      parsedGameCount: null,
-      requestUrl: safeRequestUrl,
-      responseSummary: `Steam returned achievement data for app ${appId} that could not be parsed as JSON.`,
-      steamId64: settings.steamId64,
-    });
-    throw new SteamApiError('Steam returned malformed achievement data. Try the request again.', 'malformed-response');
+  return payload;
+}
+
+function getSteamStatsResponseError(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
   }
+
+  const playerstats = (payload as { playerstats?: { error?: unknown } }).playerstats;
+  return typeof playerstats?.error === 'string' ? playerstats.error : null;
+}
+
+function isSteamNoStatsError(error: string | null) {
+  return error?.trim().toLowerCase() === 'requested app has no stats';
 }
 
 export async function getOwnedGames(settings: SteamSettings): Promise<SteamOwnedGame[]> {

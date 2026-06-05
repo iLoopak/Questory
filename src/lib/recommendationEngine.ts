@@ -1,4 +1,5 @@
 import type { Game, GamePlatform } from '../types/game';
+import { hasSteamAchievementSummary } from './steamAchievementSummary';
 
 export const availableTimeOptions = ['15 min', '30 min', '1 hour', 'long session'] as const;
 export const moodOptions = ['brain off', 'story', 'grind', 'challenge', 'comfort'] as const;
@@ -109,6 +110,13 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
     reasons.push(timeFit.reason);
   }
 
+  const achievementNudge = scoreAchievementProgress(game);
+  score += achievementNudge.points;
+
+  if (achievementNudge.reason) {
+    reasons.push(achievementNudge.reason);
+  }
+
   // Missing metadata should not hide a game, but it lowers confidence in the recommendation.
   if (game.metadataSource !== 'rawg') {
     score -= 8;
@@ -123,6 +131,24 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
     reasons: reasons.slice(0, 5),
     score,
   };
+}
+
+function scoreAchievementProgress(game: Game) {
+  if (!hasSteamAchievementSummary(game)) {
+    return { points: 0, reason: null };
+  }
+
+  const percent = game.steamAchievementsPercent ?? 0;
+
+  if (percent >= 80 && percent < 100) {
+    return { points: 6, reason: 'Close to achievement completion' };
+  }
+
+  if (game.playtimeHours >= 20 && percent > 0 && percent < 35) {
+    return { points: 4, reason: 'Plenty played with achievements left' };
+  }
+
+  return { points: 0, reason: null };
 }
 
 function scoreTimeFit(game: Game, availableTime: AvailableTime, keywordText: string) {

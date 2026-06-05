@@ -233,11 +233,11 @@ function isSteamCredentialError(error: unknown) {
 }
 
 function isPermanentNoAchievementError(error: unknown) {
-  return error instanceof SteamApiError && error.code === 'private-profile';
+  return error instanceof SteamApiError && ['no-achievements', 'private-profile'].includes(error.code);
 }
 
 function isRetryableSteamAchievementError(error: unknown) {
-  return error instanceof SteamApiError && ['api-failure', 'cors-proxy', 'malformed-response'].includes(error.code);
+  return error instanceof SteamApiError && ['cors-proxy', 'malformed-response'].includes(error.code);
 }
 
 function delay(milliseconds: number) {

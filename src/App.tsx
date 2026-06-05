@@ -32,6 +32,7 @@ import {
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
+import { hasSteamAchievementSummary } from './lib/steamAchievementSummary';
 import { loadControllerLayoutPreference, saveControllerLayoutPreference, type ControllerLayoutPreference } from './lib/controllerLayoutPreferences';
 import { loadLandscapeLockPreference, saveLandscapeLockPreference } from './lib/landscapePreference';
 import {
@@ -184,8 +185,10 @@ const librarySortOptions = [
   'Recently imported',
   'Missing info first',
   'Status',
+  'Achievement completion %',
 ] as const;
 const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h'] as const;
+const achievementFilterOptions = ['All', 'Has achievements', 'No achievements synced', 'Nearly completed', 'Completed', 'Started'] as const;
 const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
 const collectionInitialRenderCount = 56;
 const collectionRenderBatchSize = 40;
@@ -194,10 +197,12 @@ const collectionLoadAheadMargin = '720px 0px';
 type SourceFilter = (typeof sourceFilterOptions)[number];
 type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
 type LibrarySortOption = (typeof librarySortOptions)[number];
+type AchievementFilter = (typeof achievementFilterOptions)[number];
 type QuickFilter = (typeof quickFilterOptions)[number];
 type CollectionViewMode = (typeof collectionViewModes)[number];
 
 type CollectionFilters = {
+  achievement: AchievementFilter;
   enrichment: EnrichmentFilter;
   platform: GamePlatform | typeof allOption;
   quickFilters: QuickFilter[];
@@ -225,6 +230,7 @@ function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { clas
 }
 
 const initialCollectionFilters: CollectionFilters = {
+  achievement: allOption,
   enrichment: allOption,
   platform: allOption,
   quickFilters: [],
@@ -997,7 +1003,7 @@ function App() {
       setGames(result.games);
       setSteamAchievementSyncState({
         status: 'success',
-        message: `Updated achievements for ${result.summary.updatedCount} games. ${result.summary.skippedNonSteamCount} skipped, ${result.summary.noAchievementDataCount} without achievement data, ${result.summary.failedCount} failed.`,
+        message: formatSteamAchievementSyncSummary(result.summary),
         progress: { completed, total },
         summary: result.summary,
       });
@@ -1008,7 +1014,7 @@ function App() {
           actions: syncableGames[0] ? [getViewGameAction(syncableGames[0].id)] : [getDismissAction()],
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-achievements:${syncableGames.map((game) => game.id).join(',')}`,
-          message: options.completionToastMessage?.(result.summary) ?? `Updated achievements for ${result.summary.updatedCount} games. ${result.summary.skippedNonSteamCount} skipped, ${result.summary.failedCount} failed.`,
+          message: options.completionToastMessage?.(result.summary) ?? formatSteamAchievementSyncSummary(result.summary),
         });
       }
 
@@ -1901,6 +1907,8 @@ function App() {
               onBack={() => setSelectedGameId(null)}
               onIgnore={removeAndIgnoreSteamGame}
               onRefreshSteamPlaytime={(game) => refreshSteamPlaytime([game.id], { showToast: true })}
+              onSyncSteamAchievements={(game) => syncSteamAchievements([game.id], { showToast: true })}
+              isSteamAchievementSyncing={steamAchievementSyncState.status === 'loading'}
               onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
               platformQueueState={platformQueueState}
@@ -1943,7 +1951,7 @@ function App() {
               onBulkRemove={removeManyGames}
               onBulkSyncSteamAchievements={(gameIds, options) =>
                 syncSteamAchievements(gameIds, {
-                  completionToastMessage: (summary) => `Updated achievements for ${summary.updatedCount} games. ${summary.skippedNonSteamCount} skipped, ${summary.failedCount} failed.`,
+                  completionToastMessage: formatSteamAchievementSyncSummary,
                   emptyToastMessage: options?.emptyToastMessage,
                   showToast: true,
                 })
@@ -2827,6 +2835,13 @@ function CollectionPanel({
                   value={filters.enrichment}
                   options={[...enrichmentFilterOptions]}
                   onChange={(value) => onFiltersChange({ enrichment: value as EnrichmentFilter })}
+                />
+
+                <FilterSelect
+                  label={t('collection.achievements')}
+                  value={filters.achievement}
+                  options={[...achievementFilterOptions]}
+                  onChange={(value) => onFiltersChange({ achievement: value as AchievementFilter })}
                 />
 
                 <FilterSelect
@@ -4718,6 +4733,8 @@ type FilterSelectProps = {
 };
 
 function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
+  const { t } = useI18n();
+
   return (
     <label className="block">
       <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
@@ -4728,7 +4745,7 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {translateOption(option, t)}
           </option>
         ))}
       </select>
@@ -4758,6 +4775,7 @@ function filterGames(games: Game[], filters: CollectionFilters) {
       const matchesTag = filters.tag === allOption || game.tags.includes(filters.tag);
       const matchesSource = matchesSourceFilter(game, filters.source);
       const matchesEnrichment = matchesEnrichmentFilter(game, filters.enrichment);
+      const matchesAchievement = matchesAchievementFilter(game, filters.achievement);
       const matchesQuickFilters = filters.quickFilters.every((quickFilter) => matchesQuickFilter(game, quickFilter));
 
       return (
@@ -4767,10 +4785,15 @@ function filterGames(games: Game[], filters: CollectionFilters) {
         matchesTag &&
         matchesSource &&
         matchesEnrichment &&
+        matchesAchievement &&
         matchesQuickFilters
       );
     })
     .sort((firstGame, secondGame) => compareGames(firstGame, secondGame, filters.sortBy));
+}
+
+function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary) {
+  return `Updated achievements for ${summary.updatedCount} games. ${summary.noAchievementDataCount} had no achievements. ${summary.failedCount} failed.`;
 }
 
 function formatBulkSummary(summary: BulkActionSummary) {
@@ -4847,6 +4870,34 @@ function matchesEnrichmentFilter(game: Game, enrichment: EnrichmentFilter) {
   return isMissingRawgMetadata(game);
 }
 
+
+function matchesAchievementFilter(game: Game, achievement: AchievementFilter) {
+  if (achievement === 'All') {
+    return true;
+  }
+
+  const hasSummary = hasSteamAchievementSummary(game);
+  const percent = hasSummary ? game.steamAchievementsPercent ?? 0 : 0;
+
+  if (achievement === 'Has achievements') {
+    return hasSummary;
+  }
+
+  if (achievement === 'No achievements synced') {
+    return !hasSummary;
+  }
+
+  if (achievement === 'Nearly completed') {
+    return hasSummary && percent >= 80 && percent < 100;
+  }
+
+  if (achievement === 'Completed') {
+    return hasSummary && percent >= 100;
+  }
+
+  return hasSummary && percent > 0 && percent < 100;
+}
+
 function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
   if (quickFilter === 'Playing Now') {
     return game.status === 'Playing';
@@ -4895,7 +4946,15 @@ function compareGames(firstGame: Game, secondGame: Game, sortBy: LibrarySortOpti
     );
   }
 
+  if (sortBy === 'Achievement completion %') {
+    return getAchievementSortValue(secondGame) - getAchievementSortValue(firstGame) || compareTitle(firstGame, secondGame);
+  }
+
   return compareTitle(firstGame, secondGame);
+}
+
+function getAchievementSortValue(game: Game) {
+  return hasSteamAchievementSummary(game) ? game.steamAchievementsPercent ?? 0 : -1;
 }
 
 function compareTitle(firstGame: Game, secondGame: Game) {
@@ -4932,6 +4991,7 @@ function isCollectionFiltered(filters: CollectionFilters) {
 
 function getActiveFilterCount(filters: CollectionFilters) {
   return [
+    filters.achievement !== allOption,
     filters.enrichment !== allOption,
     filters.platform !== allOption,
     filters.quickFilters.length > 0,
@@ -4945,6 +5005,7 @@ function getActiveFilterCount(filters: CollectionFilters) {
 
 function getActiveAdvancedFilterCount(filters: CollectionFilters) {
   return [
+    filters.achievement !== allOption,
     filters.enrichment !== allOption,
     filters.quickFilters.length > 0,
     filters.source !== allOption,
@@ -5047,6 +5108,7 @@ function normalizeCollectionFilters(value: unknown): CollectionFilters {
   const filters = value as Partial<CollectionFilters>;
 
   return {
+    achievement: isOption(filters.achievement, achievementFilterOptions) ? filters.achievement : allOption,
     enrichment: isOption(filters.enrichment, enrichmentFilterOptions) ? filters.enrichment : allOption,
     platform: typeof filters.platform === 'string' ? filters.platform : allOption,
     quickFilters: Array.isArray(filters.quickFilters)

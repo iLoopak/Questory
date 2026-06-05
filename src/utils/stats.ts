@@ -1,5 +1,6 @@
 import type { Game, GameCollectionType, GameStatus } from '../types/game';
 import { gameStatuses } from '../types/game';
+import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
 
 export const statsScopeOptions = ['library', 'wishlist', 'all'] as const;
 
@@ -12,6 +13,11 @@ export type StatsBarItem = {
 };
 
 export type QuestShelfStats = {
+  achievementAverageCompletionPercent: number;
+  achievementCompleteCount: number;
+  achievementNearlyCompleteCount: number;
+  achievementSyncedSteamGameCount: number;
+  achievementTotalUnlocked: number;
   activeBacklogCount: number;
   collectionCounts: Record<GameCollectionType, number>;
   enrichmentCompletionPercent: number;
@@ -46,9 +52,21 @@ export function getQuestShelfStats(games: Game[], scope: StatsScope): QuestShelf
     (game) => game.status === 'Want to play' || game.status === 'Playing' || game.status === 'Paused',
   ).length;
   const rawgEnrichedGames = scopedGames.filter((game) => game.metadataSource === 'rawg');
+  const achievementGames = scopedGames.filter(hasSteamAchievementSummary);
   const missingMetadataGames = scopedGames.filter((game) => game.metadataSource !== 'rawg' && !game.metadataManualManagedAt);
 
   return {
+    achievementAverageCompletionPercent: getPercent(
+      achievementGames.reduce((sum, game) => sum + (game.steamAchievementsPercent ?? 0), 0),
+      achievementGames.length * 100,
+    ),
+    achievementCompleteCount: achievementGames.filter((game) => (game.steamAchievementsPercent ?? 0) >= 100).length,
+    achievementNearlyCompleteCount: achievementGames.filter((game) => {
+      const percent = game.steamAchievementsPercent ?? 0;
+      return percent >= 80 && percent < 100;
+    }).length,
+    achievementSyncedSteamGameCount: achievementGames.length,
+    achievementTotalUnlocked: achievementGames.reduce((sum, game) => sum + (game.steamAchievementsUnlocked ?? 0), 0),
     activeBacklogCount,
     collectionCounts: {
       library: libraryGames.length,
