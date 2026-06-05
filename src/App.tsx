@@ -1705,6 +1705,10 @@ function App() {
   }
 
   function moveQueueGameToPlatform(gameId: string, platform: GamePlatform) {
+    if (!activeQueuePlatforms.includes(platform)) {
+      return;
+    }
+
     const game = games.find((currentGame) => currentGame.id === gameId);
     const currentEntry = platformQueueState.entries.find((entry) => entry.gameId === gameId);
     if (game && currentEntry && currentEntry.targetPlatform !== platform) {

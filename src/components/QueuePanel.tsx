@@ -66,6 +66,7 @@ export function QueuePanel({
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
+  const movePlatformOptions = activeQueuePlatforms;
   const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
   const displayedQueuePlatforms = useMemo(() => {
     const visiblePlatforms = platformFilter === 'All' ? activeQueuePlatforms : activeQueuePlatforms.filter((platform) => platform === platformFilter);
@@ -261,7 +262,7 @@ export function QueuePanel({
             isHighlighted={platform === initialPlatform}
             platform={platform}
             platformTag={getPlatformTag(queueState, platform)}
-            platformOptions={queuePlatforms}
+            platformOptions={movePlatformOptions}
             setPlatformRef={(element) => {
               if (element) {
                 platformRefs.current.set(platform, element);
@@ -535,17 +536,29 @@ function QueueEntryRow({
       </div>
       <details className="mt-2">
         <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.movePlatform')}</summary>
-        <select
-          className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-          value={entry.targetPlatform}
-          onChange={(event) => onMoveEntryToPlatform(game.id, event.target.value as GamePlatform)}
-        >
-          {platformOptions.map((platform) => (
-            <option key={platform} value={platform}>
-              {platform}
-            </option>
-          ))}
-        </select>
+        {platformOptions.length > 0 ? (
+          <select
+            className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+            value={platformOptions.includes(entry.targetPlatform) ? entry.targetPlatform : ''}
+            onChange={(event) => onMoveEntryToPlatform(game.id, event.target.value as GamePlatform)}
+          >
+            {!platformOptions.includes(entry.targetPlatform) ? (
+              <option disabled value="">
+                {entry.targetPlatform}
+              </option>
+            ) : null}
+            {platformOptions.map((platform) => (
+              <option key={platform} value={platform}>
+                {platform}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="mt-2 rounded-md border border-dashed border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300">
+            <div className="font-semibold text-white">{t('queue.noActivePlatformsConfigured')}</div>
+            <p className="mt-1 text-xs text-slate-400">{t('queue.managePlatformsHint')}</p>
+          </div>
+        )}
       </details>
     </article>
   );
