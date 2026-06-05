@@ -69,6 +69,9 @@ type PlayerSummaryResponse = {
 const steamApiDebugEntries: SteamApiDebugEntry[] = [];
 
 export class SteamApiError extends Error {
+  public httpStatus?: number;
+  public isTransient?: boolean;
+
   constructor(
     message: string,
     public code:
@@ -81,9 +84,12 @@ export class SteamApiError extends Error {
       | 'malformed-response'
       | 'cors-proxy'
       | 'api-failure',
+    options: { httpStatus?: number; isTransient?: boolean } = {},
   ) {
     super(message);
     this.name = 'SteamApiError';
+    this.httpStatus = options.httpStatus;
+    this.isTransient = options.isTransient;
   }
 }
 
@@ -237,7 +243,7 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
       responseSummary: `Steam achievement request for app ${appId} failed before an HTTP response was received.`,
       steamId64: settings.steamId64,
     });
-    throw new SteamApiError('Steam achievement data is unavailable right now. Try again later.', import.meta.env.DEV ? 'cors-proxy' : 'api-failure');
+    throw new SteamApiError('Steam achievement data is unavailable right now. Try again later.', import.meta.env.DEV ? 'cors-proxy' : 'api-failure', { isTransient: true });
   }
 
   let payload: T;
@@ -257,7 +263,10 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
     });
 
     if (!response.ok) {
-      throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure');
+      throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure', {
+        httpStatus: response.status,
+        isTransient: isTransientSteamStatsHttpStatus(response.status),
+      });
     }
 
     throw new SteamApiError('Steam returned malformed achievement data. Try the request again.', 'malformed-response');
@@ -279,8 +288,12 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
       throw new SteamApiError('Steam reports this app has no achievement stats.', 'no-achievements');
     }
 
+    if (response.status === 400 && isSteamUnavailableStatsError(steamError)) {
+      throw new SteamApiError('Steam achievements are private or unavailable for this SteamID64.', 'private-profile');
+    }
+
     if (response.status === 400 && steamError) {
-      throw new SteamApiError(`Steam rejected the achievement request: ${steamError}`, 'api-failure');
+      throw new SteamApiError(`Steam rejected the achievement request: ${steamError}`, 'api-failure', { httpStatus: response.status });
     }
 
     if (response.status === 400) {
@@ -291,7 +304,10 @@ async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 
       throw new SteamApiError('Steam achievements are private or unavailable for this SteamID64.', 'private-profile');
     }
 
-    throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure');
+    throw new SteamApiError(`Steam achievement request failed with status ${response.status}.`, 'api-failure', {
+      httpStatus: response.status,
+      isTransient: isTransientSteamStatsHttpStatus(response.status),
+    });
   }
 
   return payload;
@@ -308,6 +324,21 @@ function getSteamStatsResponseError(payload: unknown) {
 
 function isSteamNoStatsError(error: string | null) {
   return error?.trim().toLowerCase() === 'requested app has no stats';
+}
+
+function isSteamUnavailableStatsError(error: string | null) {
+  const normalizedError = error?.trim().toLowerCase() ?? '';
+
+  return (
+    normalizedError.includes('private') ||
+    normalizedError.includes('unavailable') ||
+    normalizedError.includes('not available') ||
+    normalizedError.includes('profile')
+  );
+}
+
+function isTransientSteamStatsHttpStatus(status: number) {
+  return status === 429 || [500, 502, 503, 504].includes(status);
 }
 
 export async function getOwnedGames(settings: SteamSettings): Promise<SteamOwnedGame[]> {
