@@ -1272,7 +1272,7 @@ function App() {
     const targetGames = games.filter((game) => game.collectionType === 'wishlist' && gameIds.includes(game.id));
 
     if (targetGames.length === 0) {
-      const message = 'No wishlist games are visible for deal sync.';
+      const message = t('itad.noWishlistGamesForSync');
       setItadDealSyncState({ status: 'error', message, summary: null });
       addToastNotification({ category: 'info', dedupeKey: 'itad-deal-sync-empty', message });
       return null;
@@ -1344,7 +1344,7 @@ function App() {
       return summary;
     } catch (error) {
       const message = error instanceof IsThereAnyDealError && error.code === 'missing-api-key'
-        ? 'Add an IsThereAnyDeal API key in Settings before syncing deals.'
+        ? t('itad.missingApiKey')
         : error instanceof Error
           ? error.message
           : 'Deal sync failed.';
@@ -2780,6 +2780,9 @@ function CollectionPanel({
   const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
   const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
   const isItadDealSyncing = itadDealSyncState?.status === 'loading';
+  const hasWishlistDealSyncAction = collectionType === 'wishlist' && Boolean(onSyncItadDeals);
+  const isWishlistDealSyncDisabled = isItadDealSyncing || games.length === 0;
+  const wishlistDealSyncTitle = games.length === 0 ? t('itad.noWishlistGamesForSync') : undefined;
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
@@ -3086,11 +3089,12 @@ function CollectionPanel({
                 {steamWishlistSyncState?.status === 'loading' ? t('collection.syncingSteamWishlist') : t('collection.syncSteamWishlist')}
               </button>
             ) : null}
-            {collectionType === 'wishlist' && onSyncItadDeals ? (
+            {hasWishlistDealSyncAction ? (
               <button
                 className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
-                disabled={isItadDealSyncing}
+                disabled={isWishlistDealSyncDisabled}
                 onClick={syncVisibleOrSelectedWishlistDeals}
+                title={wishlistDealSyncTitle}
                 type="button"
               >
                 {isItadDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
@@ -3303,8 +3307,8 @@ function CollectionPanel({
                   Add to Wishlist
                 </button>
               ) : null}
-              {collectionType === 'wishlist' && onSyncItadDeals ? (
-                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedCount === 0 || isItadDealSyncing} onClick={syncVisibleOrSelectedWishlistDeals} type="button">
+              {hasWishlistDealSyncAction ? (
+                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={isWishlistDealSyncDisabled} onClick={syncVisibleOrSelectedWishlistDeals} title={wishlistDealSyncTitle} type="button">
                   {isItadDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
                 </button>
               ) : null}
