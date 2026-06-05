@@ -331,13 +331,24 @@ function App() {
   const t = useMemo(() => createTranslator(language), [language]);
   const visibleNavItems = useMemo(() => getVisibleNavItems(navigationVisibility), [navigationVisibility]);
 
-  useEffect(() => () => {
-    isAppMountedRef.current = false;
+  useEffect(() => {
+    isAppMountedRef.current = true;
+
+    return () => {
+      isAppMountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
     saveGames(games);
   }, [games]);
+
+  useEffect(() => {
+    debugAchievementSyncDiagnostic('render updated', {
+      status: steamAchievementSyncState.status,
+      syncedAchievementGameCount: games.filter(hasSteamAchievementSummary).length,
+    });
+  }, [games, steamAchievementSyncState]);
 
   useEffect(() => {
     saveIgnoredSteamGames(ignoredSteamGames);
@@ -1013,11 +1024,22 @@ function App() {
 
       summaryToReturn = result.summary;
 
+      debugAchievementSyncDiagnostic('helper resolved', { summary: result.summary });
+      debugAchievementSyncDiagnostic('updated games count', {
+        updatedGamesCount: result.games.filter((game) => targetGameIds.has(game.id) && hasSteamAchievementSummary(game)).length,
+      });
+
       if (!isAppMountedRef.current) {
         return summaryToReturn;
       }
 
-      setGames((currentGames) => mergeSteamAchievementUpdates(currentGames, result.games, targetGameIds));
+      setGames((currentGames) => {
+        const mergedGames = mergeSteamAchievementUpdates(currentGames, result.games, targetGameIds);
+        debugAchievementSyncDiagnostic('state update dispatched', {
+          updatedGamesCount: mergedGames.filter((game) => targetGameIds.has(game.id) && hasSteamAchievementSummary(game)).length,
+        });
+        return mergedGames;
+      });
       terminalState = {
         status: 'success',
         message: formatSteamAchievementSyncSummary(result.summary),
@@ -1080,6 +1102,10 @@ function App() {
       });
 
       if (isAppMountedRef.current) {
+        debugAchievementSyncDiagnostic('sync state success', {
+          status: terminalState?.status ?? 'error',
+          hasSummary: summaryToReturn !== null,
+        });
         setSteamAchievementSyncState(
           terminalState ?? {
             status: 'error',
@@ -4898,6 +4924,14 @@ function debugSteamAchievementSyncFinalization(message: string, data?: Record<st
   }
 
   console.debug(`[SteamAchievementSync] ${message}`, data ?? {});
+}
+
+function debugAchievementSyncDiagnostic(message: string, data?: Record<string, unknown>) {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  console.debug(`[ach-sync] ${message}`, data ?? {});
 }
 
 function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[], targetGameIds: Set<string>) {
