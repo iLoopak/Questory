@@ -433,6 +433,7 @@ function ShelfGameCard({
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
         <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
         <AchievementProgressBadge className="mt-2 text-[0.65rem]" game={game} showLabel />
+        <WishlistDealSummary game={game} compact />
       </span>
 
       {!isMultiSelectMode ? (
@@ -564,6 +565,7 @@ function CompactGameRow({
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
             <AchievementProgressBadge game={game} showLabel />
           </span>
+          <WishlistDealSummary game={game} />
         </span>
       </button>
 
@@ -590,6 +592,42 @@ function CompactGameRow({
   );
 }
 
+
+
+function WishlistDealSummary({ game, compact = false }: { game: Game; compact?: boolean }) {
+  const { t } = useI18n();
+
+  if (game.collectionType !== 'wishlist' || typeof game.itadCurrentBestPrice !== 'number' || !game.itadCurrentBestCurrency) {
+    return null;
+  }
+
+  const price = formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency);
+  const discount = typeof game.itadDiscountPercent === 'number' && game.itadDiscountPercent > 0 ? `-${game.itadDiscountPercent}%` : null;
+
+  return (
+    <span className={`mt-2 flex flex-wrap items-center gap-1.5 ${compact ? 'text-[0.65rem]' : 'text-xs'}`} onClick={(event) => event.stopPropagation()}>
+      <span className="rounded-full border border-mint/30 bg-mint/10 px-2 py-0.5 font-semibold text-mint">
+        {t('itad.bestPrice')}: {price}
+      </span>
+      {discount ? <span className="rounded-full border border-amber-300/35 bg-amber-300/10 px-2 py-0.5 font-semibold text-amber-200">{discount}</span> : null}
+      {game.itadIsHistoricalLow ? <span className="rounded-full border border-fuchsia-300/35 bg-fuchsia-300/10 px-2 py-0.5 font-semibold text-fuchsia-200">{t('itad.historicalLow')}</span> : null}
+      {game.itadCurrentBestShop ? <span className="text-slate-400">{game.itadCurrentBestShop}</span> : null}
+      {game.itadCurrentBestUrl ? (
+        <a className="font-semibold text-skyglass hover:text-white" href={game.itadCurrentBestUrl} target="_blank" rel="noreferrer">
+          {t('itad.openDeal')}
+        </a>
+      ) : null}
+    </span>
+  );
+}
+
+function formatDealPrice(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, { currency, style: 'currency' }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}
 
 function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
   return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;

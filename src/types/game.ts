@@ -35,6 +35,7 @@ export type GamePlatform = (typeof gamePlatforms)[number] | (string & {});
 export type GameStatus = (typeof gameStatuses)[number];
 export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
+export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
 export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
 
@@ -83,6 +84,19 @@ export type Game = {
   steamReviewInfo?: string;
   wishlistImportedAt?: string;
   wishlistSyncedAt?: string;
+  itadId?: string;
+  itadPlain?: string;
+  itadSlug?: string;
+  itadMatchConfidence?: ItadMatchConfidence;
+  itadCurrentBestPrice?: number;
+  itadCurrentBestCurrency?: string;
+  itadCurrentBestShop?: string;
+  itadCurrentBestUrl?: string;
+  itadDiscountPercent?: number;
+  itadHistoricalLowPrice?: number;
+  itadHistoricalLowCurrency?: string;
+  itadIsHistoricalLow?: boolean;
+  itadLastSyncedAt?: string;
   rawgId?: number;
   genres?: string[];
   rawgTags?: string[];
