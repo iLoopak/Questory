@@ -24,7 +24,8 @@ export function PlatformBadge({ accentColor: accentColorOverride, className = ''
       style={style}
       title={title ?? platform}
     >
-      {platform}
+      {accentColor ? <span aria-hidden="true" className="platform-badge__dot" /> : null}
+      <span className="platform-badge__label">{platform}</span>
     </span>
   );
 }

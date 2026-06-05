@@ -106,10 +106,10 @@
   --focus-ring-outer: rgb(var(--accent-rgb) / 0.54);
   --shadow-panel: 0 18px 52px rgb(var(--overlay-rgb) / 0.12), 0 0 0 1px rgb(var(--overlay-rgb) / 0.03);
   --shadow-glow: 0 0 0 3px rgb(var(--accent-rgb) / 0.16), 0 14px 32px rgb(var(--accent-rgb) / 0.13);
-  --badge-bg: rgb(37 31 27 / 0.88);
-  --badge-text: rgb(255 255 255);
-  --badge-border: rgb(37 31 27 / 0.42);
-  --badge-shadow: 0 8px 18px rgb(var(--overlay-rgb) / 0.18);
+  --badge-bg: rgb(var(--ink-950-rgb) / 0.86);
+  --badge-text: rgb(var(--text-primary-rgb));
+  --badge-border: rgb(var(--skyglass-rgb) / 0.16);
+  --badge-shadow: 0 8px 18px rgb(var(--overlay-rgb) / 0.08);
   --body-background:
     radial-gradient(circle at 14% 0%, rgb(var(--accent-rgb) / 0.13), transparent 30%),
     linear-gradient(135deg, rgb(var(--ink-950-rgb) / 0.92), rgb(var(--ink-800-rgb) / 0.9)),
@@ -632,10 +632,14 @@ img {
 }
 
 .platform-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
   border: 1px solid var(--badge-border);
   background: var(--badge-bg);
   color: var(--badge-text);
   box-shadow: var(--badge-shadow);
+  vertical-align: middle;
 }
 
 .platform-badge--identity {
@@ -645,16 +649,32 @@ img {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--platform-badge-accent) 18%, transparent), 0 8px 18px rgb(var(--overlay-rgb) / 0.22);
 }
 
-.platform-badge--identity::before {
-  content: '';
-  display: inline-block;
+.platform-badge__dot {
   width: 0.45rem;
   height: 0.45rem;
+  flex: 0 0 0.45rem;
   margin-right: 0.4rem;
   border-radius: 999px;
   background: var(--platform-badge-accent);
   box-shadow: 0 0 10px color-mix(in srgb, var(--platform-badge-accent) 70%, transparent);
-  vertical-align: 0.03em;
+}
+
+.platform-badge__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-theme='light'] .platform-badge--identity {
+  border-color: color-mix(in srgb, var(--platform-badge-accent) 34%, var(--badge-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--platform-badge-accent) 14%, var(--badge-bg)), color-mix(in srgb, var(--platform-badge-accent) 6%, var(--badge-bg)));
+  color: color-mix(in srgb, var(--platform-badge-accent) 38%, var(--text-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--platform-badge-accent) 10%, transparent), 0 6px 14px rgb(var(--overlay-rgb) / 0.08);
+}
+
+:root[data-theme='light'] .platform-badge__dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--platform-badge-accent) 16%, transparent);
 }
 
 @media (max-width: 760px) {
