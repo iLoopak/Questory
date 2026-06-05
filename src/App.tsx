@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import type { CSSProperties, FormEvent, RefObject } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { BackToTopButton } from './components/BackToTopButton';
 import { BacklogPlatformPicker } from './components/BacklogPlatformPicker';
@@ -75,6 +75,7 @@ import { loadRawgSettings } from './lib/rawgSettingsStorage';
 import { IsThereAnyDealError, syncItadDealsForWishlistGames } from './lib/isThereAnyDeal';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from './lib/steamAchievementsSync';
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
+import { parseSteamWishlistHtmlTextWithSummary, type ParsedSteamWishlistImportItem } from './lib/steamWishlistHtmlImport';
 import {
   getBulkWishlistToastMessage,
   getDismissAction,
@@ -251,6 +252,12 @@ const initialCollectionFilters: CollectionFilters = {
 type MetadataSelectionRequest = {
   ids: string[];
   requestId: number;
+};
+
+type SteamWishlistHtmlImportSummary = {
+  addedCount: number;
+  existingCount: number;
+  skippedCount: number;
 };
 
 type BulkActionSummary = {
@@ -1446,6 +1453,60 @@ function App() {
     return summary;
   }
 
+  function importSteamWishlistHtmlItems(items: ParsedSteamWishlistImportItem[], inputSkippedCount = 0): SteamWishlistHtmlImportSummary {
+    const importedAt = new Date().toISOString();
+    const existingWishlistSteamAppIds = new Set(
+      games
+        .filter((game) => game.collectionType === 'wishlist')
+        .map((game) => game.steamAppId)
+        .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+    );
+    const existingGameIds = new Set(games.map((game) => game.id));
+    const nextGames = [...games];
+    const summary: SteamWishlistHtmlImportSummary = {
+      addedCount: 0,
+      existingCount: 0,
+      skippedCount: inputSkippedCount,
+    };
+
+    items.forEach((item) => {
+      if (!item.appid || existingWishlistSteamAppIds.has(item.appid)) {
+        summary.existingCount += 1;
+        return;
+      }
+
+      const mappedGame = mapSteamWishlistItemToLocalGame(item, importedAt);
+      let wishlistId = mappedGame.id;
+      let suffix = 2;
+
+      while (existingGameIds.has(wishlistId)) {
+        wishlistId = `${mappedGame.id}-${suffix}`;
+        suffix += 1;
+      }
+
+      existingGameIds.add(wishlistId);
+      existingWishlistSteamAppIds.add(item.appid);
+      nextGames.push(touchGameRecord({
+        ...mappedGame,
+        id: wishlistId,
+        wishlistSyncedAt: undefined,
+      }));
+      summary.addedCount += 1;
+    });
+
+    setGames(nextGames);
+    saveGames(nextGames);
+
+    const message = formatSteamWishlistHtmlImportSummary(summary, t);
+    addToastNotification({
+      category: summary.addedCount > 0 ? 'success' : 'info',
+      dedupeKey: 'steam-wishlist-html-import',
+      message,
+    });
+
+    return summary;
+  }
+
   function addManualGame(game: Game) {
     const collectionName = game.collectionType === 'wishlist' ? 'Wishlist' : 'Library';
     addUndoAction(`${game.title} added to ${collectionName}`, {
@@ -2333,6 +2394,7 @@ function App() {
               onStartReview={startReviewMode}
               onStatusChange={updateGameStatus}
               onSyncSteamWishlist={syncSteamWishlist}
+              onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
               onSyncItadDeals={syncWishlistDeals}
             />
           ) : activeNavItem === 'Queue' ? (
@@ -2699,6 +2761,7 @@ type CollectionPanelProps = {
   onStartReview: (source: ReviewSource) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncSteamWishlist?: () => void;
+  onImportSteamWishlistHtml?: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
   itadDealSyncState?: ItadDealSyncState;
   onSyncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
 };
@@ -2736,6 +2799,7 @@ function CollectionPanel({
   onStartReview,
   onStatusChange,
   onSyncSteamWishlist,
+  onImportSteamWishlistHtml,
   itadDealSyncState,
   onSyncItadDeals,
 }: CollectionPanelProps) {
@@ -2744,10 +2808,12 @@ function CollectionPanel({
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
   const [renderedGameCount, setRenderedGameCount] = useState(collectionInitialRenderCount);
   const activeViewModeCollectionRef = useRef(collectionType);
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
+  const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const { t } = useI18n();
   const title = collectionType === 'wishlist' ? t('collection.wishlist') : t('collection.library');
@@ -3089,6 +3155,16 @@ function CollectionPanel({
                 {steamWishlistSyncState?.status === 'loading' ? t('collection.syncingSteamWishlist') : t('collection.syncSteamWishlist')}
               </button>
             ) : null}
+            {collectionType === 'wishlist' && onImportSteamWishlistHtml ? (
+              <button
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+                onClick={() => setIsSteamWishlistHtmlImportOpen(true)}
+                ref={steamWishlistHtmlImportButtonRef}
+                type="button"
+              >
+                {t('wishlist.importSteamHtml')}
+              </button>
+            ) : null}
             {hasWishlistDealSyncAction ? (
               <button
                 className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
@@ -3155,6 +3231,14 @@ function CollectionPanel({
 
       {collectionType === 'wishlist' && steamWishlistSyncState && steamWishlistSyncState.status !== 'idle' ? (
         <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
+      ) : null}
+
+      {isSteamWishlistHtmlImportOpen && onImportSteamWishlistHtml ? (
+        <SteamWishlistHtmlImportModal
+          onClose={() => setIsSteamWishlistHtmlImportOpen(false)}
+          onImport={onImportSteamWishlistHtml}
+          restoreFocusRef={steamWishlistHtmlImportButtonRef}
+        />
       ) : null}
 
       {collectionType === 'wishlist' && itadDealSyncState && itadDealSyncState.status !== 'idle' ? (
@@ -3543,6 +3627,91 @@ function SteamWishlistSyncNotice({ syncState }: { syncState: SteamWishlistSyncSt
         </div>
       ) : null}
     </div>
+  );
+}
+
+
+type SteamWishlistHtmlImportModalProps = {
+  restoreFocusRef: RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+  onImport: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
+};
+
+function SteamWishlistHtmlImportModal({ onClose, onImport, restoreFocusRef }: SteamWishlistHtmlImportModalProps) {
+  const { t } = useI18n();
+  const [pastedText, setPastedText] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [summaryMessage, setSummaryMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const parseResult = useMemo(() => parseSteamWishlistHtmlTextWithSummary(pastedText), [pastedText]);
+  const foundCount = parseResult.items.length;
+
+  function handleImport() {
+    if (foundCount === 0) {
+      setSummaryMessage('');
+      setErrorMessage(t('wishlist.noSteamAppLinksFound'));
+      return;
+    }
+
+    const summary = onImport(parseResult.items, parseResult.skippedCount);
+    setErrorMessage('');
+    setSummaryMessage(formatSteamWishlistHtmlImportSummary(summary, t));
+  }
+
+  return (
+    <ViewportModal
+      ariaLabel={t('wishlist.importSteamHtml')}
+      initialFocusRef={textareaRef}
+      restoreFocusRef={restoreFocusRef}
+      onClose={onClose}
+      placement="center"
+    >
+      <div className="border-b border-skyglass/15 bg-ink-950/90 p-4">
+        <h3 className="text-lg font-semibold text-white">{t('wishlist.importSteamHtml')}</h3>
+        <p className="mt-1 text-sm text-slate-400">{t('wishlist.importSteamHtmlHelp')}</p>
+      </div>
+      <div className="space-y-4 p-4">
+        <label className="block text-sm font-semibold text-slate-200" htmlFor="steam-wishlist-html-import">
+          {t('wishlist.pasteSteamHtmlOrLinks')}
+        </label>
+        <textarea
+          className="min-h-48 w-full resize-y rounded-lg border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-mint/50 focus:ring-2 focus:ring-mint/20"
+          id="steam-wishlist-html-import"
+          onChange={(event) => {
+            setPastedText(event.target.value);
+            setErrorMessage('');
+            setSummaryMessage('');
+          }}
+          placeholder="https://store.steampowered.com/app/488790/South_Park_The_Fractured_But_Whole?snr=..."
+          ref={textareaRef}
+          value={pastedText}
+        />
+        {foundCount > 0 ? (
+          <p className="text-sm font-semibold text-mint">{formatCountMessage(t('wishlist.foundSteamGames'), foundCount)}</p>
+        ) : pastedText.trim() ? (
+          <p className="text-sm font-semibold text-amber-300">{t('wishlist.noSteamAppLinksFound')}</p>
+        ) : null}
+        {errorMessage ? <p className="text-sm font-semibold text-rose-300">{errorMessage}</p> : null}
+        {summaryMessage ? <p className="text-sm font-semibold text-mint">{summaryMessage}</p> : null}
+      </div>
+      <div className="flex flex-col-reverse gap-2 border-t border-skyglass/15 bg-ink-950/80 p-4 sm:flex-row sm:justify-end">
+        <button
+          className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+          onClick={onClose}
+          type="button"
+        >
+          {t('action.cancel')}
+        </button>
+        <button
+          className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none"
+          disabled={foundCount === 0}
+          onClick={handleImport}
+          type="button"
+        >
+          {t('wishlist.import')}
+        </button>
+      </div>
+    </ViewportModal>
   );
 }
 
@@ -5326,6 +5495,17 @@ function formatSteamWishlistSyncSummary(summary: SteamWishlistSyncSummary, t: TF
   }
 
   return `${t('collection.steamWishlistSyncComplete')}. ${summary.addedCount} added · ${summary.updatedCount} updated · ${summary.unchangedCount} unchanged · ${summary.failedCount} failed.`;
+}
+
+function formatSteamWishlistHtmlImportSummary(summary: SteamWishlistHtmlImportSummary, t: TFunction) {
+  return t('wishlist.importSummary')
+    .replace('X', summary.addedCount.toString())
+    .replace('Y', summary.existingCount.toString())
+    .replace('Z', summary.skippedCount.toString());
+}
+
+function formatCountMessage(message: string, count: number) {
+  return message.replace('X', count.toString());
 }
 
 function normalizeGameTitleForWishlistMatch(title: string) {
