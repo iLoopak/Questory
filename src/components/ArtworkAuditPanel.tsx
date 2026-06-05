@@ -16,6 +16,7 @@ type ArtworkAuditPanelProps = {
   games: Game[];
   onApplyArtworkUpdate: (gameId: string, changes: Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
   onEnrichGames: (gameIds: string[]) => void;
+  onFindArtwork?: (game: Game) => Promise<'updated' | 'no-match' | 'error'>;
   onOpenDetails: (gameId: string) => void;
 };
 
@@ -42,11 +43,13 @@ const emptySummary: ArtworkBulkSummary = {
 
 const progressDelayMs = 120;
 
-export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, onOpenDetails }: ArtworkAuditPanelProps) {
+export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, onFindArtwork, onOpenDetails }: ArtworkAuditPanelProps) {
   const { t } = useI18n();
   const [summary, setSummary] = useState<ArtworkBulkSummary | null>(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [isFindingArtwork, setIsFindingArtwork] = useState(false);
+  const [findingArtworkGameIds, setFindingArtworkGameIds] = useState<Set<string>>(new Set());
+  const [artworkMessageByGameId, setArtworkMessageByGameId] = useState<Record<string, string>>({});
   const shouldCancel = useRef(false);
 
   const audit = useMemo(() => getArtworkAudit(games), [games]);
@@ -75,6 +78,56 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
 
     setSummary(nextSummary);
     setIsFindingArtwork(false);
+  }
+
+
+  async function findArtworkForGame(game: Game) {
+    if (findingArtworkGameIds.has(game.id)) {
+      return;
+    }
+
+    setFindingArtworkGameIds((currentIds) => new Set(currentIds).add(game.id));
+    setArtworkMessageByGameId((currentMessages) => ({
+      ...currentMessages,
+      [game.id]: t('artwork.searching'),
+    }));
+
+    try {
+      const candidate = getBestRealArtworkCandidate(game);
+
+      if (candidate && canApplyArtwork(game, candidate.source)) {
+        onApplyArtworkUpdate(game.id, {
+          artworkSource: candidate.source,
+          artworkUpdatedAt: new Date().toISOString(),
+          coverImage: candidate.url,
+        });
+        setArtworkMessageByGameId((currentMessages) => ({
+          ...currentMessages,
+          [game.id]: t('artwork.updated'),
+        }));
+        return;
+      }
+
+      if (!onFindArtwork) {
+        setArtworkMessageByGameId((currentMessages) => ({
+          ...currentMessages,
+          [game.id]: t('artwork.noArtworkFound'),
+        }));
+        return;
+      }
+
+      const result = await onFindArtwork(game);
+      setArtworkMessageByGameId((currentMessages) => ({
+        ...currentMessages,
+        [game.id]: result === 'updated' ? t('artwork.updated') : t('artwork.noArtworkFound'),
+      }));
+    } finally {
+      setFindingArtworkGameIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(game.id);
+        return nextIds;
+      });
+    }
   }
 
   function applyBestArtwork(game: Game): ArtworkBulkSummary {
@@ -164,13 +217,13 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
                 onClick={() => void findMissingArtwork()}
                 type="button"
               >
-                Find artwork
+                {isFindingArtwork ? t('artwork.searching') : t('artwork.findArtwork')}
               </button>
             }
             actionMenu={
               <>
                 <AuditActionButton disabled={isFindingArtwork || audit.needsRealArtwork.length === 0} onClick={() => void findMissingArtwork()}>
-                  Fix missing artwork
+                  {t('artwork.findArtwork')}
                 </AuditActionButton>
                 <AuditActionButton disabled={isFindingArtwork || audit.enrichedWithoutAppliedCover.length === 0} onClick={applyRawgImages}>
                   Apply RAWG image
@@ -185,7 +238,7 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
                   disabled={isFindingArtwork || audit.missingRawgMetadata.length === 0}
                   onClick={() => onEnrichGames(audit.missingRawgMetadata.map((game) => game.id))}
                 >
-                  Enrich metadata
+                  {t('artwork.enrichMetadata')}
                 </AuditActionButton>
                 <AuditActionButton
                   disabled={!isFindingArtwork}
@@ -223,8 +276,24 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
 
         <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           <div className="grid gap-4 xl:grid-cols-3">
-            <ArtworkBucket title={t('artwork.missing')} bucket="missing" games={audit.missingArtwork} onOpenDetails={onOpenDetails} />
-            <ArtworkBucket title={t('artwork.fallback')} bucket="fallback" games={audit.fallbackArtwork} onOpenDetails={onOpenDetails} />
+            <ArtworkBucket
+              title={t('artwork.missing')}
+              bucket="missing"
+              games={audit.missingArtwork}
+              findingArtworkGameIds={findingArtworkGameIds}
+              artworkMessageByGameId={artworkMessageByGameId}
+              onFindArtwork={findArtworkForGame}
+              onOpenDetails={onOpenDetails}
+            />
+            <ArtworkBucket
+              title={t('artwork.fallback')}
+              bucket="fallback"
+              games={audit.fallbackArtwork}
+              findingArtworkGameIds={findingArtworkGameIds}
+              artworkMessageByGameId={artworkMessageByGameId}
+              onFindArtwork={findArtworkForGame}
+              onOpenDetails={onOpenDetails}
+            />
             <ArtworkBucket title={t('artwork.enrichedNotApplied')} bucket="enriched" games={audit.enrichedWithoutAppliedCover} onOpenDetails={onOpenDetails} />
           </div>
         </div>
@@ -318,7 +387,23 @@ function AuditActionButton({ children, disabled, onClick }: { children: string; 
   );
 }
 
-function ArtworkBucket({ bucket, games, onOpenDetails, title }: { bucket: AuditBucket; games: Game[]; onOpenDetails: (gameId: string) => void; title: string }) {
+function ArtworkBucket({
+  artworkMessageByGameId,
+  bucket,
+  findingArtworkGameIds,
+  games,
+  onFindArtwork,
+  onOpenDetails,
+  title,
+}: {
+  artworkMessageByGameId?: Record<string, string>;
+  bucket: AuditBucket;
+  findingArtworkGameIds?: Set<string>;
+  games: Game[];
+  onFindArtwork?: (game: Game) => void;
+  onOpenDetails: (gameId: string) => void;
+  title: string;
+}) {
   const { t } = useI18n();
   return (
     <section className="rounded-xl border border-white/10 bg-ink-950/60 p-3">
@@ -327,23 +412,42 @@ function ArtworkBucket({ bucket, games, onOpenDetails, title }: { bucket: AuditB
       </div>
 
       <div className="mt-3 grid gap-2">
-        {games.length > 0 ? games.slice(0, 30).map((game) => (
-          <button
-            key={`${bucket}-${game.id}`}
-            className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-mint/30 hover:bg-mint/10"
-            onClick={() => onOpenDetails(game.id)}
-            type="button"
-          >
-            <div className="font-semibold text-white">{game.title}</div>
-            <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
-              <span>{game.platform}</span>
-              <span>•</span>
-              <span>{getArtworkLabel(game)}</span>
-              {game.rawgId ? <span>RAWG #{game.rawgId}</span> : null}
-              {typeof game.steamAppId === 'number' ? <span>Steam #{game.steamAppId}</span> : null}
+        {games.length > 0 ? games.slice(0, 30).map((game) => {
+          const isFindingArtworkForGame = findingArtworkGameIds?.has(game.id) ?? false;
+          const artworkMessage = artworkMessageByGameId?.[game.id];
+
+          return (
+            <div
+              key={`${bucket}-${game.id}`}
+              className="rounded-lg border border-white/10 bg-white/[0.03] p-3 transition hover:border-mint/30 hover:bg-mint/10"
+            >
+              <button className="block w-full text-left" onClick={() => onOpenDetails(game.id)} type="button">
+                <div className="font-semibold text-white">{game.title}</div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+                  <span>{game.platform}</span>
+                  <span>•</span>
+                  <span>{getArtworkLabel(game)}</span>
+                  {game.rawgId ? <span>RAWG #{game.rawgId}</span> : null}
+                  {typeof game.steamAppId === 'number' ? <span>Steam #{game.steamAppId}</span> : null}
+                </div>
+              </button>
+
+              {onFindArtwork ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    className="h-8 rounded-md border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isFindingArtworkForGame}
+                    onClick={() => onFindArtwork(game)}
+                    type="button"
+                  >
+                    {isFindingArtworkForGame ? t('artwork.searching') : t('artwork.findArtwork')}
+                  </button>
+                  {artworkMessage ? <span className="text-xs text-slate-400">{artworkMessage}</span> : null}
+                </div>
+              ) : null}
             </div>
-          </button>
-        )) : (
+          );
+        }) : (
           <div className="rounded-lg border border-dashed border-white/10 p-4 text-sm text-slate-500">{t('artwork.emptyBucket')}</div>
         )}
       </div>
