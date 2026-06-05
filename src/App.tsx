@@ -972,11 +972,15 @@ function App() {
             return;
           }
 
-          setSteamAchievementSyncState((currentState) => ({
-            ...currentState,
-            message: `Syncing Steam achievements ${progress.completed}/${progress.total}...`,
-            progress,
-          }));
+          setSteamAchievementSyncState((currentState) =>
+            currentState.status === 'loading'
+              ? {
+                  ...currentState,
+                  message: `Syncing Steam achievements ${progress.completed}/${progress.total}...`,
+                  progress,
+                }
+              : currentState,
+          );
         },
         (batchResult) => {
           if (!isAppMountedRef.current) {
@@ -989,12 +993,16 @@ function App() {
             saveGames(mergedGames);
             return mergedGames;
           });
-          setSteamAchievementSyncState((currentState) => ({
-            ...currentState,
-            message: `Syncing Steam achievements ${batchResult.progress.completed}/${batchResult.progress.total}...`,
-            progress: batchResult.progress,
-            summary: batchResult.summary,
-          }));
+          setSteamAchievementSyncState((currentState) =>
+            currentState.status === 'loading'
+              ? {
+                  ...currentState,
+                  message: `Syncing Steam achievements ${batchResult.progress.completed}/${batchResult.progress.total}...`,
+                  progress: batchResult.progress,
+                  summary: batchResult.summary,
+                }
+              : currentState,
+          );
         },
       );
       const completed = total;
@@ -1013,7 +1021,7 @@ function App() {
       });
 
       if (options.showToast) {
-        const hasPartialFailures = result.summary.failedCount > 0 || result.summary.noAchievementDataCount > 0;
+        const hasPartialFailures = result.summary.failedCount > 0;
         addToastNotification({
           actions: syncableGames[0] ? [getViewGameAction(syncableGames[0].id)] : [getDismissAction()],
           category: hasPartialFailures ? 'warning' : 'success',
@@ -3123,7 +3131,7 @@ function SteamAchievementSyncNotice({ syncState }: { syncState: SteamAchievement
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-5">
           <NoticeStat label="Updated" value={syncState.summary.updatedCount.toString()} />
           <NoticeStat label="Unchanged" value={syncState.summary.unchangedCount.toString()} />
-          <NoticeStat label="Unavailable" value={syncState.summary.noAchievementDataCount.toString()} />
+          <NoticeStat label="No achievements" value={syncState.summary.noAchievementDataCount.toString()} />
           <NoticeStat label="Failed" value={syncState.summary.failedCount.toString()} />
           <NoticeStat label="Non-Steam skipped" value={syncState.summary.skippedNonSteamCount.toString()} />
         </div>
