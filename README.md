@@ -14,7 +14,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
 - Separate local Wishlist collection for platform-agnostic future games.
 - Compact Library and Wishlist toolbar with search, source, enrichment, platform, status, tag, quick filters, and sorting.
-- Manual Steam wishlist sync into the general local Wishlist collection.
+- Recommended manual Steam Wishlist import assistant with bookmarklet-based appid/link collection.
 - Change game status directly from the library.
 - Steam connector foundation in Settings.
 - Local Steam Web API key and SteamID64 storage.
@@ -182,17 +182,19 @@ QuestShelf has a separate **Wishlist** tab for games that are not owned or activ
 - Library cards can be copied into Wishlist with **Add to Wishlist**.
 - Wishlist cards can be promoted with **Move to Library** or deleted with **Remove Wishlist**.
 - RAWG enrichment works on Wishlist entries because the metadata workflow reads both collections.
-- Steam wishlist sync is manual and feeds the general Wishlist collection without treating those items as owned games.
+- **Import Steam Wishlist** is the recommended manual Steam Wishlist flow. It does not call Steam wishlist endpoints or require a Steam API key.
 
-Steam wishlist sync is available from the Wishlist view with **Sync Steam Wishlist**. It uses the SteamID64 already saved in Steam Settings and imports public Steam wishlist entries into the general QuestShelf Wishlist collection, not the owned Library. If Steam redirects your SteamID64 wishlist to a custom profile URL, paste that public wishlist URL into **Steam wishlist URL** in Settings so QuestShelf can sync from the stable `id/...` wishlist path directly.
+The Wishlist view provides **Import Steam Wishlist** as a manual assistant:
 
-- Steam wishlist items are saved locally with Steam App ID, Steam store URL, cover art, release date, price, discount, review summary, and sync timestamps when Steam provides them.
-- Existing Wishlist items with the same Steam App ID are refreshed with sync metadata, but user-owned fields such as notes, tags, and priority are preserved.
-- Games already present in the Library are shown as skipped and are not duplicated into Wishlist.
-- Ignored Steam App IDs are skipped during wishlist sync.
-- Wishlist items can still be moved to Library, removed, opened on Steam, or enriched with RAWG metadata.
-- Steam wishlist sync requires a public Steam wishlist/profile. The Steam Store wishlist endpoint is less official and less stable than the Steam Web API owned-games endpoint.
-- Local development routes wishlist requests through the Vite `/api/steam-store` proxy when needed for browser/CORS behavior.
+1. Open Steam Wishlist in the browser.
+2. Copy QuestShelf's generated bookmarklet into a browser bookmark URL.
+3. Run the bookmarklet on the Steam Wishlist page. It scrolls gradually because Steam lazy-loads wishlist entries in batches.
+4. Paste the collected Steam store links/appids into QuestShelf.
+5. Import the parsed appids into the local Wishlist.
+
+Manual Steam Wishlist import accepts Steam store URLs, `/app/{appid}/` paths, raw numeric appids, copied page HTML/text, and bookmarklet output. The import creates local Wishlist items with Steam App ID as the stable source id, preserves existing Wishlist items, skips Wishlist duplicates by Steam App ID, and uses a URL slug title fallback when available (otherwise `Steam App {appid}`). The bookmarklet only reads store links from the current Steam page, does not send data to any server, and does not click buy/remove buttons or modify Steam account data.
+
+The older automatic **Sync Steam Wishlist** endpoint-based path is no longer a primary Wishlist action. It remains under **Advanced / Experimental** in the manual import assistant with a warning because Steam may rate-limit or reject automatic wishlist endpoint requests. Failed automatic sync must not clear existing Wishlist data.
 
 ## Library Filtering and Sorting
 
