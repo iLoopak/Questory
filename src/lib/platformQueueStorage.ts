@@ -384,7 +384,6 @@ export function moveQueueEntryToPlatform(
 
   return normalizeQueuePositions({
     ...state,
-    activePlatforms: state.activePlatforms.includes(targetPlatform) ? state.activePlatforms : [...state.activePlatforms, targetPlatform],
     entries: nextEntries,
   });
 }
