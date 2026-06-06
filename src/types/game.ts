@@ -36,7 +36,6 @@ export type GameStatus = (typeof gameStatuses)[number];
 export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
 export type ItadMatchConfidence = 'exact' | 'title-normalized';
-export type HltbMatchConfidence = 'exact' | 'high' | 'medium';
 
 export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
 
@@ -98,11 +97,14 @@ export type Game = {
   itadHistoricalLowCurrency?: string;
   itadIsHistoricalLow?: boolean;
   itadLastSyncedAt?: string;
+  hltbId?: string;
+  hltbTitle?: string;
   hltbMainHours?: number;
   hltbMainExtraHours?: number;
   hltbCompletionistHours?: number;
+  hltbSourceUrl?: string;
+  hltbMatchConfidence?: number;
   hltbLastSyncedAt?: string;
-  hltbMatchConfidence?: HltbMatchConfidence;
   rawgId?: number;
   genres?: string[];
   rawgTags?: string[];

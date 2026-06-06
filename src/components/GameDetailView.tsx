@@ -380,8 +380,10 @@ export function GameDetailView({
                     <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours)} />
                     <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours)} />
                     <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours)} />
-                    <ReadOnlyField label="Match confidence" value={game.hltbMatchConfidence ?? 'n/a'} />
+                    <ReadOnlyField label="Matched title" value={game.hltbTitle ?? 'n/a'} />
+                    <ReadOnlyField label="Match confidence" value={formatConfidence(game.hltbMatchConfidence)} />
                     <ReadOnlyField label="Last synced" value={formatDateTime(game.hltbLastSyncedAt)} />
+                    {game.hltbSourceUrl ? <ReadOnlyLink label="Source" value={game.hltbSourceUrl} /> : null}
                   </div>
                 </MetadataAccordion>
               ) : null}
@@ -665,4 +667,9 @@ function formatHours(value?: number | null) {
 
 function formatList(value?: string[]) {
   return value && value.length > 0 ? value.join(', ') : 'n/a';
+}
+
+
+function formatConfidence(value?: number) {
+  return typeof value === 'number' ? `${Math.round(value * 100)}%` : 'n/a';
 }

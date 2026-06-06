@@ -1,11 +1,10 @@
 import type { Game } from '../types/game';
 
 const HLTB_CACHE_KEY = 'questshelf.hltbCache.v1';
-const HLTB_SEARCH_URL = 'https://howlongtobeat.com/api/search';
+const HLTB_SEARCH_URL = import.meta.env.DEV ? '/api/hltb/api/search' : '';
+const HLTB_SOURCE_BASE_URL = 'https://howlongtobeat.com/game';
 const MIN_SAFE_MATCH_CONFIDENCE = 0.82;
 const AMBIGUOUS_MATCH_DELTA = 0.08;
-
-export type HltbMatchConfidence = 'exact' | 'high' | 'medium';
 
 export type HltbSearchResult = {
   id?: string;
@@ -13,17 +12,20 @@ export type HltbSearchResult = {
   mainHours?: number;
   mainExtraHours?: number;
   completionistHours?: number;
+  sourceUrl?: string;
   confidence?: number;
   platforms?: string[];
 };
 
 export type HltbCachedEntry = {
+  hltbId?: string;
+  hltbTitle?: string;
   hltbMainHours?: number;
   hltbMainExtraHours?: number;
   hltbCompletionistHours?: number;
+  hltbSourceUrl?: string;
+  hltbMatchConfidence?: number;
   hltbLastSyncedAt: string;
-  hltbMatchConfidence?: HltbMatchConfidence;
-  matchedTitle?: string;
 };
 
 export type HltbSyncSummary = {
@@ -31,42 +33,60 @@ export type HltbSyncSummary = {
   noMatchCount: number;
   failedCount: number;
   cachedCount: number;
+  unavailableCount: number;
 };
 
 export interface HltbProvider {
   search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]>;
 }
 
+export class HltbProviderError extends Error {
+  constructor(message = 'HowLongToBeat data is temporarily unavailable.') {
+    super(message);
+    this.name = 'HltbProviderError';
+  }
+}
+
 export class HowLongToBeatProvider implements HltbProvider {
   async search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]> {
-    const response = await fetch(HLTB_SEARCH_URL, {
-      body: JSON.stringify({
-        searchType: 'games',
-        searchTerms: normalizeSearchTerms(title),
-        searchPage: 1,
-        size: 20,
-        searchOptions: {
-          games: {
-            userId: 0,
-            platform: '',
-            sortCategory: 'popular',
-            rangeCategory: 'main',
-            rangeTime: { min: 0, max: 0 },
-            gameplay: { perspective: '', flow: '', genre: '' },
-            modifier: '',
+    if (!HLTB_SEARCH_URL) {
+      throw new HltbProviderError();
+    }
+
+    let response: Response;
+
+    try {
+      response = await fetch(HLTB_SEARCH_URL, {
+        body: JSON.stringify({
+          searchType: 'games',
+          searchTerms: normalizeSearchTerms(title),
+          searchPage: 1,
+          size: 20,
+          searchOptions: {
+            games: {
+              userId: 0,
+              platform: '',
+              sortCategory: 'popular',
+              rangeCategory: 'main',
+              rangeTime: { min: 0, max: 0 },
+              gameplay: { perspective: '', flow: '', genre: '' },
+              modifier: '',
+            },
           },
+        }),
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+          'Content-Type': 'application/json',
         },
-      }),
-      headers: {
-        Accept: 'application/json, text/plain, */*',
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-      signal,
-    });
+        method: 'POST',
+        signal,
+      });
+    } catch (error) {
+      throw new HltbProviderError(error instanceof Error ? error.message : undefined);
+    }
 
     if (!response.ok) {
-      throw new Error(`HowLongToBeat search failed with ${response.status}`);
+      throw new HltbProviderError(`HowLongToBeat search failed with ${response.status}`);
     }
 
     const data = await response.json();
@@ -76,37 +96,39 @@ export class HowLongToBeatProvider implements HltbProvider {
   }
 }
 
-export async function syncHltbForGames(games: Game[], provider: HltbProvider = new HowLongToBeatProvider()): Promise<{ games: Game[]; summary: HltbSyncSummary }> {
+export async function searchHowLongToBeat(title: string, provider: HltbProvider = new HowLongToBeatProvider(), signal?: AbortSignal) {
+  return provider.search(title, signal);
+}
+
+export async function syncHltbForGames(
+  games: Game[],
+  provider: HltbProvider = new HowLongToBeatProvider(),
+  options: { force?: boolean } = {},
+): Promise<{ games: Game[]; summary: HltbSyncSummary }> {
   const syncedAt = new Date().toISOString();
   const cache = loadHltbCache();
-  const summary: HltbSyncSummary = { updatedCount: 0, noMatchCount: 0, failedCount: 0, cachedCount: 0 };
+  const summary: HltbSyncSummary = { updatedCount: 0, noMatchCount: 0, failedCount: 0, cachedCount: 0, unavailableCount: 0 };
   const updatedGames: Game[] = [];
 
   for (const game of games) {
     const cacheKey = getHltbCacheKey(game);
 
-    if (hasHltbData(game)) {
-      cache[cacheKey] = {
-        hltbMainHours: game.hltbMainHours,
-        hltbMainExtraHours: game.hltbMainExtraHours,
-        hltbCompletionistHours: game.hltbCompletionistHours,
-        hltbLastSyncedAt: game.hltbLastSyncedAt ?? syncedAt,
-        hltbMatchConfidence: game.hltbMatchConfidence,
-      };
+    if (!options.force && hasHltbData(game)) {
+      cache[cacheKey] = pickHltbEntryFromGame(game, syncedAt);
       summary.cachedCount += 1;
       continue;
     }
 
     const cachedEntry = cache[cacheKey];
 
-    if (cachedEntry && hasHltbHours(cachedEntry)) {
+    if (!options.force && cachedEntry && hasHltbHours(cachedEntry)) {
       updatedGames.push(applyHltbEntry(game, { ...cachedEntry, hltbLastSyncedAt: game.hltbLastSyncedAt ?? cachedEntry.hltbLastSyncedAt }));
       summary.cachedCount += 1;
       continue;
     }
 
     try {
-      const results = await provider.search(game.title);
+      const results = await searchHowLongToBeat(game.title, provider);
       const match = chooseBestHltbMatch(game, results);
 
       if (!match) {
@@ -115,12 +137,14 @@ export async function syncHltbForGames(games: Game[], provider: HltbProvider = n
       }
 
       const entry: HltbCachedEntry = {
+        hltbId: match.result.id,
+        hltbTitle: match.result.title,
         hltbMainHours: match.result.mainHours,
         hltbMainExtraHours: match.result.mainExtraHours,
         hltbCompletionistHours: match.result.completionistHours,
+        hltbSourceUrl: match.result.sourceUrl ?? getHltbSourceUrl(match.result.id),
+        hltbMatchConfidence: match.confidence,
         hltbLastSyncedAt: syncedAt,
-        hltbMatchConfidence: match.confidenceLabel,
-        matchedTitle: match.result.title,
       };
 
       cache[cacheKey] = entry;
@@ -128,6 +152,9 @@ export async function syncHltbForGames(games: Game[], provider: HltbProvider = n
       summary.updatedCount += 1;
     } catch (error) {
       console.warn(`HLTB sync failed for ${game.title}`, error);
+      if (error instanceof HltbProviderError) {
+        summary.unavailableCount += 1;
+      }
       summary.failedCount += 1;
     }
   }
@@ -155,7 +182,6 @@ export function chooseBestHltbMatch(game: Pick<Game, 'title' | 'platform'>, resu
   return {
     result: best.result,
     confidence: best.score,
-    confidenceLabel: best.score >= 0.98 ? 'exact' : best.score >= 0.9 ? 'high' : 'medium' as HltbMatchConfidence,
   };
 }
 
@@ -196,12 +222,15 @@ function mapHowLongToBeatResult(value: Record<string, unknown>): HltbSearchResul
     return null;
   }
 
+  const id = getString(value.game_id) ?? getString(value.id);
+
   return {
-    id: getString(value.game_id) ?? getString(value.id),
+    id,
     title,
     mainHours: normalizeHltbHours(value.comp_main ?? value.gameplayMain ?? value.main_story),
     mainExtraHours: normalizeHltbHours(value.comp_plus ?? value.gameplayMainExtra ?? value.main_extra),
     completionistHours: normalizeHltbHours(value.comp_100 ?? value.gameplayCompletionist ?? value.completionist),
+    sourceUrl: getString(value.game_url) ?? getString(value.url) ?? getHltbSourceUrl(id),
     confidence: getNumber(value.similarity),
     platforms: Array.isArray(value.profile_platform) ? value.profile_platform.filter((platform): platform is string => typeof platform === 'string') : undefined,
   };
@@ -295,13 +324,33 @@ function hasHltbHours(value: Pick<HltbCachedEntry, 'hltbMainHours' | 'hltbMainEx
 function applyHltbEntry(game: Game, entry: HltbCachedEntry): Game {
   return {
     ...game,
+    hltbId: entry.hltbId,
+    hltbTitle: entry.hltbTitle,
     hltbMainHours: entry.hltbMainHours,
     hltbMainExtraHours: entry.hltbMainExtraHours,
     hltbCompletionistHours: entry.hltbCompletionistHours,
-    hltbLastSyncedAt: entry.hltbLastSyncedAt,
+    hltbSourceUrl: entry.hltbSourceUrl,
     hltbMatchConfidence: entry.hltbMatchConfidence,
+    hltbLastSyncedAt: entry.hltbLastSyncedAt,
     updatedAt: entry.hltbLastSyncedAt,
   };
+}
+
+function pickHltbEntryFromGame(game: Game, fallbackSyncedAt: string): HltbCachedEntry {
+  return {
+    hltbId: game.hltbId,
+    hltbTitle: game.hltbTitle,
+    hltbMainHours: game.hltbMainHours,
+    hltbMainExtraHours: game.hltbMainExtraHours,
+    hltbCompletionistHours: game.hltbCompletionistHours,
+    hltbSourceUrl: game.hltbSourceUrl,
+    hltbMatchConfidence: game.hltbMatchConfidence,
+    hltbLastSyncedAt: game.hltbLastSyncedAt ?? fallbackSyncedAt,
+  };
+}
+
+function getHltbSourceUrl(id?: string) {
+  return id ? `${HLTB_SOURCE_BASE_URL}/${id}` : undefined;
 }
 
 function getHltbCacheKey(game: Pick<Game, 'title' | 'steamAppId'>) {

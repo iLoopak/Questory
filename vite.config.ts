@@ -30,6 +30,25 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/steam/, ''),
       },
+      '/api/hltb': {
+        target: 'https://howlongtobeat.com',
+        changeOrigin: true,
+        secure: true,
+        headers: {
+          accept: 'application/json,text/plain,*/*',
+          origin: 'https://howlongtobeat.com',
+          referer: 'https://howlongtobeat.com/',
+          'user-agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36',
+        },
+        configure: (proxy) => {
+          proxy.on('error', (error) => {
+            const logger = Reflect.get(globalThis, 'console') as { error?: (...args: unknown[]) => void } | undefined;
+            logger?.error?.('[QuestShelf HLTB proxy]', error.message);
+          });
+        },
+        rewrite: (path) => path.replace(/^\/api\/hltb/, ''),
+      },
       '/api/itad': {
         target: 'https://api.isthereanydeal.com',
         changeOrigin: true,
