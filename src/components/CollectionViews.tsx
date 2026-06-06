@@ -8,6 +8,7 @@ import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
+import { DealCoverBadges } from './DealCoverBadges';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -427,13 +428,13 @@ function ShelfGameCard({
         {game.status === 'Playing' || game.status === 'Paused' ? (
           <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={game.status} />
         ) : null}
+        <DealCoverBadges game={game} variant="shelf" />
       </span>
 
       <span className="mt-3 block min-h-[3rem]">
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
         <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
         <AchievementProgressBadge className="mt-2 text-[0.65rem]" game={game} showLabel />
-        <WishlistDealSummary game={game} compact />
       </span>
 
       {!isMultiSelectMode ? (
@@ -532,7 +533,7 @@ function CompactGameRow({
       }`}
     >
       <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={isMultiSelectMode ? onToggleSelected : onOpenDetails} type="button">
-        <span className="relative block h-16 w-12 shrink-0 overflow-hidden rounded-md bg-ink-700">
+        <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-md bg-ink-700">
           {activeCoverSource ? (
             <img
               alt=""
@@ -549,6 +550,7 @@ function CompactGameRow({
           ) : (
             <MissingCover title={game.title} />
           )}
+          <DealCoverBadges game={game} isInteractive={false} variant="compact" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
@@ -565,7 +567,6 @@ function CompactGameRow({
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
             <AchievementProgressBadge game={game} showLabel />
           </span>
-          <WishlistDealSummary game={game} />
         </span>
       </button>
 
@@ -590,43 +591,6 @@ function CompactGameRow({
       ) : null}
     </article>
   );
-}
-
-
-
-function WishlistDealSummary({ game, compact = false }: { game: Game; compact?: boolean }) {
-  const { t } = useI18n();
-
-  if (game.collectionType !== 'wishlist' || typeof game.itadCurrentBestPrice !== 'number' || !game.itadCurrentBestCurrency) {
-    return null;
-  }
-
-  const price = formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency);
-  const discount = typeof game.itadDiscountPercent === 'number' && game.itadDiscountPercent > 0 ? `-${game.itadDiscountPercent}%` : null;
-
-  return (
-    <span className={`mt-2 flex flex-wrap items-center gap-1.5 ${compact ? 'text-[0.65rem]' : 'text-xs'}`} onClick={(event) => event.stopPropagation()}>
-      <span className="rounded-full border border-mint/30 bg-mint/10 px-2 py-0.5 font-semibold text-mint">
-        {t('itad.bestPrice')}: {price}
-      </span>
-      {discount ? <span className="rounded-full border border-amber-300/35 bg-amber-300/10 px-2 py-0.5 font-semibold text-amber-200">{discount}</span> : null}
-      {game.itadIsHistoricalLow ? <span className="rounded-full border border-fuchsia-300/35 bg-fuchsia-300/10 px-2 py-0.5 font-semibold text-fuchsia-200">{t('itad.historicalLow')}</span> : null}
-      {game.itadCurrentBestShop ? <span className="text-slate-400">{game.itadCurrentBestShop}</span> : null}
-      {game.itadCurrentBestUrl ? (
-        <a className="font-semibold text-skyglass hover:text-white" href={game.itadCurrentBestUrl} target="_blank" rel="noreferrer">
-          {t('itad.openDeal')}
-        </a>
-      ) : null}
-    </span>
-  );
-}
-
-function formatDealPrice(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat(undefined, { currency, style: 'currency' }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
 }
 
 function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {

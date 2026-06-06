@@ -7,6 +7,7 @@ import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
 import { useI18n } from '../i18n';
+import { formatDealPrice } from './DealCoverBadges';
 
 type GameDetailViewProps = {
   game: Game;
@@ -69,6 +70,12 @@ export function GameDetailView({
   const platformLabel = getGamePlatformLabel(game, platformQueueState);
   const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
   const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
+  const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
+    ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
+    : undefined;
+  const historicalItadPrice = typeof game.itadHistoricalLowPrice === 'number' && game.itadHistoricalLowCurrency
+    ? formatDealPrice(game.itadHistoricalLowPrice, game.itadHistoricalLowCurrency)
+    : undefined;
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -135,6 +142,19 @@ export function GameDetailView({
       ]
     : [];
 
+
+  const dealActions: GameDetailAction[] = game.itadCurrentBestUrl
+    ? [
+        {
+          icon: '💰',
+          label: currentItadPrice ? `${t('itad.openDeal')} · ${currentItadPrice}` : t('itad.openDeal'),
+          onClick: () => {
+            window.open(game.itadCurrentBestUrl, '_blank', 'noopener,noreferrer');
+          },
+          tone: 'accent',
+        },
+      ]
+    : [];
 
   const artworkActions: GameDetailAction[] = canFindArtwork
     ? [
@@ -246,6 +266,9 @@ export function GameDetailView({
                   {steamActions.map((action) => (
                     <GameDetailActionButton key={action.label} action={action} />
                   ))}
+                  {dealActions.map((action) => (
+                    <GameDetailActionButton key={action.label} action={action} />
+                  ))}
                   {artworkActions.map((action) => (
                     <GameDetailActionButton key={action.label} action={action} />
                   ))}
@@ -316,9 +339,15 @@ export function GameDetailView({
                     <ReadOnlyField label="Steam price" value={game.steamPriceInfo || 'n/a'} />
                     <ReadOnlyField label="Steam discount" value={game.steamDiscountInfo || 'n/a'} />
                     <ReadOnlyField label="Steam reviews" value={game.steamReviewInfo || 'n/a'} />
+                    <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || 'n/a'} />
+                    <ReadOnlyField label="Deal store" value={game.itadCurrentBestShop || 'n/a'} />
+                    <ReadOnlyField label="Discount" value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : 'n/a'} />
+                    <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || 'n/a'} />
+                    <ReadOnlyField label="Historical low status" value={game.itadIsHistoricalLow ? t('itad.historicalLow') : 'n/a'} />
                     <ReadOnlyField label="Wishlist imported" value={formatDateTime(game.wishlistImportedAt)} />
                     <ReadOnlyField label="Wishlist synced" value={formatDateTime(game.wishlistSyncedAt)} />
                     <ReadOnlyLink label="Store URL" value={game.storeUrl} />
+                    <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
                   </div>
                 </MetadataAccordion>
               ) : null}
