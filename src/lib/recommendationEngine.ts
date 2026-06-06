@@ -143,6 +143,8 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
 }
 
 
+// HLTB is a light recommendation nudge only: completion estimates should help surface
+// quick wins without dominating playtime, status, platform, and achievement signals.
 function scoreHltbFit(game: Game) {
   if (!hasHltbData(game)) {
     return { points: 0, reason: null };

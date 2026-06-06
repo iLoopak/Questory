@@ -8,6 +8,7 @@ import { GameDetailView } from './components/GameDetailView';
 import { CollectionToolbar } from './components/CollectionToolbar';
 import { ViewportModal } from './components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from './components/CollectionViews';
+import { HltbSettingsPanel } from './components/HltbSettingsPanel';
 import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
@@ -273,6 +274,7 @@ function App() {
     initialSteamPlaytimeRefreshState,
   );
   const [itadDealSyncState, setItadDealSyncState] = useState<ItadDealSyncState>(initialItadDealSyncState);
+  const [isHltbSyncing, setIsHltbSyncing] = useState(false);
   const [refreshingMetadataGameIds, setRefreshingMetadataGameIds] = useState<Set<string>>(new Set());
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
@@ -1188,6 +1190,10 @@ function App() {
 
 
   async function syncHltb(gameIds: string[]): Promise<HltbSyncSummary | null> {
+    if (isHltbSyncing) {
+      return null;
+    }
+
     const targetGames = games.filter((game) => gameIds.includes(game.id));
 
     if (targetGames.length === 0) {
@@ -1196,15 +1202,19 @@ function App() {
       return null;
     }
 
-    addToastNotification({ category: 'info', dedupeKey: 'hltb-sync-start', message: t('hltb.syncing') });
+    const runningMessage = targetGames.length > 12 ? t('hltb.syncingLong') : t('hltb.syncing');
+    setIsHltbSyncing(true);
+    addToastNotification({ category: 'info', dedupeKey: 'hltb-sync-start', message: runningMessage });
 
     try {
-      const result = await syncHltbForGames(targetGames);
+      const result = await syncHltbForGames(targetGames, undefined, { force: true });
       const updatedGamesById = new Map(result.games.map((game) => [game.id, game]));
 
       setGames((currentGames) => currentGames.map((game) => updatedGamesById.get(game.id) ?? game));
 
-      const message = formatHltbSyncSummary(result.summary, t);
+      const message = result.summary.unavailableCount > 0 && result.summary.updatedCount === 0 && result.summary.noMatchCount === 0
+        ? `${t('hltb.unavailable')} ${formatHltbSyncSummary(result.summary, t)}`
+        : formatHltbSyncSummary(result.summary, t);
       addToastNotification({
         category: result.summary.failedCount > 0 ? 'warning' : 'success',
         dedupeKey: 'hltb-sync-complete',
@@ -1215,6 +1225,8 @@ function App() {
       const message = error instanceof Error ? error.message : t('hltb.syncFailed');
       addToastNotification({ category: 'error', dedupeKey: 'hltb-sync-error', message });
       return null;
+    } finally {
+      setIsHltbSyncing(false);
     }
   }
 
@@ -2284,6 +2296,7 @@ function App() {
               onFinish={finishGameFromCompactRow}
               onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
+              isHltbSyncing={isHltbSyncing}
               onBulkSyncHltb={syncHltb}
               onBulkRemove={removeManyGames}
               onBulkSyncSteamAchievements={(gameIds, options) =>
@@ -2331,6 +2344,7 @@ function App() {
               onFinish={finishGameFromCompactRow}
               onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
+              isHltbSyncing={isHltbSyncing}
               onBulkSyncHltb={syncHltb}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
@@ -2688,6 +2702,7 @@ type CollectionPanelProps = {
   steamAchievementSyncState?: SteamAchievementSyncState;
   steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
   steamWishlistSyncState?: SteamWishlistSyncState;
+  isHltbSyncing?: boolean;
   tags: string[];
   onAddGame: () => void;
   onAddToWishlist: (game: Game) => void;
@@ -2755,6 +2770,7 @@ function CollectionPanel({
   onImportSteamWishlistHtml,
   itadDealSyncState,
   onSyncItadDeals,
+  isHltbSyncing = false,
 }: CollectionPanelProps) {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
@@ -3124,11 +3140,11 @@ function CollectionPanel({
 
             <button
               className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
-              disabled={games.length === 0}
+              disabled={isHltbSyncing}
               onClick={syncVisibleOrSelectedHltb}
               type="button"
             >
-              {t('hltb.sync')}
+              {isHltbSyncing ? t('hltb.syncing') : t('hltb.sync')}
             </button>
             {hasWishlistDealSyncAction ? (
               <button
@@ -3364,11 +3380,11 @@ function CollectionPanel({
 
             <button
               className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
-              disabled={games.length === 0}
+              disabled={isHltbSyncing}
               onClick={syncVisibleOrSelectedHltb}
               type="button"
             >
-              {t('hltb.sync')}
+              {isHltbSyncing ? t('hltb.syncing') : t('hltb.sync')}
             </button>
             {hasWishlistDealSyncAction ? (
                 <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={isWishlistDealSyncDisabled} onClick={syncVisibleOrSelectedWishlistDeals} title={wishlistDealSyncTitle} type="button">
@@ -3412,7 +3428,13 @@ function CollectionPanel({
         </div>
       ) : null}
 
-      {bulkSummary && !isSteamAchievementSyncing && !isSteamPlaytimeSyncing ? (
+      {isHltbSyncing ? (
+        <div className="mb-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
+          {games.length > 12 ? t('hltb.syncingLong') : t('hltb.syncing')}
+        </div>
+      ) : null}
+
+      {bulkSummary && !isSteamAchievementSyncing && !isSteamPlaytimeSyncing && !isHltbSyncing ? (
         <div className="mb-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-sm text-mint">
           {formatBulkSummary(bulkSummary)}
         </div>
@@ -4344,6 +4366,7 @@ function SettingsPanel({
             <div className="space-y-4">
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
               <IsThereAnyDealSettingsPanel />
+              <HltbSettingsPanel />
               <SteamSettingsPanel
                 games={games}
                 ignoredSteamGames={ignoredSteamGames}
@@ -5574,7 +5597,7 @@ function formatBulkSummary(summary: BulkActionSummary) {
 
 
 function formatHltbSyncSummary(summary: HltbSyncSummary, t: TFunction) {
-  return `${t('hltb.syncComplete')}. ${summary.updatedCount} updated · ${summary.cachedCount} cached · ${summary.noMatchCount} no match · ${summary.failedCount} failed.`;
+  return `${t('hltb.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed.`;
 }
 
 function formatSteamWishlistSyncSummary(summary: SteamWishlistSyncSummary, t: TFunction) {

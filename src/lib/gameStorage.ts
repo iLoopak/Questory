@@ -50,10 +50,13 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     externalSource: normalizeExternalSource(game.externalSource),
     finishedAt: typeof game.finishedAt === 'string' ? game.finishedAt : undefined,
     hltbCompletionistHours: getOptionalNonNegativeNumber(game.hltbCompletionistHours),
+    hltbId: typeof game.hltbId === 'string' ? game.hltbId : undefined,
     hltbLastSyncedAt: typeof game.hltbLastSyncedAt === 'string' ? game.hltbLastSyncedAt : undefined,
     hltbMainExtraHours: getOptionalNonNegativeNumber(game.hltbMainExtraHours),
     hltbMainHours: getOptionalNonNegativeNumber(game.hltbMainHours),
     hltbMatchConfidence: normalizeHltbMatchConfidence(game.hltbMatchConfidence),
+    hltbSourceUrl: typeof game.hltbSourceUrl === 'string' ? game.hltbSourceUrl : undefined,
+    hltbTitle: typeof game.hltbTitle === 'string' ? game.hltbTitle : undefined,
     id: game.id,
     lastPlayedAt: typeof game.lastPlayedAt === 'string' ? game.lastPlayedAt : null,
     notes: typeof game.notes === 'string' ? game.notes : '',
@@ -90,7 +93,23 @@ function normalizeExternalSource(externalSource: unknown): Game['externalSource'
 }
 
 function normalizeHltbMatchConfidence(confidence: unknown): Game['hltbMatchConfidence'] {
-  return confidence === 'exact' || confidence === 'high' || confidence === 'medium' ? confidence : undefined;
+  if (typeof confidence === 'number' && Number.isFinite(confidence)) {
+    return Math.min(Math.max(confidence, 0), 1);
+  }
+
+  if (confidence === 'exact') {
+    return 1;
+  }
+
+  if (confidence === 'high') {
+    return 0.9;
+  }
+
+  if (confidence === 'medium') {
+    return 0.82;
+  }
+
+  return undefined;
 }
 
 function normalizeWishlistPriority(priority: unknown): Game['priority'] {
