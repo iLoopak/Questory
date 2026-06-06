@@ -31,8 +31,17 @@ type GameActionMenuOverlayProps = Omit<GameActionMenuProps, 'variant' | 'isOpen'
 type GameActionMenuItem = {
   disabled?: boolean;
   href?: string;
+  icon: string;
+  currentLabel?: string;
+  isCurrent?: boolean;
   label: string;
   onSelect?: () => void;
+  tone?: 'danger';
+};
+
+type GameActionMenuSection = {
+  items: GameActionMenuItem[];
+  label: string;
   tone?: 'danger';
 };
 
@@ -153,9 +162,9 @@ function GameActionMenuOverlay({
   t,
 }: GameActionMenuOverlayProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const actions = useMemo(
+  const sections = useMemo(
     () =>
-      buildGameActionMenuItems({
+      buildGameActionMenuSections({
         game,
         includeDetails,
         onAddToQueue,
@@ -172,8 +181,6 @@ function GameActionMenuOverlay({
     [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange, t],
   );
 
-  const primaryActions = actions.filter((action) => action.tone !== 'danger');
-  const destructiveActions = actions.filter((action) => action.tone === 'danger');
 
   useEffect(() => {
     const firstMenuItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])');
@@ -219,7 +226,7 @@ function GameActionMenuOverlay({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1200] flex items-end justify-center bg-black/45 p-2 backdrop-blur-sm sm:items-center sm:p-4"
+      className="qs-game-action-backdrop fixed inset-0 z-[1200] flex items-end justify-center p-2 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
@@ -227,37 +234,39 @@ function GameActionMenuOverlay({
         id={menuId}
         aria-label={`${t('action.actions')} ${game.title}`}
         aria-modal="true"
-        className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-2xl border border-skyglass/20 bg-ink-950/98 shadow-panel ring-1 ring-white/10 backdrop-blur-md sm:rounded-2xl"
+        className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-3xl sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleMenuKeyDown}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-skyglass/15 bg-white/[0.03] px-4 py-3">
+        <div className="qs-game-action-header">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('action.actions')}</p>
-            <h3 className="mt-1 truncate text-base font-semibold text-white">{game.title}</h3>
+            <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
+            <h3 className="qs-game-action-title">{game.title}</h3>
+            <p className="qs-game-action-platform">{game.platform}</p>
           </div>
           <button
-            className="min-h-10 shrink-0 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+            aria-label={t('action.close')}
+            className="qs-game-action-close"
             onClick={onClose}
             type="button"
           >
-            {t('action.close')}
+            <span aria-hidden="true">×</span>
           </button>
         </div>
-        <div className="max-h-[min(74dvh,34rem)] overflow-y-auto py-2 pb-[max(1rem,calc(var(--qs-safe-bottom)+0.75rem))]">
-          <div role="menu" aria-label={`${t('action.actions')} ${game.title}`}>
-            {primaryActions.map((action) => (
-              <GameActionMenuItemButton key={action.label} action={action} />
+        <div className="qs-game-action-scroll">
+          <div role="menu" aria-label={`${t('action.actions')} ${game.title}`} className="qs-game-action-sections">
+            {sections.map((section) => (
+              <section key={section.label} className={section.tone === 'danger' ? 'qs-game-action-section qs-game-action-section-danger' : 'qs-game-action-section'}>
+                <h4 className="qs-game-action-section-title">{section.label}</h4>
+                <div className="qs-game-action-section-list" role="group" aria-label={section.label}>
+                  {section.items.map((action) => (
+                    <GameActionMenuItemButton key={action.label} action={action} />
+                  ))}
+                </div>
+              </section>
             ))}
-            {destructiveActions.length > 0 ? (
-              <div className="mt-2 border-t border-red-400/20 pt-2" aria-label={`${game.title} ${t('toolbar.actions')}`}>
-                {destructiveActions.map((action) => (
-                  <GameActionMenuItemButton key={action.label} action={action} />
-                ))}
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
@@ -267,11 +276,14 @@ function GameActionMenuOverlay({
 }
 
 function GameActionMenuItemButton({ action }: { action: GameActionMenuItem }) {
-  const className = `block min-h-12 w-full px-5 py-3.5 text-left text-base font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint sm:text-sm ${
-    action.tone === 'danger'
-      ? 'text-red-200 hover:bg-red-500/10 focus-visible:bg-red-500/10'
-      : 'text-slate-100 hover:bg-mint/10 focus-visible:bg-mint/10'
-  } ${action.disabled ? 'cursor-not-allowed text-slate-600 hover:bg-transparent' : ''}`;
+  const className = `qs-game-action-row ${action.tone === 'danger' ? 'qs-game-action-row-danger' : ''} ${action.isCurrent ? 'qs-game-action-row-current' : ''} ${action.disabled ? 'qs-game-action-row-disabled' : ''}`;
+  const content = (
+    <>
+      <span className="qs-game-action-row-icon" aria-hidden="true">{action.icon}</span>
+      <span className="qs-game-action-row-label">{action.label}</span>
+      {action.isCurrent ? <span className="qs-game-action-current-badge">{action.currentLabel}</span> : null}
+    </>
+  );
 
   if (action.href) {
     return (
@@ -283,7 +295,7 @@ function GameActionMenuItemButton({ action }: { action: GameActionMenuItem }) {
         role="menuitem"
         target="_blank"
       >
-        {action.label}
+        {content}
       </a>
     );
   }
@@ -297,12 +309,12 @@ function GameActionMenuItemButton({ action }: { action: GameActionMenuItem }) {
       role="menuitem"
       type="button"
     >
-      {action.label}
+      {content}
     </button>
   );
 }
 
-function buildGameActionMenuItems({
+function buildGameActionMenuSections({
   game,
   includeDetails,
   onAddToQueue,
@@ -315,12 +327,16 @@ function buildGameActionMenuItems({
   onRemoveAndIgnore,
   onStatusChange,
   t,
-}: Omit<GameActionMenuOverlayProps, 'anchorRef' | 'menuId'>): GameActionMenuItem[] {
-  const items: GameActionMenuItem[] = [];
+}: Omit<GameActionMenuOverlayProps, 'anchorRef' | 'menuId'>): GameActionMenuSection[] {
+  const metadataItems: GameActionMenuItem[] = [];
+  const statusItems: GameActionMenuItem[] = [];
+  const platformItems: GameActionMenuItem[] = [];
+  const otherItems: GameActionMenuItem[] = [];
+  const dangerItems: GameActionMenuItem[] = [];
 
-  const addAction = (item: GameActionMenuItem) => {
+  const addAction = (targetItems: GameActionMenuItem[], item: GameActionMenuItem) => {
     if (item.href) {
-      items.push({
+      targetItems.push({
         ...item,
         onSelect: () => {
           onClose();
@@ -330,7 +346,7 @@ function buildGameActionMenuItems({
       return;
     }
 
-    items.push({
+    targetItems.push({
       ...item,
       onSelect: () => {
         if (item.disabled) {
@@ -343,42 +359,85 @@ function buildGameActionMenuItems({
     });
   };
 
-  if (includeDetails && onOpenDetails) {
-    addAction({ label: t('action.detailsEdit'), onSelect: onOpenDetails });
-  }
-
   if (onFindMetadata) {
-    addAction({ label: t('action.refreshMetadata'), onSelect: () => onFindMetadata(game) });
+    addAction(metadataItems, { icon: '↻', label: t('action.refreshMetadata'), onSelect: () => onFindMetadata(game) });
   }
 
-  if (onAddToQueue) {
-    addAction({ label: t('action.addToQueue'), onSelect: () => onAddToQueue(game) });
-  }
-
-  addAction({ label: t('action.playingNow'), onSelect: () => onStatusChange(game.id, 'Playing') });
+  addAction(statusItems, {
+    icon: '▶',
+    currentLabel: t('action.current'),
+    isCurrent: game.status === 'Playing',
+    label: t('action.playingNow'),
+    onSelect: () => onStatusChange(game.id, 'Playing'),
+  });
 
   if (game.collectionType === 'wishlist') {
-    addAction({ label: t('action.moveToLibrary'), onSelect: () => onMoveToLibrary?.(game), disabled: !onMoveToLibrary });
+    addAction(statusItems, {
+      disabled: !onMoveToLibrary,
+      icon: '★',
+      currentLabel: t('action.current'),
+      isCurrent: true,
+      label: t('action.moveToLibrary'),
+      onSelect: () => onMoveToLibrary?.(game),
+    });
   } else if (onAddToWishlist) {
-    addAction({ label: t('action.wishlist'), onSelect: () => onAddToWishlist(game) });
+    addAction(statusItems, {
+      icon: '★',
+      label: t('action.wishlist'),
+      onSelect: () => onAddToWishlist(game),
+    });
   }
 
-  addAction({ label: t('action.finished'), onSelect: () => onStatusChange(game.id, 'Finished') });
+  addAction(statusItems, {
+    icon: '✓',
+    currentLabel: t('action.current'),
+    isCurrent: game.status === 'Finished',
+    label: t('action.finished'),
+    onSelect: () => onStatusChange(game.id, 'Finished'),
+  });
+  addAction(statusItems, {
+    icon: '⏸',
+    currentLabel: t('action.current'),
+    isCurrent: game.status === 'Dropped',
+    label: t('action.dropped'),
+    onSelect: () => onStatusChange(game.id, 'Dropped'),
+  });
+
+  if (onAddToQueue) {
+    addAction(platformItems, { icon: '▦', label: t('action.addToQueue'), onSelect: () => onAddToQueue(game) });
+  }
+
+  if (includeDetails && onOpenDetails) {
+    addAction(otherItems, { icon: 'ℹ', label: t('action.detailsEdit'), onSelect: onOpenDetails });
+  }
 
   if (game.storeUrl || game.externalUrl) {
-    addAction({ label: t('action.openStore'), href: game.storeUrl ?? game.externalUrl });
+    addAction(otherItems, { icon: '↗', label: t('action.openStore'), href: game.storeUrl ?? game.externalUrl });
   }
 
-  addAction({ label: game.collectionType === 'wishlist' ? t('action.removeFromWishlist') : t('action.remove'), onSelect: () => onRemove(game.id), tone: 'danger' });
-  addAction({ label: t('action.dropped'), onSelect: () => onStatusChange(game.id, 'Dropped'), tone: 'danger' });
-  addAction({
+  addAction(dangerItems, {
+    icon: '−',
+    label: game.collectionType === 'wishlist' ? t('action.removeFromWishlist') : t('action.remove'),
+    onSelect: () => onRemove(game.id),
+    tone: 'danger',
+  });
+  addAction(dangerItems, {
     disabled: typeof game.steamAppId !== 'number',
+    icon: '⊘',
     label: t('action.ignore'),
     onSelect: () => onRemoveAndIgnore(game),
     tone: 'danger',
   });
 
-  return items;
+  const sections: GameActionMenuSection[] = [
+    { label: t('action.sectionMetadata'), items: metadataItems },
+    { label: t('action.sectionStatus'), items: statusItems },
+    { label: t('action.sectionPlatform'), items: platformItems },
+    { label: t('action.sectionOther'), items: otherItems },
+    { label: t('action.sectionDanger'), items: dangerItems, tone: 'danger' },
+  ];
+
+  return sections.filter((section) => section.items.length > 0);
 }
 
 function getActionButtonClass(variant: GameActionMenuProps['variant']) {
