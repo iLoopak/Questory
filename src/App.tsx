@@ -21,6 +21,46 @@ import { RetroImportPanel } from './components/RetroImportPanel';
 import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModePanel';
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
+import {
+  alwaysVisibleNavItems,
+  allNavItems,
+  navItemLabelKeys,
+  navigationVisibilityLabelKeys,
+  navItems,
+  type NavItem,
+  type TopNavItem,
+} from './config/navigation';
+import { settingsCategories, settingsCategoryStorageKey, type SettingsCategory } from './config/settings';
+import {
+  achievementFilterOptions,
+  allOption,
+  collectionInitialRenderCount,
+  collectionLoadAheadMargin,
+  collectionRenderBatchSize,
+  collectionViewModeStorageKey,
+  collectionViewModes,
+  enrichmentFilterOptions,
+  initialCollectionFilters,
+  libraryFiltersStorageKey,
+  librarySortOptions,
+  quickFilterOptions,
+  sourceFilterOptions,
+  wishlistFiltersStorageKey,
+  type AchievementFilter,
+  type CollectionFilters,
+  type CollectionViewMode,
+  type EnrichmentFilter,
+  type LibrarySortOption,
+  type QuickFilter,
+  type SourceFilter,
+} from './config/collection';
+import {
+  initialItadDealSyncState,
+  initialSteamAchievementSyncState,
+  initialSteamPlaytimeRefreshState,
+  initialSteamWishlistSyncState,
+  type ItadDealSyncState,
+} from './config/syncStates';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage, type TFunction } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
@@ -139,87 +179,7 @@ import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamAchievementSyncState, SteamAchievementSyncSummary, SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
 
-const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Recommendation', 'Stats', 'Settings'] as const;
-const alwaysVisibleNavItems = ['Library', 'Settings'] as const;
-const navItemLabelKeys: Record<(typeof navItems)[number], Parameters<ReturnType<typeof createTranslator>>[0]> = {
-  Artwork: 'nav.artwork',
-  Library: 'nav.library',
-  Queue: 'nav.queue',
-  Recommendation: 'nav.recommendations',
-  'Review Mode': 'nav.reviewMode',
-  Settings: 'nav.settings',
-  Stats: 'nav.stats',
-  Wishlist: 'nav.wishlist',
-};
-
-const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, Parameters<ReturnType<typeof createTranslator>>[0]> = {
-  Artwork: 'nav.artwork',
-  Queue: 'settings.navigation.platformsQueue',
-  Recommendation: 'nav.recommendations',
-  'Review Mode': 'settings.navigation.questQueueReviewMode',
-  Stats: 'nav.stats',
-  Wishlist: 'nav.wishlist',
-};
-const allNavItems = ['Home', ...navItems, 'Metadata'] as const;
-type TopNavItem = (typeof navItems)[number];
-type NavItem = (typeof allNavItems)[number];
-const settingsCategories = [
-  'Integrations',
-  'Library',
-  'Wishlist',
-  'Platforms',
-  'Retro',
-  'Appearance',
-  'Data & Backup',
-  'About',
-] as const;
-type SettingsCategory = (typeof settingsCategories)[number];
-
-const allOption = 'All';
 const questShelfIcon = '/icons/questshelf-icon.png';
-const libraryFiltersStorageKey = 'questshelf.libraryFilters.v1';
-const collectionViewModeStorageKey = 'questshelf.collectionViewMode.v1';
-const settingsCategoryStorageKey = 'questshelf.settingsCategory.v1';
-const wishlistFiltersStorageKey = 'questshelf.wishlistFilters.v1';
-const sourceFilterOptions = ['All', 'Steam', 'Manual', 'Wishlist', 'Retro / future-ready'] as const;
-const enrichmentFilterOptions = ['All', 'Enriched', 'Missing info', 'Manual metadata'] as const;
-const librarySortOptions = [
-  'Title A-Z',
-  'Recently played',
-  'Most playtime',
-  'Least playtime',
-  'Recently imported',
-  'Missing info first',
-  'Status',
-  'Achievement completion %',
-  'Best discount',
-  'Lowest price',
-] as const;
-const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h', 'On sale', 'Historical low', 'Deal synced', 'No deal match'] as const;
-const achievementFilterOptions = ['All', 'Has achievements', 'No achievements synced', 'Nearly completed', 'Completed', 'Started'] as const;
-const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
-const collectionInitialRenderCount = 56;
-const collectionRenderBatchSize = 40;
-const collectionLoadAheadMargin = '720px 0px';
-
-type SourceFilter = (typeof sourceFilterOptions)[number];
-type EnrichmentFilter = (typeof enrichmentFilterOptions)[number];
-type LibrarySortOption = (typeof librarySortOptions)[number];
-type AchievementFilter = (typeof achievementFilterOptions)[number];
-type QuickFilter = (typeof quickFilterOptions)[number];
-type CollectionViewMode = (typeof collectionViewModes)[number];
-
-type CollectionFilters = {
-  achievement: AchievementFilter;
-  enrichment: EnrichmentFilter;
-  platform: GamePlatform | typeof allOption;
-  quickFilters: QuickFilter[];
-  searchTerm: string;
-  sortBy: LibrarySortOption;
-  source: SourceFilter;
-  status: GameStatus | typeof allOption;
-  tag: string;
-};
 
 type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>;
 
@@ -236,18 +196,6 @@ function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { clas
     </div>
   );
 }
-
-const initialCollectionFilters: CollectionFilters = {
-  achievement: allOption,
-  enrichment: allOption,
-  platform: allOption,
-  quickFilters: [],
-  searchTerm: '',
-  sortBy: 'Title A-Z',
-  source: allOption,
-  status: allOption,
-  tag: allOption,
-};
 
 type MetadataSelectionRequest = {
   ids: string[];
@@ -271,38 +219,6 @@ type BulkActionSummary = {
   unchangedCount?: number;
   updatedCount?: number;
   wishlistedCount?: number;
-};
-
-const initialSteamWishlistSyncState: SteamWishlistSyncState = {
-  status: 'idle',
-  message: 'Steam wishlist sync runs only when you start it.',
-  summary: null,
-};
-
-const initialSteamAchievementSyncState: SteamAchievementSyncState = {
-  status: 'idle',
-  message: 'Steam achievement sync runs only when you start it.',
-  progress: { completed: 0, total: 0 },
-  summary: null,
-};
-
-const initialSteamPlaytimeRefreshState: SteamPlaytimeRefreshState = {
-  status: 'idle',
-  message: 'Steam playtime refresh runs only when you start it.',
-  progress: { completed: 0, total: 0 },
-  summary: null,
-};
-
-type ItadDealSyncState = {
-  status: 'idle' | 'loading' | 'success' | 'error';
-  message: string;
-  summary: { updatedCount: number; noMatchCount: number; failedCount: number } | null;
-};
-
-const initialItadDealSyncState: ItadDealSyncState = {
-  status: 'idle',
-  message: 'Deal sync runs only when you start it.',
-  summary: null,
 };
 
 type MetadataRefreshMode = 'metadata' | 'artwork';
