@@ -1,6 +1,7 @@
 import type { Game, GameCollectionType, GameStatus } from '../types/game';
 import { gameStatuses } from '../types/game';
 import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
+import { getPrimaryHltbHours, hasHltbData } from '../lib/hltb';
 
 export const statsScopeOptions = ['library', 'wishlist', 'all'] as const;
 
@@ -21,6 +22,11 @@ export type QuestShelfStats = {
   activeBacklogCount: number;
   collectionCounts: Record<GameCollectionType, number>;
   enrichmentCompletionPercent: number;
+  hltbAverageGameLength: number;
+  hltbGamesWithDataCount: number;
+  hltbLongGameCount: number;
+  hltbMediumGameCount: number;
+  hltbShortGameCount: number;
   finishedPercent: number;
   gamesMissingMetadata: Game[];
   gamesNeverPlayed: number;
@@ -54,6 +60,8 @@ export function getQuestShelfStats(games: Game[], scope: StatsScope): QuestShelf
   const rawgEnrichedGames = scopedGames.filter((game) => game.metadataSource === 'rawg');
   const achievementGames = scopedGames.filter(hasSteamAchievementSummary);
   const missingMetadataGames = scopedGames.filter((game) => game.metadataSource !== 'rawg' && !game.metadataManualManagedAt);
+  const hltbGames = scopedGames.filter(hasHltbData);
+  const hltbMainHours = hltbGames.map(getPrimaryHltbHours).filter((hours): hours is number => typeof hours === 'number');
 
   return {
     achievementAverageCompletionPercent: getPercent(
@@ -76,6 +84,11 @@ export function getQuestShelfStats(games: Game[], scope: StatsScope): QuestShelf
     // Dropped games are excluded from the progress denominator so abandoned titles do not make completion feel worse.
     finishedPercent: getPercent(finishedCount, Math.max(scopedGames.length - droppedCount, 0)),
     gamesMissingMetadata: sortByTitle(missingMetadataGames).slice(0, 10),
+    hltbAverageGameLength: hltbMainHours.length > 0 ? Math.round((hltbMainHours.reduce((sum, hours) => sum + hours, 0) / hltbMainHours.length) * 10) / 10 : 0,
+    hltbGamesWithDataCount: hltbGames.length,
+    hltbLongGameCount: hltbMainHours.filter((hours) => hours > 25).length,
+    hltbMediumGameCount: hltbMainHours.filter((hours) => hours >= 10 && hours <= 25).length,
+    hltbShortGameCount: hltbMainHours.filter((hours) => hours < 10).length,
     gamesNeverPlayed: scopedGames.filter((game) => game.playtimeHours <= 0).length,
     gamesWithPlaytimeNotFinished: scopedGames.filter((game) => game.playtimeHours > 0 && game.status !== 'Finished').length,
     libraryTotal: libraryGames.length,

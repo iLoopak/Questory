@@ -1,4 +1,5 @@
 import type { Game, GamePlatform } from '../types/game';
+import { getPrimaryHltbHours, hasHltbData } from './hltb';
 import { hasSteamAchievementSummary } from './steamAchievementSummary';
 
 export const availableTimeOptions = ['15 min', '30 min', '1 hour', 'long session'] as const;
@@ -110,6 +111,14 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
     reasons.push(timeFit.reason);
   }
 
+
+  const hltbNudge = scoreHltbFit(game);
+  score += hltbNudge.points;
+
+  if (hltbNudge.reason) {
+    reasons.push(hltbNudge.reason);
+  }
+
   const achievementNudge = scoreAchievementProgress(game);
   score += achievementNudge.points;
 
@@ -133,6 +142,39 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
   };
 }
 
+
+function scoreHltbFit(game: Game) {
+  if (!hasHltbData(game)) {
+    return { points: 0, reason: null };
+  }
+
+  const mainHours = getPrimaryHltbHours(game);
+  if (typeof mainHours !== 'number') {
+    return { points: 0, reason: null };
+  }
+
+  if (game.playtimeHours > 0 && game.playtimeHours < mainHours) {
+    const remainingHours = Math.max(0, mainHours - game.playtimeHours);
+    const achievementPercent = game.steamAchievementsPercent ?? 0;
+
+    if (achievementPercent >= 70 && remainingHours <= 5) {
+      return { points: 7, reason: 'Near completion by achievements and HLTB time' };
+    }
+
+    return { points: 4, reason: 'Started and still within estimated length' };
+  }
+
+  if (mainHours < 10) {
+    return { points: 5, reason: 'Short game from HLTB' };
+  }
+
+  if (mainHours >= 10 && mainHours <= 25) {
+    return { points: 3, reason: 'Medium-length game from HLTB' };
+  }
+
+  return { points: 0, reason: null };
+}
+
 function scoreAchievementProgress(game: Game) {
   if (!hasSteamAchievementSummary(game)) {
     return { points: 0, reason: null };
@@ -152,7 +194,7 @@ function scoreAchievementProgress(game: Game) {
 }
 
 function scoreTimeFit(game: Game, availableTime: AvailableTime, keywordText: string) {
-  const averagePlaytime = game.averagePlaytime ?? null;
+  const averagePlaytime = getPrimaryHltbHours(game) ?? game.averagePlaytime ?? null;
   const hasShortSessionHint = shortSessionKeywords.some((keyword) => keywordText.includes(keyword));
   const hasLongSessionHint = longSessionKeywords.some((keyword) => keywordText.includes(keyword));
 

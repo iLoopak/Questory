@@ -7,6 +7,7 @@ import { GameActionMenu } from './GameActionMenu';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
 import { DealCoverBadges } from './DealCoverBadges';
+import { HltbBadge } from './HltbBadge';
 import { useI18n } from '../i18n';
 
 type GameCardProps = {
@@ -203,7 +204,10 @@ export function GameCard({
           </h3>
 
           <div className="mt-2 text-sm text-slate-400">{game.status}</div>
-          <AchievementProgressBadge className="mt-2 px-2.5 py-1" game={game} showLabel />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <AchievementProgressBadge className="px-2.5 py-1" game={game} showLabel />
+            <HltbBadge game={game} includeLabel />
+          </div>
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-3">
