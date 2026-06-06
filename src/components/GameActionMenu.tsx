@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n, type TFunction } from '../i18n';
+import { formatDealPrice } from './DealCoverBadges';
 import type { Game, GameStatus } from '../types/game';
 
 type GameActionMenuProps = {
@@ -409,6 +410,14 @@ function buildGameActionMenuSections({
 
   if (includeDetails && onOpenDetails) {
     addAction(otherItems, { icon: 'ℹ', label: t('action.detailsEdit'), onSelect: onOpenDetails });
+  }
+
+  if (game.itadCurrentBestUrl) {
+    const dealLabel = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
+      ? `${t('itad.openDeal')} · ${formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)}`
+      : t('itad.openDeal');
+
+    addAction(otherItems, { icon: '💰', label: dealLabel, href: game.itadCurrentBestUrl });
   }
 
   if (game.storeUrl || game.externalUrl) {
