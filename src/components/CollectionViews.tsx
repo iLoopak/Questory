@@ -9,6 +9,7 @@ import { GameCard } from './GameCard';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
 import { DealCoverBadges } from './DealCoverBadges';
+import { HltbBadge } from './HltbBadge';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -434,7 +435,10 @@ function ShelfGameCard({
       <span className="mt-3 block min-h-[3rem]">
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
         <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
-        <AchievementProgressBadge className="mt-2 text-[0.65rem]" game={game} showLabel />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <AchievementProgressBadge className="text-[0.65rem]" game={game} showLabel />
+          <HltbBadge game={game} />
+        </div>
       </span>
 
       {!isMultiSelectMode ? (
@@ -566,6 +570,7 @@ function CompactGameRow({
             <span>{game.status}</span>
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
             <AchievementProgressBadge game={game} showLabel />
+            <HltbBadge game={game} />
           </span>
         </span>
       </button>

@@ -28,6 +28,7 @@ import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformBadge } from './PlatformBadge';
 import { PlatformIdentityFields } from './PlatformIdentityFields';
+import { HltbBadge } from './HltbBadge';
 import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
 
@@ -714,6 +715,7 @@ function QueueEntryRow({
           <div className="mt-1 flex flex-wrap gap-1.5">
             <PlatformBadge accentColor={platformAccentColor} className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} />
             <AchievementProgressBadge game={game} />
+            <HltbBadge game={game} />
           </div>
         </div>
         <div className="col-span-3 flex flex-wrap gap-1 sm:col-auto">
@@ -790,7 +792,10 @@ function QueueGameRow({
         </button>
         <span className="qs-platform-playing-label mt-1 block text-xs font-semibold uppercase tracking-[0.14em]">{playingNowLabel}</span>
         <span className="qs-platform-playing-meta mt-1 block truncate text-xs">{game.platform}</span>
-        <AchievementProgressBadge className="mt-2" game={game} />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <AchievementProgressBadge game={game} />
+          <HltbBadge game={game} includeLabel />
+        </div>
         <div className="mt-3 flex flex-wrap gap-1" aria-label={`${game.title} ${t('queue.currentlyPlayingActions')}`}>
           <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'move-to-backlog')} type="button">{t('queue.moveToQueue')}</button>
           <button className="qs-platform-playing-action h-8 rounded-md border px-2 text-xs" onClick={() => onAction(game.id, platform, 'finished')} type="button">{t('action.finished')}</button>

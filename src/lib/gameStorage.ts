@@ -49,6 +49,11 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     droppedReason: typeof game.droppedReason === 'string' ? game.droppedReason : undefined,
     externalSource: normalizeExternalSource(game.externalSource),
     finishedAt: typeof game.finishedAt === 'string' ? game.finishedAt : undefined,
+    hltbCompletionistHours: getOptionalNonNegativeNumber(game.hltbCompletionistHours),
+    hltbLastSyncedAt: typeof game.hltbLastSyncedAt === 'string' ? game.hltbLastSyncedAt : undefined,
+    hltbMainExtraHours: getOptionalNonNegativeNumber(game.hltbMainExtraHours),
+    hltbMainHours: getOptionalNonNegativeNumber(game.hltbMainHours),
+    hltbMatchConfidence: normalizeHltbMatchConfidence(game.hltbMatchConfidence),
     id: game.id,
     lastPlayedAt: typeof game.lastPlayedAt === 'string' ? game.lastPlayedAt : null,
     notes: typeof game.notes === 'string' ? game.notes : '',
@@ -84,6 +89,10 @@ function normalizeExternalSource(externalSource: unknown): Game['externalSource'
     : undefined;
 }
 
+function normalizeHltbMatchConfidence(confidence: unknown): Game['hltbMatchConfidence'] {
+  return confidence === 'exact' || confidence === 'high' || confidence === 'medium' ? confidence : undefined;
+}
+
 function normalizeWishlistPriority(priority: unknown): Game['priority'] {
   return priority === 'low' || priority === 'medium' || priority === 'high' ? priority : undefined;
 }
@@ -106,4 +115,7 @@ function normalizeLoadedStatus(status: unknown): GameStatus {
 
 function getNonNegativeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+function getOptionalNonNegativeNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }

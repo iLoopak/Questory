@@ -8,6 +8,7 @@ import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
 import { useI18n } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
+import { formatHltbBadge, hasHltbData } from '../lib/hltb';
 
 type GameDetailViewProps = {
   game: Game;
@@ -76,6 +77,7 @@ export function GameDetailView({
   const historicalItadPrice = typeof game.itadHistoricalLowPrice === 'number' && game.itadHistoricalLowCurrency
     ? formatDealPrice(game.itadHistoricalLowPrice, game.itadHistoricalLowCurrency)
     : undefined;
+  const hltbBadge = formatHltbBadge(game, { includeLabel: true });
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -249,6 +251,7 @@ export function GameDetailView({
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
                     <HeroStat label={t('detail.currentStatus')} value={game.status} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+                    {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                     {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} badge={<AchievementProgressBadge game={game} />} /> : null}
                   </div>
                 </div>
@@ -285,6 +288,7 @@ export function GameDetailView({
             <DetailSection kicker={t('detail.editable')} title={t('detail.myInformation')} description={t('detail.myInformationHelp')}>
               <div className="grid gap-3 md:grid-cols-3">
                 <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} />
+                {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                 <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt)} />
                 <PersonalStatField label={t('toolbar.status')} value={game.status} />
               </div>
@@ -368,6 +372,19 @@ export function GameDetailView({
                   <EmptyState text={t('detail.noSteamMetadata')} />
                 )}
               </MetadataAccordion>
+
+
+              {hasHltbData(game) ? (
+                <MetadataAccordion title="HowLongToBeat" summary={t('hltb.estimatedTime')}>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours)} />
+                    <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours)} />
+                    <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours)} />
+                    <ReadOnlyField label="Match confidence" value={game.hltbMatchConfidence ?? 'n/a'} />
+                    <ReadOnlyField label="Last synced" value={formatDateTime(game.hltbLastSyncedAt)} />
+                  </div>
+                </MetadataAccordion>
+              ) : null}
 
               <MetadataAccordion title={t('detail.rawgMetadata')} summary={t('detail.rawgSummary')}>
                 {game.metadataSource === 'rawg' ? (

@@ -19,8 +19,10 @@ export const librarySortOptions = [
   'Achievement completion %',
   'Best discount',
   'Lowest price',
+  'Shortest first',
+  'Longest first',
 ] as const;
-export const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h', 'On sale', 'Historical low', 'Deal synced', 'No deal match'] as const;
+export const quickFilterOptions = ['Playing Now', 'Paused', 'Queue / Want to play', 'Missing info', 'Played > 0h', 'On sale', 'Historical low', 'Deal synced', 'No deal match', 'Has HLTB data', 'Under 10 hours', '10–25 hours', 'Over 25 hours', 'Unknown length'] as const;
 export const achievementFilterOptions = ['All', 'Has achievements', 'No achievements synced', 'Nearly completed', 'Completed', 'Started'] as const;
 export const collectionViewModes = ['Grid View', 'Shelf View', 'Compact View'] as const;
 

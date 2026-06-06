@@ -52,6 +52,7 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
               <QueueStatsPanel queueSummary={queueSummary} />
               <ProgressGrid stats={stats} />
               <AchievementStatsPanel stats={stats} />
+              <HltbStatsPanel stats={stats} />
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <BreakdownPanel
@@ -193,6 +194,32 @@ function AchievementStatsPanel({ stats }: { stats: QuestShelfStats }) {
         <MetricCard label={t('stats.completedAchievements')} value={stats.achievementCompleteCount.toString()} compact />
         <MetricCard label={t('stats.nearlyCompleted')} value={stats.achievementNearlyCompleteCount.toString()} compact />
         <MetricCard label={t('stats.totalUnlockedAchievements')} value={stats.achievementTotalUnlocked.toString()} compact />
+      </div>
+    </section>
+  );
+}
+
+
+function HltbStatsPanel({ stats }: { stats: QuestShelfStats }) {
+  const { t } = useI18n();
+
+  return (
+    <section className="rounded-lg border border-skyglass/20 bg-skyglass/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-white">HowLongToBeat</h3>
+          <p className="mt-1 text-sm text-slate-400">{t('hltb.estimatedTime')} overview for the current scope.</p>
+        </div>
+        <span className="rounded-md border border-skyglass/30 bg-ink-950/60 px-2.5 py-1 text-sm font-semibold text-sky-100">
+          {stats.hltbGamesWithDataCount}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <MetricCard label="Games with HLTB data" value={stats.hltbGamesWithDataCount.toString()} compact />
+        <MetricCard label="Average game length" value={stats.hltbAverageGameLength ? `${stats.hltbAverageGameLength}h` : 'n/a'} compact />
+        <MetricCard label={t('hltb.shortGame')} value={stats.hltbShortGameCount.toString()} compact />
+        <MetricCard label="Medium games" value={stats.hltbMediumGameCount.toString()} compact />
+        <MetricCard label={t('hltb.longGame')} value={stats.hltbLongGameCount.toString()} compact />
       </div>
     </section>
   );

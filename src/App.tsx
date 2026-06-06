@@ -113,6 +113,7 @@ import {
 import { loadIsThereAnyDealSettings } from './lib/isThereAnyDealSettingsStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
 import { IsThereAnyDealError, syncItadDealsForWishlistGames } from './lib/isThereAnyDeal';
+import { getPrimaryHltbHours, hasHltbData, syncHltbForGames, type HltbSyncSummary } from './lib/hltb';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from './lib/steamAchievementsSync';
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
 import { parseSteamWishlistHtmlTextWithSummary, steamWishlistBookmarklet, type ParsedSteamWishlistImportItem } from './lib/steamWishlistHtmlImport';
@@ -1186,6 +1187,38 @@ function App() {
   }
 
 
+  async function syncHltb(gameIds: string[]): Promise<HltbSyncSummary | null> {
+    const targetGames = games.filter((game) => gameIds.includes(game.id));
+
+    if (targetGames.length === 0) {
+      const message = t('hltb.noGamesForSync');
+      addToastNotification({ category: 'info', dedupeKey: 'hltb-sync-empty', message });
+      return null;
+    }
+
+    addToastNotification({ category: 'info', dedupeKey: 'hltb-sync-start', message: t('hltb.syncing') });
+
+    try {
+      const result = await syncHltbForGames(targetGames);
+      const updatedGamesById = new Map(result.games.map((game) => [game.id, game]));
+
+      setGames((currentGames) => currentGames.map((game) => updatedGamesById.get(game.id) ?? game));
+
+      const message = formatHltbSyncSummary(result.summary, t);
+      addToastNotification({
+        category: result.summary.failedCount > 0 ? 'warning' : 'success',
+        dedupeKey: 'hltb-sync-complete',
+        message,
+      });
+      return result.summary;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('hltb.syncFailed');
+      addToastNotification({ category: 'error', dedupeKey: 'hltb-sync-error', message });
+      return null;
+    }
+  }
+
+
   async function syncWishlistDeals(gameIds: string[]) {
     if (itadDealSyncState.status === 'loading') {
       return null;
@@ -2251,6 +2284,7 @@ function App() {
               onFinish={finishGameFromCompactRow}
               onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
+              onBulkSyncHltb={syncHltb}
               onBulkRemove={removeManyGames}
               onBulkSyncSteamAchievements={(gameIds, options) =>
                 syncSteamAchievements(gameIds, {
@@ -2297,6 +2331,7 @@ function App() {
               onFinish={finishGameFromCompactRow}
               onDrop={dropGameFromCompactRow}
               onBulkEnrich={startMetadataWorkflow}
+              onBulkSyncHltb={syncHltb}
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
@@ -2662,6 +2697,7 @@ type CollectionPanelProps = {
   onFinish: (game: Game) => void;
   onDrop: (game: Game) => void;
   onBulkEnrich: (gameIds: string[]) => void;
+  onBulkSyncHltb: (gameIds: string[]) => Promise<HltbSyncSummary | null>;
   onBulkRefreshSteamPlaytime?: (gameIds: string[], options?: { emptyToastMessage?: string }) => Promise<SteamPlaytimeRefreshSummary | null>;
   onBulkSyncSteamAchievements?: (gameIds: string[], options?: { emptyToastMessage?: string; force?: boolean }) => Promise<SteamAchievementSyncSummary | null>;
   onBulkRemove: (gameIds: string[]) => void;
@@ -2700,6 +2736,7 @@ function CollectionPanel({
   onFinish,
   onDrop,
   onBulkEnrich,
+  onBulkSyncHltb,
   onBulkRefreshSteamPlaytime,
   onBulkSyncSteamAchievements,
   onBulkRemove,
@@ -2996,6 +3033,19 @@ function CollectionPanel({
   }
 
 
+  async function syncVisibleOrSelectedHltb() {
+    const hasSelection = selectedCount > 0;
+    const targetGames = hasSelection ? selectedGames : games;
+
+    setBulkSummary(null);
+    const summary = await onBulkSyncHltb(targetGames.map((game) => game.id));
+
+    if (summary) {
+      setBulkSummary({ ...summary, message: formatHltbSyncSummary(summary, t) });
+    }
+  }
+
+
   async function syncVisibleOrSelectedWishlistDeals() {
     if (collectionType !== 'wishlist' || !onSyncItadDeals || isItadDealSyncing) {
       return;
@@ -3071,6 +3121,15 @@ function CollectionPanel({
                 {t('wishlist.importSteamHtml')}
               </button>
             ) : null}
+
+            <button
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
+              disabled={games.length === 0}
+              onClick={syncVisibleOrSelectedHltb}
+              type="button"
+            >
+              {t('hltb.sync')}
+            </button>
             {hasWishlistDealSyncAction ? (
               <button
                 className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
@@ -3302,7 +3361,16 @@ function CollectionPanel({
                   Add to Wishlist
                 </button>
               ) : null}
-              {hasWishlistDealSyncAction ? (
+
+            <button
+              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
+              disabled={games.length === 0}
+              onClick={syncVisibleOrSelectedHltb}
+              type="button"
+            >
+              {t('hltb.sync')}
+            </button>
+            {hasWishlistDealSyncAction ? (
                 <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={isWishlistDealSyncDisabled} onClick={syncVisibleOrSelectedWishlistDeals} title={wishlistDealSyncTitle} type="button">
                   {isItadDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
                 </button>
@@ -5505,6 +5573,10 @@ function formatBulkSummary(summary: BulkActionSummary) {
 }
 
 
+function formatHltbSyncSummary(summary: HltbSyncSummary, t: TFunction) {
+  return `${t('hltb.syncComplete')}. ${summary.updatedCount} updated · ${summary.cachedCount} cached · ${summary.noMatchCount} no match · ${summary.failedCount} failed.`;
+}
+
 function formatSteamWishlistSyncSummary(summary: SteamWishlistSyncSummary, t: TFunction) {
   if (summary.fetchedCount === 0) {
     return t('collection.noSteamWishlistGames');
@@ -5669,6 +5741,28 @@ function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
     return Boolean(game.itadLastSyncedAt && !game.itadId);
   }
 
+  const hltbHours = getPrimaryHltbHours(game);
+
+  if (quickFilter === 'Has HLTB data') {
+    return hasHltbData(game);
+  }
+
+  if (quickFilter === 'Under 10 hours') {
+    return typeof hltbHours === 'number' && hltbHours < 10;
+  }
+
+  if (quickFilter === '10–25 hours') {
+    return typeof hltbHours === 'number' && hltbHours >= 10 && hltbHours <= 25;
+  }
+
+  if (quickFilter === 'Over 25 hours') {
+    return typeof hltbHours === 'number' && hltbHours > 25;
+  }
+
+  if (quickFilter === 'Unknown length') {
+    return !hasHltbData(game);
+  }
+
   return game.playtimeHours > 0;
 }
 
@@ -5712,7 +5806,19 @@ function compareGames(firstGame: Game, secondGame: Game, sortBy: LibrarySortOpti
     return getDealPriceSortValue(firstGame) - getDealPriceSortValue(secondGame) || compareTitle(firstGame, secondGame);
   }
 
+  if (sortBy === 'Shortest first') {
+    return getHltbSortValue(firstGame) - getHltbSortValue(secondGame) || compareTitle(firstGame, secondGame);
+  }
+
+  if (sortBy === 'Longest first') {
+    return getHltbSortValue(secondGame, -1) - getHltbSortValue(firstGame, -1) || compareTitle(firstGame, secondGame);
+  }
+
   return compareTitle(firstGame, secondGame);
+}
+
+function getHltbSortValue(game: Game, fallback = Number.POSITIVE_INFINITY) {
+  return getPrimaryHltbHours(game) ?? fallback;
 }
 
 function getDealPriceSortValue(game: Game) {
