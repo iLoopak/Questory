@@ -334,7 +334,7 @@ const en = {
   'queue.buildReview': 'Build in Quest Queue',
   'queue.managePlatforms': 'Manage platforms',
   'queue.customPlatform': 'Custom platform',
-  'queue.addPlatform': 'Add platform',
+  'queue.addPlatform': 'Add Platform',
   'queue.options': 'Options',
   'queue.futureActiveLimit': 'Future active limit',
   'queue.hidePlatform': 'Hide Platform',

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { CSSProperties, FormEvent, KeyboardEvent } from 'react';
 import {
   addActiveQueuePlatform,
   compareQueueEntries,
   getActiveQueuePlatforms,
+  createPlatformArtworkPreset,
+  getDefaultPlatformAccentColor,
   getPlatformAccentColor,
   getPlatformArtworkUrl,
   getPlatformMaxActiveGames,
@@ -13,6 +15,8 @@ import {
   moveQueuePlatform,
   removeQueuePlatform,
   renameQueuePlatform,
+  updatePlatformQueueVisualSettings,
+  type PlatformArtworkPreset,
   type PlatformQueueEntry,
   type PlatformQueueState,
 } from '../lib/platformQueueStorage';
@@ -23,6 +27,8 @@ import { getGameCoverSources } from '../lib/gameCoverImages';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityFields } from './PlatformIdentityFields';
+import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
 
 type QueuePanelProps = {
@@ -59,6 +65,7 @@ export function QueuePanel({
   const { t } = useI18n();
   const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | ''>(initialPlatform ?? queueState.activePlatforms[0] ?? '');
   const [customPlatformName, setCustomPlatformName] = useState('');
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
   const [selectedGameId, setSelectedGameId] = useState('');
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
@@ -159,12 +166,11 @@ export function QueuePanel({
         ]}
         primaryAction={
           <button
-            className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-            disabled={!selectedGameId || !selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)}
-            onClick={addSelectedGame}
+            className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            onClick={() => setIsPlatformModalOpen(true)}
             type="button"
           >
-            {t('toolbar.add')}
+            ＋ Add Platform
           </button>
         }
         actionMenu={
@@ -198,6 +204,14 @@ export function QueuePanel({
                 ))}
               </select>
             </label>
+            <button
+              className="h-9 rounded-md bg-mint px-3 text-left text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+              disabled={!selectedGameId || !selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)}
+              onClick={addSelectedGame}
+              type="button"
+            >
+              {t('queue.addGame')}
+            </button>
             <button
               className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20"
               onClick={onStartReview}
@@ -246,7 +260,11 @@ export function QueuePanel({
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">
-          No active platforms yet. Add Steam, Retroid, PS5, Switch 2, or a custom platform to make Platforms personal.
+          <div className="font-semibold text-white">No platforms yet</div>
+          <p className="mt-1 text-slate-300">Create your first platform to make Platforms personal.</p>
+          <button className="mt-3 h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => setIsPlatformModalOpen(true)} type="button">
+            ＋ Add Platform
+          </button>
         </div>
       ) : null}
 
@@ -291,7 +309,189 @@ export function QueuePanel({
           />
         ))}
       </div>
+
+      {isPlatformModalOpen ? (
+        <AddPlatformModal
+          games={games}
+          queueState={queueState}
+          onClose={() => setIsPlatformModalOpen(false)}
+          onCreate={(nextState, platform) => {
+            onQueueStateChange(nextState);
+            setPlatformFilter('All');
+            setSelectedPlatform(platform);
+            setIsPlatformModalOpen(false);
+            window.requestAnimationFrame(() => {
+              platformRefs.current.get(platform)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            });
+          }}
+        />
+      ) : null}
     </section>
+  );
+}
+
+const platformPresetSuggestions: GamePlatform[] = [
+  'Steam',
+  'PlayStation',
+  'Xbox',
+  'Nintendo Switch',
+  'Switch 2',
+  'Wii',
+  'Wii U',
+  'GameCube',
+  'PS Vita',
+  'PSP',
+  'PS2',
+  'SNES',
+  'N64',
+  'Dreamcast',
+  'PC',
+  'Retro',
+];
+
+function AddPlatformModal({
+  games,
+  queueState,
+  onClose,
+  onCreate,
+}: {
+  games: Game[];
+  queueState: PlatformQueueState;
+  onClose: () => void;
+  onCreate: (state: PlatformQueueState, platform: GamePlatform) => void;
+}) {
+  const [platformName, setPlatformName] = useState('');
+  const [accentColor, setAccentColor] = useState('#2563eb');
+  const [artworkUrl, setArtworkUrl] = useState('');
+  const [platformTag, setPlatformTag] = useState('');
+  const [validationMessage, setValidationMessage] = useState('');
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const availablePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
+  const activePlatformNames = useMemo(
+    () => new Map(queueState.activePlatforms.map((platform) => [platform.trim().toLowerCase(), platform])),
+    [queueState.activePlatforms],
+  );
+  const availablePlatformNames = useMemo(
+    () => new Map(availablePlatforms.map((platform) => [platform.trim().toLowerCase(), platform])),
+    [availablePlatforms],
+  );
+  const previewName = (platformName.trim() || 'New Platform') as GamePlatform;
+  const previewArtworkUrl = artworkUrl || createPlatformArtworkPreset(previewName, accentColor, 'Aurora');
+
+  function applyPresetPlatform(platform: GamePlatform) {
+    const nextAccentColor = getDefaultPlatformAccentColor(platform);
+    setPlatformName(platform);
+    setAccentColor(nextAccentColor);
+    setArtworkUrl(createPlatformArtworkPreset(platform, nextAccentColor, 'Aurora'));
+    setValidationMessage('');
+  }
+
+  function applyPresetArtwork(preset: PlatformArtworkPreset) {
+    setArtworkUrl(createPlatformArtworkPreset(previewName, accentColor, preset));
+  }
+
+  function submitPlatform(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const platformDraft = platformName.trim() as GamePlatform;
+
+    if (!platformDraft) {
+      setValidationMessage('Platform name is required.');
+      nameInputRef.current?.focus();
+      return;
+    }
+
+    const existingActivePlatform = activePlatformNames.get(platformDraft.toLowerCase());
+    if (existingActivePlatform) {
+      setValidationMessage(`“${existingActivePlatform}” already exists in Platforms. Choose a unique platform name.`);
+      nameInputRef.current?.focus();
+      return;
+    }
+
+    const platform = (availablePlatformNames.get(platformDraft.toLowerCase()) ?? platformDraft) as GamePlatform;
+    const createdState = updatePlatformQueueVisualSettings(addActiveQueuePlatform(queueState, platform), platform, {
+      accentColor,
+      artworkUrl,
+      platformTag: platformTag.trim(),
+    });
+    onCreate(createdState, platform);
+  }
+
+  return (
+    <ViewportModal ariaLabel="Add Platform" initialFocusRef={nameInputRef} onClose={onClose} placement="center">
+      <form className="max-h-[85vh] overflow-y-auto p-4" onSubmit={submitPlatform}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Platforms</div>
+            <h2 className="mt-1 text-xl font-semibold text-white">Add Platform</h2>
+            <p className="mt-1 text-sm text-slate-400">Create a platform with its accent color, artwork, and preset image before adding games.</p>
+          </div>
+          <button className="rounded-md border border-white/10 px-2 py-1 text-sm text-slate-300 hover:bg-white/10" onClick={onClose} type="button">
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-ink-950/70">
+          <div className="relative h-24">
+            {previewArtworkUrl ? <img alt="" className="h-full w-full object-cover" src={previewArtworkUrl} /> : null}
+            <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 to-ink-950/15" />
+            <div className="absolute inset-x-0 bottom-0 p-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-ink-950/75 px-3 py-1 text-sm font-semibold text-white">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                {previewName}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <label className="mt-4 grid gap-1">
+          <span className="text-xs font-semibold text-slate-400">Platform name <span className="text-red-300">*</span></span>
+          <input
+            ref={nameInputRef}
+            aria-invalid={Boolean(validationMessage)}
+            className="h-10 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
+            placeholder="Steam, PlayStation, Dreamcast..."
+            value={platformName}
+            onChange={(event) => {
+              setPlatformName(event.target.value);
+              setValidationMessage('');
+            }}
+          />
+          {validationMessage ? <span className="text-xs font-semibold text-red-200">{validationMessage}</span> : null}
+        </label>
+
+        <div className="mt-4">
+          <div className="text-xs font-semibold text-slate-400">Platform presets</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {platformPresetSuggestions.map((platform) => (
+              <button key={platform} className="min-h-9 rounded-md border border-white/10 px-3 py-1 text-xs text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint" onClick={() => applyPresetPlatform(platform)} type="button">
+                {platform}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-white/10 bg-ink-950/60 p-3">
+          <PlatformIdentityFields
+            accentColor={accentColor}
+            artworkUrl={artworkUrl}
+            platformTag={platformTag}
+            onAccentColorChange={setAccentColor}
+            onArtworkUrlChange={setArtworkUrl}
+            onPlatformTagChange={setPlatformTag}
+            onPresetArtwork={applyPresetArtwork}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button className="h-10 rounded-md border border-white/10 px-4 text-sm font-semibold text-slate-200 hover:bg-white/10" onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90" type="submit">
+            Add Platform
+          </button>
+        </div>
+      </form>
+    </ViewportModal>
   );
 }
 
