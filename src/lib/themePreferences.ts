@@ -138,7 +138,14 @@ export function saveAccentColorPreference(color: AccentColorPreference) {
   void saveAccentColorPreferenceToNativeStorage(color);
 }
 
-export function resolveThemePreference(preference: ThemePreference): ResolvedTheme {
+export function resolveThemePreference(
+  preference: ThemePreference,
+  appTemplatePreference: AppTemplatePreference = 'classic',
+): ResolvedTheme {
+  if (appTemplatePreference === 'neon-deck') {
+    return 'dark';
+  }
+
   if (preference !== 'system') {
     return preference;
   }
@@ -170,8 +177,11 @@ export function applyAccentColorPreference(color: AccentColorPreference) {
   root.dataset.accentColor = color;
 }
 
-export function applyThemePreference(preference: ThemePreference): ResolvedTheme {
-  const resolvedTheme = resolveThemePreference(preference);
+export function applyThemePreference(
+  preference: ThemePreference,
+  appTemplatePreference: AppTemplatePreference = 'classic',
+): ResolvedTheme {
+  const resolvedTheme = resolveThemePreference(preference, appTemplatePreference);
 
   if (typeof document === 'undefined') {
     return resolvedTheme;
@@ -185,7 +195,7 @@ export function applyThemePreference(preference: ThemePreference): ResolvedTheme
 
   window.dispatchEvent(
     new CustomEvent('questshelf:theme-change', {
-      detail: { preference, theme: resolvedTheme },
+      detail: { preference, theme: resolvedTheme, appTemplate: appTemplatePreference },
     }),
   );
 

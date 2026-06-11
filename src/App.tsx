@@ -253,9 +253,12 @@ function App() {
   const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
     loadNavigationVisibilityPreferences(),
   );
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => applyThemePreference(loadThemePreference()));
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+    applyThemePreference(loadThemePreference(), loadAppTemplatePreference()),
+  );
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
+  const isNeonTemplate = appTemplatePreference === 'neon-deck';
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
@@ -332,17 +335,17 @@ function App() {
   }, [platformQueueState]);
 
   useEffect(() => {
-    setResolvedTheme(applyThemePreference(themePreference));
+    setResolvedTheme(applyThemePreference(themePreference, appTemplatePreference));
     saveThemePreference(themePreference);
 
-    if (themePreference !== 'system') {
+    if (isNeonTemplate || themePreference !== 'system') {
       return undefined;
     }
 
     return watchSystemTheme(() => {
-      setResolvedTheme(applyThemePreference('system'));
+      setResolvedTheme(applyThemePreference('system', appTemplatePreference));
     });
-  }, [themePreference]);
+  }, [appTemplatePreference, isNeonTemplate, themePreference]);
 
 
   useEffect(() => {
@@ -351,9 +354,9 @@ function App() {
   }, [appTemplatePreference]);
 
   useEffect(() => {
-    applyAccentColorPreference(accentColorPreference);
+    applyAccentColorPreference(isNeonTemplate ? null : accentColorPreference);
     saveAccentColorPreference(accentColorPreference);
-  }, [accentColorPreference]);
+  }, [accentColorPreference, isNeonTemplate]);
 
   useEffect(() => {
     pendingUndoActionsRef.current = pendingUndoActions;
@@ -5116,6 +5119,7 @@ function AppearanceSettingsPanel({
       value: 'neon-deck',
     },
   ];
+  const isNeonTemplate = appTemplatePreference === 'neon-deck';
   const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
   const isDefaultAccentColor = accentColorPreference === null;
   const accentColorPresets = [
@@ -5156,42 +5160,42 @@ function AppearanceSettingsPanel({
         </span>
       </div>
 
-      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.theme')}</div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t('settings.theme')}>
-          {themeOptions.map((option) => {
-            const isSelected = themePreference === option.value;
+      {!isNeonTemplate ? (
+        <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.theme')}</div>
+          <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t('settings.theme')}>
+            {themeOptions.map((option) => {
+              const isSelected = themePreference === option.value;
 
-            return (
-              <button
-                aria-checked={isSelected}
-                className={`min-h-28 rounded-md border p-3 text-left transition ${
-                  isSelected
-                    ? 'border-mint/60 bg-mint/15 text-white shadow-glow'
-                    : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/35 hover:bg-mint/10 hover:text-white'
-                }`}
-                key={option.value}
-                onClick={() => onThemePreferenceChange(option.value)}
-                role="radio"
-                type="button"
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`grid h-5 w-5 place-items-center rounded-full border ${isSelected ? 'border-mint bg-mint text-ink-950' : 'border-skyglass/30'}`}>
-                    {isSelected ? <span className="h-2 w-2 rounded-full bg-ink-950" /> : null}
+              return (
+                <button
+                  aria-checked={isSelected}
+                  className={`min-h-28 rounded-md border p-3 text-left transition ${
+                    isSelected
+                      ? 'border-mint/60 bg-mint/15 text-white shadow-glow'
+                      : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/35 hover:bg-mint/10 hover:text-white'
+                  }`}
+                  key={option.value}
+                  onClick={() => onThemePreferenceChange(option.value)}
+                  role="radio"
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`grid h-5 w-5 place-items-center rounded-full border ${isSelected ? 'border-mint bg-mint text-ink-950' : 'border-skyglass/30'}`}>
+                      {isSelected ? <span className="h-2 w-2 rounded-full bg-ink-950" /> : null}
+                    </span>
+                    <span className="font-semibold">{option.label}</span>
                   </span>
-                  <span className="font-semibold">{option.label}</span>
-                </span>
-                <span className="mt-2 block text-xs leading-5 text-slate-500">{option.description}</span>
-              </button>
-            );
-          })}
+                  <span className="mt-2 block text-xs leading-5 text-slate-500">{option.description}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
+          </p>
         </div>
-        <p className="mt-3 text-xs leading-5 text-slate-500">
-          Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
-        </p>
-      </div>
-
-
+      ) : null}
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.template')}</div>
@@ -5225,66 +5229,74 @@ function AppearanceSettingsPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.accentColor')}</div>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{t('settings.accentColorHelp')}</p>
+      {!isNeonTemplate ? (
+        <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.accentColor')}</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{t('settings.accentColorHelp')}</p>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2">
+              <span
+                aria-hidden="true"
+                className="h-8 w-8 rounded-full border border-white/20 shadow-glow"
+                style={{ backgroundColor: selectedAccentColor }}
+              />
+              <span className="text-xs font-semibold text-mint">{t('settings.currentAccentColor')} · {selectedAccentColor}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2">
-            <span
-              aria-hidden="true"
-              className="h-8 w-8 rounded-full border border-white/20 shadow-glow"
-              style={{ backgroundColor: selectedAccentColor }}
+
+          <label className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+            <span className="font-semibold text-white">{t('settings.customAccentColor')}</span>
+            <input
+              aria-label={t('settings.customAccentColor')}
+              className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
+              onChange={(event) => selectAccentColor(event.target.value)}
+              type="color"
+              value={selectedAccentColor}
             />
-            <span className="text-xs font-semibold text-mint">{t('settings.currentAccentColor')} · {selectedAccentColor}</span>
+          </label>
+
+          <div className="mt-4">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.recommendedAccents')}</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {accentColorPresets.map((preset) => {
+                const isSelected = selectedAccentColor === preset.color && (preset.color !== defaultAccentColor || isDefaultAccentColor);
+
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={`qs-accent-swatch grid min-h-11 min-w-11 place-items-center rounded-md border p-1 transition ${
+                      isSelected ? 'border-mint/60 shadow-glow' : 'border-skyglass/20 hover:border-mint/45 hover:shadow-glow'
+                    }`}
+                    key={preset.color}
+                    onClick={() => selectAccentColor(preset.color)}
+                    title={preset.label}
+                    type="button"
+                  >
+                    <span className="sr-only">{preset.label}</span>
+                    <span className="h-8 w-8 rounded-full border border-white/25" style={{ backgroundColor: preset.color }} />
+                  </button>
+                );
+              })}
+              <button
+                className="min-h-11 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/45 hover:bg-mint/10 hover:text-white"
+                onClick={() => onAccentColorChange(null)}
+                type="button"
+              >
+                {t('settings.resetAccentColor')}
+              </button>
+            </div>
           </div>
         </div>
-
-        <label className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-          <span className="font-semibold text-white">{t('settings.customAccentColor')}</span>
-          <input
-            aria-label={t('settings.customAccentColor')}
-            className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
-            onChange={(event) => selectAccentColor(event.target.value)}
-            type="color"
-            value={selectedAccentColor}
-          />
-        </label>
-
-        <div className="mt-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.recommendedAccents')}</div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {accentColorPresets.map((preset) => {
-              const isSelected = selectedAccentColor === preset.color && (preset.color !== defaultAccentColor || isDefaultAccentColor);
-
-              return (
-                <button
-                  aria-pressed={isSelected}
-                  className={`qs-accent-swatch grid min-h-11 min-w-11 place-items-center rounded-md border p-1 transition ${
-                    isSelected ? 'border-mint/60 shadow-glow' : 'border-skyglass/20 hover:border-mint/45 hover:shadow-glow'
-                  }`}
-                  key={preset.color}
-                  onClick={() => selectAccentColor(preset.color)}
-                  title={preset.label}
-                  type="button"
-                >
-                  <span className="sr-only">{preset.label}</span>
-                  <span className="h-8 w-8 rounded-full border border-white/25" style={{ backgroundColor: preset.color }} />
-                </button>
-              );
-            })}
-            <button
-              className="min-h-11 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/45 hover:bg-mint/10 hover:text-white"
-              onClick={() => onAccentColorChange(null)}
-              type="button"
-            >
-              {t('settings.resetAccentColor')}
-            </button>
-          </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-mint/30 bg-mint/10 p-3 text-sm text-slate-300 shadow-glow">
+          <div className="font-semibold text-white">Neon Deck controls its own look</div>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            This template is dark-first and uses a fixed neon palette for consistent contrast and glow effects.
+          </p>
         </div>
-      </div>
-
+      )}
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <label className="block">

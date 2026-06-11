@@ -5,7 +5,14 @@ import { configureAndroidGamepadShortcuts } from './lib/androidGamepadShortcuts'
 import { configureHandheldImmersiveMode } from './lib/handheldImmersiveMode';
 import { hydrateLocalStorageFromPreferences } from './lib/localPersistence';
 import { persistentStorageKeys } from './lib/persistentStorageKeys';
-import { applyAccentColorPreference, applyThemePreference, loadAccentColorPreference, loadThemePreference } from './lib/themePreferences';
+import {
+  applyAccentColorPreference,
+  applyAppTemplatePreference,
+  applyThemePreference,
+  loadAccentColorPreference,
+  loadAppTemplatePreference,
+  loadThemePreference,
+} from './lib/themePreferences';
 import { registerServiceWorker } from './lib/serviceWorkerRegistration';
 import './styles.css';
 
@@ -18,8 +25,12 @@ void startApp();
 
 async function startApp() {
   await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
-  applyThemePreference(loadThemePreference());
-  applyAccentColorPreference(loadAccentColorPreference());
+  const appTemplatePreference = loadAppTemplatePreference();
+  const isNeonTemplate = appTemplatePreference === 'neon-deck';
+
+  applyAppTemplatePreference(appTemplatePreference);
+  applyThemePreference(loadThemePreference(), appTemplatePreference);
+  applyAccentColorPreference(isNeonTemplate ? null : loadAccentColorPreference());
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
