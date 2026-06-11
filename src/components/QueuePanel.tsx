@@ -548,6 +548,7 @@ function PlatformQueueColumn({
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
   const platformAccentColor = accentColor || 'var(--accent)';
+  const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
   const accentStyle = { '--platform-accent': platformAccentColor, borderColor: isHighlighted || hasGames ? platformAccentColor : undefined } as CSSProperties;
 
   function renamePlatform() {
@@ -561,16 +562,20 @@ function PlatformQueueColumn({
 
   return (
     <section ref={setPlatformRef} style={accentStyle} className={`overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'shadow-glow' : hasGames ? '' : 'border-skyglass/10 opacity-80'}`}>
-      {artworkUrl ? (
+      {displayArtworkUrl ? (
         <div className="relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
-          <img alt="" className="h-full w-full object-cover opacity-75" src={artworkUrl} />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 via-ink-950/35 to-ink-950/80" />
-          <h3 className="absolute bottom-2 left-3 truncate text-lg font-semibold text-white">{platform}</h3>
+          <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
+          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
+          <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
+            <h3 className="max-w-full truncate rounded-full border border-white/10 bg-ink-950/80 px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm">
+              {platform}
+            </h3>
+          </div>
         </div>
       ) : null}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          {!artworkUrl ? <h3 className="truncate text-lg font-semibold text-white" style={{ color: platformAccentColor }}>{platform}</h3> : null}
+          {!displayArtworkUrl ? <h3 className="truncate text-base font-semibold leading-tight text-white" style={{ color: platformAccentColor }}>{platform}</h3> : null}
           {platformTag ? <div className="mt-1 text-xs text-slate-500">Tag: {platformTag}</div> : null}
         </div>
         <details className="relative">
@@ -648,6 +653,30 @@ function PlatformQueueColumn({
       </div>
     </section>
   );
+}
+
+function removePlatformArtworkWatermark(artworkUrl: string) {
+  if (!artworkUrl.startsWith('data:image/svg+xml,')) {
+    return artworkUrl;
+  }
+
+  try {
+    const [prefix, encodedSvg] = artworkUrl.split(',', 2);
+    const svg = decodeURIComponent(encodedSvg);
+    const isQuestShelfPreset = svg.includes('viewBox="0 0 360 120"') && svg.includes('<radialGradient id="v"');
+
+    if (!isQuestShelfPreset) {
+      return artworkUrl;
+    }
+
+    const cleanedSvg = svg
+      .replace(/<rect x="12" y="22" width="230" height="60" rx="18" fill="#020617" fill-opacity="0\.18"\/>/g, '')
+      .replace(/<text\b[^>]*>.*?<\/text>/g, '');
+
+    return `${prefix},${encodeURIComponent(cleanedSvg)}`;
+  } catch {
+    return artworkUrl;
+  }
 }
 
 function QueueEntryRow({
