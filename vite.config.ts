@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -51,36 +49,28 @@ export default defineConfig({
 
 type HltbProviderFailureReason = 'network' | 'cors-proxy' | 'blocked' | 'temporary' | 'invalid-response' | 'parse' | 'unavailable';
 
-type HltbPackageModule = {
-  HowLongToBeat?: HltbPackageConstructor;
-  default?: HltbPackageModule;
-  [key: string]: unknown;
+type HltbApiGame = Record<string, unknown>;
+
+type HltbSearchResult = {
+  id?: string;
+  title: string;
+  mainHours?: number;
+  mainExtraHours?: number;
+  completionistHours?: number;
+  allStylesHours?: number;
+  allStylesCount?: number;
+  sourceUrl?: string;
+  steamAppId?: number;
+  profileSteam?: string;
 };
 
-type HltbProviderOptions = {
-  apiKey?: string | undefined;
-};
+const HLTB_API_SEARCH_URL = 'https://howlongtobeat.com/api/search';
+const HLTB_SOURCE_BASE_URL = 'https://howlongtobeat.com/game';
+const HLTB_BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-type HltbPackageInitMode = 'numeric-minimum-similarity' | 'no-args' | 'options-api-key-undefined';
-
-type HltbPackageDiagnostics = {
-  exportKeys: string[];
-  packageVersion: string;
-};
-
-type HltbPackageClient = {
-  minimumSimilarity?: unknown;
-  search: (title: string) => Promise<unknown[] | null>;
-};
-
-type HltbPackageConstructor = new (...args: [] | [HltbProviderOptions] | [number]) => HltbPackageClient;
-
-const hltbPackageRequire = createRequire(import.meta.url);
-let hltbPackageDiagnosticsLogged = false;
-
-// Dev/server-only bridge for howlongtobeat-js. The package depends on Node
-// request/parsing libraries and cannot be safely imported into the Vite browser
-// bundle, so the frontend talks to /api/hltb/search instead.
+// Dev/server-only HLTB bridge. The frontend talks to /api/hltb/search so browser
+// code never calls howlongtobeat.com directly; this Node middleware owns the
+// hltb-for-deck-style POST request to HowLongToBeat.
 function hltbDevEndpointPlugin(): Plugin {
   return {
     name: 'questshelf-hltb-dev-endpoint',
@@ -113,134 +103,155 @@ async function handleHltbSearchRequest(
   const title = titleResult.title;
   logHltbDevEndpoint('internal endpoint called', { title });
 
-  const hltbModule = await loadHowLongToBeatJs().catch((error: unknown) => {
+  const apiResponse = await fetch(HLTB_API_SEARCH_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json,text/plain,*/*',
+      'Content-Type': 'application/json',
+      Origin: 'https://howlongtobeat.com',
+      Referer: 'https://howlongtobeat.com/',
+      'User-Agent': HLTB_BROWSER_USER_AGENT,
+    },
+    body: JSON.stringify(createHltbSearchPayload(title)),
+  }).catch((error: unknown) => {
     throw toHltbDevEndpointError(error);
   });
-  const HowLongToBeat = hltbModule.HowLongToBeat ?? hltbModule.default?.HowLongToBeat;
-  const diagnostics = await getHowLongToBeatPackageDiagnostics(hltbModule);
 
-  if (!HowLongToBeat) {
-    const error = {
-      message: 'howlongtobeat-js did not expose a HowLongToBeat class in this runtime.',
-      reason: 'unavailable' as HltbProviderFailureReason,
-      status: 503,
-    };
-    logHltbDevEndpoint('provider failure', error);
+  logHltbDevEndpoint('request status', { title, status: apiResponse.status });
+
+  const responseText = await apiResponse.text().catch((error: unknown) => {
+    throw toHltbDevEndpointError(error);
+  });
+  const parsed = parseHltbApiResponseJson(responseText, apiResponse.status);
+
+  if (!apiResponse.ok) {
+    const error = classifyHltbHttpError(apiResponse.status, parsed);
+    logHltbDevEndpoint('provider failure reason', error);
     sendHltbJson(response, error.status, error);
     return;
   }
 
-  const { client, mode } = createHowLongToBeatClient(HowLongToBeat, diagnostics);
-  logHowLongToBeatPackageDiagnostics(diagnostics, mode);
-  const results = await client.search(title).catch((error: unknown) => {
-    throw toHltbDevEndpointError(error);
-  });
-  const safeResults = Array.isArray(results) ? results : [];
-  logHltbDevEndpoint('provider package result count', { title, count: safeResults.length });
-  sendHltbJson(response, 200, { provider: 'howlongtobeat-js', results: safeResults });
-}
-
-function createHowLongToBeatClient(
-  HowLongToBeat: HltbPackageConstructor,
-  diagnostics: HltbPackageDiagnostics,
-): { client: HltbPackageClient; mode: HltbPackageInitMode } {
-  const candidates = getHowLongToBeatInitCandidates(HowLongToBeat, diagnostics);
-  let lastError: unknown;
-
-  for (const candidate of candidates) {
-    try {
-      logHltbDevEndpoint('provider init candidate', { mode: candidate.mode });
-      const client = new HowLongToBeat(...candidate.args);
-      if (typeof client.search !== 'function') {
-        throw new Error(`howlongtobeat-js client created with ${candidate.mode} does not expose search().`);
-      }
-      if (Object.prototype.hasOwnProperty.call(client, 'minimumSimilarity') && typeof client.minimumSimilarity !== 'number') {
-        client.minimumSimilarity = 0;
-      }
-      return { client, mode: candidate.mode };
-    } catch (error) {
-      lastError = error;
-      logHltbDevEndpoint('provider init candidate failed', {
-        mode: candidate.mode,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('howlongtobeat-js client could not be initialized with any supported constructor shape.');
-}
-
-function getHowLongToBeatInitCandidates(
-  HowLongToBeat: HltbPackageConstructor,
-  diagnostics: HltbPackageDiagnostics,
-): Array<{ mode: HltbPackageInitMode; args: [] | [number] | [HltbProviderOptions] }> {
-  const constructorSource = Function.prototype.toString.call(HowLongToBeat);
-  const supportsNumericMinimumSimilarity = /^1\.0\./.test(diagnostics.packageVersion)
-    || /min(?:imum)?Similarity|minimumSimilarity/i.test(constructorSource);
-  const explicitlySupportsOptions = /apiKey|config|options/i.test(constructorSource) && !supportsNumericMinimumSimilarity;
-
-  if (supportsNumericMinimumSimilarity) {
-    return [
-      { mode: 'numeric-minimum-similarity', args: [0] },
-      { mode: 'no-args', args: [] },
-    ];
-  }
-
-  if (explicitlySupportsOptions) {
-    return [
-      { mode: 'options-api-key-undefined', args: [{ apiKey: undefined }] },
-      { mode: 'no-args', args: [] },
-      { mode: 'numeric-minimum-similarity', args: [0] },
-    ];
-  }
-
-  return [
-    { mode: 'no-args', args: [] },
-    { mode: 'numeric-minimum-similarity', args: [0] },
-  ];
-}
-
-async function getHowLongToBeatPackageDiagnostics(module: HltbPackageModule): Promise<HltbPackageDiagnostics> {
-  return {
-    exportKeys: getHowLongToBeatExportKeys(module),
-    packageVersion: await getHowLongToBeatPackageVersion(),
-  };
-}
-
-function getHowLongToBeatExportKeys(module: HltbPackageModule) {
-  const keys = new Set(Object.keys(module));
-  if (module.default && typeof module.default === 'object') {
-    Object.keys(module.default).forEach((key) => keys.add(`default.${key}`));
-  }
-  return [...keys].sort();
-}
-
-async function getHowLongToBeatPackageVersion() {
-  try {
-    const packageJsonPath = hltbPackageRequire.resolve('howlongtobeat-js/package.json');
-    const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8')) as { version?: unknown };
-    return typeof packageJson.version === 'string' && packageJson.version.trim() ? packageJson.version : 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
-
-function logHowLongToBeatPackageDiagnostics(diagnostics: HltbPackageDiagnostics, mode: HltbPackageInitMode) {
-  if (hltbPackageDiagnosticsLogged) {
+  const data = getHltbApiResponseData(parsed);
+  if (!data) {
+    const error = {
+      message: 'HowLongToBeat returned an invalid response shape.',
+      reason: 'invalid-response' as HltbProviderFailureReason,
+      status: 502,
+    };
+    logHltbDevEndpoint('provider failure reason', error);
+    sendHltbJson(response, error.status, error);
     return;
   }
 
-  hltbPackageDiagnosticsLogged = true;
-  logHltbDevEndpoint('package version', diagnostics.packageVersion);
-  logHltbDevEndpoint('package export keys', diagnostics.exportKeys);
-  logHltbDevEndpoint('init mode', mode);
+  const results = data.map(mapHltbApiGame).filter((result): result is HltbSearchResult => Boolean(result));
+  logHltbDevEndpoint('candidates count', { title, count: results.length });
+  sendHltbJson(response, 200, { provider: 'howlongtobeat-api', results });
 }
 
-async function loadHowLongToBeatJs(): Promise<HltbPackageModule> {
-  const importDependency = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<HltbPackageModule>;
-  return importDependency('howlongtobeat-js');
+function createHltbSearchPayload(title: string) {
+  return {
+    searchType: 'games',
+    searchTerms: title.split(' ').filter(Boolean),
+    searchPage: 1,
+    size: 50,
+    searchOptions: {
+      games: {
+        userId: 0,
+        platform: '',
+        sortCategory: 'name',
+        rangeCategory: 'main',
+        rangeTime: { min: 0, max: 0 },
+        gameplay: {
+          perspective: '',
+          flow: '',
+          genre: '',
+        },
+        modifier: 'hide_dlc',
+      },
+      users: {},
+      filter: '',
+      sort: 0,
+      randomizer: 0,
+    },
+  };
+}
+
+function parseHltbApiResponseJson(text: string, status: number): unknown {
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    throw {
+      message: `HowLongToBeat returned non-JSON data${error instanceof Error ? `: ${error.message}` : '.'}`,
+      reason: 'parse' as HltbProviderFailureReason,
+      status: status >= 400 ? status : 502,
+    };
+  }
+}
+
+function getHltbApiResponseData(value: unknown): HltbApiGame[] | null {
+  if (!isRecord(value) || !Array.isArray(value.data)) {
+    return null;
+  }
+
+  return value.data.filter(isRecord);
+}
+
+function mapHltbApiGame(value: HltbApiGame): HltbSearchResult | null {
+  const title = getString(value.game_name);
+  if (!title) {
+    return null;
+  }
+
+  const id = getString(value.game_id);
+  const profileSteam = getString(value.profile_steam);
+
+  return {
+    id,
+    title,
+    mainHours: normalizeHltbSecondsToHours(value.comp_main),
+    mainExtraHours: normalizeHltbSecondsToHours(value.comp_plus),
+    completionistHours: normalizeHltbSecondsToHours(value.comp_100),
+    allStylesHours: normalizeHltbSecondsToHours(value.comp_all),
+    allStylesCount: getNumber(value.comp_all_count),
+    sourceUrl: id ? `${HLTB_SOURCE_BASE_URL}/${id}` : undefined,
+    steamAppId: getSteamAppId(profileSteam),
+    profileSteam,
+  };
+}
+
+function normalizeHltbSecondsToHours(value: unknown) {
+  const seconds = getNumber(value);
+  if (typeof seconds !== 'number' || seconds <= 0) {
+    return undefined;
+  }
+
+  return Math.round((seconds / 3600) * 10) / 10;
+}
+
+function classifyHltbHttpError(status: number, data: unknown): { message: string; reason: HltbProviderFailureReason; status: number } {
+  const message = getHltbErrorMessage(data) ?? `HowLongToBeat request failed with HTTP ${status}.`;
+
+  if (status === 403 || status === 429) {
+    return { message, reason: 'blocked', status };
+  }
+
+  if (status >= 500) {
+    return { message, reason: 'temporary', status };
+  }
+
+  return { message, reason: 'invalid-response', status };
+}
+
+function getHltbErrorMessage(data: unknown) {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+
+  return getString(data.message) ?? getString(data.error);
 }
 
 async function getHltbRequestTitle(request: { method?: string; url?: string; headers?: { host?: string }; on: (event: string, listener: (chunk?: unknown) => void) => void }): Promise<{ title: string; error?: never } | { title?: never; error: { message: string; reason: HltbProviderFailureReason; status: number } }> {
@@ -302,7 +313,7 @@ function toHltbDevEndpointError(error: unknown) {
   }
 
   const endpointError = classifyHltbDevEndpointError(error);
-  logHltbDevEndpoint('provider failure', endpointError);
+  logHltbDevEndpoint('provider failure reason', endpointError);
   return endpointError;
 }
 
@@ -315,34 +326,70 @@ function isHltbDevEndpointError(error: unknown): error is { message: string; rea
 }
 
 function classifyHltbDevEndpointError(error: unknown): { message: string; reason: HltbProviderFailureReason; status: number } {
-  const message = error instanceof Error ? error.message : 'Unknown howlongtobeat-js runtime failure.';
-
-  if (/cannot find package|cannot find module|ERR_MODULE_NOT_FOUND/i.test(message)) {
-    return {
-      message: 'howlongtobeat-js is not installed. Run npm install before using HLTB sync in dev/server mode.',
-      reason: 'unavailable',
-      status: 503,
-    };
-  }
+  const message = error instanceof Error ? error.message : 'Unknown HowLongToBeat provider failure.';
 
   if (/JSON|Unexpected token|Unexpected end/i.test(message)) {
     return { message: `HLTB endpoint request parsing failed: ${message}`, reason: 'parse', status: 400 };
   }
 
   if (/timeout|network|socket|ECONN|ENOTFOUND|ETIMEDOUT|fetch/i.test(message)) {
-    return { message: `howlongtobeat-js network failure: ${message}`, reason: 'network', status: 502 };
+    return { message: `HowLongToBeat network failure: ${message}`, reason: 'network', status: 502 };
   }
 
   if (/403|429|blocked|rate/i.test(message)) {
-    return { message: `HowLongToBeat blocked or rate-limited howlongtobeat-js: ${message}`, reason: 'blocked', status: 503 };
+    return { message: `HowLongToBeat blocked or rate-limited the request: ${message}`, reason: 'blocked', status: 503 };
   }
 
-  return { message: `howlongtobeat-js failed at runtime: ${message}`, reason: 'temporary', status: 500 };
+  return { message: `HowLongToBeat provider failed: ${message}`, reason: 'temporary', status: 500 };
+}
+
+function getSteamAppId(value: unknown) {
+  const profileSteam = getString(value);
+  if (!profileSteam) {
+    return undefined;
+  }
+
+  const match = profileSteam.match(/\d+/);
+  if (!match) {
+    return undefined;
+  }
+
+  const appId = Number(match[0]);
+  return Number.isFinite(appId) ? appId : undefined;
+}
+
+function getString(value: unknown) {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+
+  return undefined;
+}
+
+function getNumber(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : undefined;
+  }
+
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function logHltbDevEndpoint(label: string, details?: unknown) {
   const logger = Reflect.get(globalThis, 'console') as { debug?: (...args: unknown[]) => void; warn?: (...args: unknown[]) => void } | undefined;
-  if (label === 'provider failure') {
+  if (label === 'provider failure reason') {
     logger?.warn?.(`[hltb] ${label}`, details ?? '');
     return;
   }

@@ -15,6 +15,10 @@ export type HltbSearchResult = {
   sourceUrl?: string;
   confidence?: number;
   platforms?: string[];
+  steamAppId?: number;
+  profileSteam?: string;
+  allStylesHours?: number;
+  allStylesCount?: number;
 };
 
 export type HltbCachedEntry = {
@@ -42,7 +46,7 @@ export interface HltbProvider {
 
 export type HltbProviderFailureReason = 'network' | 'cors-proxy' | 'blocked' | 'temporary' | 'invalid-response' | 'parse' | 'unavailable';
 
-type PackageHltbResult = {
+type EndpointHltbResult = {
   gameId?: unknown;
   game_id?: unknown;
   id?: unknown;
@@ -66,6 +70,13 @@ type PackageHltbResult = {
   profilePlatforms?: unknown;
   profile_platform?: unknown;
   platforms?: unknown;
+  steamAppId?: unknown;
+  profileSteam?: unknown;
+  profile_steam?: unknown;
+  allStylesHours?: unknown;
+  allStylesCount?: unknown;
+  comp_all?: unknown;
+  comp_all_count?: unknown;
 };
 
 export class HltbProviderError extends Error {
@@ -80,12 +91,11 @@ export class HltbProviderError extends Error {
   }
 }
 
-// howlongtobeat-js is a Node/CommonJS scraper package. The browser adapter calls
-// QuestShelf's HLTB endpoint so UI code never bundles the package directly and
-// production/static builds fail gracefully unless a compatible backend provides it.
+// Browser adapter for QuestShelf's internal HLTB endpoint. UI code never calls
+// howlongtobeat.com directly; the Node/Vite middleware owns the provider request.
 export class HowLongToBeatProvider implements HltbProvider {
   async search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]> {
-    debugHltb('provider', 'howlongtobeat-js via QuestShelf HLTB endpoint');
+    debugHltb('provider', 'QuestShelf custom HLTB endpoint');
     debugHltb('search title', title);
 
     try {
@@ -103,8 +113,8 @@ export class HowLongToBeatProvider implements HltbProvider {
         throw new HltbProviderError('QuestShelf HLTB endpoint returned an invalid response.', 'invalid-response', response.status);
       }
 
-      const results = rawResults.map(mapHowLongToBeatJsResult).filter((result): result is HltbSearchResult => Boolean(result));
-      debugHltb('provider package result count', results.length);
+      const results = rawResults.map(mapHltbEndpointResult).filter((result): result is HltbSearchResult => Boolean(result));
+      debugHltb('candidates count', results.length);
       return results;
     } catch (error) {
       const hltbError = error instanceof HltbProviderError ? error : classifyFetchFailure(error);
@@ -188,13 +198,24 @@ export async function syncHltbForGames(
   return { games: updatedGames, summary };
 }
 
-export function chooseBestHltbMatch(game: Pick<Game, 'title' | 'platform'>, results: HltbSearchResult[]) {
+export function chooseBestHltbMatch(game: Pick<Game, 'title' | 'platform' | 'steamAppId'>, results: HltbSearchResult[]) {
   const candidates = results
+    .filter(hasHltbHours)
     .map((result) => ({ result, score: scoreHltbCandidate(game, result) }))
-    .filter((candidate) => candidate.score >= MIN_SAFE_MATCH_CONFIDENCE && hasHltbHours(candidate.result))
     .sort((first, second) => second.score - first.score);
 
-  const best = candidates[0];
+  const steamMatch = chooseSteamAppIdMatch(game, candidates);
+  if (steamMatch) {
+    return steamMatch;
+  }
+
+  const exactMatch = chooseExactTitleMatch(game, candidates);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const safeCandidates = candidates.filter((candidate) => candidate.score >= MIN_SAFE_MATCH_CONFIDENCE);
+  const best = safeCandidates[0];
   if (!best) {
     debugHltb('no match', {
       title: game.title,
@@ -204,8 +225,8 @@ export function chooseBestHltbMatch(game: Pick<Game, 'title' | 'platform'>, resu
     return null;
   }
 
-  const second = candidates[1];
-  if (second && best.score - second.score < AMBIGUOUS_MATCH_DELTA && normalizeHltbTitle(best.result.title) !== normalizeHltbTitle(game.title)) {
+  const second = safeCandidates[1];
+  if (second && best.score - second.score < AMBIGUOUS_MATCH_DELTA) {
     debugHltb('no match', {
       title: game.title,
       reason: 'ambiguous match',
@@ -284,13 +305,13 @@ function createEndpointHltbError(status: number, data: unknown) {
   const reason = getEndpointFailureReason(data, status);
   const message = getEndpointFailureMessage(data)
     ?? (status === 404
-      ? 'QuestShelf HLTB endpoint is unavailable in this build. A Node/server runtime is required for howlongtobeat-js.'
+      ? 'QuestShelf HLTB endpoint is unavailable in this build. A Node/server runtime is required for HLTB sync.'
       : `QuestShelf HLTB endpoint failed with HTTP ${status}.`);
 
   return new HltbProviderError(message, reason, status);
 }
 
-function getEndpointResults(data: unknown): PackageHltbResult[] | null {
+function getEndpointResults(data: unknown): EndpointHltbResult[] | null {
   if (Array.isArray(data)) {
     return data.filter(isRecord);
   }
@@ -364,7 +385,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function mapHowLongToBeatJsResult(value: PackageHltbResult): HltbSearchResult | null {
+function mapHltbEndpointResult(value: EndpointHltbResult): HltbSearchResult | null {
   const title = getString(value.gameName) ?? getString(value.game_name) ?? getString(value.name) ?? getString(value.title);
   if (!title) {
     return null;
@@ -381,6 +402,10 @@ function mapHowLongToBeatJsResult(value: PackageHltbResult): HltbSearchResult | 
     sourceUrl: getString(value.gameWebLink) ?? getString(value.game_url) ?? getString(value.url) ?? getHltbSourceUrl(id),
     confidence: getNumber(value.similarity),
     platforms: normalizeHltbPlatforms(value.profilePlatforms ?? value.profile_platform ?? value.platforms),
+    steamAppId: getSteamAppId(value.steamAppId ?? value.profileSteam ?? value.profile_steam),
+    profileSteam: getString(value.profileSteam) ?? getString(value.profile_steam),
+    allStylesHours: normalizeHltbHours(value.allStylesHours ?? value.comp_all),
+    allStylesCount: getNumber(value.allStylesCount ?? value.comp_all_count),
   };
 }
 
@@ -397,6 +422,51 @@ function normalizeHltbPlatforms(value: unknown) {
   return undefined;
 }
 
+
+function chooseSteamAppIdMatch(
+  game: Pick<Game, 'title' | 'steamAppId'>,
+  candidates: Array<{ result: HltbSearchResult; score: number }>,
+) {
+  if (typeof game.steamAppId !== 'number') {
+    return null;
+  }
+
+  const steamMatches = candidates.filter((candidate) => candidate.result.steamAppId === game.steamAppId);
+  if (steamMatches.length === 0) {
+    return null;
+  }
+
+  const best = steamMatches[0];
+  debugHltb('selected match', {
+    title: game.title,
+    reason: 'steam appid',
+    hltbTitle: best.result.title,
+    hltbId: best.result.id,
+    steamAppId: game.steamAppId,
+  });
+  return { result: best.result, confidence: 1 };
+}
+
+function chooseExactTitleMatch(
+  game: Pick<Game, 'title'>,
+  candidates: Array<{ result: HltbSearchResult; score: number }>,
+) {
+  const normalizedGameTitle = normalizeHltbTitle(game.title);
+  const exactMatches = candidates.filter((candidate) => normalizeHltbTitle(candidate.result.title) === normalizedGameTitle);
+  if (exactMatches.length === 0) {
+    return null;
+  }
+
+  const best = exactMatches[0];
+  debugHltb('selected match', {
+    title: game.title,
+    reason: 'exact normalized title',
+    hltbTitle: best.result.title,
+    hltbId: best.result.id,
+  });
+  return { result: best.result, confidence: Math.max(best.score, 1) };
+}
+
 function scoreHltbCandidate(game: Pick<Game, 'title' | 'platform'>, result: HltbSearchResult) {
   const normalizedGameTitle = normalizeHltbTitle(game.title);
   const normalizedResultTitle = normalizeHltbTitle(result.title);
@@ -405,7 +475,8 @@ function scoreHltbCandidate(game: Pick<Game, 'title' | 'platform'>, result: Hltb
     return 0;
   }
 
-  let score = result.confidence ?? diceCoefficient(normalizedGameTitle, normalizedResultTitle);
+  const editScore = normalizedEditDistanceScore(normalizedGameTitle, normalizedResultTitle);
+  let score = result.confidence ?? Math.max(diceCoefficient(normalizedGameTitle, normalizedResultTitle), editScore);
 
   if (normalizedGameTitle === normalizedResultTitle) {
     score = Math.max(score, 1);
@@ -433,6 +504,36 @@ function normalizeHltbTitle(title: string) {
 
 function normalizePlatform(platform: string) {
   return platform.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizedEditDistanceScore(firstValue: string, secondValue: string) {
+  const maxLength = Math.max(firstValue.length, secondValue.length);
+  if (maxLength === 0) {
+    return 1;
+  }
+
+  return 1 - levenshteinDistance(firstValue, secondValue) / maxLength;
+}
+
+function levenshteinDistance(firstValue: string, secondValue: string) {
+  const previous = Array.from({ length: secondValue.length + 1 }, (_, index) => index);
+
+  for (let firstIndex = 0; firstIndex < firstValue.length; firstIndex += 1) {
+    const current = [firstIndex + 1];
+
+    for (let secondIndex = 0; secondIndex < secondValue.length; secondIndex += 1) {
+      const substitutionCost = firstValue[firstIndex] === secondValue[secondIndex] ? 0 : 1;
+      current[secondIndex + 1] = Math.min(
+        current[secondIndex] + 1,
+        previous[secondIndex + 1] + 1,
+        previous[secondIndex] + substitutionCost,
+      );
+    }
+
+    previous.splice(0, previous.length, ...current);
+  }
+
+  return previous[secondValue.length];
 }
 
 function diceCoefficient(firstValue: string, secondValue: string) {
@@ -556,6 +657,21 @@ function formatHourValue(value?: number) {
   }
 
   return `${Number.isInteger(value) ? value : value.toFixed(1)}h`;
+}
+
+function getSteamAppId(value: unknown) {
+  const profileSteam = getString(value);
+  if (!profileSteam) {
+    return undefined;
+  }
+
+  const match = profileSteam.match(/\d+/);
+  if (!match) {
+    return undefined;
+  }
+
+  const appId = Number(match[0]);
+  return Number.isFinite(appId) ? appId : undefined;
 }
 
 function getString(value: unknown) {
