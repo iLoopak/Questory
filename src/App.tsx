@@ -5138,14 +5138,6 @@ function AppearanceSettingsPanel({
     }
   };
 
-  const themeCoverageChecklist = [
-    'Light, Dark, and Follow Device all resolve through the same CSS theme tokens.',
-    'Theme switching updates the active screen, browser theme-color, and native color-scheme without a page reload.',
-    'App shell, top navigation, home, library, wishlist, metadata, artwork, recommendations, stats, and settings panels use tokenized backgrounds, borders, shadows, and text.',
-    'Cards, detail dialogs, modal overlays, toasts, tooltips, dropdown menus, forms, buttons, badges, and disabled states inherit theme tokens.',
-    'Quest Queue panels, Platforms panels, setup/onboarding widgets, controller focus rings, and scrollbars avoid fixed dark surfaces in Light Theme.',
-  ];
-
   return (
     <section className="qs-glass rounded-lg border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -5314,18 +5306,6 @@ function AppearanceSettingsPanel({
           </select>
           <span className="mt-2 block text-xs leading-5 text-slate-500">{t('settings.languageHelp')}</span>
         </label>
-      </div>
-
-      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.themeChecklist')}</div>
-        <ul className="mt-3 grid gap-2 text-sm text-slate-300">
-          {themeCoverageChecklist.map((item) => (
-            <li className="flex gap-2" key={item}>
-              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-mint/30 bg-mint/10 text-xs font-bold text-mint">✓</span>
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
       </div>
 
       {runtimeEnvironment.isAndroid ? (
