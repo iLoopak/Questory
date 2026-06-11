@@ -7,7 +7,7 @@ export type ToastActionKind = 'dismiss' | 'open-queue' | 'open-steam-settings' |
 export type ToastAction = {
   gameId?: string;
   kind: ToastActionKind;
-  label: 'Dismiss' | 'Open Platforms' | 'Open Steam Settings' | 'Undo' | 'View Game';
+  label: 'Dismiss' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game';
 };
 
 export type NotificationDraft = {
@@ -15,6 +15,7 @@ export type NotificationDraft = {
   category: ToastCategory;
   dedupeKey?: string;
   message: string;
+  details?: string;
 };
 
 export type MergeableNotification = NotificationDraft & {
@@ -64,7 +65,7 @@ export function getOpenQueueAction(): ToastAction {
 }
 
 export function getOpenSteamSettingsAction(): ToastAction {
-  return { kind: 'open-steam-settings', label: 'Open Steam Settings' };
+  return { kind: 'open-steam-settings', label: 'Open Steam settings' };
 }
 
 export function getDismissAction(): ToastAction {

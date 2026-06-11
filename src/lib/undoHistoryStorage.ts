@@ -28,6 +28,7 @@ export type PendingUndoAction = {
   createdAt: number;
   expiresAt: number;
   dedupeKey?: string;
+  details?: string;
   historyEntry: UndoActionHistoryEntry;
   id: string;
   message: string;
@@ -100,6 +101,7 @@ function isPendingUndoAction(value: unknown): value is PendingUndoAction {
     typeof candidate.message === 'string' &&
     typeof candidate.createdAt === 'number' &&
     typeof candidate.expiresAt === 'number' &&
+    (!candidate.details || typeof candidate.details === 'string') &&
     (!candidate.category || isToastCategory(candidate.category)) &&
     (!candidate.actions || Array.isArray(candidate.actions)) &&
     Boolean(candidate.snapshot) &&
