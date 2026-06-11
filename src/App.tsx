@@ -3654,13 +3654,16 @@ function SteamWishlistHtmlImportModal({
   const [clipboardMessage, setClipboardMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [summaryMessage, setSummaryMessage] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const parseResult = useMemo(() => parseSteamWishlistHtmlTextWithSummary(pastedText), [pastedText]);
   const existingSteamAppIdSet = useMemo(() => new Set(existingSteamAppIds), [existingSteamAppIds]);
+  const hasPastedText = pastedText.trim().length > 0;
   const foundCount = parseResult.items.length;
   const existingCount = parseResult.items.filter((item) => existingSteamAppIdSet.has(item.appid)).length;
   const newCount = Math.max(0, foundCount - existingCount);
   const previewItems = parseResult.items.slice(0, 6);
+  const importDisabled = !hasPastedText || foundCount === 0 || isImporting;
 
   async function copyBookmarklet() {
     try {
@@ -3687,16 +3690,24 @@ function SteamWishlistHtmlImportModal({
     }
   }
 
-  function handleImport() {
-    if (foundCount === 0) {
-      setSummaryMessage('');
-      setErrorMessage(t('wishlist.noSteamAppLinksFound'));
+  async function handleImport() {
+    if (importDisabled) {
+      if (hasPastedText && foundCount === 0) {
+        setSummaryMessage('');
+        setErrorMessage(t('wishlist.noSteamAppLinksFound'));
+      }
       return;
     }
 
-    const summary = onImport(parseResult.items, parseResult.skippedCount + parseResult.duplicateCount);
+    setIsImporting(true);
     setErrorMessage('');
-    setSummaryMessage(`${formatSteamWishlistHtmlImportSummary(summary, t)} ${t('wishlist.refreshMetadataHint')}`);
+
+    try {
+      const summary = onImport(parseResult.items, parseResult.skippedCount + parseResult.duplicateCount);
+      setSummaryMessage(`${formatSteamWishlistHtmlImportSummary(summary, t)} ${t('wishlist.refreshMetadataHint')}`);
+    } finally {
+      setIsImporting(false);
+    }
   }
 
   return (
@@ -3726,7 +3737,7 @@ function SteamWishlistHtmlImportModal({
           </a>
         </div>
       </div>
-      <div className="max-h-[76vh] space-y-5 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
         <section className="rounded-lg border border-mint/25 bg-mint/10 p-3 text-sm leading-6 text-slate-200">
           <p className="font-semibold text-mint">{t('wishlist.manualImportDoesNotCallEndpoints')}</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-300">
@@ -3814,7 +3825,7 @@ function SteamWishlistHtmlImportModal({
                 ))}
               </ul>
             </div>
-          ) : pastedText.trim() ? (
+          ) : hasPastedText ? (
             <p className="text-sm font-semibold text-amber-300">{t('wishlist.noSteamAppLinksFound')}</p>
           ) : null}
           {errorMessage ? <p className="text-sm font-semibold text-rose-300">{errorMessage}</p> : null}
@@ -3846,11 +3857,11 @@ function SteamWishlistHtmlImportModal({
         </button>
         <button
           className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none"
-          disabled={foundCount === 0}
-          onClick={handleImport}
+          disabled={importDisabled}
+          onClick={() => void handleImport()}
           type="button"
         >
-          {t('wishlist.import')}
+          {isImporting ? t('wishlist.importingToWishlist') : t('wishlist.importToWishlist')}
         </button>
       </div>
     </ViewportModal>
