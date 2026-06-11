@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useI18n, type TFunction } from '../i18n';
 import type { Game } from '../types/game';
+import { Icon } from './Icon';
 
 type DealCoverBadgesProps = {
   game: Game;
@@ -18,7 +19,7 @@ export function DealCoverBadges({ game, isInteractive = true, variant = 'grid' }
   }
 
   const isCompact = variant === 'compact';
-  const historicalLowLabel = isCompact ? '🏆 Low' : `🏆 ${t('itad.historicalLow')}`;
+  const historicalLowLabel = isCompact ? 'Low' : t('itad.historicalLow');
   const containerClass = isCompact
     ? 'absolute inset-x-1 bottom-1 z-10 flex max-w-[calc(100%-0.5rem)] flex-col items-start gap-0.5'
     : 'absolute bottom-3 right-3 z-10 flex max-w-[58%] flex-col items-end gap-1.5 sm:max-w-[52%]';
@@ -31,9 +32,9 @@ export function DealCoverBadges({ game, isInteractive = true, variant = 'grid' }
 
   const content = (
     <>
-      <span className={priceBadgeClass}>💰 {dealSummary.price}</span>
+      <span className={`${priceBadgeClass} inline-flex items-center gap-1`}><Icon name="shopping-bag" /> <span>{dealSummary.price}</span></span>
       {dealSummary.discount ? <span className={discountBadgeClass}>{dealSummary.discount}</span> : null}
-      {game.itadIsHistoricalLow ? <span className={historicalBadgeClass}>{historicalLowLabel}</span> : null}
+      {game.itadIsHistoricalLow ? <span className={`${historicalBadgeClass} inline-flex items-center gap-1`}><Icon name="trophy" /> <span>{historicalLowLabel}</span></span> : null}
     </>
   );
 

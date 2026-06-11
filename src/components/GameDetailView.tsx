@@ -9,6 +9,7 @@ import { PlatformBadge } from './PlatformBadge';
 import { useI18n } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
 import { formatHltbBadge, hasHltbData } from '../lib/hltb';
+import { Icon, type IconName } from './Icon';
 
 type GameDetailViewProps = {
   game: Game;
@@ -26,7 +27,7 @@ type GameDetailViewProps = {
 };
 
 type GameDetailAction = {
-  icon: string;
+  icon: IconName;
   label: string;
   onClick: () => void;
   tone: 'accent' | 'neutral' | 'danger';
@@ -104,28 +105,28 @@ export function GameDetailView({
 
   const primaryActions: GameDetailAction[] = [
     {
-      icon: '📌',
+      icon: 'list-plus',
       label: 'Quest Queue',
       onClick: () => onAddToQueue?.(game),
       tone: 'accent',
       disabled: !onAddToQueue,
     },
     {
-      icon: '🎮',
+      icon: 'gamepad-2',
       label: t('status.playing'),
       onClick: () => onStatusChange?.(game.id, 'Playing'),
       tone: 'accent',
       disabled: !onStatusChange,
     },
     {
-      icon: '💖',
+      icon: 'heart',
       label: t('wishlist.title'),
       onClick: () => onAddToWishlist?.(game),
       tone: 'neutral',
       disabled: !onAddToWishlist,
     },
     {
-      icon: '🏆',
+      icon: 'trophy',
       label: t('action.finished'),
       onClick: () => onStatusChange?.(game.id, 'Finished'),
       tone: 'neutral',
@@ -135,7 +136,7 @@ export function GameDetailView({
   const steamActions: GameDetailAction[] = isSteamLibraryGame
     ? [
         {
-          icon: '🔄',
+          icon: 'refresh-cw',
           label: isSteamDataSyncing ? t('detail.syncingSteamData') : t('detail.syncSteamData'),
           onClick: () => onSyncSteamData?.(game),
           tone: 'neutral',
@@ -148,7 +149,7 @@ export function GameDetailView({
   const dealActions: GameDetailAction[] = game.itadCurrentBestUrl
     ? [
         {
-          icon: '💰',
+          icon: 'shopping-bag',
           label: currentItadPrice ? `${t('itad.openDeal')} · ${currentItadPrice}` : t('itad.openDeal'),
           onClick: () => {
             window.open(game.itadCurrentBestUrl, '_blank', 'noopener,noreferrer');
@@ -161,7 +162,7 @@ export function GameDetailView({
   const artworkActions: GameDetailAction[] = canFindArtwork
     ? [
         {
-          icon: '🖼️',
+          icon: 'image',
           label: isFindingArtwork
             ? t('artwork.searching')
             : (isArtworkMissing ? t('artwork.findArtwork') : t('artwork.enrichMetadata')),
@@ -176,14 +177,14 @@ export function GameDetailView({
 
   const destructiveActions: GameDetailAction[] = [
     {
-      icon: '🗑️',
+      icon: 'trash-2',
       label: t('queue.drop'),
       onClick: () => onStatusChange?.(game.id, 'Dropped'),
       tone: 'danger',
       disabled: !onStatusChange,
     },
     {
-      icon: '🚫',
+      icon: 'eye-off',
       label: t('action.ignore'),
       onClick: () => onIgnore?.(game),
       tone: 'danger',
@@ -239,8 +240,9 @@ export function GameDetailView({
                 </div>
 
                 <div className="min-w-0 space-y-4">
-                  <button className="text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
-                    {t('detail.backToLibrary')}
+                  <button className="inline-flex items-center gap-1.5 text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
+                    <Icon name="arrow-left" />
+                    <span>{t('detail.backToLibrary')}</span>
                   </button>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
@@ -462,9 +464,7 @@ function GameDetailActionButton({ action }: { action: GameDetailAction }) {
       type="button"
     >
       <span className="flex items-center gap-2">
-        <span aria-hidden="true" className="text-base leading-none">
-          {action.icon}
-        </span>
+        <Icon name={action.icon} />
         <span>{action.label}</span>
       </span>
     </button>
@@ -524,12 +524,8 @@ function MetadataAccordion({ children, summary, title }: MetadataAccordionProps)
   return (
     <details className="group rounded-xl border border-white/10 bg-ink-950/65 text-slate-300">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
-        <span className="text-slate-500 transition group-open:rotate-90" aria-hidden="true">
-          ▶
-        </span>
-        <span className="text-slate-500" aria-hidden="true">
-          🔒
-        </span>
+        <Icon className="text-slate-500 transition group-open:rotate-90" name="chevrons-right" />
+        <Icon className="text-slate-500" name="lock" />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold text-slate-200">{title}</span>
           <span className="block truncate text-xs text-slate-500">{summary}</span>

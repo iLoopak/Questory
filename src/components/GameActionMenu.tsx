@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent
 import { createPortal } from 'react-dom';
 import { useI18n, type TFunction } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
+import { Icon, type IconName } from './Icon';
 import type { Game, GameStatus } from '../types/game';
 
 type GameActionMenuProps = {
@@ -32,7 +33,7 @@ type GameActionMenuOverlayProps = Omit<GameActionMenuProps, 'variant' | 'isOpen'
 type GameActionMenuItem = {
   disabled?: boolean;
   href?: string;
-  icon: string;
+  icon: IconName;
   currentLabel?: string;
   isCurrent?: boolean;
   label: string;
@@ -122,7 +123,7 @@ export function GameActionMenu({
         onKeyDown={handleButtonKeyDown}
         type="button"
       >
-        <span aria-hidden="true">•••</span>
+        <Icon name="more-horizontal" />
       </button>
       {isOpen ? (
         <GameActionMenuOverlay
@@ -280,7 +281,7 @@ function GameActionMenuItemButton({ action }: { action: GameActionMenuItem }) {
   const className = `qs-game-action-row ${action.tone === 'danger' ? 'qs-game-action-row-danger' : ''} ${action.isCurrent ? 'qs-game-action-row-current' : ''} ${action.disabled ? 'qs-game-action-row-disabled' : ''}`;
   const content = (
     <>
-      <span className="qs-game-action-row-icon" aria-hidden="true">{action.icon}</span>
+      <span className="qs-game-action-row-icon" aria-hidden="true"><Icon name={action.icon} /></span>
       <span className="qs-game-action-row-label">{action.label}</span>
       {action.isCurrent ? <span className="qs-game-action-current-badge">{action.currentLabel}</span> : null}
     </>
@@ -362,11 +363,11 @@ function buildGameActionMenuSections({
   };
 
   if (onFindMetadata) {
-    addAction(metadataItems, { icon: '↻', label: t('action.refreshMetadata'), onSelect: () => onFindMetadata(game) });
+    addAction(metadataItems, { icon: 'refresh-cw', label: t('action.refreshMetadata'), onSelect: () => onFindMetadata(game) });
   }
 
   addAction(statusItems, {
-    icon: '▶',
+    icon: 'gamepad-2',
     currentLabel: t('action.current'),
     isCurrent: game.status === 'Playing',
     label: t('action.playingNow'),
@@ -375,7 +376,7 @@ function buildGameActionMenuSections({
 
   addAction(collectionItems, {
     disabled: game.collectionType === 'library' || !onMoveToLibrary,
-    icon: '▣',
+    icon: 'plus-square',
     currentLabel: t('action.current'),
     isCurrent: game.collectionType === 'library',
     label: t('action.moveToLibrary'),
@@ -384,7 +385,7 @@ function buildGameActionMenuSections({
 
   addAction(collectionItems, {
     disabled: game.collectionType === 'wishlist' || !onAddToWishlist,
-    icon: '★',
+    icon: 'heart',
     currentLabel: t('action.current'),
     isCurrent: game.collectionType === 'wishlist',
     label: t('action.wishlist'),
@@ -392,14 +393,14 @@ function buildGameActionMenuSections({
   });
 
   addAction(statusItems, {
-    icon: '✓',
+    icon: 'trophy',
     currentLabel: t('action.current'),
     isCurrent: game.status === 'Finished',
     label: t('action.finished'),
     onSelect: () => onStatusChange(game.id, 'Finished'),
   });
   addAction(statusItems, {
-    icon: '⏸',
+    icon: 'trash-2',
     currentLabel: t('action.current'),
     isCurrent: game.status === 'Dropped',
     label: t('action.dropped'),
@@ -407,11 +408,11 @@ function buildGameActionMenuSections({
   });
 
   if (onAddToQueue) {
-    addAction(platformItems, { icon: '▦', label: t('action.addToQueue'), onSelect: () => onAddToQueue(game) });
+    addAction(platformItems, { icon: 'list-plus', label: t('action.addToQueue'), onSelect: () => onAddToQueue(game) });
   }
 
   if (includeDetails && onOpenDetails) {
-    addAction(otherItems, { icon: 'ℹ', label: t('action.detailsEdit'), onSelect: onOpenDetails });
+    addAction(otherItems, { icon: 'info', label: t('action.detailsEdit'), onSelect: onOpenDetails });
   }
 
   if (game.itadCurrentBestUrl) {
@@ -419,22 +420,22 @@ function buildGameActionMenuSections({
       ? `${t('itad.openDeal')} · ${formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)}`
       : t('itad.openDeal');
 
-    addAction(otherItems, { icon: '💰', label: dealLabel, href: game.itadCurrentBestUrl });
+    addAction(otherItems, { icon: 'shopping-bag', label: dealLabel, href: game.itadCurrentBestUrl });
   }
 
   if (game.storeUrl || game.externalUrl) {
-    addAction(otherItems, { icon: '↗', label: t('action.openStore'), href: game.storeUrl ?? game.externalUrl });
+    addAction(otherItems, { icon: 'external-link', label: t('action.openStore'), href: game.storeUrl ?? game.externalUrl });
   }
 
   addAction(dangerItems, {
-    icon: '−',
+    icon: 'trash-2',
     label: game.collectionType === 'wishlist' ? t('action.removeFromWishlist') : t('action.remove'),
     onSelect: () => onRemove(game.id),
     tone: 'danger',
   });
   addAction(dangerItems, {
     disabled: typeof game.steamAppId !== 'number',
-    icon: '⊘',
+    icon: 'eye-off',
     label: t('action.ignore'),
     onSelect: () => onRemoveAndIgnore(game),
     tone: 'danger',

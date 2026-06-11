@@ -1,3 +1,4 @@
+import { Icon } from './components/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, RefObject } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
@@ -2028,7 +2029,7 @@ function App() {
     }
 
     if (action === 'ignore') {
-      addUndoAction('🚫 Ignored', {
+      addUndoAction('Ignored', {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
       description: `Restore ${game.title} to Quest Queue`,
@@ -2658,7 +2659,7 @@ function App() {
           </div>
         ) : (
           <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={`Open setup checklist, ${completedOnboardingItemIds.size} of ${onboardingItemIds.length} complete`}>
-            <span aria-hidden="true">⚙</span>
+            <Icon name="settings" />
             <strong>Setup {completedOnboardingItemIds.size}/{onboardingItemIds.length}</strong>
           </button>
         )
