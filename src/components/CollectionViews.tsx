@@ -39,6 +39,7 @@ type CollectionViewProps = CollectionActionHandlers &
   CollectionSelectionProps &
   CollectionHighlightProps & {
     games: Game[];
+    hideRecommendationBadge?: boolean;
     includeDetailsAction?: boolean;
     platformQueueState?: PlatformQueueState;
   };
@@ -49,6 +50,7 @@ const shelfRenderBatchSize = 48;
 export function CollectionGrid({
   games,
   getHighlightLabel,
+  hideRecommendationBadge = false,
   includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
@@ -69,7 +71,7 @@ export function CollectionGrid({
         <GameCard
           key={game.id}
           game={game}
-          highlightLabel={getHighlightLabel?.(game)}
+          highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
           includeDetailsAction={includeDetailsAction}
           isMultiSelectMode={isMultiSelectMode}
           isSelected={selectedGameIds.has(game.id)}
@@ -93,6 +95,7 @@ export function CollectionGrid({
 export function CollectionShelf({
   games,
   getHighlightLabel,
+  hideRecommendationBadge = false,
   includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
@@ -214,7 +217,7 @@ export function CollectionShelf({
               shelfCardRefs.current[index] = element;
             }}
             game={game}
-            highlightLabel={getHighlightLabel?.(game)}
+            highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
             includeDetailsAction={includeDetailsAction}
             index={index}
             isMultiSelectMode={isMultiSelectMode}
@@ -252,6 +255,7 @@ export function CollectionShelf({
 export function CollectionList({
   games,
   getHighlightLabel,
+  hideRecommendationBadge = false,
   includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
@@ -275,7 +279,7 @@ export function CollectionList({
         <CompactGameRow
           key={game.id}
           game={game}
-          highlightLabel={getHighlightLabel?.(game)}
+          highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
           includeDetailsAction={includeDetailsAction}
           isMultiSelectMode={isMultiSelectMode}
           isSelected={selectedGameIds.has(game.id)}

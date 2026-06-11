@@ -244,6 +244,7 @@ export function RecommendationPanel({
           <CollectionShelf
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
+            hideRecommendationBadge
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
@@ -259,6 +260,7 @@ export function RecommendationPanel({
           <CollectionList
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
+            hideRecommendationBadge
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
@@ -274,6 +276,7 @@ export function RecommendationPanel({
           <CollectionGrid
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
+            hideRecommendationBadge
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
