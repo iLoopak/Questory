@@ -64,8 +64,10 @@ type HltbSearchResult = {
   profileSteam?: string;
 };
 
-const HLTB_API_SEARCH_URL = 'https://howlongtobeat.com/api/search';
-const HLTB_SOURCE_BASE_URL = 'https://howlongtobeat.com/game';
+const HLTB_ORIGIN = 'https://howlongtobeat.com';
+const HLTB_API_SEARCH_PATH = '/api/search';
+const HLTB_API_SEARCH_URL = new URL(HLTB_API_SEARCH_PATH, HLTB_ORIGIN).toString();
+const HLTB_SOURCE_BASE_URL = `${HLTB_ORIGIN}/game`;
 const HLTB_BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
 // Dev/server-only HLTB bridge. The frontend talks to /api/hltb/search so browser
@@ -103,13 +105,18 @@ async function handleHltbSearchRequest(
   const title = titleResult.title;
   logHltbDevEndpoint('internal endpoint called', { title });
 
-  const apiResponse = await fetch(HLTB_API_SEARCH_URL, {
-    method: 'POST',
+  const upstreamUrl = HLTB_API_SEARCH_URL;
+  const upstreamMethod = 'POST';
+  logHltbDevEndpoint('upstream url', { title, url: upstreamUrl, path: HLTB_API_SEARCH_PATH });
+  logHltbDevEndpoint('request method', { title, method: upstreamMethod });
+
+  const apiResponse = await fetch(upstreamUrl, {
+    method: upstreamMethod,
     headers: {
       Accept: 'application/json,text/plain,*/*',
       'Content-Type': 'application/json',
-      Origin: 'https://howlongtobeat.com',
-      Referer: 'https://howlongtobeat.com/',
+      Origin: HLTB_ORIGIN,
+      Referer: `${HLTB_ORIGIN}/`,
       'User-Agent': HLTB_BROWSER_USER_AGENT,
     },
     body: JSON.stringify(createHltbSearchPayload(title)),
@@ -117,15 +124,34 @@ async function handleHltbSearchRequest(
     throw toHltbDevEndpointError(error);
   });
 
-  logHltbDevEndpoint('request status', { title, status: apiResponse.status });
+  const responseContentType = apiResponse.headers.get('content-type') ?? '';
+  logHltbDevEndpoint('response status', { title, status: apiResponse.status });
+  logHltbDevEndpoint('response content-type', { title, contentType: responseContentType || '(none)' });
 
   const responseText = await apiResponse.text().catch((error: unknown) => {
     throw toHltbDevEndpointError(error);
   });
-  const parsed = parseHltbApiResponseJson(responseText, apiResponse.status);
+  const isJsonResponse = isHltbJsonContentType(responseContentType);
+  if (!isJsonResponse && responseText.trim()) {
+    logHltbDevEndpoint('non-JSON response preview', {
+      title,
+      status: apiResponse.status,
+      contentType: responseContentType || '(none)',
+      preview: responseText.trim().slice(0, 120),
+    });
+  }
+
+  if (!isJsonResponse) {
+    const error = classifyHltbNonJsonResponse(apiResponse.status, responseContentType, responseText, upstreamUrl);
+    logHltbDevEndpoint('provider failure reason', error);
+    sendHltbJson(response, error.status, error);
+    return;
+  }
+
+  const parsed = parseHltbApiResponseJson(responseText, apiResponse.status, upstreamUrl, responseContentType);
 
   if (!apiResponse.ok) {
-    const error = classifyHltbHttpError(apiResponse.status, parsed);
+    const error = classifyHltbHttpError(apiResponse.status, parsed, upstreamUrl, responseContentType);
     logHltbDevEndpoint('provider failure reason', error);
     sendHltbJson(response, error.status, error);
     return;
@@ -176,7 +202,11 @@ function createHltbSearchPayload(title: string) {
   };
 }
 
-function parseHltbApiResponseJson(text: string, status: number): unknown {
+function isHltbJsonContentType(contentType: string) {
+  return /(^|[\s;])application\/(?:[\w.+-]+\+)?json(?:[\s;]|$)/i.test(contentType);
+}
+
+function parseHltbApiResponseJson(text: string, status: number, upstreamUrl: string, contentType: string): unknown {
   if (!text.trim()) {
     return null;
   }
@@ -185,7 +215,7 @@ function parseHltbApiResponseJson(text: string, status: number): unknown {
     return JSON.parse(text) as unknown;
   } catch (error) {
     throw {
-      message: `HowLongToBeat returned non-JSON data${error instanceof Error ? `: ${error.message}` : '.'}`,
+      message: `HowLongToBeat returned invalid JSON from ${upstreamUrl} (HTTP ${status}, content-type: ${contentType || 'unknown'})${error instanceof Error ? `: ${error.message}` : '.'}`,
       reason: 'parse' as HltbProviderFailureReason,
       status: status >= 400 ? status : 502,
     };
@@ -232,18 +262,44 @@ function normalizeHltbSecondsToHours(value: unknown) {
   return Math.round((seconds / 3600) * 10) / 10;
 }
 
-function classifyHltbHttpError(status: number, data: unknown): { message: string; reason: HltbProviderFailureReason; status: number } {
-  const message = getHltbErrorMessage(data) ?? `HowLongToBeat request failed with HTTP ${status}.`;
+function classifyHltbNonJsonResponse(status: number, contentType: string, text: string, upstreamUrl: string): { message: string; reason: HltbProviderFailureReason; status: number; upstreamUrl: string; upstreamStatus: number; upstreamContentType: string } {
+  const responseLooksHtml = /<\s*!doctype|<\s*html/i.test(text);
+  const upstreamContentType = contentType || 'unknown';
+
+  if (status === 404 && responseLooksHtml) {
+    return {
+      message: `HLTB upstream returned 404 HTML. Check endpoint path. Upstream URL: ${upstreamUrl}; status: ${status}; content-type: ${upstreamContentType}.`,
+      reason: 'unavailable',
+      status: 502,
+      upstreamUrl,
+      upstreamStatus: status,
+      upstreamContentType,
+    };
+  }
+
+  return {
+    message: `HowLongToBeat returned non-JSON data from ${upstreamUrl} (HTTP ${status}, content-type: ${upstreamContentType}).`,
+    reason: 'parse',
+    status: status >= 400 ? status : 502,
+    upstreamUrl,
+    upstreamStatus: status,
+    upstreamContentType,
+  };
+}
+
+function classifyHltbHttpError(status: number, data: unknown, upstreamUrl: string, contentType: string): { message: string; reason: HltbProviderFailureReason; status: number; upstreamUrl: string; upstreamStatus: number; upstreamContentType: string } {
+  const upstreamContentType = contentType || 'unknown';
+  const message = getHltbErrorMessage(data) ?? `HowLongToBeat request to ${upstreamUrl} failed with HTTP ${status} (content-type: ${upstreamContentType}).`;
 
   if (status === 403 || status === 429) {
-    return { message, reason: 'blocked', status };
+    return { message, reason: 'blocked', status, upstreamUrl, upstreamStatus: status, upstreamContentType };
   }
 
   if (status >= 500) {
-    return { message, reason: 'temporary', status };
+    return { message, reason: 'temporary', status, upstreamUrl, upstreamStatus: status, upstreamContentType };
   }
 
-  return { message, reason: 'invalid-response', status };
+  return { message, reason: 'invalid-response', status, upstreamUrl, upstreamStatus: status, upstreamContentType };
 }
 
 function getHltbErrorMessage(data: unknown) {
