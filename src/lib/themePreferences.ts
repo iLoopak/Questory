@@ -1,11 +1,14 @@
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
 export type AccentColorPreference = string | null;
+export type AppTemplatePreference = 'classic' | 'neon-deck';
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
 export const accentColorStorageKey = 'questshelf.accentColor.v1';
+export const appTemplateStorageKey = 'questshelf.appTemplate.v1';
 export const defaultAccentColor = '#ff5a2c';
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
+export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
 
 const preferenceModuleName = '@capacitor/preferences';
 const darkThemeQuery = '(prefers-color-scheme: dark)';
@@ -25,6 +28,10 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 
 export function isAccentColor(value: unknown): value is string {
   return typeof value === 'string' && hexColorPattern.test(value);
+}
+
+export function isAppTemplatePreference(value: unknown): value is AppTemplatePreference {
+  return typeof value === 'string' && appTemplatePreferences.includes(value as AppTemplatePreference);
 }
 
 export function normalizeAccentColor(value: string): string | null {
@@ -57,6 +64,48 @@ export function saveThemePreference(preference: ThemePreference) {
   }
 
   void saveThemePreferenceToNativeStorage(preference);
+}
+
+export function loadAppTemplatePreference(): AppTemplatePreference {
+  if (typeof window === 'undefined') {
+    return 'classic';
+  }
+
+  try {
+    const storedPreference = window.localStorage.getItem(appTemplateStorageKey);
+    return isAppTemplatePreference(storedPreference) ? storedPreference : 'classic';
+  } catch {
+    return 'classic';
+  }
+}
+
+export function saveAppTemplatePreference(preference: AppTemplatePreference) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(appTemplateStorageKey, preference);
+  } catch {
+    // Template selection should stay responsive even when storage is unavailable.
+  }
+
+  void saveAppTemplatePreferenceToNativeStorage(preference);
+}
+
+export function applyAppTemplatePreference(preference: AppTemplatePreference) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const root = document.documentElement;
+  root.dataset.appTemplate = preference;
+  root.classList.toggle('qs-template-classic', preference === 'classic');
+  root.classList.toggle('qs-template-neon-deck', preference === 'neon-deck');
+}
+
+export function getAppTemplateClassName(preference: AppTemplatePreference) {
+  return preference === 'neon-deck' ? 'qs-template-neon-deck' : 'qs-template-classic';
 }
 
 export function loadAccentColorPreference(): AccentColorPreference {
@@ -168,6 +217,15 @@ function updateThemeColorMeta(theme: ResolvedTheme) {
   }
 
   metaElement.content = themeColor;
+}
+
+async function saveAppTemplatePreferenceToNativeStorage(preference: AppTemplatePreference) {
+  try {
+    const preferences = (await import(/* @vite-ignore */ preferenceModuleName)) as PreferencesPlugin;
+    await preferences.Preferences.set({ key: appTemplateStorageKey, value: preference });
+  } catch {
+    // Capacitor Preferences mirrors localStorage when available; browsers continue with localStorage only.
+  }
 }
 
 async function saveThemePreferenceToNativeStorage(preference: ThemePreference) {

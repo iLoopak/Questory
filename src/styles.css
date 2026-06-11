@@ -55,6 +55,15 @@
     linear-gradient(135deg, rgb(var(--accent-rgb) / 0.08), transparent 34%),
     linear-gradient(315deg, rgb(var(--skyglass-rgb) / 0.08), transparent 40%),
     var(--bg-primary);
+  --qs-app-background: var(--body-background);
+  --qs-panel-background: var(--surface-primary);
+  --qs-card-background: var(--surface-raised);
+  --qs-border-color: var(--border);
+  --qs-primary-accent: var(--accent);
+  --qs-secondary-accent: rgb(var(--success-rgb));
+  --qs-danger-cta: rgb(var(--danger-rgb));
+  --qs-glow-shadow: var(--shadow-glow);
+  --qs-muted-text: var(--text-muted);
   --qs-bg: var(--bg-primary);
   --qs-panel: var(--bg-secondary);
   --qs-panel-strong: var(--bg-tertiary);
@@ -1733,4 +1742,251 @@ textarea,
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
+}
+
+
+.qs-template-neon-deck {
+  color-scheme: dark;
+  --ink-950-rgb: 3 6 18;
+  --ink-900-rgb: 7 12 30;
+  --ink-800-rgb: 13 21 44;
+  --ink-700-rgb: 23 34 64;
+  --accent-rgb: 91 255 216;
+  --skyglass-rgb: 139 246 255;
+  --overlay-rgb: 0 0 0;
+  --text-primary-rgb: 246 248 255;
+  --text-secondary-rgb: 205 219 235;
+  --text-muted-rgb: 145 164 190;
+  --text-subtle-rgb: 93 111 142;
+  --danger-rgb: 255 47 111;
+  --danger-text-rgb: 255 186 206;
+  --success-rgb: 91 255 216;
+  --success-text-rgb: 180 255 238;
+  --bg-primary: rgb(3 6 18);
+  --bg-secondary: rgb(7 12 30);
+  --bg-tertiary: rgb(13 21 44);
+  --surface-primary: rgb(8 13 31 / 0.78);
+  --surface-secondary: rgb(5 9 23 / 0.84);
+  --surface-raised: rgb(13 21 44 / 0.82);
+  --text-primary: rgb(var(--text-primary-rgb));
+  --text-secondary: rgb(var(--text-secondary-rgb));
+  --text-muted: rgb(var(--text-muted-rgb));
+  --accent: rgb(var(--accent-rgb));
+  --accent-contrast: rgb(3 6 18);
+  --accent-soft: rgb(var(--accent-rgb) / 0.13);
+  --border: rgb(var(--skyglass-rgb) / 0.18);
+  --border-strong: rgb(var(--accent-rgb) / 0.62);
+  --focus: rgb(var(--accent-rgb));
+  --focus-ring-inner: rgb(3 6 18 / 0.96);
+  --focus-ring-outer: rgb(var(--accent-rgb) / 0.48);
+  --shadow-panel: 0 26px 90px rgb(0 0 0 / 0.58), 0 0 0 1px rgb(139 246 255 / 0.08), 0 0 42px rgb(var(--accent-rgb) / 0.08);
+  --shadow-glow: 0 0 0 1px rgb(var(--accent-rgb) / 0.22), 0 0 26px rgb(var(--accent-rgb) / 0.24), 0 0 54px rgb(var(--danger-rgb) / 0.08);
+  --badge-bg: rgb(8 13 31 / 0.58);
+  --badge-text: rgb(var(--text-primary-rgb));
+  --badge-border: rgb(var(--accent-rgb) / 0.28);
+  --badge-shadow: 0 10px 24px rgb(0 0 0 / 0.44), 0 0 22px rgb(var(--accent-rgb) / 0.12);
+  --body-background: radial-gradient(circle at 12% -10%, rgb(var(--danger-rgb) / 0.26), transparent 28rem), radial-gradient(circle at 84% 4%, rgb(var(--accent-rgb) / 0.18), transparent 30rem), linear-gradient(135deg, #020512 0%, #05091b 44%, #11071d 100%);
+  --qs-app-background: var(--body-background);
+  --qs-panel-background: var(--surface-primary);
+  --qs-card-background: linear-gradient(180deg, rgb(18 28 58 / 0.82), rgb(7 11 27 / 0.9));
+  --qs-border-color: var(--border);
+  --qs-primary-accent: rgb(var(--accent-rgb));
+  --qs-secondary-accent: rgb(var(--success-rgb));
+  --qs-danger-cta: rgb(var(--danger-rgb));
+  --qs-glow-shadow: var(--shadow-glow);
+  --qs-muted-text: var(--text-muted);
+}
+
+.qs-template-neon-deck body {
+  background: var(--body-background);
+}
+
+.qs-template-neon-deck .qs-app-root,
+.qs-app-root.qs-template-neon-deck {
+  min-height: 100vh;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 8rem), var(--qs-app-background);
+  color: var(--text-primary);
+}
+
+.qs-template-neon-deck .qs-handheld-shell {
+  position: relative;
+}
+
+.qs-template-neon-deck .qs-handheld-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: '';
+  background-image: linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.02) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.7), transparent 72%);
+}
+
+.qs-template-neon-deck .qs-glass,
+.qs-template-neon-deck .qs-settings-shell,
+.qs-template-neon-deck .qs-queue-shell,
+.qs-template-neon-deck .qs-review-shell,
+.qs-template-neon-deck .qs-modal-panel {
+  border-color: var(--qs-border-color) !important;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.018)), var(--qs-panel-background) !important;
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+
+.qs-template-neon-deck .qs-compact-header {
+  position: sticky;
+  top: max(0.35rem, var(--qs-safe-top));
+  z-index: 40;
+  border-radius: 1rem;
+}
+
+.qs-template-neon-deck .qs-top-nav {
+  border-color: rgb(var(--accent-rgb) / 0.16) !important;
+  background: rgb(1 5 17 / 0.64) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 24px rgb(var(--accent-rgb) / 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.qs-template-neon-deck .qs-top-nav button.bg-mint,
+.qs-template-neon-deck .qs-collection-primary-action > button,
+.qs-template-neon-deck .qs-game-card-details-button,
+.qs-template-neon-deck button.bg-mint {
+  border: 1px solid rgb(var(--danger-rgb) / 0.38);
+  background: linear-gradient(135deg, rgb(var(--danger-rgb)), #ff7a3d) !important;
+  color: white !important;
+  box-shadow: 0 0 26px rgb(var(--danger-rgb) / 0.35), 0 12px 28px rgb(0 0 0 / 0.42);
+}
+
+.qs-template-neon-deck .qs-top-nav button:not(.bg-mint):hover,
+.qs-template-neon-deck .qs-collection-toolbar-button:hover,
+.qs-template-neon-deck .qs-actions-menu summary:hover,
+.qs-template-neon-deck .qs-view-menu summary:hover {
+  border-color: rgb(var(--accent-rgb) / 0.34) !important;
+  background: rgb(var(--accent-rgb) / 0.1) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 0 22px rgb(var(--accent-rgb) / 0.13);
+}
+
+.qs-template-neon-deck .qs-collection-toolbar,
+.qs-template-neon-deck .qs-toolbar-menu-panel,
+.qs-template-neon-deck .qs-settings-detail > header,
+.qs-template-neon-deck .qs-settings-list {
+  border-color: rgb(var(--accent-rgb) / 0.14) !important;
+  border-radius: 1rem;
+  background: rgb(3 7 20 / 0.72) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 18px 50px rgb(0 0 0 / 0.32);
+  backdrop-filter: blur(18px);
+}
+
+.qs-template-neon-deck input,
+.qs-template-neon-deck select,
+.qs-template-neon-deck textarea {
+  border-color: rgb(var(--accent-rgb) / 0.16) !important;
+  background-color: rgb(2 6 19 / 0.72) !important;
+  color: var(--text-primary) !important;
+}
+
+.qs-template-neon-deck input::placeholder,
+.qs-template-neon-deck textarea::placeholder {
+  color: rgb(var(--text-subtle-rgb));
+}
+
+.qs-template-neon-deck .qs-game-card {
+  min-height: 340px;
+  border-color: rgb(var(--skyglass-rgb) / 0.16) !important;
+  border-radius: 1.15rem;
+  background: var(--qs-card-background) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 22px 62px rgb(0 0 0 / 0.48), 0 0 0 1px rgb(var(--danger-rgb) / 0.035);
+}
+
+.qs-template-neon-deck .qs-game-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  content: '';
+  border-radius: inherit;
+  background: radial-gradient(circle at 18% 0%, rgb(var(--accent-rgb) / 0.13), transparent 38%), radial-gradient(circle at 100% 100%, rgb(var(--danger-rgb) / 0.13), transparent 36%);
+  opacity: 0.78;
+}
+
+.qs-template-neon-deck .qs-game-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.qs-template-neon-deck .qs-game-card:hover,
+.qs-template-neon-deck .qs-game-card:focus-within,
+.qs-template-neon-deck .qs-game-card[aria-selected='true'] {
+  border-color: rgb(var(--accent-rgb) / 0.62) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 26px 78px rgb(0 0 0 / 0.56), 0 0 0 1px rgb(var(--accent-rgb) / 0.28), 0 0 38px rgb(var(--accent-rgb) / 0.26), 0 0 56px rgb(var(--danger-rgb) / 0.12);
+}
+
+.qs-template-neon-deck .qs-game-card-artwork {
+  aspect-ratio: 21 / 11;
+  max-height: 11.5rem;
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.12);
+  background: linear-gradient(135deg, rgb(10 17 38), rgb(3 6 18));
+}
+
+.qs-template-neon-deck .qs-game-card-artwork img {
+  filter: saturate(1.12) contrast(1.06);
+}
+
+.qs-template-neon-deck .platform-badge {
+  border-color: rgb(var(--accent-rgb) / 0.32);
+  background: rgb(3 8 24 / 0.58);
+  color: var(--text-primary);
+  box-shadow: 0 0 20px rgb(var(--accent-rgb) / 0.15), 0 8px 20px rgb(0 0 0 / 0.34);
+  backdrop-filter: blur(14px);
+}
+
+.qs-template-neon-deck .qs-game-card-status {
+  border: 1px solid rgb(var(--accent-rgb) / 0.26);
+  background: rgb(var(--accent-rgb) / 0.1);
+  padding: 0.22rem 0.62rem;
+  color: rgb(var(--accent-rgb));
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.12);
+}
+
+.qs-template-neon-deck .qs-game-card-details-button:hover,
+.qs-template-neon-deck .qs-game-card-details-button:focus-visible {
+  box-shadow: 0 0 30px rgb(var(--danger-rgb) / 0.44), 0 12px 28px rgb(0 0 0 / 0.44);
+}
+
+.qs-template-neon-deck .qs-platform-playing-panel,
+.qs-template-neon-deck .qs-platform-playing-row,
+.qs-template-neon-deck .qs-review-cover,
+.qs-template-neon-deck .qs-review-zone,
+.qs-template-neon-deck .qs-shelf-card,
+.qs-template-neon-deck .qs-compact-card {
+  border-color: rgb(var(--accent-rgb) / 0.18) !important;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.02)), rgb(7 12 30 / 0.76) !important;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.42), 0 0 28px rgb(var(--accent-rgb) / 0.08);
+}
+
+.qs-template-neon-deck .qs-review-zone-negative {
+  border-color: rgb(var(--danger-rgb) / 0.28) !important;
+  background: linear-gradient(90deg, rgb(var(--danger-rgb) / 0.16), rgb(7 12 30 / 0.7)) !important;
+}
+
+.qs-template-neon-deck .qs-review-zone-positive {
+  border-color: rgb(var(--accent-rgb) / 0.32) !important;
+  background: linear-gradient(270deg, rgb(var(--accent-rgb) / 0.16), rgb(7 12 30 / 0.7)) !important;
+}
+
+.qs-template-neon-deck .qs-modal-panel {
+  border-radius: 1.25rem;
+  box-shadow: 0 34px 120px rgb(0 0 0 / 0.72), 0 0 52px rgb(var(--danger-rgb) / 0.12), var(--shadow-glow);
+}
+
+.qs-template-neon-deck .qs-accent-swatch[aria-pressed='true'],
+.qs-template-neon-deck [aria-checked='true'] {
+  border-color: rgb(var(--accent-rgb) / 0.62) !important;
+  box-shadow: var(--shadow-glow);
 }

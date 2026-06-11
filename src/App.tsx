@@ -147,15 +147,20 @@ import {
 import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
   applyAccentColorPreference,
+  applyAppTemplatePreference,
   applyThemePreference,
   defaultAccentColor,
+  getAppTemplateClassName,
   loadAccentColorPreference,
+  loadAppTemplatePreference,
   loadThemePreference,
   normalizeAccentColor,
   saveAccentColorPreference,
+  saveAppTemplatePreference,
   saveThemePreference,
   watchSystemTheme,
   type AccentColorPreference,
+  type AppTemplatePreference,
   type ResolvedTheme,
   type ThemePreference,
 } from './lib/themePreferences';
@@ -242,6 +247,7 @@ function App() {
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
+  const [appTemplatePreference, setAppTemplatePreference] = useState<AppTemplatePreference>(() => loadAppTemplatePreference());
   const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
   const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
@@ -338,6 +344,11 @@ function App() {
     });
   }, [themePreference]);
 
+
+  useEffect(() => {
+    applyAppTemplatePreference(appTemplatePreference);
+    saveAppTemplatePreference(appTemplatePreference);
+  }, [appTemplatePreference]);
 
   useEffect(() => {
     applyAccentColorPreference(accentColorPreference);
@@ -2249,7 +2260,7 @@ function App() {
 
   return (
     <I18nProvider language={language}>
-    <main className="min-h-screen bg-ink-950 text-slate-100">
+    <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`}>
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label="QuestShelf">
@@ -2504,6 +2515,7 @@ function App() {
               resolvedTheme={resolvedTheme}
               runtimeEnvironment={runtimeEnvironment}
               themePreference={themePreference}
+              appTemplatePreference={appTemplatePreference}
               accentColorPreference={accentColorPreference}
               language={language}
               navigationVisibility={navigationVisibility}
@@ -2534,6 +2546,7 @@ function App() {
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onThemePreferenceChange={setThemePreferenceState}
+              onAppTemplatePreferenceChange={setAppTemplatePreference}
               onAccentColorChange={setAccentColorPreference}
               onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
@@ -4267,6 +4280,7 @@ type SettingsPanelProps = {
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   language: AppLanguage;
   navigationVisibility: NavigationVisibilityPreferences;
@@ -4294,6 +4308,7 @@ type SettingsPanelProps = {
   onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
   onReviewRetroImportedGames: () => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
+  onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSteamApiKeyConfigured: () => void;
@@ -4319,6 +4334,7 @@ function SettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  appTemplatePreference,
   accentColorPreference,
   language,
   navigationVisibility,
@@ -4346,6 +4362,7 @@ function SettingsPanel({
   onRefreshSteamPlaytime,
   onReviewRetroImportedGames,
   onThemePreferenceChange,
+  onAppTemplatePreferenceChange,
   onAccentColorChange,
   onLanguageChange,
   onSteamApiKeyConfigured,
@@ -4484,12 +4501,14 @@ function SettingsPanel({
                 resolvedTheme={resolvedTheme}
                 runtimeEnvironment={runtimeEnvironment}
                 themePreference={themePreference}
+                appTemplatePreference={appTemplatePreference}
                 accentColorPreference={accentColorPreference}
                 language={language}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
                 onLandscapeLockChange={onLandscapeLockChange}
                 onThemePreferenceChange={onThemePreferenceChange}
+                onAppTemplatePreferenceChange={onAppTemplatePreferenceChange}
                 onAccentColorChange={onAccentColorChange}
                 onLanguageChange={onLanguageChange}
               />
@@ -5039,12 +5058,14 @@ function AppearanceSettingsPanel({
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
+  appTemplatePreference,
   accentColorPreference,
   language,
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
   onThemePreferenceChange,
+  onAppTemplatePreferenceChange,
   onAccentColorChange,
   onLanguageChange,
 }: {
@@ -5054,12 +5075,14 @@ function AppearanceSettingsPanel({
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
+  appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   language: AppLanguage;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
+  onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
 }) {
@@ -5079,6 +5102,18 @@ function AppearanceSettingsPanel({
       description: 'Automatically follows Android, PWA, browser, and desktop OS theme changes.',
       label: t('settings.followDevice'),
       value: 'system',
+    },
+  ];
+  const appTemplateOptions: Array<{ description: string; label: string; value: AppTemplatePreference }> = [
+    {
+      description: t('settings.templateClassicDescription'),
+      label: t('settings.templateClassic'),
+      value: 'classic',
+    },
+    {
+      description: t('settings.templateNeonDeckDescription'),
+      label: t('settings.templateNeonDeck'),
+      value: 'neon-deck',
     },
   ];
   const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
@@ -5156,6 +5191,39 @@ function AppearanceSettingsPanel({
         </p>
       </div>
 
+
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.template')}</div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2" role="radiogroup" aria-label={t('settings.template')}>
+          {appTemplateOptions.map((option) => {
+            const isSelected = appTemplatePreference === option.value;
+
+            return (
+              <button
+                aria-checked={isSelected}
+                className={`min-h-24 rounded-md border p-3 text-left transition ${
+                  isSelected
+                    ? 'border-mint/60 bg-mint/15 text-white shadow-glow'
+                    : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/35 hover:bg-mint/10 hover:text-white'
+                }`}
+                key={option.value}
+                onClick={() => onAppTemplatePreferenceChange(option.value)}
+                role="radio"
+                type="button"
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`grid h-5 w-5 place-items-center rounded-full border ${isSelected ? 'border-mint bg-mint text-ink-950' : 'border-skyglass/30'}`}>
+                    {isSelected ? <span className="h-2 w-2 rounded-full bg-ink-950" /> : null}
+                  </span>
+                  <span className="font-semibold">{option.label}</span>
+                </span>
+                <span className="mt-2 block text-xs leading-5 text-slate-500">{option.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

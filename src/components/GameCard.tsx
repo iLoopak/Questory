@@ -151,7 +151,7 @@ export function GameCard({
         </div>
       ) : null}
 
-      <div className="relative aspect-[16/9] max-h-32 shrink-0 overflow-hidden bg-ink-700 sm:max-h-36">
+      <div className="qs-game-card-artwork relative aspect-[16/9] max-h-32 shrink-0 overflow-hidden bg-ink-700 sm:max-h-36">
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
@@ -203,7 +203,7 @@ export function GameCard({
             {game.title}
           </h3>
 
-          <div className="mt-2 text-sm text-slate-400">{game.status}</div>
+          <div className="qs-game-card-status mt-2 inline-flex rounded-full text-sm text-slate-400">{game.status}</div>
           <div className="mt-2 flex flex-wrap gap-2">
             <AchievementProgressBadge className="px-2.5 py-1" game={game} showLabel />
             <HltbBadge game={game} includeLabel />
@@ -213,7 +213,7 @@ export function GameCard({
         <div className="mt-auto border-t border-skyglass/15 pt-3">
           <div className="flex items-center gap-2">
             <button
-              className="h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              className="qs-game-card-details-button h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
               onClick={(event) => {
                 stopCardAction(event);
                 onOpenDetails();
