@@ -89,13 +89,11 @@ export class HowLongToBeatProvider implements HltbProvider {
     debugHltb('search title', title);
 
     try {
-      const response = await fetch(HLTB_SEARCH_URL, {
-        body: JSON.stringify({ title }),
+      const response = await fetch(`${HLTB_SEARCH_URL}?title=${encodeURIComponent(title)}`, {
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'application/json',
         },
-        method: 'POST',
+        method: 'GET',
         signal,
       });
 
@@ -106,7 +104,7 @@ export class HowLongToBeatProvider implements HltbProvider {
       }
 
       const results = rawResults.map(mapHowLongToBeatJsResult).filter((result): result is HltbSearchResult => Boolean(result));
-      debugHltb('result count', results.length);
+      debugHltb('provider package result count', results.length);
       return results;
     } catch (error) {
       const hltbError = error instanceof HltbProviderError ? error : classifyFetchFailure(error);
@@ -152,7 +150,6 @@ export async function syncHltbForGames(
       const match = chooseBestHltbMatch(game, results);
 
       if (!match) {
-        debugHltb('selected match', { title: game.title, selected: null, reason: 'no safe match' });
         summary.noMatchCount += 1;
         continue;
       }
@@ -179,7 +176,7 @@ export async function syncHltbForGames(
       updatedGames.push(applyHltbEntry(game, entry));
       summary.updatedCount += 1;
     } catch (error) {
-      console.warn(`[hltb] failure reason for ${game.title}`, describeHltbError(error));
+      console.warn(`[hltb] provider failure for ${game.title}`, describeHltbError(error));
       if (error instanceof HltbProviderError) {
         summary.unavailableCount += 1;
       }
@@ -199,11 +196,22 @@ export function chooseBestHltbMatch(game: Pick<Game, 'title' | 'platform'>, resu
 
   const best = candidates[0];
   if (!best) {
+    debugHltb('no match', {
+      title: game.title,
+      reason: results.length > 0 ? 'below safe threshold or missing hour data' : 'empty result set',
+      resultCount: results.length,
+    });
     return null;
   }
 
   const second = candidates[1];
   if (second && best.score - second.score < AMBIGUOUS_MATCH_DELTA && normalizeHltbTitle(best.result.title) !== normalizeHltbTitle(game.title)) {
+    debugHltb('no match', {
+      title: game.title,
+      reason: 'ambiguous match',
+      best: { title: best.result.title, score: best.score },
+      second: { title: second.result.title, score: second.score },
+    });
     return null;
   }
 

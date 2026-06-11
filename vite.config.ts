@@ -63,48 +63,98 @@ function hltbDevEndpointPlugin(): Plugin {
   return {
     name: 'questshelf-hltb-dev-endpoint',
     configureServer(server) {
-      server.middlewares.use('/api/hltb/search', async (request, response) => {
-        if (request.method !== 'POST') {
-          sendHltbJson(response, 405, { message: 'HLTB search endpoint only supports POST.', reason: 'invalid-response' });
-          return;
-        }
-
-        try {
-          const body = await readRequestBody(request);
-          const parsedBody = JSON.parse(body || '{}') as { title?: unknown };
-          const title = typeof parsedBody.title === 'string' ? parsedBody.title.trim() : '';
-
-          if (!title) {
-            sendHltbJson(response, 400, { message: 'HLTB search requires a non-empty title.', reason: 'invalid-response' });
-            return;
-          }
-
-          const hltbModule = await loadHowLongToBeatJs();
-          const HowLongToBeat = hltbModule.HowLongToBeat ?? hltbModule.default?.HowLongToBeat;
-
-          if (!HowLongToBeat) {
-            sendHltbJson(response, 503, {
-              message: 'howlongtobeat-js did not expose a HowLongToBeat class in this runtime.',
-              reason: 'unavailable',
-            });
-            return;
-          }
-
-          const client = new HowLongToBeat(0);
-          const results = await client.search(title);
-          sendHltbJson(response, 200, { provider: 'howlongtobeat-js', results: Array.isArray(results) ? results : [] });
-        } catch (error) {
-          const { message, reason, status } = classifyHltbDevEndpointError(error);
+      server.middlewares.use('/api/hltb/search', (request, response) => {
+        void handleHltbSearchRequest(request, response).catch((error: unknown) => {
+          const { message, reason, status } = toHltbDevEndpointError(error);
           sendHltbJson(response, status, { message, reason });
-        }
+        });
       });
     },
   };
 }
 
+async function handleHltbSearchRequest(
+  request: { method?: string; url?: string; headers?: { host?: string }; on: (event: string, listener: (chunk?: unknown) => void) => void },
+  response: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void },
+) {
+  if (request.method !== 'GET' && request.method !== 'POST') {
+    sendHltbJson(response, 405, { message: 'HLTB search endpoint only supports GET or POST.', reason: 'invalid-response' });
+    return;
+  }
+
+  const titleResult = await getHltbRequestTitle(request);
+  if (titleResult.error) {
+    sendHltbJson(response, titleResult.error.status, titleResult.error);
+    return;
+  }
+
+  const title = titleResult.title;
+  logHltbDevEndpoint('internal endpoint called', { title });
+
+  const hltbModule = await loadHowLongToBeatJs().catch((error: unknown) => {
+    throw toHltbDevEndpointError(error);
+  });
+  const HowLongToBeat = hltbModule.HowLongToBeat ?? hltbModule.default?.HowLongToBeat;
+
+  if (!HowLongToBeat) {
+    const error = {
+      message: 'howlongtobeat-js did not expose a HowLongToBeat class in this runtime.',
+      reason: 'unavailable' as HltbProviderFailureReason,
+      status: 503,
+    };
+    logHltbDevEndpoint('provider failure', error);
+    sendHltbJson(response, error.status, error);
+    return;
+  }
+
+  const client = new HowLongToBeat(0);
+  const results = await client.search(title).catch((error: unknown) => {
+    throw toHltbDevEndpointError(error);
+  });
+  const safeResults = Array.isArray(results) ? results : [];
+  logHltbDevEndpoint('provider package result count', { title, count: safeResults.length });
+  sendHltbJson(response, 200, { provider: 'howlongtobeat-js', results: safeResults });
+}
+
 async function loadHowLongToBeatJs(): Promise<HltbPackageModule> {
   const importDependency = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<HltbPackageModule>;
   return importDependency('howlongtobeat-js');
+}
+
+async function getHltbRequestTitle(request: { method?: string; url?: string; headers?: { host?: string }; on: (event: string, listener: (chunk?: unknown) => void) => void }): Promise<{ title: string; error?: never } | { title?: never; error: { message: string; reason: HltbProviderFailureReason; status: number } }> {
+  const requestUrl = new URL(request.url ?? '', `http://${request.headers?.host ?? 'localhost'}`);
+  const queryTitle = requestUrl.searchParams.get('title')?.trim();
+  if (queryTitle) {
+    return { title: queryTitle };
+  }
+
+  if (request.method === 'POST') {
+    const body = await readRequestBody(request).catch((error: unknown) => {
+      throw toHltbDevEndpointError(error);
+    });
+    const parsedBody = parseHltbRequestBody(body);
+    const bodyTitle = typeof parsedBody.title === 'string' ? parsedBody.title.trim() : '';
+    if (bodyTitle) {
+      return { title: bodyTitle };
+    }
+  }
+
+  return {
+    error: {
+      message: 'HLTB search requires a non-empty title.',
+      reason: 'invalid-response' as HltbProviderFailureReason,
+      status: 400,
+    },
+  };
+}
+
+function parseHltbRequestBody(body: string): { title?: unknown } {
+  if (!body.trim()) {
+    return {};
+  }
+
+  const parsed = JSON.parse(body) as { title?: unknown };
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function readRequestBody(request: { on: (event: string, listener: (chunk?: unknown) => void) => void }): Promise<string> {
@@ -124,6 +174,24 @@ function sendHltbJson(response: { statusCode: number; setHeader: (name: string, 
   response.end(JSON.stringify(body));
 }
 
+function toHltbDevEndpointError(error: unknown) {
+  if (isHltbDevEndpointError(error)) {
+    return error;
+  }
+
+  const endpointError = classifyHltbDevEndpointError(error);
+  logHltbDevEndpoint('provider failure', endpointError);
+  return endpointError;
+}
+
+function isHltbDevEndpointError(error: unknown): error is { message: string; reason: HltbProviderFailureReason; status: number } {
+  return Boolean(error)
+    && typeof error === 'object'
+    && typeof (error as { message?: unknown }).message === 'string'
+    && typeof (error as { status?: unknown }).status === 'number'
+    && typeof (error as { reason?: unknown }).reason === 'string';
+}
+
 function classifyHltbDevEndpointError(error: unknown): { message: string; reason: HltbProviderFailureReason; status: number } {
   const message = error instanceof Error ? error.message : 'Unknown howlongtobeat-js runtime failure.';
 
@@ -135,6 +203,10 @@ function classifyHltbDevEndpointError(error: unknown): { message: string; reason
     };
   }
 
+  if (/JSON|Unexpected token|Unexpected end/i.test(message)) {
+    return { message: `HLTB endpoint request parsing failed: ${message}`, reason: 'parse', status: 400 };
+  }
+
   if (/timeout|network|socket|ECONN|ENOTFOUND|ETIMEDOUT|fetch/i.test(message)) {
     return { message: `howlongtobeat-js network failure: ${message}`, reason: 'network', status: 502 };
   }
@@ -144,4 +216,13 @@ function classifyHltbDevEndpointError(error: unknown): { message: string; reason
   }
 
   return { message: `howlongtobeat-js failed at runtime: ${message}`, reason: 'temporary', status: 500 };
+}
+
+function logHltbDevEndpoint(label: string, details?: unknown) {
+  const logger = Reflect.get(globalThis, 'console') as { debug?: (...args: unknown[]) => void; warn?: (...args: unknown[]) => void } | undefined;
+  if (label === 'provider failure') {
+    logger?.warn?.(`[hltb] ${label}`, details ?? '');
+    return;
+  }
+  logger?.debug?.(`[hltb] ${label}`, details ?? '');
 }
