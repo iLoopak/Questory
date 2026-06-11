@@ -531,7 +531,7 @@ const en = {
   'hltb.proxyHelp': 'Best-effort sync uses QuestShelf’s HLTB helper and the Vite development proxy when available.',
   'hltb.syncingLong': 'Syncing HLTB… This may take a while.',
   'hltb.noMatch': 'No HLTB match',
-  'hltb.unavailable': 'HowLongToBeat data is temporarily unavailable.',
+  'hltb.unavailable': 'HowLongToBeat is temporarily unavailable. Try again later.',
   'hltb.shortestFirst': 'Shortest first',
   'hltb.longestFirst': 'Longest first',
   'hltb.estimatedTime': 'Estimated time',
