@@ -117,7 +117,7 @@ import { IsThereAnyDealError, syncItadDealsForWishlistGames } from './lib/isTher
 import { getPrimaryHltbHours, hasHltbData, syncHltbForGames, type HltbSyncSummary } from './lib/hltb';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from './lib/steamAchievementsSync';
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
-import { parseSteamWishlistHtmlTextWithSummary, steamWishlistBookmarklet, type ParsedSteamWishlistImportItem } from './lib/steamWishlistHtmlImport';
+import { parseSteamWishlistHtmlTextWithSummary, repairSteamWishlistPlaceholderItems, steamWishlistBookmarklet, type ParsedSteamWishlistImportItem } from './lib/steamWishlistHtmlImport';
 import {
   getBulkWishlistToastMessage,
   getDismissAction,
@@ -1454,6 +1454,7 @@ function App() {
             externalUrl: mappedGame.externalUrl,
             storeUrl: mappedGame.storeUrl,
             wishlistImportedAt: existingGame.wishlistImportedAt ?? importedAt,
+            wishlistSyncedAt: importedAt,
           });
           console.info('[Steam Wishlist HTML Import] Repaired existing placeholder wishlist title.', {
             appid: item.appid,
@@ -3743,7 +3744,8 @@ function SteamWishlistHtmlImportModal({
     setErrorMessage('');
 
     try {
-      const summary = onImport(parseResult.items, parseResult.skippedCount + parseResult.duplicateCount);
+      const repairedItems = await repairSteamWishlistPlaceholderItems(parseResult.items);
+      const summary = onImport(repairedItems, parseResult.skippedCount + parseResult.duplicateCount);
       setSummaryMessage(`${formatSteamWishlistHtmlImportSummary(summary, t)} ${t('wishlist.refreshMetadataHint')}`);
     } finally {
       setIsImporting(false);

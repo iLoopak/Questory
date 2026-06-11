@@ -1,6 +1,10 @@
 import type { SteamWishlistItem } from '../types/steam';
 
-export type ParsedSteamWishlistImportItem = Pick<SteamWishlistItem, 'appid' | 'name' | 'storeUrl'>;
+export type ParsedSteamWishlistImportItem = Pick<SteamWishlistItem, 'appid' | 'name' | 'storeUrl'> & {
+  titleSource?: SteamWishlistImportTitleSource;
+};
+
+export type SteamWishlistImportTitleSource = 'DOM' | 'HTML' | 'JSON' | 'slug' | 'appdetails' | 'placeholder';
 
 export type SteamWishlistHtmlParseResult = {
   items: ParsedSteamWishlistImportItem[];
@@ -8,12 +12,15 @@ export type SteamWishlistHtmlParseResult = {
   skippedCount: number;
 };
 
+type ParsedSteamWishlistTextLineItem = ParsedSteamWishlistImportItem & { consumedRange: [number, number]; slug?: string };
+
 const steamAppUrlPattern = /https?:\/\/(?:store\.)?steampowered\.com\/app\/(\d+)(?:\/([^\s"'<>?#]*))?/gi;
 const steamAppPathPattern = /\/app\/(\d+)(?:\/([^\s"'<>?#]*))?/gi;
 const steamAppAnchorPattern = /<a\b[^>]*href=["'][^"']*\/app\/(\d+)(?:\/([^"'<>?#]*))?[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
 const plainAppIdLinePattern = /^\s*([1-9]\d{1,9})\s*$/gm;
+const steamStoreAppDetailsFilters = 'basic';
 
-export const steamWishlistBookmarklet = String.raw`javascript:(async()=>{const sleep=t=>new Promise(r=>setTimeout(r,t));const seen=new Map();const clean=t=>(t||'').replace(/\s+/g,' ').trim();const getTitle=a=>{const row=a.closest('[id^="game_"],.wishlistRow,.wishlist_row,[data-app-id]');return clean(row?.querySelector('.title,.gameListRowItemName,.ellipsis')?.textContent)||clean(a.textContent);};const collect=()=>{document.querySelectorAll('a[href*="store.steampowered.com/app/"]').forEach(a=>{const m=a.href.match(/\/app\/(\d+)/);if(!m)return;const current=seen.get(m[1]);const title=getTitle(a);if(!current||(!current.title&&title))seen.set(m[1],{url:a.href,title});});};const getScroller=()=>{const els=[...document.querySelectorAll('*')].filter(e=>e.scrollHeight>e.clientHeight+300);return els.sort((a,b)=>(b.scrollHeight-b.clientHeight)-(a.scrollHeight-a.clientHeight))[0]||document.scrollingElement||document.documentElement;};let scroller=getScroller();let stable=0,last=0;for(let i=0;i<250;i++){collect();scroller=getScroller();const step=Math.max(500,Math.floor(scroller.clientHeight*0.65));scroller.scrollTop=Math.min(scroller.scrollTop+step,scroller.scrollHeight);window.scrollBy(0,step);await sleep(1200);collect();if(seen.size===last)stable++;else stable=0;last=seen.size;if(stable>=12)break;}const out=[...seen.entries()].sort((a,b)=>Number(a[0])-Number(b[0])).map(([,item])=>item.title?\`\${item.title}\t\${item.url}\`:item.url).join('\n');try{await navigator.clipboard.writeText(out);alert(\`QuestShelf: copied \${seen.size} Steam wishlist games to clipboard.\`);}catch(e){const ta=document.createElement('textarea');ta.value=out;ta.style='position:fixed;z-index:999999;top:20px;left:20px;width:80vw;height:70vh;background:#111;color:#fff;padding:16px;font:14px monospace;';document.body.appendChild(ta);ta.focus();ta.select();alert(\`QuestShelf: found \${seen.size} games. Copy them from the textarea.\`);}})()`;
+export const steamWishlistBookmarklet = String.raw`javascript:(async()=>{const sleep=t=>new Promise(r=>setTimeout(r,t));const seen=new Map();const clean=t=>(t||'').replace(/https?:\/\/\S+/gi,' ').replace(/\s+/g,' ').trim();const good=t=>{t=clean(t);return t&&!/^Steam App \d+$/i.test(t)&&!/^\d+$/.test(t)?t:''};const jsonTitles=new Map();document.querySelectorAll('script').forEach(s=>{const text=s.textContent||'';const m=text.match(/var\s+g_rgWishlistData\s*=\s*(\[.*?\]|\{.*?\});/s);if(!m)return;try{const data=JSON.parse(m[1]);const entries=Array.isArray(data)?data.map(v=>[v&&v.appid,v]):Object.entries(data);entries.forEach(([id,v])=>{const appid=String((v&&v.appid)||id||'').match(/\d+/)?.[0];const title=good(v&&v.name);if(appid&&title)jsonTitles.set(appid,title);});}catch(e){console.warn('[QuestShelf Steam Wishlist Bookmarklet] Failed to parse wishlist JSON.',e);}});const attrTitle=e=>good(e?.getAttribute?.('aria-label'))||good(e?.getAttribute?.('title'))||good(e?.getAttribute?.('alt'));const textFrom=e=>good(e?.textContent);const sourceTitle=(a,appid)=>{const row=a.closest('[id^="game_"],.wishlistRow,.wishlist_row,[data-app-id],[data-appid],[data-ds-appid],[class*="wishlist" i],[class*="game" i]');const scopes=[row,a].filter(Boolean);for(const scope of scopes){for(const sel of ['.title','[class*="title" i]','[class*="name" i]']){const title=good(scope.querySelector?.(sel)?.textContent);if(title)return{title,source:'DOM'};}}for(const scope of scopes){const imgTitle=good(scope.querySelector?.('img')?.getAttribute('alt'))||good(scope.querySelector?.('img')?.getAttribute('title'));if(imgTitle)return{title:imgTitle,source:'DOM'};}for(const scope of scopes){const title=attrTitle(scope);if(title)return{title,source:'DOM'};}const anchorTitle=attrTitle(a)||textFrom(a);if(anchorTitle)return{title:anchorTitle,source:'DOM'};const near=textFrom(row);if(near)return{title:near,source:'DOM'};const jsonTitle=jsonTitles.get(appid);if(jsonTitle)return{title:jsonTitle,source:'JSON'};return{title:'',source:'placeholder'};};const better=(next,current)=>next.title&&(!current?.title||current.source==='placeholder'||(current.source==='JSON'&&next.source==='DOM'));const remember=(appid,url,next)=>{const current=seen.get(appid);if(!current||better(next,current)){seen.set(appid,{url,title:next.title,source:next.source});console.info('[QuestShelf Steam Wishlist Bookmarklet] title source per item',{appid,title:next.title||'Steam App '+appid,titleSource:next.source});}};const collect=()=>{document.querySelectorAll('a[href*="store.steampowered.com/app/"],a[href^="/app/"]').forEach(a=>{const href=a.href||a.getAttribute('href')||'';const m=href.match(/\/app\/(\d+)/);if(!m)return;remember(m[1],a.href||'https://store.steampowered.com/app/'+m[1],sourceTitle(a,m[1]));});jsonTitles.forEach((title,appid)=>remember(appid,'https://store.steampowered.com/app/'+appid,{title,source:'JSON'}));};const getScroller=()=>{const els=[...document.querySelectorAll('*')].filter(e=>e.scrollHeight>e.clientHeight+300);return els.sort((a,b)=>(b.scrollHeight-b.clientHeight)-(a.scrollHeight-a.clientHeight))[0]||document.scrollingElement||document.documentElement;};let scroller=getScroller();let stable=0,last=0;for(let i=0;i<250;i++){collect();scroller=getScroller();const step=Math.max(500,Math.floor(scroller.clientHeight*0.65));scroller.scrollTop=Math.min(scroller.scrollTop+step,scroller.scrollHeight);window.scrollBy(0,step);await sleep(1200);collect();if(seen.size===last)stable++;else stable=0;last=seen.size;if(stable>=12)break;}const sorted=[...seen.entries()].sort((a,b)=>Number(a[0])-Number(b[0]));const out=sorted.map(([appid,item])=>item.title?item.title+'\t'+item.url:item.url).join('\n');const placeholders=sorted.filter(([appid,item])=>!item.title||/^Steam App \d+$/i.test(item.title)).length;console.info('[QuestShelf Steam Wishlist Bookmarklet] copied bookmarklet item count',{itemCount:seen.size,placeholderCount:placeholders});try{await navigator.clipboard.writeText(out);alert('QuestShelf: copied '+seen.size+' Steam wishlist games to clipboard.');}catch(e){const ta=document.createElement('textarea');ta.value=out;ta.style='position:fixed;z-index:999999;top:20px;left:20px;width:80vw;height:70vh;background:#111;color:#fff;padding:16px;font:14px monospace;';document.body.appendChild(ta);ta.focus();ta.select();alert('QuestShelf: found '+seen.size+' games. Copy them from the textarea.');}})()`;
 
 export function parseSteamWishlistHtmlText(input: string): ParsedSteamWishlistImportItem[] {
   return parseSteamWishlistHtmlTextWithSummary(input).items;
@@ -25,7 +32,7 @@ export function parseSteamWishlistHtmlTextWithSummary(input: string): SteamWishl
   let duplicateCount = 0;
   let skippedCount = 0;
 
-  const addItem = (appidText: string | undefined, extractedTitle?: string | null, slug?: string, source = 'unknown') => {
+  const addItem = (appidText: string | undefined, extractedTitle?: string | null, slug?: string, source: SteamWishlistImportTitleSource | 'text-line' | 'anchor-text' | 'store-url' | 'store-path' | 'plain-app-id' = 'placeholder') => {
     const appid = Number(appidText);
 
     if (!Number.isSafeInteger(appid) || appid <= 0) {
@@ -37,7 +44,11 @@ export function parseSteamWishlistHtmlTextWithSummary(input: string): SteamWishl
     const normalizedExtractedTitle = normalizeExtractedTitle(extractedTitle);
     const titleFromSlug = getTitleFromSteamSlug(slug);
     const title = normalizedExtractedTitle ?? titleFromSlug ?? `Steam App ${appid}`;
-    const titleSource = normalizedExtractedTitle ? source : titleFromSlug ? 'store-url-slug' : 'placeholder';
+    const titleSource: SteamWishlistImportTitleSource = normalizedExtractedTitle
+      ? normalizeTitleSource(source)
+      : titleFromSlug
+        ? 'slug'
+        : 'placeholder';
     const existingIndex = itemIndexByAppId.get(appid);
 
     if (typeof existingIndex === 'number') {
@@ -45,19 +56,20 @@ export function parseSteamWishlistHtmlTextWithSummary(input: string): SteamWishl
       const existingItem = parsedItems[existingIndex];
 
       if (isPlaceholderSteamAppTitle(existingItem.name, appid) && !isPlaceholderSteamAppTitle(title, appid)) {
-        parsedItems[existingIndex] = { ...existingItem, name: title };
-        console.info('[Steam Wishlist HTML Import] Repaired duplicate wishlist title from later HTML match.', {
+        parsedItems[existingIndex] = { ...existingItem, name: title, titleSource };
+        console.info('[Steam Wishlist HTML Import] Repaired duplicate wishlist title from later match.', {
           appid,
           previousTitle: existingItem.name,
           title,
           titleSource,
         });
       } else {
-        console.debug('[Steam Wishlist HTML Import] Ignored duplicate wishlist entry.', {
+        console.info('[Steam Wishlist HTML Import] Title source per item.', {
           appid,
           existingTitle: existingItem.name,
           duplicateTitle: title,
           titleSource,
+          ignoredDuplicate: true,
         });
       }
 
@@ -69,29 +81,34 @@ export function parseSteamWishlistHtmlTextWithSummary(input: string): SteamWishl
       appid,
       name: title,
       storeUrl: `https://store.steampowered.com/app/${appid}`,
+      titleSource,
     });
 
     const logPayload = { appid, title, titleSource, slug };
     if (titleSource === 'placeholder') {
-      console.warn('[Steam Wishlist HTML Import] Falling back to placeholder title; no wishlist HTML title was found.', logPayload);
+      console.warn('[Steam Wishlist HTML Import] Title source per item: placeholder.', logPayload);
     } else {
-      console.debug('[Steam Wishlist HTML Import] Extracted wishlist title.', logPayload);
+      console.info('[Steam Wishlist HTML Import] Title source per item.', logPayload);
     }
   };
 
   for (const item of parseSteamWishlistDataScriptItems(input)) {
-    addItem(item.appid.toString(), item.name, undefined, 'g_rgWishlistData');
+    addItem(item.appid.toString(), item.name, undefined, 'JSON');
   }
 
   const consumedRanges: Array<[number, number]> = [];
 
   for (const item of parseSteamWishlistTextLineItems(input)) {
-    addItem(item.appid.toString(), item.name, item.slug, 'text-line');
+    addItem(item.appid.toString(), item.name, item.slug, 'HTML');
     consumedRanges.push(item.consumedRange);
   }
 
+  for (const item of parseSteamWishlistHtmlRowItems(input)) {
+    addItem(item.appid.toString(), item.name, item.slug, 'HTML');
+  }
+
   for (const match of input.matchAll(steamAppAnchorPattern)) {
-    addItem(match[1], getTitleFromHtmlFragment(match[3]), match[2], 'anchor-text');
+    addItem(match[1], getTitleFromHtmlFragment(match[3]), match[2], 'HTML');
     if (typeof match.index === 'number') {
       consumedRanges.push([match.index, match.index + match[0].length]);
     }
@@ -131,6 +148,43 @@ export function parseSteamWishlistHtmlTextWithSummary(input: string): SteamWishl
   return { items: parsedItems, duplicateCount, skippedCount };
 }
 
+export async function repairSteamWishlistPlaceholderItems(items: ParsedSteamWishlistImportItem[]): Promise<ParsedSteamWishlistImportItem[]> {
+  const repairedItems = await Promise.all(items.map(async (item) => {
+    if (!isPlaceholderSteamAppTitle(item.name, item.appid)) {
+      return item;
+    }
+
+    const fetchedTitle = await fetchSteamAppDetailsTitle(item.appid);
+
+    if (!fetchedTitle) {
+      console.warn('[Steam Wishlist HTML Import] Title source per item: placeholder.', {
+        appid: item.appid,
+        title: item.name,
+        titleSource: 'placeholder',
+      });
+      return item;
+    }
+
+    console.info('[Steam Wishlist HTML Import] Title source per item.', {
+      appid: item.appid,
+      title: fetchedTitle,
+      titleSource: 'appdetails',
+    });
+
+    return {
+      ...item,
+      name: fetchedTitle,
+      titleSource: 'appdetails' as const,
+    };
+  }));
+
+  console.info('[Steam Wishlist HTML Import] Placeholder count after import.', {
+    placeholderCount: repairedItems.filter((item) => isPlaceholderSteamAppTitle(item.name, item.appid)).length,
+  });
+
+  return repairedItems;
+}
+
 function maskConsumedRanges(input: string, ranges: Array<[number, number]>) {
   if (ranges.length === 0) {
     return input;
@@ -144,6 +198,14 @@ function maskConsumedRanges(input: string, ranges: Array<[number, number]>) {
   });
 
   return characters.join('');
+}
+
+function normalizeTitleSource(source: SteamWishlistImportTitleSource | 'text-line' | 'anchor-text' | 'store-url' | 'store-path' | 'plain-app-id'): SteamWishlistImportTitleSource {
+  if (source === 'JSON' || source === 'DOM' || source === 'HTML' || source === 'appdetails' || source === 'placeholder') {
+    return source;
+  }
+
+  return source === 'store-url' || source === 'store-path' || source === 'plain-app-id' ? 'slug' : 'HTML';
 }
 
 function getTitleFromSteamSlug(slug: string | undefined) {
@@ -163,44 +225,43 @@ function getTitleFromSteamSlug(slug: string | undefined) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  return title || null;
+  return normalizeExtractedTitle(title);
 }
-
 
 function parseSteamWishlistDataScriptItems(input: string): ParsedSteamWishlistImportItem[] {
-  const wishlistDataMatch = input.match(/var\s+g_rgWishlistData\s*=\s*(\[.*?\]|\{.*?\});/s);
+  const scriptPattern = /var\s+g_rgWishlistData\s*=\s*(\[.*?\]|\{.*?\});/gs;
+  const items: ParsedSteamWishlistImportItem[] = [];
 
-  if (!wishlistDataMatch) {
-    return [];
+  for (const wishlistDataMatch of input.matchAll(scriptPattern)) {
+    try {
+      const payload = JSON.parse(wishlistDataMatch[1]) as unknown;
+      const entries = Array.isArray(payload) ? payload.map((value) => [undefined, value] as const) : Object.entries(payload as Record<string, unknown>);
+
+      entries.forEach(([fallbackAppId, value]) => {
+        if (!value || typeof value !== 'object') {
+          return;
+        }
+
+        const entry = value as Record<string, unknown>;
+        const appid = getNumber(entry.appid) ?? getNumber(fallbackAppId);
+        const name = getString(entry.name) ?? getString(entry.title);
+
+        if (!appid || !name) {
+          return;
+        }
+
+        items.push({ appid, name, storeUrl: `https://store.steampowered.com/app/${appid}`, titleSource: 'JSON' });
+      });
+    } catch (error) {
+      console.warn('[Steam Wishlist HTML Import] Failed to parse Steam wishlist data script.', { error });
+    }
   }
 
-  try {
-    const payload = JSON.parse(wishlistDataMatch[1]) as unknown;
-    const entries = Array.isArray(payload) ? payload.map((value) => [undefined, value] as const) : Object.entries(payload as Record<string, unknown>);
-
-    return entries.flatMap(([fallbackAppId, value]) => {
-      if (!value || typeof value !== 'object') {
-        return [];
-      }
-
-      const entry = value as Record<string, unknown>;
-      const appid = getNumber(entry.appid) ?? getNumber(fallbackAppId);
-      const name = getString(entry.name);
-
-      if (!appid || !name) {
-        return [];
-      }
-
-      return [{ appid, name, storeUrl: `https://store.steampowered.com/app/${appid}` }];
-    });
-  } catch (error) {
-    console.warn('[Steam Wishlist HTML Import] Failed to parse Steam wishlist data script.', { error });
-    return [];
-  }
+  return items;
 }
 
-function parseSteamWishlistTextLineItems(input: string): Array<ParsedSteamWishlistImportItem & { consumedRange: [number, number]; slug?: string }> {
-  const items: Array<ParsedSteamWishlistImportItem & { consumedRange: [number, number]; slug?: string }> = [];
+function parseSteamWishlistTextLineItems(input: string): ParsedSteamWishlistTextLineItem[] {
+  const items: ParsedSteamWishlistTextLineItem[] = [];
   const titledSteamAppUrlLinePattern = /^.*https?:\/\/(?:store\.)?steampowered\.com\/app\/\d+.*$/gmi;
 
   for (const lineMatch of input.matchAll(titledSteamAppUrlLinePattern)) {
@@ -219,22 +280,117 @@ function parseSteamWishlistTextLineItems(input: string): Array<ParsedSteamWishli
     const appid = Number(urlMatch[1]);
     const titleBeforeUrl = line.slice(0, urlMatch.index);
     const titleAfterUrl = line.slice(urlMatch.index + urlMatch[0].length);
-    const name = normalizeExtractedTitle(titleBeforeUrl) ?? normalizeExtractedTitle(titleAfterUrl);
+    const tabTitle = line.includes('\t') ? titleBeforeUrl.split('\t').at(-1) : undefined;
+    const name = normalizeExtractedTitle(tabTitle) ?? normalizeExtractedTitle(titleBeforeUrl) ?? normalizeExtractedTitle(titleAfterUrl);
 
-    if (!Number.isSafeInteger(appid) || appid <= 0 || !name) {
+    if (!Number.isSafeInteger(appid) || appid <= 0) {
       continue;
     }
 
     items.push({
       appid,
       consumedRange: [lineMatch.index, lineMatch.index + line.length],
-      name,
+      name: name ?? `Steam App ${appid}`,
       slug: urlMatch[2],
       storeUrl: `https://store.steampowered.com/app/${appid}`,
+      titleSource: name ? 'HTML' : 'placeholder',
     });
   }
 
   return items;
+}
+
+function parseSteamWishlistHtmlRowItems(input: string): Array<ParsedSteamWishlistImportItem & { slug?: string }> {
+  if (!/[<][a-z][\s\S]*>/i.test(input)) {
+    return [];
+  }
+
+  const items: Array<ParsedSteamWishlistImportItem & { slug?: string }> = [];
+  const seen = new Set<number>();
+
+  for (const match of input.matchAll(steamAppUrlPattern)) {
+    const appid = Number(match[1]);
+
+    if (!Number.isSafeInteger(appid) || appid <= 0 || seen.has(appid) || typeof match.index !== 'number') {
+      continue;
+    }
+
+    const rowFragment = getNearbyHtmlRowFragment(input, match.index);
+    const name = getTitleFromWishlistHtmlRowFragment(rowFragment, appid);
+
+    if (name) {
+      seen.add(appid);
+      items.push({
+        appid,
+        name,
+        slug: match[2],
+        storeUrl: `https://store.steampowered.com/app/${appid}`,
+        titleSource: 'HTML',
+      });
+    }
+  }
+
+  return items;
+}
+
+function getNearbyHtmlRowFragment(input: string, appUrlIndex: number) {
+  const startCandidates = [
+    input.lastIndexOf('<div', appUrlIndex),
+    input.lastIndexOf('<li', appUrlIndex),
+    input.lastIndexOf('<a', appUrlIndex),
+    Math.max(0, appUrlIndex - 1500),
+  ];
+  const start = Math.max(0, Math.max(...startCandidates));
+  const nextRowIndex = findNextRowBoundary(input, appUrlIndex + 1);
+  const end = nextRowIndex > appUrlIndex ? nextRowIndex : Math.min(input.length, appUrlIndex + 3000);
+
+  return input.slice(start, end);
+}
+
+function findNextRowBoundary(input: string, fromIndex: number) {
+  const candidates = ['<div', '<li', '<a']
+    .map((token) => input.indexOf(token, fromIndex))
+    .filter((index) => index >= 0);
+
+  if (candidates.length === 0) {
+    return -1;
+  }
+
+  return Math.min(...candidates);
+}
+
+function getTitleFromWishlistHtmlRowFragment(fragment: string, appid: number) {
+  const classTitle = getHtmlFragmentTextByClass(fragment, /(?:^|[\s_-])(title|name)(?:[\s_-]|$)/i);
+  const imageTitle = getHtmlAttributeValue(fragment, /<img\b[^>]*(?:alt|title)=["']([^"']+)["'][^>]*>/i);
+  const ariaOrTitle = getHtmlAttributeValue(fragment, /\b(?:aria-label|title)=["']([^"']+)["']/i);
+  const nearbyText = getTitleFromHtmlFragment(fragment);
+
+  return [classTitle, imageTitle, ariaOrTitle, nearbyText]
+    .map((title) => normalizeExtractedTitle(title))
+    .find((title) => title && !isPlaceholderSteamAppTitle(title, appid)) ?? null;
+}
+
+function getHtmlFragmentTextByClass(fragment: string, classNamePattern: RegExp) {
+  const elementPattern = /<([a-z0-9-]+)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+
+  for (const match of fragment.matchAll(elementPattern)) {
+    const classValue = getHtmlAttributeValue(match[2], /\bclass=["']([^"']+)["']/i);
+
+    if (classValue && classNamePattern.test(classValue)) {
+      const title = getTitleFromHtmlFragment(match[3]);
+
+      if (title) {
+        return title;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getHtmlAttributeValue(fragment: string, pattern: RegExp) {
+  const match = fragment.match(pattern);
+  return match ? decodeHtmlEntities(match[1]) : null;
 }
 
 function getTitleFromHtmlFragment(fragment: string | undefined) {
@@ -258,15 +414,53 @@ function normalizeExtractedTitle(value: string | null | undefined) {
   const title = decodeHtmlEntities(value)
     .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/\b(?:store\.)?steampowered\.com\/app\/\d+\S*/gi, ' ')
+    .replace(/\bAdd to wishlist\b/gi, ' ')
+    .replace(/\bFollow\b|\bIgnore\b|\bNot Interested\b/gi, ' ')
+    .replace(/\bAvailable\b|\bReleased\b/gi, ' ')
     .replace(/[|•·]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (!title || /^[-–—:]+$/.test(title)) {
+  if (!title || /^[-–—:]+$/.test(title) || /^\d+$/.test(title) || /^Steam App \d+$/i.test(title)) {
     return null;
   }
 
   return title;
+}
+
+async function fetchSteamAppDetailsTitle(appid: number) {
+  const directUrl = new URL('https://store.steampowered.com/api/appdetails');
+  directUrl.searchParams.set('appids', appid.toString());
+  directUrl.searchParams.set('filters', steamStoreAppDetailsFilters);
+  const candidateUrls = [directUrl.toString()];
+
+  if (typeof window !== 'undefined') {
+    const proxyUrl = new URL('/api/steam-store/api/appdetails', window.location.origin);
+    proxyUrl.searchParams.set('appids', appid.toString());
+    proxyUrl.searchParams.set('filters', steamStoreAppDetailsFilters);
+    candidateUrls.unshift(proxyUrl.toString());
+  }
+
+  for (const url of candidateUrls) {
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const payload = await response.json() as Record<string, { data?: { name?: unknown }; success?: boolean } | undefined>;
+      const name = getString(payload[appid.toString()]?.data?.name);
+
+      if (name) {
+        return name;
+      }
+    } catch (error) {
+      console.warn('[Steam Wishlist HTML Import] Failed to fetch Steam appdetails title.', { appid, url, error });
+    }
+  }
+
+  return null;
 }
 
 function decodeHtmlEntities(value: string) {
