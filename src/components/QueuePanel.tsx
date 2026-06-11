@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent, KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   addActiveQueuePlatform,
   compareQueueEntries,
@@ -496,6 +497,144 @@ function AddPlatformModal({
   );
 }
 
+
+type PlatformOptionsMenuPosition = {
+  left: number;
+  top: number;
+};
+
+type PlatformOptionsMenuProps = {
+  children: (options: { closeMenu: () => void }) => ReactNode;
+  label: string;
+};
+
+const platformOptionsMenuWidth = 192;
+const platformOptionsMenuViewportMargin = 8;
+const platformOptionsMenuOffset = 8;
+
+function PlatformOptionsMenu({ children, label }: PlatformOptionsMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState<PlatformOptionsMenuPosition>({ left: 0, top: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  function closeMenu() {
+    setIsOpen(false);
+  }
+
+  function updateMenuPosition() {
+    const button = buttonRef.current;
+
+    if (!button) {
+      return;
+    }
+
+    const buttonRect = button.getBoundingClientRect();
+    const menuHeight = menuRef.current?.offsetHeight ?? 304;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const maxLeft = Math.max(platformOptionsMenuViewportMargin, viewportWidth - platformOptionsMenuWidth - platformOptionsMenuViewportMargin);
+    const left = Math.min(
+      Math.max(buttonRect.right - platformOptionsMenuWidth, platformOptionsMenuViewportMargin),
+      maxLeft,
+    );
+    const belowTop = buttonRect.bottom + platformOptionsMenuOffset;
+    const aboveTop = buttonRect.top - menuHeight - platformOptionsMenuOffset;
+    const maxTop = Math.max(platformOptionsMenuViewportMargin, viewportHeight - menuHeight - platformOptionsMenuViewportMargin);
+    const top =
+      belowTop + menuHeight <= viewportHeight - platformOptionsMenuViewportMargin
+        ? belowTop
+        : aboveTop >= platformOptionsMenuViewportMargin
+          ? aboveTop
+          : Math.min(Math.max(belowTop, platformOptionsMenuViewportMargin), maxTop);
+
+    setPosition({ left, top });
+  }
+
+  function toggleMenu() {
+    if (!isOpen) {
+      updateMenuPosition();
+    }
+
+    setIsOpen((currentIsOpen) => !currentIsOpen);
+  }
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    updateMenuPosition();
+    const animationFrame = window.requestAnimationFrame(updateMenuPosition);
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+
+      closeMenu();
+    }
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMenu();
+        buttonRef.current?.focus();
+      }
+    }
+
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        className="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10"
+        onClick={toggleMenu}
+        type="button"
+      >
+        {label}
+      </button>
+      {isOpen && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="fixed grid w-48 gap-2 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel"
+              role="menu"
+              style={{ left: position.left, top: position.top, zIndex: 1000 }}
+            >
+              {children({ closeMenu })}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
 function PlatformQueueColumn({
   games,
   gamesById,
@@ -578,29 +717,28 @@ function PlatformQueueColumn({
           {!displayArtworkUrl ? <h3 className="truncate text-base font-semibold leading-tight text-white" style={{ color: platformAccentColor }}>{platform}</h3> : null}
           {platformTag ? <div className="mt-1 text-xs text-slate-500">Tag: {platformTag}</div> : null}
         </div>
-        <details className="relative">
-          <summary className="cursor-pointer rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10">
-            {t('queue.options')}
-          </summary>
-          <div className="absolute right-0 z-20 mt-2 grid w-48 gap-2 rounded-md border border-skyglass/15 bg-ink-950 p-3 shadow-panel">
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.futureActiveLimit')}</span>
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-                min={1}
-                max={25}
-                type="number"
-                value={maxActiveGames}
-                onChange={(event) => onLimitChange(platform, Number(event.target.value))}
-              />
-            </label>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onHidePlatform(platform)} type="button">{t('queue.hidePlatform')}</button>
-            <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemovePlatform(platform)} type="button">{t('queue.removePlatform')}</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={renamePlatform} type="button">{t('queue.renamePlatform')}</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'up')} type="button">{t('queue.moveUp')}</button>
-            <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => onMovePlatform(platform, 'down')} type="button">{t('queue.moveDown')}</button>
-          </div>
-        </details>
+        <PlatformOptionsMenu label={t('queue.options')}>
+          {({ closeMenu }) => (
+            <>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.futureActiveLimit')}</span>
+                <input
+                  className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+                  min={1}
+                  max={25}
+                  type="number"
+                  value={maxActiveGames}
+                  onChange={(event) => onLimitChange(platform, Number(event.target.value))}
+                />
+              </label>
+              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
+              <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
+              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { renamePlatform(); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
+              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
+              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
+            </>
+          )}
+        </PlatformOptionsMenu>
       </div>
 
       {currentlyPlaying.length > 0 ? (
