@@ -551,10 +551,7 @@ type ReadOnlyFieldProps = {
 function ReadOnlyField({ label, value }: ReadOnlyFieldProps) {
   return (
     <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2">
-      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-        <span aria-hidden="true">🔒</span>
-        <span>{label}</span>
-      </div>
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
       <div className="mt-1 truncate text-sm text-slate-300">{value}</div>
     </div>
   );
@@ -568,10 +565,7 @@ type ReadOnlyLinkProps = {
 function ReadOnlyLink({ label, value }: ReadOnlyLinkProps) {
   return (
     <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2 sm:col-span-2 lg:col-span-3">
-      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-        <span aria-hidden="true">🔒</span>
-        <span>{label}</span>
-      </div>
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
       {value ? (
         <a className="mt-1 block truncate text-sm text-mint transition hover:text-white" href={value} rel="noreferrer" target="_blank">
           {value}
@@ -596,10 +590,7 @@ function ChipGroup({ accent, label, values }: ChipGroupProps) {
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-        <span aria-hidden="true">🔒</span>
-        <span>{label}</span>
-      </div>
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
       <div className="mt-2 flex flex-wrap gap-2">
         {values.map((value) => (
           <span
