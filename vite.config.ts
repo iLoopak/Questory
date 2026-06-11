@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -52,10 +54,18 @@ type HltbProviderFailureReason = 'network' | 'cors-proxy' | 'blocked' | 'tempora
 type HltbPackageModule = {
   HowLongToBeat?: HltbPackageConstructor;
   default?: HltbPackageModule;
+  [key: string]: unknown;
 };
 
 type HltbProviderOptions = {
-  apiKey?: string;
+  apiKey?: string | undefined;
+};
+
+type HltbPackageInitMode = 'numeric-minimum-similarity' | 'no-args' | 'options-api-key-undefined';
+
+type HltbPackageDiagnostics = {
+  exportKeys: string[];
+  packageVersion: string;
 };
 
 type HltbPackageClient = {
@@ -63,7 +73,10 @@ type HltbPackageClient = {
   search: (title: string) => Promise<unknown[] | null>;
 };
 
-type HltbPackageConstructor = new (options?: HltbProviderOptions | number) => HltbPackageClient;
+type HltbPackageConstructor = new (...args: [] | [HltbProviderOptions] | [number]) => HltbPackageClient;
+
+const hltbPackageRequire = createRequire(import.meta.url);
+let hltbPackageDiagnosticsLogged = false;
 
 // Dev/server-only bridge for howlongtobeat-js. The package depends on Node
 // request/parsing libraries and cannot be safely imported into the Vite browser
@@ -104,6 +117,7 @@ async function handleHltbSearchRequest(
     throw toHltbDevEndpointError(error);
   });
   const HowLongToBeat = hltbModule.HowLongToBeat ?? hltbModule.default?.HowLongToBeat;
+  const diagnostics = await getHowLongToBeatPackageDiagnostics(hltbModule);
 
   if (!HowLongToBeat) {
     const error = {
@@ -116,7 +130,8 @@ async function handleHltbSearchRequest(
     return;
   }
 
-  const client = createHowLongToBeatClient(HowLongToBeat);
+  const { client, mode } = createHowLongToBeatClient(HowLongToBeat, diagnostics);
+  logHowLongToBeatPackageDiagnostics(diagnostics, mode);
   const results = await client.search(title).catch((error: unknown) => {
     throw toHltbDevEndpointError(error);
   });
@@ -125,28 +140,102 @@ async function handleHltbSearchRequest(
   sendHltbJson(response, 200, { provider: 'howlongtobeat-js', results: safeResults });
 }
 
-function createHowLongToBeatClient(HowLongToBeat: HltbPackageConstructor, config?: HltbProviderOptions | null): HltbPackageClient {
-  const providerOptions = config ?? {};
-  logHltbDevEndpoint('provider init options', sanitizeHltbProviderOptions(providerOptions));
+function createHowLongToBeatClient(
+  HowLongToBeat: HltbPackageConstructor,
+  diagnostics: HltbPackageDiagnostics,
+): { client: HltbPackageClient; mode: HltbPackageInitMode } {
+  const candidates = getHowLongToBeatInitCandidates(HowLongToBeat, diagnostics);
+  let lastError: unknown;
 
-  const client = new HowLongToBeat(providerOptions);
-
-  // howlongtobeat-js 1.0.x used a numeric constructor argument for the minimum
-  // similarity threshold. Newer option-based builds expect a config object
-  // instead. Passing {} prevents option-based builds from reading apiKey from a
-  // null config, and this normalization keeps the older numeric build returning
-  // all candidates like the previous new HowLongToBeat(0) call did.
-  if (Object.prototype.hasOwnProperty.call(client, 'minimumSimilarity') && typeof client.minimumSimilarity !== 'number') {
-    client.minimumSimilarity = 0;
+  for (const candidate of candidates) {
+    try {
+      logHltbDevEndpoint('provider init candidate', { mode: candidate.mode });
+      const client = new HowLongToBeat(...candidate.args);
+      if (typeof client.search !== 'function') {
+        throw new Error(`howlongtobeat-js client created with ${candidate.mode} does not expose search().`);
+      }
+      if (Object.prototype.hasOwnProperty.call(client, 'minimumSimilarity') && typeof client.minimumSimilarity !== 'number') {
+        client.minimumSimilarity = 0;
+      }
+      return { client, mode: candidate.mode };
+    } catch (error) {
+      lastError = error;
+      logHltbDevEndpoint('provider init candidate failed', {
+        mode: candidate.mode,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
-  return client;
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('howlongtobeat-js client could not be initialized with any supported constructor shape.');
 }
 
-function sanitizeHltbProviderOptions(options: HltbProviderOptions) {
+function getHowLongToBeatInitCandidates(
+  HowLongToBeat: HltbPackageConstructor,
+  diagnostics: HltbPackageDiagnostics,
+): Array<{ mode: HltbPackageInitMode; args: [] | [number] | [HltbProviderOptions] }> {
+  const constructorSource = Function.prototype.toString.call(HowLongToBeat);
+  const supportsNumericMinimumSimilarity = /^1\.0\./.test(diagnostics.packageVersion)
+    || /min(?:imum)?Similarity|minimumSimilarity/i.test(constructorSource);
+  const explicitlySupportsOptions = /apiKey|config|options/i.test(constructorSource) && !supportsNumericMinimumSimilarity;
+
+  if (supportsNumericMinimumSimilarity) {
+    return [
+      { mode: 'numeric-minimum-similarity', args: [0] },
+      { mode: 'no-args', args: [] },
+    ];
+  }
+
+  if (explicitlySupportsOptions) {
+    return [
+      { mode: 'options-api-key-undefined', args: [{ apiKey: undefined }] },
+      { mode: 'no-args', args: [] },
+      { mode: 'numeric-minimum-similarity', args: [0] },
+    ];
+  }
+
+  return [
+    { mode: 'no-args', args: [] },
+    { mode: 'numeric-minimum-similarity', args: [0] },
+  ];
+}
+
+async function getHowLongToBeatPackageDiagnostics(module: HltbPackageModule): Promise<HltbPackageDiagnostics> {
   return {
-    hasApiKey: Boolean(options.apiKey?.trim()),
+    exportKeys: getHowLongToBeatExportKeys(module),
+    packageVersion: await getHowLongToBeatPackageVersion(),
   };
+}
+
+function getHowLongToBeatExportKeys(module: HltbPackageModule) {
+  const keys = new Set(Object.keys(module));
+  if (module.default && typeof module.default === 'object') {
+    Object.keys(module.default).forEach((key) => keys.add(`default.${key}`));
+  }
+  return [...keys].sort();
+}
+
+async function getHowLongToBeatPackageVersion() {
+  try {
+    const packageJsonPath = hltbPackageRequire.resolve('howlongtobeat-js/package.json');
+    const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8')) as { version?: unknown };
+    return typeof packageJson.version === 'string' && packageJson.version.trim() ? packageJson.version : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+function logHowLongToBeatPackageDiagnostics(diagnostics: HltbPackageDiagnostics, mode: HltbPackageInitMode) {
+  if (hltbPackageDiagnosticsLogged) {
+    return;
+  }
+
+  hltbPackageDiagnosticsLogged = true;
+  logHltbDevEndpoint('package version', diagnostics.packageVersion);
+  logHltbDevEndpoint('package export keys', diagnostics.exportKeys);
+  logHltbDevEndpoint('init mode', mode);
 }
 
 async function loadHowLongToBeatJs(): Promise<HltbPackageModule> {
