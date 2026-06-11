@@ -1416,12 +1416,14 @@ function App() {
 
   function importSteamWishlistHtmlItems(items: ParsedSteamWishlistImportItem[], inputSkippedCount = 0): SteamWishlistHtmlImportSummary {
     const importedAt = new Date().toISOString();
-    const existingWishlistSteamAppIds = new Set(
-      games
-        .filter((game) => game.collectionType === 'wishlist')
-        .map((game) => game.steamAppId)
-        .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
-    );
+    const existingWishlistIndexBySteamAppId = new Map<number, number>();
+
+    games.forEach((game, index) => {
+      if (game.collectionType === 'wishlist' && typeof game.steamAppId === 'number') {
+        existingWishlistIndexBySteamAppId.set(game.steamAppId, index);
+      }
+    });
+
     const existingGameIds = new Set(games.map((game) => game.id));
     const nextGames = [...games];
     const summary: SteamWishlistHtmlImportSummary = {
@@ -1431,12 +1433,45 @@ function App() {
     };
 
     items.forEach((item) => {
-      if (!item.appid || existingWishlistSteamAppIds.has(item.appid)) {
+      if (!item.appid) {
         summary.existingCount += 1;
+        console.warn('[Steam Wishlist HTML Import] Skipped parsed item without a Steam app id.', { item });
         return;
       }
 
       const mappedGame = mapSteamWishlistItemToLocalGame(item, importedAt);
+      const existingWishlistIndex = existingWishlistIndexBySteamAppId.get(item.appid);
+
+      if (typeof existingWishlistIndex === 'number') {
+        const existingGame = nextGames[existingWishlistIndex];
+
+        if (shouldReplaceSteamWishlistPlaceholderTitle(existingGame, mappedGame)) {
+          nextGames[existingWishlistIndex] = touchGameRecord({
+            ...existingGame,
+            title: mappedGame.title,
+            steamAppId: existingGame.steamAppId ?? mappedGame.steamAppId,
+            externalSource: existingGame.externalSource ?? mappedGame.externalSource,
+            externalUrl: mappedGame.externalUrl,
+            storeUrl: mappedGame.storeUrl,
+            wishlistImportedAt: existingGame.wishlistImportedAt ?? importedAt,
+          });
+          console.info('[Steam Wishlist HTML Import] Repaired existing placeholder wishlist title.', {
+            appid: item.appid,
+            previousTitle: existingGame.title,
+            repairedTitle: mappedGame.title,
+          });
+        } else {
+          console.debug('[Steam Wishlist HTML Import] Existing wishlist item kept unchanged.', {
+            appid: item.appid,
+            existingTitle: existingGame.title,
+            importedTitle: mappedGame.title,
+          });
+        }
+
+        summary.existingCount += 1;
+        return;
+      }
+
       let wishlistId = mappedGame.id;
       let suffix = 2;
 
@@ -1446,12 +1481,17 @@ function App() {
       }
 
       existingGameIds.add(wishlistId);
-      existingWishlistSteamAppIds.add(item.appid);
+      existingWishlistIndexBySteamAppId.set(item.appid, nextGames.length);
       nextGames.push(touchGameRecord({
         ...mappedGame,
         id: wishlistId,
         wishlistSyncedAt: undefined,
       }));
+      console.debug('[Steam Wishlist HTML Import] Added wishlist item.', {
+        appid: item.appid,
+        title: mappedGame.title,
+        id: wishlistId,
+      });
       summary.addedCount += 1;
     });
 
@@ -5658,10 +5698,19 @@ function areSteamWishlistSyncedFieldsEqual(previousGame: Game, nextGame: Game) {
 
 function mergeSteamWishlistSync(existingGame: Game, syncedGame: Game, syncedAt: string): Game {
   const shouldUseSyncedArtwork = isMissingOrGeneratedCover(existingGame.coverImage) && syncedGame.coverImage;
+  const shouldUseSyncedTitle = shouldReplaceSteamWishlistPlaceholderTitle(existingGame, syncedGame);
+
+  if (shouldUseSyncedTitle) {
+    console.info('[Steam Wishlist Sync] Repaired placeholder wishlist title.', {
+      appid: syncedGame.steamAppId,
+      previousTitle: existingGame.title,
+      repairedTitle: syncedGame.title,
+    });
+  }
 
   return {
     ...existingGame,
-    title: existingGame.title || syncedGame.title,
+    title: shouldUseSyncedTitle ? syncedGame.title : existingGame.title || syncedGame.title,
     platform: existingGame.platform || syncedGame.platform,
     artworkSource: shouldUseSyncedArtwork ? syncedGame.artworkSource : existingGame.artworkSource,
     artworkUpdatedAt: shouldUseSyncedArtwork ? syncedAt : existingGame.artworkUpdatedAt,
@@ -5677,6 +5726,21 @@ function mergeSteamWishlistSync(existingGame: Game, syncedGame: Game, syncedAt: 
     wishlistImportedAt: existingGame.wishlistImportedAt ?? syncedAt,
     wishlistSyncedAt: syncedAt,
   };
+}
+
+
+function shouldReplaceSteamWishlistPlaceholderTitle(existingGame: Game, syncedGame: Game) {
+  const appid = existingGame.steamAppId ?? syncedGame.steamAppId;
+
+  if (typeof appid !== 'number') {
+    return false;
+  }
+
+  return isPlaceholderSteamWishlistTitle(existingGame.title, appid) && !isPlaceholderSteamWishlistTitle(syncedGame.title, appid);
+}
+
+function isPlaceholderSteamWishlistTitle(title: string, appid: number) {
+  return title.trim().toLowerCase() === `steam app ${appid}`.toLowerCase();
 }
 
 function matchesSourceFilter(game: Game, source: SourceFilter) {

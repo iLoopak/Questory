@@ -832,10 +832,18 @@ export function mapSteamGamesToLocalGames(
 
 export function mapSteamWishlistItemToLocalGame(item: SteamWishlistItem, syncedAt: string): Game {
   const artworkUrls = getSteamArtworkUrls(item.appid);
+  const title = getSteamWishlistItemTitle(item);
+
+  console.debug('[Steam Wishlist Sync] Mapping wishlist item to local game.', {
+    appid: item.appid,
+    incomingTitle: item.name,
+    mappedTitle: title,
+    usedPlaceholderTitle: isPlaceholderSteamAppTitle(title, item.appid),
+  });
 
   return {
     id: `steam-wishlist-${item.appid}`,
-    title: item.name,
+    title,
     platform: 'Steam',
     status: 'Want to play',
     coverImage: artworkUrls.library,
@@ -858,6 +866,26 @@ export function mapSteamWishlistItemToLocalGame(item: SteamWishlistItem, syncedA
     wishlistImportedAt: syncedAt,
     wishlistSyncedAt: syncedAt,
   };
+}
+
+
+function getSteamWishlistItemTitle(item: SteamWishlistItem) {
+  const title = typeof item.name === 'string' ? item.name.trim() : '';
+
+  if (title) {
+    return title;
+  }
+
+  const placeholderTitle = `Steam App ${item.appid}`;
+  console.warn('[Steam Wishlist Sync] Falling back to placeholder title; wishlist item had no title.', {
+    appid: item.appid,
+    item,
+  });
+  return placeholderTitle;
+}
+
+function isPlaceholderSteamAppTitle(title: string, appid: number) {
+  return title.trim().toLowerCase() === `steam app ${appid}`.toLowerCase();
 }
 
 function recordSteamApiDebug(entry: SteamApiDebugEntry) {
