@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { getPlatformAccentColor, getPlatformArtworkUrl, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
@@ -93,7 +94,7 @@ export function BacklogPlatformPicker({
       <div className="qs-review-queue-modal p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">📌 {t('backlog.choosePlatform')}</div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint"><Icon name="list-plus" /> <span>{t('backlog.choosePlatform')}</span></div>
             <h2 className="mt-1 text-xl font-bold leading-tight text-white">{t('backlog.addToQueue')}</h2>
             <p className="mt-1 line-clamp-2 text-sm text-slate-400">{game.title}</p>
           </div>

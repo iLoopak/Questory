@@ -270,15 +270,15 @@ export function formatHltbBadge(game: Pick<Game, 'hltbMainHours' | 'hltbMainExtr
   const mainExtra = formatHourValue(game.hltbMainExtraHours);
 
   if (main && mainExtra && main !== mainExtra) {
-    return options.includeLabel ? `🎮 ${main} / ${mainExtra}` : `🎮 ${main}`;
+    return options.includeLabel ? `${main} / ${mainExtra}` : main;
   }
 
   if (main) {
-    return options.includeLabel ? `🎮 ${main} Main` : `🎮 ${main}`;
+    return options.includeLabel ? `${main} Main` : main;
   }
 
   if (mainExtra) {
-    return `🎮 ${mainExtra}`;
+    return mainExtra;
   }
 
   return null;

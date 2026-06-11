@@ -7,6 +7,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { PlatformBadge } from './PlatformBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
+import { Icon, type IconName } from './Icon';
 
 export type ReviewModeAction =
   | 'queue'
@@ -41,26 +42,26 @@ const anyPlatform = 'Any platform';
 const negativeActions: Array<{
   action: ReviewModeAction;
   hint: string;
-  icon: string;
+  icon: IconName;
   label: string;
   tone: 'danger' | 'quiet';
 }> = [
-  { action: 'ignore', hint: '', icon: '🚫', label: 'Ignore', tone: 'danger' },
-  { action: 'dropped', hint: '', icon: '🗑️', label: 'Drop', tone: 'danger' },
-  { action: 'skip', hint: 'cancel', icon: '⏭️', label: 'Skip', tone: 'quiet' },
+  { action: 'ignore', hint: '', icon: 'eye-off', label: 'Ignore', tone: 'danger' },
+  { action: 'dropped', hint: '', icon: 'trash-2', label: 'Drop', tone: 'danger' },
+  { action: 'skip', hint: 'cancel', icon: 'chevrons-right', label: 'Skip', tone: 'quiet' },
 ];
 
 const positiveActions: Array<{
   action: ReviewModeAction;
   hint: string;
-  icon: string;
+  icon: IconName;
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'primary', icon: '📌', label: 'Add to Platforms', tone: 'accent' },
-  { action: 'playing', hint: 'topFace', icon: '🎮', label: 'Playing Now', tone: 'accent' },
-  { action: 'wishlist', hint: 'leftFace', icon: '💖', label: 'Wishlist', tone: 'neutral' },
-  { action: 'finished', hint: '', icon: '🏆', label: 'Finished', tone: 'neutral' },
+  { action: 'queue', hint: 'primary', icon: 'list-plus', label: 'Add to Platforms', tone: 'accent' },
+  { action: 'playing', hint: 'topFace', icon: 'gamepad-2', label: 'Playing Now', tone: 'accent' },
+  { action: 'wishlist', hint: 'leftFace', icon: 'heart', label: 'Wishlist', tone: 'neutral' },
+  { action: 'finished', hint: '', icon: 'trophy', label: 'Finished', tone: 'neutral' },
 ];
 
 const decisionActions = [...negativeActions, ...positiveActions];
@@ -82,11 +83,11 @@ const emptyReviewActionStats: ReviewActionStats = {
   wishlisted: 0,
 };
 
-const secondaryActions: Array<{ action: ReviewModeAction; label: string }> = [
-  { action: 'open-details', label: 'Open full details' },
-  { action: 'enrich', label: 'Enrich metadata' },
-  { action: 'find-artwork', label: 'Find Artwork' },
-  { action: 'note', label: 'Add note' },
+const secondaryActions: Array<{ action: ReviewModeAction; icon: IconName; label: string }> = [
+  { action: 'open-details', icon: 'info', label: 'Open full details' },
+  { action: 'enrich', icon: 'refresh-cw', label: 'Enrich metadata' },
+  { action: 'find-artwork', icon: 'image', label: 'Find Artwork' },
+  { action: 'note', icon: 'pencil', label: 'Add note' },
 ];
 
 export function ReviewModePanel({
@@ -357,7 +358,7 @@ export function ReviewModePanel({
             onClick={() => setIsReviewOptionsOpen((isOpen) => !isOpen)}
             type="button"
           >
-            ⚙
+            <Icon name="settings" />
           </button>
 
           {isReviewOptionsOpen ? (
@@ -541,7 +542,7 @@ function FocusedReviewCard({
               type="button"
             >
               <div className="flex items-center gap-1.5 justify-center">
-                <span className="text-base select-none leading-none">{action.icon}</span>
+                <Icon className="select-none" name={action.icon} />
                 <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
               </div>
               {action.hint && (
@@ -668,7 +669,10 @@ function FocusedReviewCard({
                     onClick={() => onAction(action.action)}
                     type="button"
                   >
-                    {action.label}
+                    <span className="inline-flex items-center justify-center gap-1.5">
+                      <Icon name={action.icon} />
+                      <span>{action.label}</span>
+                    </span>
                   </button>
                 ))}
               </div>
@@ -718,7 +722,7 @@ function FocusedReviewCard({
                 type="button"
               >
                 <div className="flex items-center gap-1.5 justify-center">
-                  <span className="text-base select-none leading-none">{action.icon}</span>
+                  <Icon className="select-none" name={action.icon} />
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
                 {action.hint && (

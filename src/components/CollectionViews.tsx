@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useI18n } from '../i18n';
@@ -392,7 +393,7 @@ function ShelfGameCard({
     >
       {isMultiSelectMode ? (
         <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
-          {isSelected ? '✓' : ''}
+          {isSelected ? <Icon name="check" /> : null}
         </span>
       ) : null}
 

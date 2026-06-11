@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -428,7 +429,7 @@ function AddPlatformModal({
             <p className="mt-1 text-sm text-slate-400">Create a platform with its accent color, artwork, and preset image before adding games.</p>
           </div>
           <button className="rounded-md border border-white/10 px-2 py-1 text-sm text-slate-300 hover:bg-white/10" onClick={onClose} type="button">
-            ✕
+            <Icon name="x" />
           </button>
         </div>
 
@@ -886,8 +887,9 @@ function QueueEntryRow({
           </div>
         </div>
         <div className="col-span-3 flex flex-wrap gap-1 sm:col-auto">
-          <button className="h-9 rounded-md border px-2 text-xs font-semibold text-slate-100 hover:bg-white/10" style={{ borderColor: 'var(--platform-accent)', backgroundColor: 'color-mix(in srgb, var(--platform-accent) 14%, transparent)' }} onClick={onPlayNow} type="button">
-            ▶ {t('queue.playNow')}
+          <button className="inline-flex h-9 items-center gap-1.5 rounded-md border px-2 text-xs font-semibold text-slate-100 hover:bg-white/10" style={{ borderColor: 'var(--platform-accent)', backgroundColor: 'color-mix(in srgb, var(--platform-accent) 14%, transparent)' }} onClick={onPlayNow} type="button">
+            <Icon name="gamepad-2" />
+            <span>{t('queue.playNow')}</span>
           </button>
           <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">
             {t('queue.top')}

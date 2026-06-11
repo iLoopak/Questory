@@ -116,11 +116,11 @@ export function RecommendationPanel({
 
   function getHighlightLabel(game: Game) {
     if (recommendation?.game.id === game.id) {
-      return '🎯 Recommended Today';
+      return 'Recommended Today';
     }
 
     if (recommendedGameIds.has(game.id)) {
-      return '⭐ Recommended';
+      return 'Recommended';
     }
 
     return undefined;
