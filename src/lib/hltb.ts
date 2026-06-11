@@ -1,7 +1,8 @@
 import type { Game } from '../types/game';
 
 const HLTB_CACHE_KEY = 'questshelf.hltbCache.v1';
-const HLTB_SEARCH_URL = import.meta.env.DEV ? '/api/hltb/api/search' : '';
+const HLTB_FIND_INIT_URL = import.meta.env.DEV ? '/api/hltb/api/find/init' : '';
+const HLTB_SEARCH_URL = import.meta.env.DEV ? '/api/hltb/api/find' : '';
 const HLTB_SOURCE_BASE_URL = 'https://howlongtobeat.com/game';
 const MIN_SAFE_MATCH_CONFIDENCE = 0.82;
 const AMBIGUOUS_MATCH_DELTA = 0.08;
@@ -40,59 +41,109 @@ export interface HltbProvider {
   search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]>;
 }
 
+export type HltbProviderFailureReason = 'network' | 'cors-proxy' | 'blocked' | 'temporary' | 'invalid-response' | 'parse' | 'unavailable';
+
+type HltbToken = {
+  token: string;
+  hpKey: string;
+  hpVal: string;
+};
+
 export class HltbProviderError extends Error {
-  constructor(message = 'HowLongToBeat data is temporarily unavailable.') {
+  reason: HltbProviderFailureReason;
+  status?: number;
+
+  constructor(message = 'HowLongToBeat is temporarily unavailable. Try again later.', reason: HltbProviderFailureReason = 'unavailable', status?: number) {
     super(message);
     this.name = 'HltbProviderError';
+    this.reason = reason;
+    this.status = status;
   }
 }
 
 export class HowLongToBeatProvider implements HltbProvider {
-  async search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]> {
-    if (!HLTB_SEARCH_URL) {
-      throw new HltbProviderError();
-    }
+  private token?: HltbToken;
 
-    let response: Response;
+  async search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]> {
+    debugHltb('search start', { title });
+
+    if (!HLTB_FIND_INIT_URL || !HLTB_SEARCH_URL) {
+      const error = new HltbProviderError('HowLongToBeat sync requires the Vite /api/hltb proxy in this build.', 'cors-proxy');
+      debugHltb('failure reason', describeHltbError(error));
+      throw error;
+    }
 
     try {
-      response = await fetch(HLTB_SEARCH_URL, {
-        body: JSON.stringify({
-          searchType: 'games',
-          searchTerms: normalizeSearchTerms(title),
-          searchPage: 1,
-          size: 20,
-          searchOptions: {
-            games: {
-              userId: 0,
-              platform: '',
-              sortCategory: 'popular',
-              rangeCategory: 'main',
-              rangeTime: { min: 0, max: 0 },
-              gameplay: { perspective: '', flow: '', genre: '' },
-              modifier: '',
-            },
-          },
-        }),
-        headers: {
-          Accept: 'application/json, text/plain, */*',
-          'Content-Type': 'application/json',
-        },
-        method: 'POST',
-        signal,
-      });
+      const results = await this.searchWithToken(title, signal);
+      return results;
     } catch (error) {
-      throw new HltbProviderError(error instanceof Error ? error.message : undefined);
+      if (error instanceof HltbProviderError && error.status === 403) {
+        this.token = undefined;
+        debugHltb('failure reason', 'token rejected with HTTP 403; refreshing token and retrying once');
+
+        try {
+          return await this.searchWithToken(title, signal);
+        } catch (retryError) {
+          debugHltb('failure reason', describeHltbError(retryError));
+          throw retryError;
+        }
+      }
+
+      debugHltb('failure reason', describeHltbError(error));
+      throw error;
+    }
+  }
+
+  private async searchWithToken(title: string, signal?: AbortSignal) {
+    const token = await this.getToken(signal);
+    const payload = createHltbSearchPayload(title, token);
+    const response = await fetchJson(HLTB_SEARCH_URL, {
+      body: JSON.stringify(payload),
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json',
+        'x-auth-token': token.token,
+        'x-hp-key': token.hpKey,
+        'x-hp-val': token.hpVal,
+      },
+      method: 'POST',
+      signal,
+    }, 'search');
+
+    debugHltb('response shape', describeResponseShape(response.data));
+    const rawResults = getRawHltbResults(response.data);
+
+    if (!rawResults) {
+      throw new HltbProviderError('HowLongToBeat returned an unexpected search response shape.', 'invalid-response', response.status);
     }
 
-    if (!response.ok) {
-      throw new HltbProviderError(`HowLongToBeat search failed with ${response.status}`);
+    const results = rawResults.map(mapHowLongToBeatResult).filter((result): result is HltbSearchResult => Boolean(result));
+    debugHltb('parsed candidates count', results.length);
+    return results;
+  }
+
+  private async getToken(signal?: AbortSignal) {
+    if (this.token) {
+      return this.token;
     }
 
-    const data = await response.json();
-    const rawResults = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+    const separator = HLTB_FIND_INIT_URL.includes('?') ? '&' : '?';
+    const initUrl = `${HLTB_FIND_INIT_URL}${separator}t=${Date.now()}`;
+    const response = await fetchJson(initUrl, {
+      headers: { Accept: 'application/json, text/plain, */*' },
+      method: 'GET',
+      signal,
+    }, 'token init');
 
-    return (rawResults as Record<string, unknown>[]).map(mapHowLongToBeatResult).filter((result): result is HltbSearchResult => Boolean(result));
+    debugHltb('response shape', describeResponseShape(response.data));
+    const token = parseHltbToken(response.data);
+
+    if (!token) {
+      throw new HltbProviderError('HowLongToBeat returned an unexpected token response shape.', 'invalid-response', response.status);
+    }
+
+    this.token = token;
+    return token;
   }
 }
 
@@ -151,7 +202,7 @@ export async function syncHltbForGames(
       updatedGames.push(applyHltbEntry(game, entry));
       summary.updatedCount += 1;
     } catch (error) {
-      console.warn(`HLTB sync failed for ${game.title}`, error);
+      console.warn(`[hltb] failure reason for ${game.title}`, describeHltbError(error));
       if (error instanceof HltbProviderError) {
         summary.unavailableCount += 1;
       }
@@ -216,6 +267,176 @@ export function formatHltbBadge(game: Pick<Game, 'hltbMainHours' | 'hltbMainExtr
   return null;
 }
 
+
+type FetchJsonContext = 'token init' | 'search';
+
+async function fetchJson(url: string, init: RequestInit, context: FetchJsonContext): Promise<{ data: unknown; status: number }> {
+  debugHltb('request url', `${init.method ?? 'GET'} ${url}`);
+
+  let response: Response;
+
+  try {
+    response = await fetch(url, init);
+  } catch (error) {
+    throw classifyFetchFailure(error);
+  }
+
+  debugHltb('response status', `${context} ${response.status}`);
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw createHttpHltbError(response.status, text);
+  }
+
+  try {
+    return { data: text ? JSON.parse(text) : null, status: response.status };
+  } catch (error) {
+    throw new HltbProviderError(
+      `HowLongToBeat returned non-JSON ${context} data${error instanceof Error ? `: ${error.message}` : '.'}`,
+      'parse',
+      response.status,
+    );
+  }
+}
+
+function createHttpHltbError(status: number, body: string) {
+  const detail = getHltbErrorDetail(body);
+
+  if (status === 403 || status === 429) {
+    return new HltbProviderError(
+      `HowLongToBeat blocked or rate-limited the request (HTTP ${status})${detail}. Try again later.`,
+      'blocked',
+      status,
+    );
+  }
+
+  if (status >= 500) {
+    return new HltbProviderError(
+      `HowLongToBeat is temporarily unavailable (HTTP ${status})${detail}. Try again later.`,
+      'temporary',
+      status,
+    );
+  }
+
+  return new HltbProviderError(`HowLongToBeat request failed with HTTP ${status}${detail}.`, 'invalid-response', status);
+}
+
+function classifyFetchFailure(error: unknown) {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return new HltbProviderError('HowLongToBeat request was cancelled.', 'network');
+  }
+
+  const message = error instanceof Error ? error.message : 'Unknown network failure';
+  const reason: HltbProviderFailureReason = /failed to fetch|load failed|cors|proxy/i.test(message) ? 'cors-proxy' : 'network';
+  return new HltbProviderError(`HowLongToBeat request could not be sent: ${message}`, reason);
+}
+
+function getHltbErrorDetail(body: string) {
+  const trimmedBody = body.trim();
+  if (!trimmedBody) {
+    return '';
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedBody) as { error?: unknown; message?: unknown };
+    const parsedMessage = getString(parsed.error) ?? getString(parsed.message);
+    return parsedMessage ? `: ${parsedMessage}` : '';
+  } catch {
+    return `: ${trimmedBody.slice(0, 160)}`;
+  }
+}
+
+function createHltbSearchPayload(title: string, token: HltbToken) {
+  return {
+    searchType: 'games',
+    searchTerms: normalizeSearchTerms(title),
+    searchPage: 1,
+    size: 20,
+    searchOptions: {
+      games: {
+        userId: 0,
+        platform: '',
+        sortCategory: 'popular',
+        rangeCategory: 'main',
+        rangeTime: { min: null, max: null },
+        gameplay: { perspective: '', flow: '', genre: '', difficulty: '' },
+        rangeYear: { min: '', max: '' },
+        modifier: '',
+      },
+      users: { sortCategory: 'postcount' },
+      lists: { sortCategory: 'follows' },
+      filter: '',
+      sort: 0,
+      randomizer: 0,
+    },
+    useCache: true,
+    [token.hpKey]: token.hpVal,
+  };
+}
+
+function parseHltbToken(data: unknown): HltbToken | null {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  const record = data as Record<string, unknown>;
+  const token = getString(record.token);
+  const hpKey = getString(record.hpKey);
+  const hpVal = getString(record.hpVal);
+
+  return token && hpKey && hpVal ? { token, hpKey, hpVal } : null;
+}
+
+function getRawHltbResults(data: unknown): Record<string, unknown>[] | null {
+  if (Array.isArray(data)) {
+    return data.filter(isRecord);
+  }
+
+  if (isRecord(data) && Array.isArray(data.data)) {
+    return data.data.filter(isRecord);
+  }
+
+  return null;
+}
+
+function describeResponseShape(data: unknown) {
+  if (Array.isArray(data)) {
+    return { type: 'array', length: data.length };
+  }
+
+  if (isRecord(data)) {
+    return {
+      type: 'object',
+      keys: Object.keys(data).slice(0, 12),
+      dataLength: Array.isArray(data.data) ? data.data.length : undefined,
+    };
+  }
+
+  return { type: data === null ? 'null' : typeof data };
+}
+
+function describeHltbError(error: unknown) {
+  if (error instanceof HltbProviderError) {
+    return { message: error.message, reason: error.reason, status: error.status };
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message, name: error.name };
+  }
+
+  return error;
+}
+
+function debugHltb(label: string, details?: unknown) {
+  const logger = Reflect.get(globalThis, 'console') as { debug?: (...args: unknown[]) => void } | undefined;
+  logger?.debug?.(`[hltb] ${label}`, details ?? '');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 function mapHowLongToBeatResult(value: Record<string, unknown>): HltbSearchResult | null {
   const title = getString(value.game_name) ?? getString(value.name) ?? getString(value.title);
   if (!title) {
@@ -232,8 +453,21 @@ function mapHowLongToBeatResult(value: Record<string, unknown>): HltbSearchResul
     completionistHours: normalizeHltbHours(value.comp_100 ?? value.gameplayCompletionist ?? value.completionist),
     sourceUrl: getString(value.game_url) ?? getString(value.url) ?? getHltbSourceUrl(id),
     confidence: getNumber(value.similarity),
-    platforms: Array.isArray(value.profile_platform) ? value.profile_platform.filter((platform): platform is string => typeof platform === 'string') : undefined,
+    platforms: normalizeHltbPlatforms(value.profile_platform ?? value.platforms),
   };
+}
+
+
+function normalizeHltbPlatforms(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.filter((platform): platform is string => typeof platform === 'string' && Boolean(platform.trim()));
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    return value.split(',').map((platform) => platform.trim()).filter(Boolean);
+  }
+
+  return undefined;
 }
 
 function scoreHltbCandidate(game: Pick<Game, 'title' | 'platform'>, result: HltbSearchResult) {
