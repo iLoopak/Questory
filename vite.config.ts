@@ -50,11 +50,20 @@ export default defineConfig({
 type HltbProviderFailureReason = 'network' | 'cors-proxy' | 'blocked' | 'temporary' | 'invalid-response' | 'parse' | 'unavailable';
 
 type HltbPackageModule = {
-  HowLongToBeat?: new (minSimilarity?: number) => {
-    search: (title: string) => Promise<unknown[] | null>;
-  };
+  HowLongToBeat?: HltbPackageConstructor;
   default?: HltbPackageModule;
 };
+
+type HltbProviderOptions = {
+  apiKey?: string;
+};
+
+type HltbPackageClient = {
+  minimumSimilarity?: unknown;
+  search: (title: string) => Promise<unknown[] | null>;
+};
+
+type HltbPackageConstructor = new (options?: HltbProviderOptions | number) => HltbPackageClient;
 
 // Dev/server-only bridge for howlongtobeat-js. The package depends on Node
 // request/parsing libraries and cannot be safely imported into the Vite browser
@@ -107,13 +116,37 @@ async function handleHltbSearchRequest(
     return;
   }
 
-  const client = new HowLongToBeat(0);
+  const client = createHowLongToBeatClient(HowLongToBeat);
   const results = await client.search(title).catch((error: unknown) => {
     throw toHltbDevEndpointError(error);
   });
   const safeResults = Array.isArray(results) ? results : [];
   logHltbDevEndpoint('provider package result count', { title, count: safeResults.length });
   sendHltbJson(response, 200, { provider: 'howlongtobeat-js', results: safeResults });
+}
+
+function createHowLongToBeatClient(HowLongToBeat: HltbPackageConstructor, config?: HltbProviderOptions | null): HltbPackageClient {
+  const providerOptions = config ?? {};
+  logHltbDevEndpoint('provider init options', sanitizeHltbProviderOptions(providerOptions));
+
+  const client = new HowLongToBeat(providerOptions);
+
+  // howlongtobeat-js 1.0.x used a numeric constructor argument for the minimum
+  // similarity threshold. Newer option-based builds expect a config object
+  // instead. Passing {} prevents option-based builds from reading apiKey from a
+  // null config, and this normalization keeps the older numeric build returning
+  // all candidates like the previous new HowLongToBeat(0) call did.
+  if (Object.prototype.hasOwnProperty.call(client, 'minimumSimilarity') && typeof client.minimumSimilarity !== 'number') {
+    client.minimumSimilarity = 0;
+  }
+
+  return client;
+}
+
+function sanitizeHltbProviderOptions(options: HltbProviderOptions) {
+  return {
+    hasApiKey: Boolean(options.apiKey?.trim()),
+  };
 }
 
 async function loadHowLongToBeatJs(): Promise<HltbPackageModule> {
