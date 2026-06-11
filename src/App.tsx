@@ -5597,7 +5597,8 @@ function formatBulkSummary(summary: BulkActionSummary) {
 
 
 function formatHltbSyncSummary(summary: HltbSyncSummary, t: TFunction) {
-  return `${t('hltb.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed.`;
+  const unavailablePart = summary.unavailableCount > 0 ? ` · ${summary.unavailableCount} provider unavailable` : '';
+  return `${t('hltb.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed${unavailablePart}.`;
 }
 
 function formatSteamWishlistSyncSummary(summary: SteamWishlistSyncSummary, t: TFunction) {
