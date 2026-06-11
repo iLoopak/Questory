@@ -331,6 +331,7 @@ function buildGameActionMenuSections({
 }: Omit<GameActionMenuOverlayProps, 'anchorRef' | 'menuId'>): GameActionMenuSection[] {
   const metadataItems: GameActionMenuItem[] = [];
   const statusItems: GameActionMenuItem[] = [];
+  const collectionItems: GameActionMenuItem[] = [];
   const platformItems: GameActionMenuItem[] = [];
   const otherItems: GameActionMenuItem[] = [];
   const dangerItems: GameActionMenuItem[] = [];
@@ -372,22 +373,23 @@ function buildGameActionMenuSections({
     onSelect: () => onStatusChange(game.id, 'Playing'),
   });
 
-  if (game.collectionType === 'wishlist') {
-    addAction(statusItems, {
-      disabled: !onMoveToLibrary,
-      icon: '★',
-      currentLabel: t('action.current'),
-      isCurrent: true,
-      label: t('action.moveToLibrary'),
-      onSelect: () => onMoveToLibrary?.(game),
-    });
-  } else if (onAddToWishlist) {
-    addAction(statusItems, {
-      icon: '★',
-      label: t('action.wishlist'),
-      onSelect: () => onAddToWishlist(game),
-    });
-  }
+  addAction(collectionItems, {
+    disabled: game.collectionType === 'library' || !onMoveToLibrary,
+    icon: '▣',
+    currentLabel: t('action.current'),
+    isCurrent: game.collectionType === 'library',
+    label: t('action.moveToLibrary'),
+    onSelect: () => onMoveToLibrary?.(game),
+  });
+
+  addAction(collectionItems, {
+    disabled: game.collectionType === 'wishlist' || !onAddToWishlist,
+    icon: '★',
+    currentLabel: t('action.current'),
+    isCurrent: game.collectionType === 'wishlist',
+    label: t('action.wishlist'),
+    onSelect: () => onAddToWishlist?.(game),
+  });
 
   addAction(statusItems, {
     icon: '✓',
@@ -441,6 +443,7 @@ function buildGameActionMenuSections({
   const sections: GameActionMenuSection[] = [
     { label: t('action.sectionMetadata'), items: metadataItems },
     { label: t('action.sectionStatus'), items: statusItems },
+    { label: t('action.sectionCollection'), items: collectionItems },
     { label: t('action.sectionPlatform'), items: platformItems },
     { label: t('action.sectionOther'), items: otherItems },
     { label: t('action.sectionDanger'), items: dangerItems, tone: 'danger' },
