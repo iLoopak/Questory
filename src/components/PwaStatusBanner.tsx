@@ -9,7 +9,7 @@ type BeforeInstallPromptEvent = Event & {
 
 const installDismissedKey = 'questshelf.installHintDismissed.v1';
 
-export function PwaStatusBanner() {
+export function PwaStatusBanner({ appTitle = 'QuestShelf' }: { appTitle?: string }) {
   const { t } = useI18n();
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [isNativeAndroid] = useState(() => isNativeAndroidRuntime());
@@ -89,10 +89,10 @@ export function PwaStatusBanner() {
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-      <span>{t('pwa.installHint')}</span>
+      <span>{t('pwa.installHint').replace('{appTitle}', appTitle)}</span>
       <div className="flex gap-2">
         <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint" onClick={installApp} type="button">
-          Install QuestShelf
+          Install {appTitle}
         </button>
         <button className="h-8 rounded-md border border-white/10 px-3 text-sm text-slate-300" onClick={dismissInstallHint} type="button">
           Not now
