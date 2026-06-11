@@ -423,11 +423,10 @@ function getSafePlatformArtworkAccentColor(accentColor: string) {
   return /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : '#2563eb';
 }
 
-export function createPlatformArtworkPreset(platform: GamePlatform, accentColor: string, preset: PlatformArtworkPreset) {
-  const safePlatform = platform.replace(/[<&>"]/g, '');
+export function createPlatformArtworkPreset(_platform: GamePlatform, accentColor: string, preset: PlatformArtworkPreset) {
   const safeAccentColor = getSafePlatformArtworkAccentColor(accentColor);
   const pattern = platformArtworkPresetPatterns[preset] ?? platformArtworkPresetPatterns.Aurora;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#020617" stop-opacity="0.15"/><stop offset="1" stop-color="#020617" stop-opacity="0.68"/></linearGradient><radialGradient id="v" cx="78%" cy="10%" r="75%"><stop stop-color="white" stop-opacity="0.16"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient></defs><rect width="360" height="120" fill="${safeAccentColor}"/><rect width="360" height="120" fill="url(#v)"/><rect width="360" height="120" fill="url(#g)"/>${pattern}<rect x="12" y="22" width="230" height="60" rx="18" fill="#020617" fill-opacity="0.18"/><text x="18" y="64" fill="white" fill-opacity="0.92" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="800">${safePlatform}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#020617" stop-opacity="0.15"/><stop offset="1" stop-color="#020617" stop-opacity="0.68"/></linearGradient><radialGradient id="v" cx="78%" cy="10%" r="75%"><stop stop-color="white" stop-opacity="0.16"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient></defs><rect width="360" height="120" fill="${safeAccentColor}"/><rect width="360" height="120" fill="url(#v)"/><rect width="360" height="120" fill="url(#g)"/>${pattern}<rect width="360" height="120" fill="#020617" fill-opacity="0.08"/></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
