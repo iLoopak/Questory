@@ -137,6 +137,7 @@ export async function syncHltbForGames(
   const cache = loadHltbCache();
   const summary: HltbSyncSummary = { updatedCount: 0, noMatchCount: 0, failedCount: 0, cachedCount: 0, unavailableCount: 0 };
   const updatedGames: Game[] = [];
+  let providerUnavailableError: HltbProviderError | null = null;
 
   for (const game of games) {
     const cacheKey = getHltbCacheKey(game);
@@ -152,6 +153,13 @@ export async function syncHltbForGames(
     if (!options.force && cachedEntry && hasHltbHours(cachedEntry)) {
       updatedGames.push(applyHltbEntry(game, { ...cachedEntry, hltbLastSyncedAt: game.hltbLastSyncedAt ?? cachedEntry.hltbLastSyncedAt }));
       summary.cachedCount += 1;
+      continue;
+    }
+
+    if (providerUnavailableError) {
+      console.warn(`[hltb] provider unavailable; skipping lookup for ${game.title}`, describeHltbError(providerUnavailableError));
+      summary.unavailableCount += 1;
+      summary.failedCount += 1;
       continue;
     }
 
@@ -189,6 +197,9 @@ export async function syncHltbForGames(
       console.warn(`[hltb] provider failure for ${game.title}`, describeHltbError(error));
       if (error instanceof HltbProviderError) {
         summary.unavailableCount += 1;
+        if (error.reason === 'unavailable') {
+          providerUnavailableError = error;
+        }
       }
       summary.failedCount += 1;
     }
