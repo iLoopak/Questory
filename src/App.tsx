@@ -631,6 +631,7 @@ function App() {
       category: notification.category ?? 'success',
       createdAt,
       dedupeKey: notification.dedupeKey ?? (activeNavItem === 'Review Mode' ? 'quest-queue-action' : getToastDedupeKey(historyEntry.actionType, historyEntry.affectedGameIds)),
+      details: notification.details,
       expiresAt: createdAt + undoActionTimeoutMs,
       historyEntry: {
         ...historyEntry,
@@ -656,6 +657,7 @@ function App() {
       category: notification.category,
       createdAt,
       dedupeKey: notification.dedupeKey,
+      details: notification.details,
       expiresAt: createdAt + undoActionTimeoutMs,
       historyEntry: {
         actionType: 'notification',
@@ -1030,7 +1032,8 @@ function App() {
           actions: syncableGames[0] ? [getViewGameAction(syncableGames[0].id)] : [getDismissAction()],
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-achievements:${syncableGames.map((game) => game.id).join(',')}`,
-          message: options.completionToastMessage?.(result.summary) ?? formatSteamAchievementSyncSummary(result.summary),
+          details: options.completionToastMessage?.(result.summary) ?? formatSteamAchievementSyncSummary(result.summary),
+          message: hasPartialFailures ? 'Steam achievements partially synced' : 'Steam achievements synced',
         });
       }
 
@@ -1067,7 +1070,10 @@ function App() {
         actions: isCredentialError ? [getOpenSteamSettingsAction()] : [getDismissAction()],
         category: isCredentialError ? 'warning' : 'error',
         dedupeKey: isCredentialError ? 'steam-achievements:credentials' : 'steam-achievements:error',
-        message: isCredentialError ? 'Add Steam credentials to sync achievements.' : 'Steam achievement sync failed.',
+        details: isCredentialError
+          ? 'Add your Steam API key and SteamID64 so QuestShelf can sync achievements. Your Steam profile may also need public game details.'
+          : message,
+        message: isCredentialError ? 'Steam credentials needed' : 'Steam achievement sync failed',
       });
 
       return summaryToReturn;
@@ -1152,11 +1158,13 @@ function App() {
       });
 
       if (options.showToast) {
+        const hasPartialFailures = result.summary.failedCount > 0;
         addToastNotification({
           actions: [getViewGameAction(refreshableGames[0].id)],
-          category: result.summary.failedCount > 0 ? 'warning' : 'success',
+          category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-playtime-refresh:${refreshableGames[0].id}`,
-          message: options.completionToastMessage?.(result.summary) ?? `Updated playtime for ${result.summary.updatedCount} game${result.summary.updatedCount === 1 ? '' : 's'}`,
+          details: options.completionToastMessage?.(result.summary) ?? `Updated playtime for ${result.summary.updatedCount} game${result.summary.updatedCount === 1 ? '' : 's'}`,
+          message: hasPartialFailures ? 'Steam playtime partially refreshed' : 'Steam playtime refreshed',
         });
       }
 
@@ -1178,7 +1186,10 @@ function App() {
         actions: isCredentialError ? [getOpenSteamSettingsAction()] : [getDismissAction()],
         category: isCredentialError ? 'warning' : 'error',
         dedupeKey: isCredentialError ? 'steam-playtime-refresh:credentials' : 'steam-playtime-refresh:error',
-        message: isCredentialError ? 'Add Steam credentials to refresh playtime.' : 'Steam playtime refresh failed.',
+        details: isCredentialError
+          ? 'Add your Steam API key and SteamID64 so QuestShelf can refresh playtime. Your Steam profile may also need public game details.'
+          : message,
+        message: isCredentialError ? 'Steam credentials needed' : 'Steam playtime refresh failed',
       });
 
       return null;
@@ -1191,11 +1202,13 @@ function App() {
     const achievementSummary = await syncSteamAchievements([game.id], { force: true, showToast: false });
     const isFullyUpdated = didSteamPlaytimeSyncSucceed(playtimeSummary) && didSteamAchievementSyncSucceed(achievementSummary);
     const message = isFullyUpdated ? t('detail.steamDataUpdated') : t('detail.steamDataPartiallyUpdated');
+    const details = isFullyUpdated ? undefined : formatSteamDataPartialDetails(playtimeSummary, achievementSummary);
 
     addToastNotification({
       actions: [getViewGameAction(game.id)],
       category: isFullyUpdated ? 'success' : 'warning',
       dedupeKey: `steam-data:${game.id}`,
+      details,
       message,
     });
 
@@ -2636,6 +2649,16 @@ type UndoToastStackProps = {
 };
 
 function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onUndo, onViewGame }: UndoToastStackProps) {
+  const [expandedDetailIds, setExpandedDetailIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const activeActionIds = new Set(actions.map((action) => action.id));
+    setExpandedDetailIds((currentIds) => {
+      const nextIds = new Set([...currentIds].filter((actionId) => activeActionIds.has(actionId)));
+      return nextIds.size === currentIds.size ? currentIds : nextIds;
+    });
+  }, [actions]);
+
   if (actions.length === 0) {
     return null;
   }
@@ -2671,38 +2694,78 @@ function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, 
     }
   }
 
+  function toggleToastDetails(actionId: string) {
+    setExpandedDetailIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      if (nextIds.has(actionId)) {
+        nextIds.delete(actionId);
+      } else {
+        nextIds.add(actionId);
+      }
+
+      return nextIds;
+    });
+  }
+
   return (
     <aside
       aria-label="QuestShelf notifications"
       aria-live="polite"
-      className="pointer-events-none fixed right-3 top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1100] grid w-[min(calc(100vw-1.5rem),20rem)] justify-items-end gap-2 overflow-visible sm:right-5 sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))]"
+      className="qs-toast-stack pointer-events-none fixed top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1300] grid justify-items-stretch gap-2 overflow-visible sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))] sm:justify-items-end"
       role="status"
     >
       {visibleActions.map((action) => {
         const category = action.category ?? 'success';
         const categoryStyles = getToastCategoryStyles(category);
-        const undoAction = action.actions?.[0] ?? getDismissAction();
+        const toastActions = action.actions?.length ? action.actions : [getDismissAction()];
+        const hasDetails = Boolean(action.details?.trim());
+        const isDetailsExpanded = expandedDetailIds.has(action.id);
 
         return (
           <div
             key={action.id}
-            className={`qs-toast pointer-events-auto flex max-w-full translate-x-0 items-center gap-3 rounded-full border px-3 py-2 shadow-glow ${categoryStyles.container}`}
+            className={`qs-toast pointer-events-auto flex w-full max-w-full translate-x-0 flex-col gap-2 overflow-hidden rounded-2xl border px-3 py-2 shadow-glow ${categoryStyles.container}`}
           >
-            <span className="min-w-0 truncate text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
-              {action.message}
-            </span>
-            {action.repeatCount && action.repeatCount > 1 ? (
-              <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[0.65rem] font-bold text-slate-300">
-                ×{action.repeatCount}
+            <div className="flex min-w-0 items-start gap-2">
+              <span className="qs-toast-message min-w-0 flex-1 text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
+                {action.message}
               </span>
+              {action.repeatCount && action.repeatCount > 1 ? (
+                <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.65rem] font-bold text-slate-300">
+                  ×{action.repeatCount}
+                </span>
+              ) : null}
+            </div>
+            {hasDetails ? (
+              <div className="min-w-0">
+                <button
+                  aria-expanded={isDetailsExpanded}
+                  className="max-w-full rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-100 transition hover:border-mint/40 hover:bg-mint/10"
+                  onClick={() => toggleToastDetails(action.id)}
+                  type="button"
+                >
+                  {isDetailsExpanded ? 'Hide details' : 'Show details'}
+                </button>
+                {isDetailsExpanded ? (
+                  <div className="qs-toast-details mt-2 max-h-32 overflow-y-auto rounded-xl border border-white/10 bg-black/15 p-2 text-xs leading-5 text-slate-100">
+                    {action.details}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
-            <button
-              className={getToastButtonClass(undoAction.kind)}
-              onClick={() => runToastAction(action.id, undoAction)}
-              type="button"
-            >
-              {undoAction.label}
-            </button>
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              {toastActions.map((toastAction) => (
+                <button
+                  key={`${action.id}-${toastAction.kind}-${toastAction.gameId ?? toastAction.label}`}
+                  className={getToastButtonClass(toastAction.kind)}
+                  onClick={() => runToastAction(action.id, toastAction)}
+                  type="button"
+                >
+                  {toastAction.label}
+                </button>
+              ))}
+            </div>
           </div>
         );
       })}
@@ -2735,7 +2798,7 @@ function getToastCategoryStyles(category: ToastCategory) {
 }
 
 function getToastButtonClass(kind: ToastAction['kind']) {
-  const baseClass = 'min-h-0 rounded-full px-3 py-1 text-xs font-bold transition focus-visible:translate-y-0 sm:text-sm';
+  const baseClass = 'min-h-0 max-w-full whitespace-normal break-words rounded-full px-3 py-1 text-xs font-bold leading-tight transition focus-visible:translate-y-0 sm:text-sm';
 
   if (kind === 'undo') {
     return `${baseClass} bg-mint text-ink-950 shadow-glow hover:bg-mint/90`;
@@ -5586,6 +5649,22 @@ function didSteamPlaytimeSyncSucceed(summary: SteamPlaytimeRefreshSummary | null
 
 function didSteamAchievementSyncSucceed(summary: SteamAchievementSyncSummary | null) {
   return summary !== null && summary.failedCount === 0;
+}
+
+function formatSteamDataPartialDetails(
+  playtimeSummary: SteamPlaytimeRefreshSummary | null,
+  achievementSummary: SteamAchievementSyncSummary | null,
+) {
+  const parts = [
+    playtimeSummary
+      ? `Playtime: ${playtimeSummary.updatedCount} updated, ${playtimeSummary.unchangedCount} unchanged, ${playtimeSummary.failedCount} failed${playtimeSummary.skippedNonSteamCount > 0 ? `, ${playtimeSummary.skippedNonSteamCount} non-Steam skipped` : ''}.`
+      : 'Playtime refresh did not complete.',
+    achievementSummary
+      ? `Achievements: ${achievementSummary.updatedCount} updated, ${achievementSummary.unchangedCount} unchanged, ${achievementSummary.noAchievementDataCount} no achievements, ${achievementSummary.failedCount} failed${achievementSummary.skippedNonSteamCount > 0 ? `, ${achievementSummary.skippedNonSteamCount} non-Steam skipped` : ''}.`
+      : 'Achievement sync did not complete.',
+  ];
+
+  return parts.join(' ');
 }
 
 function withSteamAchievementSyncWatchdog<T>(promise: Promise<T>, total: number) {

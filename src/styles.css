@@ -898,9 +898,38 @@ body.qs-controller-active .qs-game-card:focus {
   text-transform: uppercase;
 }
 
+.qs-toast-stack {
+  left: 12px;
+  right: 12px;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
 .qs-toast {
   backdrop-filter: blur(18px);
   min-height: 2.25rem;
+  overflow-wrap: anywhere;
+}
+
+.qs-toast-message {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.qs-toast-details {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  .qs-toast-stack {
+    left: auto;
+    right: 12px;
+    width: min(420px, calc(100vw - 24px));
+  }
 }
 
 body.qs-controller-active .qs-toast {
