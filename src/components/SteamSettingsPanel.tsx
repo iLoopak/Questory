@@ -9,6 +9,7 @@ import {
   getOwnedGames,
   getRecentlyPlayedGames,
   getSteamApiDebugLog,
+  getSteamPlayerSummary,
   mapSteamGamesToLocalGames,
   SteamApiError,
 } from '../services/steamApi';
@@ -43,6 +44,7 @@ type SteamSettingsPanelProps = {
   onSteamIdConfigured?: () => void;
   onImportGames: (games: Game[]) => void;
   onSteamLibraryImported?: () => void;
+  onSteamProfileNameChange?: (profileName: string) => void;
   playtimeRefreshState: SteamPlaytimeRefreshState;
   onRefreshSteamPlaytime: () => Promise<unknown>;
   onUnignoreSteamGame: (steamAppId: number) => void;
@@ -56,6 +58,7 @@ export function SteamSettingsPanel({
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
+  onSteamProfileNameChange,
   playtimeRefreshState,
   onRefreshSteamPlaytime,
   onUnignoreSteamGame,
@@ -131,9 +134,28 @@ export function SteamSettingsPanel({
     setImportSummary(null);
 
     try {
-      const ownedGames = await getOwnedGames(settings);
-      const recentlyPlayedGames = await getRecentlyPlayedGames(settings);
+      const [ownedGames, recentlyPlayedGames, profile] = await Promise.all([
+        getOwnedGames(settings),
+        getRecentlyPlayedGames(settings),
+        getSteamPlayerSummary(settings).catch(() => null),
+      ]);
       const mappedGames = mapSteamGamesToLocalGames(ownedGames, recentlyPlayedGames);
+      const nextSettings: SteamSettings = {
+        ...settings,
+        ...(profile
+          ? {
+              profile: {
+                ...profile,
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
+      };
+
+      if (profile) {
+        setSettings(nextSettings);
+        onSteamProfileNameChange?.(profile.personaName || profile.profileName || '');
+      }
 
       setSelectedAppIds(new Set());
       setConnectionState({
@@ -145,6 +167,7 @@ export function SteamSettingsPanel({
         data: {
           ownedGames,
           recentlyPlayedGames,
+          profile,
           mappedGames,
           apiDebugEntries: getSteamApiDebugLog(),
         },
@@ -162,6 +185,7 @@ export function SteamSettingsPanel({
         data: {
           ownedGames: connectionState.data?.ownedGames ?? [],
           recentlyPlayedGames: connectionState.data?.recentlyPlayedGames ?? [],
+          profile: connectionState.data?.profile ?? null,
           mappedGames: connectionState.data?.mappedGames ?? [],
           apiDebugEntries: getSteamApiDebugLog(),
         },
@@ -702,6 +726,7 @@ function DebugStat({ label, value }: DebugStatProps) {
 function createEmptyDebugResult(steamId64: string): SteamDebugResult {
   return {
     ownedGames: [],
+    profile: null,
     recentlyPlayedGames: [],
     mappedGames: [],
     apiDebugEntries: [

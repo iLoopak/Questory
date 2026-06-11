@@ -3,6 +3,7 @@ import type {
   SteamApiDebugEntry,
   SteamOwnedGame,
   SteamRecentlyPlayedGame,
+  SteamPlayerSummary,
   SteamSettings,
   SteamAchievementSummary,
   SteamWishlistItem,
@@ -11,15 +12,20 @@ import { getSteamArtworkUrls } from '../lib/steamArtwork';
 
 const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
 const DEVELOPMENT_STEAM_STATS_API_BASE_URL = '/api/steam/ISteamUserStats';
+const DEVELOPMENT_STEAM_USER_API_BASE_URL = '/api/steam/ISteamUser';
 const DEVELOPMENT_STEAM_STORE_BASE_URL = '/api/steam-store';
 // Production placeholder only. A deployed client will still need a safe proxy/backend before Steam sync is production-ready.
 const PRODUCTION_STEAM_API_BASE_URL = 'https://api.steampowered.com/IPlayerService';
 const PRODUCTION_STEAM_STATS_API_BASE_URL = 'https://api.steampowered.com/ISteamUserStats';
+const PRODUCTION_STEAM_USER_API_BASE_URL = 'https://api.steampowered.com/ISteamUser';
 const PRODUCTION_STEAM_STORE_BASE_URL = 'https://store.steampowered.com';
 const STEAM_API_BASE_URL = import.meta.env.DEV ? DEVELOPMENT_STEAM_API_BASE_URL : PRODUCTION_STEAM_API_BASE_URL;
 const STEAM_STATS_API_BASE_URL = import.meta.env.DEV
   ? DEVELOPMENT_STEAM_STATS_API_BASE_URL
   : PRODUCTION_STEAM_STATS_API_BASE_URL;
+const STEAM_USER_API_BASE_URL = import.meta.env.DEV
+  ? DEVELOPMENT_STEAM_USER_API_BASE_URL
+  : PRODUCTION_STEAM_USER_API_BASE_URL;
 const STEAM_STORE_BASE_URL = import.meta.env.DEV
   ? DEVELOPMENT_STEAM_STORE_BASE_URL
   : PRODUCTION_STEAM_STORE_BASE_URL;
@@ -65,7 +71,10 @@ type GameSchemaResponse = {
 
 type PlayerSummaryResponse = {
   players?: Array<{
+    personaname?: string;
+    profilestate?: number;
     profileurl?: string;
+    realname?: string;
   }>;
 };
 
@@ -164,7 +173,9 @@ function validateSettings(settings: SteamSettings) {
 async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings): Promise<T> {
   validateSettings(settings);
 
-  const url = new URL(`${STEAM_API_BASE_URL}/${endpoint}/v0001/`, window.location.origin);
+  const baseUrl = endpoint === 'GetPlayerSummaries' ? STEAM_USER_API_BASE_URL : STEAM_API_BASE_URL;
+  const version = endpoint === 'GetPlayerSummaries' ? 'v0002' : 'v0001';
+  const url = new URL(`${baseUrl}/${endpoint}/${version}/`, window.location.origin);
   url.searchParams.set('key', settings.apiKey.trim());
   url.searchParams.set('steamid', settings.steamId64);
   url.searchParams.set('format', 'json');
@@ -422,6 +433,25 @@ export async function getRecentlyPlayedGames(settings: SteamSettings): Promise<S
   const response = await requestSteamEndpoint<RecentlyPlayedResponse>('GetRecentlyPlayedGames', settings);
 
   return Array.isArray(response.games) ? response.games : [];
+}
+
+export async function getSteamPlayerSummary(settings: SteamSettings): Promise<SteamPlayerSummary | null> {
+  const response = await requestSteamEndpoint<PlayerSummaryResponse>('GetPlayerSummaries', settings);
+  const player = response.players?.[0];
+
+  if (!player) {
+    return null;
+  }
+
+  const personaName = typeof player.personaname === 'string' ? player.personaname.trim() : '';
+  const profileName = typeof player.realname === 'string' ? player.realname.trim() : '';
+  const profileUrl = typeof player.profileurl === 'string' ? player.profileurl.trim() : '';
+
+  return {
+    ...(personaName ? { personaName } : {}),
+    ...(profileName ? { profileName } : {}),
+    ...(profileUrl ? { profileUrl } : {}),
+  };
 }
 
 export async function getSteamAchievementSummary(

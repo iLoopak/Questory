@@ -16,6 +16,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.settingsCategory.v1'
   | 'questshelf.themePreference.v1'
   | 'questshelf.accentColor.v1'
+  | 'questshelf.appPersonalization.v1'
   | 'questshelf.languagePreference.v1'
   | 'questshelf.navigationVisibility.v1'
   | 'questshelf.storageIssues.v1';
@@ -149,6 +150,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Custom app-wide accent color preference.',
     scope: 'ui',
     schema: 'Lowercase #rrggbb string or empty for default.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.appPersonalization.v1',
+    purpose: 'Library owner nickname used for personalized app titles.',
+    scope: 'ui',
+    schema: 'AppPersonalizationSettings.',
   },
   {
     backup: 'never',

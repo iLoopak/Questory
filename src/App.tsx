@@ -66,6 +66,14 @@ import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage, type TFunction } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
 import {
+  formatPersonalizedQuestShelfTitle,
+  getPersonalizedQuestShelfTitle,
+  loadAppPersonalizationSettings,
+  maxLibraryOwnerNicknameLength,
+  sanitizeLibraryOwnerNickname,
+  saveAppPersonalizationSettings,
+} from './lib/appPersonalization';
+import {
   configurableNavigationItems,
   loadNavigationVisibilityPreferences,
   saveNavigationVisibilityPreferences,
@@ -113,6 +121,7 @@ import {
 } from './lib/platformQueueStorage';
 import { loadIsThereAnyDealSettings } from './lib/isThereAnyDealSettingsStorage';
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
+import { getSteamProfileDisplayName, loadSteamSettings } from './lib/steamSettingsStorage';
 import { IsThereAnyDealError, syncItadDealsForWishlistGames } from './lib/isThereAnyDeal';
 import { getPrimaryHltbHours, hasHltbData, syncHltbForGames, type HltbSyncSummary } from './lib/hltb';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from './lib/steamAchievementsSync';
@@ -144,7 +153,6 @@ import {
   type ReviewModeState,
   type ReviewSource,
 } from './lib/reviewModeStorage';
-import { loadSteamSettings } from './lib/steamSettingsStorage';
 import {
   applyAccentColorPreference,
   applyAppTemplatePreference,
@@ -250,6 +258,8 @@ function App() {
   const [appTemplatePreference, setAppTemplatePreference] = useState<AppTemplatePreference>(() => loadAppTemplatePreference());
   const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
+  const [libraryOwnerNickname, setLibraryOwnerNicknameState] = useState(() => loadAppPersonalizationSettings().libraryOwnerNickname);
+  const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(loadSteamSettings()));
   const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
     loadNavigationVisibilityPreferences(),
   );
@@ -258,7 +268,21 @@ function App() {
   );
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
+  const personalizedQuestShelfTitle = useMemo(
+    () => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName),
+    [libraryOwnerNickname, steamProfileName],
+  );
   const isNeonTemplate = appTemplatePreference === 'neon-deck';
+  useEffect(() => {
+    document.title = personalizedQuestShelfTitle;
+  }, [personalizedQuestShelfTitle]);
+
+  function setLibraryOwnerNickname(value: string) {
+    const libraryOwnerNickname = sanitizeLibraryOwnerNickname(value);
+    setLibraryOwnerNicknameState(libraryOwnerNickname);
+    saveAppPersonalizationSettings({ libraryOwnerNickname });
+  }
+
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
@@ -2279,9 +2303,9 @@ function App() {
     <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`}>
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
-          <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label="QuestShelf">
+          <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label={personalizedQuestShelfTitle}>
             <QuestShelfLogo className="h-7 w-7 rounded-md border border-mint/30" fallbackClassName="text-[9px]" />
-            <div className="hidden min-w-0 text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">QuestShelf</div>
+            <div className="hidden min-w-0 truncate text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">{personalizedQuestShelfTitle}</div>
           </div>
 
           <nav className="qs-top-nav flex flex-1 gap-1 overflow-x-auto rounded-md border border-skyglass/15 bg-ink-950/70 p-0.5 shadow-inner">
@@ -2310,7 +2334,7 @@ function App() {
         </header>
 
         <div className="pt-2">
-          <PwaStatusBanner />
+          <PwaStatusBanner appTitle={personalizedQuestShelfTitle} />
         </div>
 
         <section className="flex-1 py-2">
@@ -2331,6 +2355,7 @@ function App() {
             />
           ) : activeNavItem === 'Home' ? (
             <HomePanel
+              appTitle={personalizedQuestShelfTitle}
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
               queueState={platformQueueState}
@@ -2522,6 +2547,8 @@ function App() {
               demoGameCount={games.filter(isMockGame).length}
               games={games}
               ignoredSteamGames={ignoredSteamGames}
+              libraryOwnerNickname={libraryOwnerNickname}
+              personalizedQuestShelfTitle={personalizedQuestShelfTitle}
               controllerLayoutPreference={controllerLayoutPreference}
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
@@ -2540,6 +2567,7 @@ function App() {
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
+              onLibraryOwnerNicknameChange={setLibraryOwnerNickname}
               onConnectionTested={() => markOnboardingItemComplete('steam-test')}
               onClearLibraryFilters={() => setLibraryFilters(initialCollectionFilters)}
               onEnrichRetroImportedGames={enrichRetroImportedGames}
@@ -2559,6 +2587,7 @@ function App() {
               onRefreshSteamPlaytime={() => refreshSteamPlaytime()}
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
+              onSteamProfileNameChange={setSteamProfileName}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onThemePreferenceChange={setThemePreferenceState}
@@ -4337,6 +4366,8 @@ type SettingsPanelProps = {
   demoGameCount: number;
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
+  libraryOwnerNickname: string;
+  personalizedQuestShelfTitle: string;
   controllerLayoutPreference: ControllerLayoutPreference;
   isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
@@ -4355,6 +4386,7 @@ type SettingsPanelProps = {
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
+  onLibraryOwnerNicknameChange: (nickname: string) => void;
   onClearLibraryFilters: () => void;
   onConnectionTested: () => void;
   onEnrichRetroImportedGames: (gameIds: string[]) => void;
@@ -4380,6 +4412,7 @@ type SettingsPanelProps = {
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
+  onSteamProfileNameChange: (profileName: string) => void;
   onUnignoreSteamGame: (steamAppId: number) => void;
   onViewRetroImportedGames: (gameIds: string[]) => void;
 };
@@ -4391,6 +4424,8 @@ function SettingsPanel({
   demoGameCount,
   games,
   ignoredSteamGames,
+  libraryOwnerNickname,
+  personalizedQuestShelfTitle,
   controllerLayoutPreference,
   isControllerDebugEnabled,
   isLandscapeLockEnabled,
@@ -4409,6 +4444,7 @@ function SettingsPanel({
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
+  onLibraryOwnerNicknameChange,
   onClearLibraryFilters,
   onConnectionTested,
   onEnrichRetroImportedGames,
@@ -4434,6 +4470,7 @@ function SettingsPanel({
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
+  onSteamProfileNameChange,
   onUnignoreSteamGame,
   onViewRetroImportedGames,
 }: SettingsPanelProps) {
@@ -4511,6 +4548,7 @@ function SettingsPanel({
                 onSteamApiKeyConfigured={onSteamApiKeyConfigured}
                 onSteamIdConfigured={onSteamIdConfigured}
                 onSteamLibraryImported={onSteamLibraryImported}
+                onSteamProfileNameChange={onSteamProfileNameChange}
                 playtimeRefreshState={steamPlaytimeRefreshState}
                 onRefreshSteamPlaytime={onRefreshSteamPlaytime}
                 onUnignoreSteamGame={onUnignoreSteamGame}
@@ -4570,6 +4608,9 @@ function SettingsPanel({
                 appTemplatePreference={appTemplatePreference}
                 accentColorPreference={accentColorPreference}
                 language={language}
+                libraryOwnerNickname={libraryOwnerNickname}
+                personalizedQuestShelfTitle={personalizedQuestShelfTitle}
+                onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
                 onLandscapeLockChange={onLandscapeLockChange}
@@ -5127,6 +5168,9 @@ function AppearanceSettingsPanel({
   appTemplatePreference,
   accentColorPreference,
   language,
+  libraryOwnerNickname,
+  personalizedQuestShelfTitle,
+  onLibraryOwnerNicknameChange,
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
@@ -5144,6 +5188,9 @@ function AppearanceSettingsPanel({
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   language: AppLanguage;
+  libraryOwnerNickname: string;
+  personalizedQuestShelfTitle: string;
+  onLibraryOwnerNicknameChange: (nickname: string) => void;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
@@ -5213,6 +5260,24 @@ function AppearanceSettingsPanel({
         <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
           {resolvedTheme} {t('settings.active')}
         </span>
+      </div>
+
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <label className="block">
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.libraryOwnerNickname')}</span>
+          <input
+            className="mt-3 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+            maxLength={maxLibraryOwnerNicknameLength}
+            onChange={(event) => onLibraryOwnerNicknameChange(event.target.value)}
+            placeholder={t('settings.libraryOwnerNicknamePlaceholder')}
+            value={libraryOwnerNickname}
+          />
+          <span className="mt-2 block text-xs leading-5 text-slate-500">{t('settings.libraryOwnerNicknameHelp')}</span>
+        </label>
+        <div className="mt-3 rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm text-mint">
+          {t('settings.libraryOwnerNicknamePreview').replace('{appTitle}', personalizedQuestShelfTitle)}
+        </div>
       </div>
 
       {!isNeonTemplate ? (

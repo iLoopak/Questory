@@ -1,9 +1,17 @@
 import type { Game } from './game';
 
+export type SteamProfileMetadata = {
+  personaName?: string;
+  profileName?: string;
+  profileUrl?: string;
+  updatedAt?: string;
+};
+
 export type SteamSettings = {
   apiKey: string;
   steamId64: string;
   wishlistUrl: string;
+  profile?: SteamProfileMetadata;
 };
 
 export type SteamOwnedGame = {
@@ -34,8 +42,15 @@ export type SteamWishlistItem = {
   discountInfo?: string;
 };
 
+export type SteamPlayerSummary = {
+  personaName?: string;
+  profileName?: string;
+  profileUrl?: string;
+};
+
 export type SteamDebugResult = {
   ownedGames: SteamOwnedGame[];
+  profile?: SteamPlayerSummary | null;
   recentlyPlayedGames: SteamRecentlyPlayedGame[];
   mappedGames: Game[];
   apiDebugEntries?: SteamApiDebugEntry[];
