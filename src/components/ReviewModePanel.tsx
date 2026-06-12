@@ -65,6 +65,8 @@ const positiveActions: Array<{
   { action: 'finished', hint: '', icon: 'trophy', label: 'Finished', tone: 'neutral' },
 ];
 
+type SwipeDirection = 'left' | 'right';
+
 const decisionActions = [...negativeActions, ...positiveActions];
 const firstPositiveActionIndex = negativeActions.length;
 const defaultSwipeLeftAction: ReviewModeAction = 'skip';
@@ -73,6 +75,11 @@ const swipeLeftActionIndex = negativeActions.findIndex((action) => action.action
 const swipeRightActionIndex = firstPositiveActionIndex + positiveActions.findIndex((action) => action.action === defaultSwipeRightAction);
 const swipeReleaseThreshold = 110;
 const swipeCommitDelayMs = 180;
+const minDragScale = 0.94;
+const futureSwipeZones: Record<SwipeDirection, ReviewModeAction[]> = {
+  left: ['skip', 'dropped'],
+  right: ['finished', 'queue'],
+};
 
 type ReviewActionStats = {
   dropped: number;
@@ -543,12 +550,15 @@ function FocusedReviewCard({
   const swipeDirection = getSwipeDirection(swipeState.offsetX);
   const activeSwipeAction = getSwipeActionForDirection(swipeDirection);
   const swipeProgress = Math.min(Math.abs(swipeState.offsetX) / swipeReleaseThreshold, 1);
+  const isSwipeEngaged = swipeState.phase === 'dragging' || swipeState.phase === 'exiting';
+  const dragScale = isSwipeEngaged ? 1 - (1 - minDragScale) * Math.max(swipeProgress, 0.45) : 1;
   const rotation = Math.max(-10, Math.min(10, swipeState.offsetX / 18));
   const swipeStyle = {
     '--qs-swipe-x': `${swipeState.offsetX}px`,
     '--qs-swipe-y': `${swipeState.offsetY}px`,
     '--qs-swipe-rotate': `${rotation}deg`,
     '--qs-swipe-progress': swipeProgress,
+    '--qs-swipe-scale': dragScale,
   } as CSSProperties;
 
   function beginSwipe(event: ReactPointerEvent<HTMLElement>) {
@@ -639,9 +649,15 @@ function FocusedReviewCard({
   }
 
   return (
-    <article className="qs-review-stage min-h-full" data-swipe-active={swipeDirection ?? 'none'} data-swipe-left="negative" data-swipe-right="positive">
+    <article
+      className={`qs-review-stage min-h-full ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
+      data-swipe-active={swipeDirection ?? 'none'}
+      data-swipe-left="negative"
+      data-swipe-right="positive"
+    >
       <section className={`qs-review-zone qs-review-zone-negative ${swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
+        <SwipeZonePreview direction="left" activeDirection={swipeDirection} />
         <div className="grid gap-2">
           {negativeActions.map((action, index) => (
             <button
@@ -835,6 +851,7 @@ function FocusedReviewCard({
 
       <section className={`qs-review-zone qs-review-zone-positive ${swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
         <div className="qs-review-zone-label">{t('review.keep')}</div>
+        <SwipeZonePreview direction="right" activeDirection={swipeDirection} />
         <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
@@ -869,7 +886,21 @@ function FocusedReviewCard({
   );
 }
 
-type SwipeDirection = 'left' | 'right';
+function SwipeZonePreview({ direction, activeDirection }: { direction: SwipeDirection; activeDirection: SwipeDirection | null }) {
+  const { t } = useI18n();
+  const actions = futureSwipeZones[direction];
+
+  return (
+    <div className={`qs-review-future-zones qs-review-future-zones-${direction}`} aria-hidden="true">
+      {actions.map((action) => (
+        <div key={action} className={`qs-review-future-zone ${activeDirection === direction ? 'qs-review-future-zone-active' : ''}`}>
+          <span className="qs-review-future-zone-kicker">{direction === 'left' ? 'Swipe left' : 'Swipe right'}</span>
+          <span className="qs-review-future-zone-label">{getReviewActionLabelByType(action, t)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'exiting';
 
@@ -1057,6 +1088,11 @@ function getGameTime(value: string | null | undefined) {
 
 function getReviewActionLabel(action: { action: ReviewModeAction; label: string }, t: TFunction) {
   return action.action === 'queue' ? t('action.addToQueue') : action.label;
+}
+
+function getReviewActionLabelByType(actionType: ReviewModeAction, t: TFunction) {
+  const action = decisionActions.find((candidate) => candidate.action === actionType);
+  return action ? getReviewActionLabel(action, t) : actionType;
 }
 
 function getActionClassName(tone: 'accent' | 'neutral' | 'danger' | 'quiet', isHighlighted: boolean) {
