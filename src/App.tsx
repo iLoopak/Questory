@@ -153,18 +153,16 @@ import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from '.
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
 import { parseSteamWishlistHtmlTextWithSummary, repairSteamWishlistPlaceholderItems, steamWishlistBookmarklet, type ParsedSteamWishlistImportItem } from './lib/steamWishlistHtmlImport';
 import {
+  formatGameToastMessage,
   getBulkWishlistToastMessage,
   getDismissAction,
   getMoveQueueToastMessage,
   getOpenQueueAction,
   getOpenSteamSettingsAction,
-  getQueueToastMessage,
   getRemoveQueueToastMessage,
-  getStatusToastMessage,
   getToastDedupeKey,
   getUndoAction,
   getViewGameAction,
-  getWishlistToastMessage,
   maxVisibleToastCount,
   mergeToastNotifications,
   type NotificationDraft,
@@ -757,10 +755,27 @@ function App() {
     setActiveSettingsCategory('Integrations');
   }
 
+
+  function getLocalizedStatusToastMessage(game: Game, status: GameStatus) {
+    if (status === 'Playing') {
+      return formatGameToastMessage(t('toast.markedPlayingNow'), game);
+    }
+
+    if (status === 'Finished') {
+      return formatGameToastMessage(t('toast.markedFinished'), game);
+    }
+
+    if (status === 'Dropped') {
+      return formatGameToastMessage(t('toast.dropped'), game);
+    }
+
+    return `${formatGameToastMessage('{game}', game)} marked as ${status}`;
+  }
+
   function updateGameStatus(gameId: string, status: GameStatus) {
     const game = games.find((currentGame) => currentGame.id === gameId);
-    if (game && (status === 'Finished' || status === 'Dropped')) {
-      addUndoAction(getStatusToastMessage(game, status), {
+    if (game && (status === 'Playing' || status === 'Finished' || status === 'Dropped')) {
+      addUndoAction(getLocalizedStatusToastMessage(game, status), {
         actionType: `mark-${status.toLowerCase()}`,
         affectedGameIds: [gameId],
         description: `Restore ${game.title} to ${game.status}`,
@@ -783,8 +798,8 @@ function App() {
   function updateManyGameStatuses(gameIds: string[], status: GameStatus) {
     const targetGameIds = new Set(gameIds);
     const updatedGames = games.filter((game) => targetGameIds.has(game.id));
-    if (updatedGames.length > 0 && (status === 'Finished' || status === 'Dropped')) {
-      addUndoAction(`${updatedGames.length} games marked as ${status}`, {
+    if (updatedGames.length > 0 && (status === 'Playing' || status === 'Finished' || status === 'Dropped')) {
+      addUndoAction(updatedGames.length === 1 ? getLocalizedStatusToastMessage(updatedGames[0], status) : `${updatedGames.length} games marked as ${status}`, {
         actionType: `bulk-mark-${status.toLowerCase()}`,
         affectedGameIds: updatedGames.map((game) => game.id),
         description: `Restore statuses for ${updatedGames.length} games`,
@@ -1063,7 +1078,9 @@ function App() {
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-achievements:${syncableGames.map((game) => game.id).join(',')}`,
           details: options.completionToastMessage?.(result.summary) ?? formatSteamAchievementSyncSummary(result.summary),
-          message: hasPartialFailures ? 'Steam achievements partially synced' : 'Steam achievements synced',
+          message: syncableGames.length === 1
+            ? formatGameToastMessage(hasPartialFailures ? t('toast.steamAchievementsPartiallySynced') : t('toast.steamAchievementsSynced'), syncableGames[0])
+            : hasPartialFailures ? 'Steam achievements partially synced' : 'Steam achievements synced',
         });
       }
 
@@ -1194,7 +1211,9 @@ function App() {
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-playtime-refresh:${refreshableGames[0].id}`,
           details: options.completionToastMessage?.(result.summary) ?? `Updated playtime for ${result.summary.updatedCount} game${result.summary.updatedCount === 1 ? '' : 's'}`,
-          message: hasPartialFailures ? 'Steam playtime partially refreshed' : 'Steam playtime refreshed',
+          message: refreshableGames.length === 1
+            ? formatGameToastMessage(hasPartialFailures ? t('toast.steamPlaytimePartiallyRefreshed') : t('toast.steamPlaytimeRefreshed'), refreshableGames[0])
+            : hasPartialFailures ? 'Steam playtime partially refreshed' : 'Steam playtime refreshed',
         });
       }
 
@@ -1231,7 +1250,7 @@ function App() {
     const playtimeSummary = await refreshSteamPlaytime([game.id], { showToast: false });
     const achievementSummary = await syncSteamAchievements([game.id], { force: true, showToast: false });
     const isFullyUpdated = didSteamPlaytimeSyncSucceed(playtimeSummary) && didSteamAchievementSyncSucceed(achievementSummary);
-    const message = isFullyUpdated ? t('detail.steamDataUpdated') : t('detail.steamDataPartiallyUpdated');
+    const message = formatGameToastMessage(isFullyUpdated ? t('toast.steamDataUpdated') : t('toast.steamDataPartiallyUpdated'), game);
     const details = isFullyUpdated ? undefined : formatSteamDataPartialDetails(playtimeSummary, achievementSummary);
 
     addToastNotification({
@@ -1591,10 +1610,10 @@ function App() {
     });
 
     if (!alreadyWishlisted) {
-      addUndoAction(getWishlistToastMessage(game), {
+      addUndoAction(formatGameToastMessage(t('toast.addedToWishlist'), game), {
         actionType: 'add-to-wishlist',
         affectedGameIds: [game.id],
-      description: `Remove ${game.title} from Wishlist`,
+        description: `Remove ${game.title} from Wishlist`,
       }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
     }
 
@@ -1633,7 +1652,7 @@ function App() {
 
   function addManyToWishlist(targetGames: Game[]) {
     if (targetGames.length > 0) {
-      addUndoAction(getBulkWishlistToastMessage(targetGames.length), {
+      addUndoAction(targetGames.length === 1 ? formatGameToastMessage(t('toast.addedToWishlist'), targetGames[0]) : getBulkWishlistToastMessage(targetGames.length), {
         actionType: 'bulk-add-to-wishlist',
         affectedGameIds: targetGames.map((game) => game.id),
         description: `Remove ${targetGames.length} wishlist copies`,
@@ -1810,7 +1829,7 @@ function App() {
     addToastNotification({
       category: 'info',
       dedupeKey: toastKey,
-      message: isArtworkRefresh ? t('artwork.searching') : 'Refreshing metadata...',
+      message: formatGameToastMessage(isArtworkRefresh ? t('toast.searchingArtwork') : t('toast.refreshingMetadata'), targetGame),
     });
 
     try {
@@ -1820,7 +1839,7 @@ function App() {
         addToastNotification({
           category: 'info',
           dedupeKey: toastKey,
-          message: isArtworkRefresh ? t('artwork.noArtworkFound') : 'No metadata found',
+          message: formatGameToastMessage(isArtworkRefresh ? t('toast.noArtworkFound') : t('toast.noMetadataFound'), targetGame),
         });
         return 'no-match';
       }
@@ -1832,9 +1851,12 @@ function App() {
       addToastNotification({
         category: foundArtwork || !isArtworkRefresh ? 'success' : 'info',
         dedupeKey: toastKey,
-        message: isArtworkRefresh
-          ? (foundArtwork ? t('artwork.updated') : t('artwork.noArtworkFound'))
-          : 'Metadata updated',
+        message: formatGameToastMessage(
+          isArtworkRefresh
+            ? (foundArtwork ? t('toast.artworkUpdated') : t('toast.noArtworkFound'))
+            : t('toast.metadataUpdated'),
+          targetGame,
+        ),
       });
 
       return foundArtwork || !isArtworkRefresh ? 'updated' : 'no-match';
@@ -1894,7 +1916,7 @@ function App() {
   }
 
   function addGameToQueue(game: Game, platform: GamePlatform) {
-    addUndoAction(getQueueToastMessage(game, platform), {
+    addUndoAction(formatGameToastMessage(t('toast.addedToPlatforms'), game), {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
       description: `Remove ${game.title} from ${platform} backlog and restore positions`,
@@ -1923,7 +1945,7 @@ function App() {
       return;
     }
 
-    addUndoAction(`Added to Playing Now on ${platform}`, {
+    addUndoAction(formatGameToastMessage(t('toast.markedPlayingNow'), game), {
       actionType: 'play-now',
       affectedGameIds: [game.id],
       description: `Restore ${game.title} to ${platform} backlog`,
@@ -1959,13 +1981,13 @@ function App() {
     const now = new Date().toISOString();
     const nextStatus: GameStatus = action === 'finished' ? 'Finished' : action === 'drop' ? 'Dropped' : 'Want to play';
     const actionLabels: Record<PlayingGameAction, string> = {
-      'move-to-backlog': 'Moved to Platforms',
-      finished: 'Marked Finished',
-      drop: 'Dropped',
-      'remove-from-playing': 'Removed from Playing Now',
+      'move-to-backlog': formatGameToastMessage(t('toast.addedToPlatforms'), game),
+      finished: formatGameToastMessage(t('toast.markedFinished'), game),
+      drop: formatGameToastMessage(t('toast.dropped'), game),
+      'remove-from-playing': `${formatGameToastMessage(t('toast.removedFromPlayingNow'), game)} on ${platform}`,
     };
 
-    addUndoAction(`${actionLabels[action]} on ${platform}`, {
+    addUndoAction(actionLabels[action], {
       actionType: 'playing-action',
       affectedGameIds: [game.id],
       description: `Restore ${game.title} to Playing Now`,
@@ -2005,6 +2027,12 @@ function App() {
 
   function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     if (action === 'skip') {
+      addToastNotification({
+        actions: [getDismissAction(), getViewGameAction(game.id)],
+        category: 'info',
+        dedupeKey: `review-skip:${game.id}`,
+        message: formatGameToastMessage(t('toast.skipped'), game),
+      });
       recordReviewDecision('skipped');
       return;
     }
@@ -2034,10 +2062,10 @@ function App() {
     }
 
     if (action === 'ignore') {
-      addUndoAction('Ignored', {
+      addUndoAction(formatGameToastMessage(t('toast.ignored'), game), {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
-      description: `Restore ${game.title} to Quest Queue`,
+        description: `Restore ${game.title} to Quest Queue`,
       });
 
       setReviewModeState((currentState) => ({
@@ -2101,8 +2129,8 @@ function App() {
 
   function updateGameReviewFields(gameId: string, changes: Partial<Game>) {
     const game = games.find((currentGame) => currentGame.id === gameId);
-    if (game && (changes.status === 'Finished' || changes.status === 'Dropped')) {
-      addUndoAction(getStatusToastMessage(game, changes.status), {
+    if (game && (changes.status === 'Playing' || changes.status === 'Finished' || changes.status === 'Dropped')) {
+      addUndoAction(getLocalizedStatusToastMessage(game, changes.status), {
         actionType: `mark-${changes.status.toLowerCase()}`,
         affectedGameIds: [gameId],
         description: `Restore ${game.title} to ${game.status}`,
