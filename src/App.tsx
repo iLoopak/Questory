@@ -181,13 +181,16 @@ import {
   applyAppTemplatePreference,
   applyThemePreference,
   defaultAccentColor,
+  defaultSecondaryAccentColor,
   getAppTemplateClassName,
   loadAccentColorPreference,
   loadAppTemplatePreference,
+  loadSecondaryAccentColorPreference,
   loadThemePreference,
   normalizeAccentColor,
   saveAccentColorPreference,
   saveAppTemplatePreference,
+  saveSecondaryAccentColorPreference,
   saveThemePreference,
   watchSystemTheme,
   type AccentColorPreference,
@@ -261,6 +264,7 @@ function App() {
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
   const [appTemplatePreference, setAppTemplatePreference] = useState<AppTemplatePreference>(() => loadAppTemplatePreference());
   const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
+  const [secondaryAccentColorPreference, setSecondaryAccentColorPreference] = useState<AccentColorPreference>(() => loadSecondaryAccentColorPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
   const [libraryOwnerNickname, setLibraryOwnerNicknameState] = useState(() => loadAppPersonalizationSettings().libraryOwnerNickname);
   const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(loadSteamSettings()));
@@ -276,7 +280,6 @@ function App() {
     () => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName),
     [libraryOwnerNickname, steamProfileName],
   );
-  const isNeonTemplate = appTemplatePreference === 'neon-deck';
   useEffect(() => {
     document.title = personalizedQuestShelfTitle;
   }, [personalizedQuestShelfTitle]);
@@ -366,14 +369,14 @@ function App() {
     setResolvedTheme(applyThemePreference(themePreference, appTemplatePreference));
     saveThemePreference(themePreference);
 
-    if (isNeonTemplate || themePreference !== 'system') {
+    if (themePreference !== 'system') {
       return undefined;
     }
 
     return watchSystemTheme(() => {
       setResolvedTheme(applyThemePreference('system', appTemplatePreference));
     });
-  }, [appTemplatePreference, isNeonTemplate, themePreference]);
+  }, [appTemplatePreference, themePreference]);
 
 
   useEffect(() => {
@@ -382,9 +385,10 @@ function App() {
   }, [appTemplatePreference]);
 
   useEffect(() => {
-    applyAccentColorPreference(isNeonTemplate ? null : accentColorPreference);
+    applyAccentColorPreference(accentColorPreference, secondaryAccentColorPreference);
     saveAccentColorPreference(accentColorPreference);
-  }, [accentColorPreference, isNeonTemplate]);
+    saveSecondaryAccentColorPreference(secondaryAccentColorPreference);
+  }, [accentColorPreference, secondaryAccentColorPreference]);
 
   useEffect(() => {
     pendingUndoActionsRef.current = pendingUndoActions;
@@ -2581,6 +2585,7 @@ function App() {
               themePreference={themePreference}
               appTemplatePreference={appTemplatePreference}
               accentColorPreference={accentColorPreference}
+              secondaryAccentColorPreference={secondaryAccentColorPreference}
               language={language}
               navigationVisibility={navigationVisibility}
               platformQueueState={platformQueueState}
@@ -2617,6 +2622,7 @@ function App() {
               onThemePreferenceChange={setThemePreferenceState}
               onAppTemplatePreferenceChange={setAppTemplatePreference}
               onAccentColorChange={setAccentColorPreference}
+              onSecondaryAccentColorChange={setSecondaryAccentColorPreference}
               onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
@@ -4403,6 +4409,7 @@ type SettingsPanelProps = {
   themePreference: ThemePreference;
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
+  secondaryAccentColorPreference: AccentColorPreference;
   language: AppLanguage;
   navigationVisibility: NavigationVisibilityPreferences;
   platformQueueState: PlatformQueueState;
@@ -4433,6 +4440,7 @@ type SettingsPanelProps = {
   onThemePreferenceChange: (preference: ThemePreference) => void;
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
+  onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
@@ -4464,6 +4472,7 @@ function SettingsPanel({
   themePreference,
   appTemplatePreference,
   accentColorPreference,
+  secondaryAccentColorPreference,
   language,
   navigationVisibility,
   platformQueueState,
@@ -4494,6 +4503,7 @@ function SettingsPanel({
   onThemePreferenceChange,
   onAppTemplatePreferenceChange,
   onAccentColorChange,
+  onSecondaryAccentColorChange,
   onLanguageChange,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
@@ -4663,6 +4673,7 @@ function SettingsPanel({
                 themePreference={themePreference}
                 appTemplatePreference={appTemplatePreference}
                 accentColorPreference={accentColorPreference}
+                secondaryAccentColorPreference={secondaryAccentColorPreference}
                 language={language}
                 libraryOwnerNickname={libraryOwnerNickname}
                 personalizedQuestShelfTitle={personalizedQuestShelfTitle}
@@ -4673,6 +4684,7 @@ function SettingsPanel({
                 onThemePreferenceChange={onThemePreferenceChange}
                 onAppTemplatePreferenceChange={onAppTemplatePreferenceChange}
                 onAccentColorChange={onAccentColorChange}
+                onSecondaryAccentColorChange={onSecondaryAccentColorChange}
                 onLanguageChange={onLanguageChange}
               />
             </div>
@@ -5318,6 +5330,7 @@ function AppearanceSettingsPanel({
   themePreference,
   appTemplatePreference,
   accentColorPreference,
+  secondaryAccentColorPreference,
   language,
   libraryOwnerNickname,
   personalizedQuestShelfTitle,
@@ -5328,6 +5341,7 @@ function AppearanceSettingsPanel({
   onThemePreferenceChange,
   onAppTemplatePreferenceChange,
   onAccentColorChange,
+  onSecondaryAccentColorChange,
   onLanguageChange,
 }: {
   controllerLayoutPreference: ControllerLayoutPreference;
@@ -5338,6 +5352,7 @@ function AppearanceSettingsPanel({
   themePreference: ThemePreference;
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
+  secondaryAccentColorPreference: AccentColorPreference;
   language: AppLanguage;
   libraryOwnerNickname: string;
   personalizedQuestShelfTitle: string;
@@ -5348,6 +5363,7 @@ function AppearanceSettingsPanel({
   onThemePreferenceChange: (preference: ThemePreference) => void;
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
+  onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
 }) {
   const t = useMemo(() => createTranslator(language), [language]);
@@ -5382,7 +5398,9 @@ function AppearanceSettingsPanel({
   ];
   const isNeonTemplate = appTemplatePreference === 'neon-deck';
   const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
+  const selectedSecondaryAccentColor = secondaryAccentColorPreference ?? defaultSecondaryAccentColor;
   const isDefaultAccentColor = accentColorPreference === null;
+  const isDefaultSecondaryAccentColor = secondaryAccentColorPreference === null;
   const accentColorPresets = [
     { color: defaultAccentColor, label: t('settings.defaultAccentColor') },
     { color: '#1b75d0', label: 'Steam blue' },
@@ -5392,10 +5410,33 @@ function AppearanceSettingsPanel({
     { color: '#8b5cf6', label: 'Purple' },
     { color: '#14b8a6', label: 'Teal' },
   ];
+  const neonAccentPresetPairs = [
+    { label: 'Orange / Blue', primary: defaultAccentColor, secondary: defaultSecondaryAccentColor },
+    { label: 'Pink / Cyan', primary: '#ec4899', secondary: '#22d3ee' },
+    { label: 'Purple / Mint', primary: '#8b5cf6', secondary: '#5bffd8' },
+    { label: 'Red / Amber', primary: '#ef4444', secondary: '#f59e0b' },
+    { label: 'Green / Blue', primary: '#22c55e', secondary: '#38bdf8' },
+    { label: 'Monochrome Neon', primary: '#e5e7eb', secondary: '#94a3b8' },
+  ];
   const selectAccentColor = (color: string) => {
     const normalizedColor = normalizeAccentColor(color);
     if (normalizedColor) {
       onAccentColorChange(normalizedColor === defaultAccentColor ? null : normalizedColor);
+    }
+  };
+  const selectSecondaryAccentColor = (color: string) => {
+    const normalizedColor = normalizeAccentColor(color);
+    if (normalizedColor) {
+      onSecondaryAccentColorChange(normalizedColor === defaultSecondaryAccentColor ? null : normalizedColor);
+    }
+  };
+  const selectNeonAccentPair = (primary: string, secondary: string) => {
+    const normalizedPrimary = normalizeAccentColor(primary);
+    const normalizedSecondary = normalizeAccentColor(secondary);
+
+    if (normalizedPrimary && normalizedSecondary) {
+      onAccentColorChange(normalizedPrimary === defaultAccentColor ? null : normalizedPrimary);
+      onSecondaryAccentColorChange(normalizedSecondary === defaultSecondaryAccentColor ? null : normalizedSecondary);
     }
   };
 
@@ -5431,11 +5472,10 @@ function AppearanceSettingsPanel({
         </div>
       </div>
 
-      {!isNeonTemplate ? (
-        <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.theme')}</div>
-          <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t('settings.theme')}>
-            {themeOptions.map((option) => {
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.theme')}</div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t('settings.theme')}>
+          {themeOptions.map((option) => {
               const isSelected = themePreference === option.value;
 
               return (
@@ -5460,13 +5500,12 @@ function AppearanceSettingsPanel({
                   <span className="mt-2 block text-xs leading-5 text-slate-500">{option.description}</span>
                 </button>
               );
-            })}
-          </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
-            Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
-          </p>
+          })}
         </div>
-      ) : null}
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
+        </p>
+      </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.template')}</div>
@@ -5500,74 +5539,162 @@ function AppearanceSettingsPanel({
         </div>
       </div>
 
-      {!isNeonTemplate ? (
-        <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.accentColor')}</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{t('settings.accentColorHelp')}</p>
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        {!isNeonTemplate ? (
+          <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.accentColor')}</div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{t('settings.accentColorHelp')}</p>
+              </div>
+              <div className="flex items-center gap-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2">
+                <span
+                  aria-hidden="true"
+                  className="h-8 w-8 rounded-full border border-white/20 shadow-glow"
+                  style={{ backgroundColor: selectedAccentColor }}
+                />
+                <span className="text-xs font-semibold text-mint">{t('settings.currentAccentColor')} · {selectedAccentColor}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 rounded-md border border-mint/30 bg-mint/10 px-3 py-2">
-              <span
-                aria-hidden="true"
-                className="h-8 w-8 rounded-full border border-white/20 shadow-glow"
-                style={{ backgroundColor: selectedAccentColor }}
+
+            <label className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+              <span className="font-semibold text-white">{t('settings.customAccentColor')}</span>
+              <input
+                aria-label={t('settings.customAccentColor')}
+                className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
+                onChange={(event) => selectAccentColor(event.target.value)}
+                type="color"
+                value={selectedAccentColor}
               />
-              <span className="text-xs font-semibold text-mint">{t('settings.currentAccentColor')} · {selectedAccentColor}</span>
+            </label>
+
+            <div className="mt-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.recommendedAccents')}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {accentColorPresets.map((preset) => {
+                  const isSelected = selectedAccentColor === preset.color && (preset.color !== defaultAccentColor || isDefaultAccentColor);
+
+                  return (
+                    <button
+                      aria-pressed={isSelected}
+                      className={`qs-accent-swatch grid min-h-11 min-w-11 place-items-center rounded-md border p-1 transition ${
+                        isSelected ? 'border-mint/60 shadow-glow' : 'border-skyglass/20 hover:border-mint/45 hover:shadow-glow'
+                      }`}
+                      key={preset.color}
+                      onClick={() => selectAccentColor(preset.color)}
+                      title={preset.label}
+                      type="button"
+                    >
+                      <span className="sr-only">{preset.label}</span>
+                      <span className="h-8 w-8 rounded-full border border-white/25" style={{ backgroundColor: preset.color }} />
+                    </button>
+                  );
+                })}
+                <button
+                  className="min-h-11 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/45 hover:bg-mint/10 hover:text-white"
+                  onClick={() => onAccentColorChange(null)}
+                  type="button"
+                >
+                  {t('settings.resetAccentColor')}
+                </button>
+              </div>
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Neon accent colors</div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Tune the Neon template with a primary glow color and a secondary edge color. Orange / Blue remains the default.
+                </p>
+              </div>
+              <div className="qs-neon-accent-preview rounded-xl border p-3" style={{ '--preview-primary': selectedAccentColor, '--preview-secondary': selectedSecondaryAccentColor } as CSSProperties}>
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                  <span className="h-4 w-4 rounded-full" style={{ backgroundColor: selectedAccentColor }} />
+                  <span>Primary</span>
+                  <span className="h-4 w-4 rounded-full" style={{ backgroundColor: selectedSecondaryAccentColor }} />
+                  <span>Secondary</span>
+                </div>
+                <div className="mt-3 rounded-lg border p-3">
+                  <div className="qs-neon-preview-button inline-flex rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.12em]">Button sample</div>
+                  <div className="mt-3 text-xs text-slate-400">Card border and glow sample</div>
+                </div>
+              </div>
+            </div>
 
-          <label className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-            <span className="font-semibold text-white">{t('settings.customAccentColor')}</span>
-            <input
-              aria-label={t('settings.customAccentColor')}
-              className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
-              onChange={(event) => selectAccentColor(event.target.value)}
-              type="color"
-              value={selectedAccentColor}
-            />
-          </label>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
+                <span className="font-semibold text-white">Primary accent</span>
+                <span className="mt-1 block text-xs text-slate-500">Main glow, CTA fill, selected borders.</span>
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    aria-label="Primary accent color"
+                    className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
+                    onChange={(event) => selectAccentColor(event.target.value)}
+                    type="color"
+                    value={selectedAccentColor}
+                  />
+                  <span className="font-mono text-xs text-slate-400">{selectedAccentColor}</span>
+                </div>
+              </label>
+              <label className="rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
+                <span className="font-semibold text-white">Secondary accent</span>
+                <span className="mt-1 block text-xs text-slate-500">Counter-glow, gradients, card highlights.</span>
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    aria-label="Secondary accent color"
+                    className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
+                    onChange={(event) => selectSecondaryAccentColor(event.target.value)}
+                    type="color"
+                    value={selectedSecondaryAccentColor}
+                  />
+                  <span className="font-mono text-xs text-slate-400">{selectedSecondaryAccentColor}</span>
+                </div>
+              </label>
+            </div>
 
-          <div className="mt-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.recommendedAccents')}</div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {accentColorPresets.map((preset) => {
-                const isSelected = selectedAccentColor === preset.color && (preset.color !== defaultAccentColor || isDefaultAccentColor);
+            <div className="mt-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Neon preset pairs</div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {neonAccentPresetPairs.map((preset) => {
+                  const isSelected = selectedAccentColor === preset.primary && selectedSecondaryAccentColor === preset.secondary
+                    && (preset.primary !== defaultAccentColor || isDefaultAccentColor)
+                    && (preset.secondary !== defaultSecondaryAccentColor || isDefaultSecondaryAccentColor);
 
-                return (
-                  <button
-                    aria-pressed={isSelected}
-                    className={`qs-accent-swatch grid min-h-11 min-w-11 place-items-center rounded-md border p-1 transition ${
-                      isSelected ? 'border-mint/60 shadow-glow' : 'border-skyglass/20 hover:border-mint/45 hover:shadow-glow'
-                    }`}
-                    key={preset.color}
-                    onClick={() => selectAccentColor(preset.color)}
-                    title={preset.label}
-                    type="button"
-                  >
-                    <span className="sr-only">{preset.label}</span>
-                    <span className="h-8 w-8 rounded-full border border-white/25" style={{ backgroundColor: preset.color }} />
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      aria-pressed={isSelected}
+                      className={`qs-accent-swatch rounded-md border p-3 text-left text-sm transition ${
+                        isSelected ? 'border-mint/60 shadow-glow' : 'border-skyglass/20 hover:border-mint/45 hover:shadow-glow'
+                      }`}
+                      key={`${preset.primary}-${preset.secondary}`}
+                      onClick={() => selectNeonAccentPair(preset.primary, preset.secondary)}
+                      type="button"
+                    >
+                      <span className="font-semibold text-white">{preset.label}</span>
+                      <span className="mt-2 flex gap-2">
+                        <span className="h-6 flex-1 rounded-full border border-white/20" style={{ backgroundColor: preset.primary }} />
+                        <span className="h-6 flex-1 rounded-full border border-white/20" style={{ backgroundColor: preset.secondary }} />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
               <button
-                className="min-h-11 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/45 hover:bg-mint/10 hover:text-white"
-                onClick={() => onAccentColorChange(null)}
+                className="mt-3 min-h-11 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/45 hover:bg-mint/10 hover:text-white"
+                onClick={() => {
+                  onAccentColorChange(null);
+                  onSecondaryAccentColorChange(null);
+                }}
                 type="button"
               >
-                {t('settings.resetAccentColor')}
+                Reset to Orange / Blue
               </button>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-4 rounded-lg border border-mint/30 bg-mint/10 p-3 text-sm text-slate-300 shadow-glow">
-          <div className="font-semibold text-white">Neon Deck controls its own look</div>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
-            This template is dark-first and uses a fixed neon palette for consistent contrast and glow effects.
-          </p>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <label className="block">
