@@ -233,34 +233,48 @@ Quest Queue uses the same artwork resolver, so games without real covers show ge
 
 ## PWA Install and Offline Behavior
 
-QuestShelf includes a basic Progressive Web App setup so it can be installed from supported desktop and Android browsers.
+QuestShelf is configured as an installable Progressive Web App for static hosting and iOS Safari **Add to Home Screen** installs. The PWA setup lives in Vite through `vite-plugin-pwa` with `registerType: "autoUpdate"`, while the app remains a normal Capacitor-compatible web build for Android APK packaging.
 
-To install:
+To run and verify locally:
 
-1. Run the production build and preview it, or deploy the built app over HTTPS.
-2. Open QuestShelf in Chrome, Edge, or another PWA-capable browser.
-3. Use the browser install action, or the in-app **Install QuestShelf** hint when the browser exposes the install prompt.
+```bash
+npm install
+npm run build
+npm run preview
+```
+
+Then open the preview URL in a browser. Service worker registration is skipped in Vite development mode, so PWA install/offline checks should use `npm run preview` or a deployed HTTPS build.
 
 The PWA manifest uses:
 
 - App name and short name: `QuestShelf`
+- Start URL and scope: `/`
 - Display mode: `standalone`
-- Orientation: landscape-friendly
-- PNG app icons generated from the QuestShelf source icon for favicon, app shell, and PWA manifest usage
-- Warm charcoal background and ember-orange theme color
+- Dark/neon app colors: `theme_color` and `background_color` use the QuestShelf dark navy shell (`#030612`)
+- PNG app icons generated from the QuestShelf source icon: 180x180 Apple touch icon, 192x192 icon, 512x512 icon, and a 512x512 maskable icon
 
 Offline support is intentionally app-shell focused:
 
-- The app shell, manifest, and local placeholder icons are cached by the service worker after the app has loaded.
-- The local library continues to work offline because game data is stored in browser `localStorage`.
-- Steam and RAWG actions require network access and will show their existing error states when offline or unavailable.
+- The app shell, manifest, icons, splash/brand image, and local placeholder covers are cached by the service worker after the app has loaded.
+- Built JS/CSS and same-origin assets are cached on first request so repeat launches can recover from a network miss.
+- The local library continues to work offline because game data is stored in browser `localStorage` and mirrored to Capacitor Preferences only when the native plugin is available.
+- Steam, RAWG, IsThereAnyDeal, and other remote actions require network access and will show their existing error states when offline or unavailable.
 - External Steam and RAWG images may depend on the browser cache and are not guaranteed to be available offline.
 
-Known limitations:
+### Add QuestShelf to iPhone Home Screen
 
-- Service worker registration is skipped during Vite development mode.
+1. Deploy QuestShelf over HTTPS or open an HTTPS preview URL in **Safari** on iPhone.
+2. Tap Safari's **Share** button.
+3. Choose **Add to Home Screen**.
+4. Confirm the name **QuestShelf** and tap **Add**.
+5. Launch QuestShelf from the new Home Screen icon; iOS should open it in standalone mode instead of a normal Safari tab.
+
+Known iOS PWA limitations:
+
+- iOS requires the user-driven Safari **Add to Home Screen** flow; the Chromium `beforeinstallprompt` install button is not exposed on iPhone.
+- Web push, background execution, storage persistence, and service worker behavior can vary by iOS version and device storage pressure.
 - The first offline launch is only reliable after the production app has been loaded at least once.
-- Browser install support varies, especially on iOS and embedded webviews.
+- Remote integrations still need network access even when the app shell opens offline.
 - This PWA layer does not add cloud sync, accounts, or a backend.
 
 ## Android Handheld / Capacitor Notes
@@ -449,8 +463,35 @@ npm run dev
 npm run build
 ```
 
+The static production output is written to `dist/`.
+
 ## Preview Production Build
 
 ```bash
 npm run preview
 ```
+
+Use the local preview for PWA smoke tests because it serves the built app shell and service worker.
+
+## Static Deploy
+
+QuestShelf does not require a custom server for the app shell. Deploy the `dist/` folder produced by `npm run build` to any static host.
+
+### Vercel
+
+- Framework preset: **Vite**
+- Build command: `npm run build`
+- Output directory: `dist`
+
+### Netlify
+
+- Build command: `npm run build`
+- Publish directory: `dist`
+
+### Cloudflare Pages
+
+- Framework preset: **Vite**
+- Build command: `npm run build`
+- Build output directory: `dist`
+
+After deploy, open the HTTPS production URL on iPhone Safari and use **Share → Add to Home Screen** to install the standalone PWA.
