@@ -15,11 +15,7 @@ import {
   getLocalStorageIssues,
   type LocalStorageIssue,
 } from '../lib/localPersistence';
-import {
-  createPortableBackupFilename,
-  portableSyncProviders,
-  serializePortableBackup,
-} from '../lib/portableSync';
+import { portableSyncProviders } from '../lib/portableSync';
 import {
   chooseBackupFileHandle,
   clearBackupFileHandle,
@@ -32,6 +28,7 @@ import {
   type SyncFolderSettings,
 } from '../lib/syncFolderStorage';
 import { useI18n } from '../i18n';
+import { downloadRawQuestShelfLocalData, exportQuestShelfBackupFile } from '../lib/backupExport';
 
 type DataManagementPanelProps = {
   autoBackupSignal?: string;
@@ -99,17 +96,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   }
 
   function downloadRawLocalData() {
-    const blob = new Blob(
-      [JSON.stringify({ exportedAt: new Date().toISOString(), rawData: exportRawQuestShelfLocalData() }, null, 2)],
-      { type: 'application/json' },
-    );
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = `questshelf-raw-local-data-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadRawQuestShelfLocalData(exportRawQuestShelfLocalData());
     showMessage('Raw local data exported for recovery.', 'success');
   }
 
@@ -119,16 +106,9 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
     showMessage('Storage recovery warnings cleared.');
   }
 
-  function downloadBackup() {
+  async function downloadBackup() {
     const backup = createQuestShelfBackup(includeIntegrationSettings);
-    const blob = new Blob([serializePortableBackup(backup)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = createPortableBackupFilename(backup);
-    link.click();
-    URL.revokeObjectURL(url);
+    await exportQuestShelfBackupFile(backup);
 
     showMessage(
       includeIntegrationSettings
@@ -165,7 +145,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   async function saveBackupNow(isAutomatic = false) {
     if (!supportsFileSystemAccess) {
       if (!isAutomatic) {
-        downloadBackup();
+        void downloadBackup();
       }
       return;
     }
@@ -328,7 +308,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
         </div>
         <button
           className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-          onClick={downloadBackup}
+          onClick={() => void downloadBackup()}
           type="button"
         >
           {t('data.exportBackup')}
