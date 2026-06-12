@@ -27,33 +27,72 @@ export type MergeableNotification = NotificationDraft & {
 
 export const maxVisibleToastCount = 3;
 export const maxPendingToastCount = 3;
+export const defaultToastGameTitleMaxLength = 20;
+
+export function truncateGameTitle(title: string, maxLength = defaultToastGameTitleMaxLength) {
+  const trimmedTitle = title.trim().replace(/\s+/g, ' ');
+  const safeMaxLength = Math.max(2, maxLength);
+
+  if (trimmedTitle.length <= safeMaxLength) {
+    return trimmedTitle;
+  }
+
+  const ellipsis = '…';
+  const availableLength = safeMaxLength - ellipsis.length;
+  const candidate = trimmedTitle.slice(0, availableLength).trimEnd();
+  const lastSpaceIndex = candidate.lastIndexOf(' ');
+  const shouldUseWordBoundary = lastSpaceIndex >= Math.floor(availableLength * 0.45);
+  const truncatedTitle = shouldUseWordBoundary ? candidate.slice(0, lastSpaceIndex).trimEnd() : candidate;
+
+  return `${truncatedTitle || candidate}${ellipsis}`;
+}
+
+export function formatToastGameTitle(title: string, maxLength = defaultToastGameTitleMaxLength) {
+  return truncateGameTitle(title, maxLength) || 'Game';
+}
+
+export function formatGameToastMessage(template: string, game: Pick<Game, 'title'>) {
+  return template.replace('{game}', formatToastGameTitle(game.title));
+}
 
 export function getGameTitle(game: Pick<Game, 'title'>) {
   return game.title.trim() || 'Game';
 }
 
 export function getStatusToastMessage(game: Pick<Game, 'title'>, status: GameStatus) {
-  return status === 'Finished' ? 'Finished' : status;
+  if (status === 'Playing') {
+    return `${formatToastGameTitle(game.title)} marked as Playing Now`;
+  }
+
+  if (status === 'Finished') {
+    return `${formatToastGameTitle(game.title)} marked as Finished`;
+  }
+
+  if (status === 'Dropped') {
+    return `${formatToastGameTitle(game.title)} dropped`;
+  }
+
+  return `${formatToastGameTitle(game.title)} marked as ${status}`;
 }
 
 export function getWishlistToastMessage(game: Pick<Game, 'title'>) {
-  return 'Wishlisted';
+  return `${formatToastGameTitle(game.title)} added to Wishlist`;
 }
 
-export function getBulkWishlistToastMessage(count: number) {
-  return count === 1 ? 'Wishlisted' : `${count} wishlisted`;
+export function getBulkWishlistToastMessage(count: number, game?: Pick<Game, 'title'>) {
+  return count === 1 && game ? getWishlistToastMessage(game) : `${count} games added to Wishlist`;
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `Added to ${platform} backlog`;
+  return `${formatToastGameTitle(game.title)} added to Platforms`;
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `Moved to ${platform} backlog`;
+  return `${formatToastGameTitle(game.title)} moved to ${platform}`;
 }
 
 export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `Removed from ${platform} backlog`;
+  return `${formatToastGameTitle(game.title)} removed from Platforms`;
 }
 
 export function getViewGameAction(gameId: string): ToastAction {
