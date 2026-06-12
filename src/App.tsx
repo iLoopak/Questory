@@ -24,15 +24,16 @@ import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModeP
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import {
-  alwaysVisibleNavItems,
-  allNavItems,
+  getNavDescription,
+  getVisibleNavItems,
+  isNavigationItemVisible,
+  isTopNavItem,
   navItemLabelKeys,
   navigationVisibilityLabelKeys,
-  navItems,
   type NavItem,
   type TopNavItem,
 } from './config/navigation';
-import { settingsCategories, settingsCategoryStorageKey, type SettingsCategory } from './config/settings';
+import { getSettingsCategoryMeta, settingsCategories, settingsCategoryStorageKey, type SettingsCategory } from './config/settings';
 import {
   achievementFilterOptions,
   allOption,
@@ -63,8 +64,30 @@ import {
   initialSteamWishlistSyncState,
   type ItadDealSyncState,
 } from './config/syncStates';
+import {
+  didSteamAchievementSyncSucceed,
+  didSteamPlaytimeSyncSucceed,
+  formatBulkSummary,
+  formatCountMessage,
+  formatHltbSyncSummary,
+  formatSteamAchievementSyncSummary,
+  formatSteamDataPartialDetails,
+  formatSteamWishlistHtmlImportSummary,
+  formatSteamWishlistSyncSummary,
+  type BulkActionSummary,
+  type SteamWishlistHtmlImportSummary,
+} from './utils/summaryFormatters';
+import {
+  filterGames,
+  getActiveAdvancedFilterCount,
+  getActiveFilterCount,
+  isCollectionFiltered,
+  isOption,
+  normalizeCollectionFilters,
+  parseTagInput,
+} from './utils/gameFilters';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
-import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage, type TFunction } from './i18n';
+import { I18nProvider, createTranslator, languageOptions, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
 import {
   formatPersonalizedQuestShelfTitle,
@@ -125,7 +148,7 @@ import { loadIsThereAnyDealSettings } from './lib/isThereAnyDealSettingsStorage'
 import { loadRawgSettings } from './lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from './lib/steamSettingsStorage';
 import { IsThereAnyDealError, syncItadDealsForWishlistGames } from './lib/isThereAnyDeal';
-import { getPrimaryHltbHours, hasHltbData, syncHltbForGames, type HltbSyncSummary } from './lib/hltb';
+import { syncHltbForGames, type HltbSyncSummary } from './lib/hltb';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from './lib/steamAchievementsSync';
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from './lib/steamPlaytimeRefresh';
 import { parseSteamWishlistHtmlTextWithSummary, repairSteamWishlistPlaceholderItems, steamWishlistBookmarklet, type ParsedSteamWishlistImportItem } from './lib/steamWishlistHtmlImport';
@@ -217,25 +240,6 @@ function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { clas
 type MetadataSelectionRequest = {
   ids: string[];
   requestId: number;
-};
-
-type SteamWishlistHtmlImportSummary = {
-  addedCount: number;
-  existingCount: number;
-  skippedCount: number;
-};
-
-type BulkActionSummary = {
-  message?: string;
-  failedCount?: number;
-  ignoredCount?: number;
-  removedCount?: number;
-  skippedCount?: number;
-  noAchievementDataCount?: number;
-  skippedNonSteamCount?: number;
-  unchangedCount?: number;
-  updatedCount?: number;
-  wishlistedCount?: number;
 };
 
 type MetadataRefreshMode = 'metadata' | 'artwork';
@@ -4790,60 +4794,6 @@ function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
   );
 }
 
-function getSettingsCategoryMeta(category: SettingsCategory) {
-  const meta: Record<
-    SettingsCategory,
-    {
-      description: string;
-      label: string;
-      shortDescription: string;
-    }
-  > = {
-    Integrations: {
-      description: 'Connect local credentials and import helpers for Steam, RAWG, and future providers.',
-      label: 'Integrations',
-      shortDescription: 'Steam, RAWG, providers',
-    },
-    Library: {
-      description: 'Manage local library data, demo content, and library-specific defaults.',
-      label: 'Library',
-      shortDescription: 'Owned games and demos',
-    },
-    Wishlist: {
-      description: 'Tune wishlist behavior, planning defaults, and future wishlist integrations.',
-      label: 'Wishlist',
-      shortDescription: 'Planning and priorities',
-    },
-    Platforms: {
-      description: 'Choose, hide, remove, rename, and reorder the active gaming platforms that appear in Platforms.',
-      label: 'Platforms',
-      shortDescription: 'Active platform plans',
-    },
-    Retro: {
-      description: 'Import ROM entries, review platform preferences, and prepare emulator settings.',
-      label: 'Retro',
-      shortDescription: 'ROM import and platforms',
-    },
-    Appearance: {
-      description: 'Adjust handheld presentation, landscape preference, theme, language, and UI behavior.',
-      label: 'Appearance',
-      shortDescription: 'Theme and UI feel',
-    },
-    'Data & Backup': {
-      description: 'Export, restore, import, reset, and sync QuestShelf data without a backend.',
-      label: 'Data & Backup',
-      shortDescription: 'Backup, restore, sync',
-    },
-    About: {
-      description: 'View version, credits, debug information, and onboarding controls.',
-      label: 'About',
-      shortDescription: 'Version and debug',
-    },
-  };
-
-  return meta[category];
-}
-
 function FutureProvidersPanel() {
   return null;
 }
@@ -5734,54 +5684,6 @@ function AppStartupScreen() {
   );
 }
 
-function getNavDescription(activeNavItem: NavItem) {
-  if (activeNavItem === 'Settings') {
-    return 'Settings are grouped for handheld use.';
-  }
-
-  if (activeNavItem === 'Metadata') {
-    return 'Metadata runs only when you start it.';
-  }
-
-  if (activeNavItem === 'Wishlist') {
-    return 'Wishlist items are separate from owned library games.';
-  }
-
-  if (activeNavItem === 'Recommendation') {
-    return 'Local picks based on your library.';
-  }
-
-  if (activeNavItem === 'Queue') {
-    return 'Platforms is the focused plan for active systems, currently playing games, and platform backlogs.';
-  }
-
-  if (activeNavItem === 'Review Mode') {
-    return 'Quest Queue helps quickly process imported games into Platforms plans, wishlist picks, status updates, or ignores.';
-  }
-
-  if (activeNavItem === 'Stats') {
-    return 'Local overview of backlog, progress, and playtime.';
-  }
-
-  return 'Local library and wishlist data stays on this device.';
-}
-
-function getVisibleNavItems(navigationVisibility: NavigationVisibilityPreferences): TopNavItem[] {
-  return navItems.filter((item) => isNavigationItemVisible(item, navigationVisibility));
-}
-
-function isNavigationItemVisible(item: TopNavItem, navigationVisibility: NavigationVisibilityPreferences) {
-  if (alwaysVisibleNavItems.includes(item as (typeof alwaysVisibleNavItems)[number])) {
-    return true;
-  }
-
-  return navigationVisibility[item as ConfigurableNavigationItem] ?? true;
-}
-
-function isTopNavItem(item: NavItem): item is TopNavItem {
-  return navItems.includes(item as TopNavItem);
-}
-
 function touchGameRecord(game: Game): Game {
   return {
     ...game,
@@ -5840,69 +5742,6 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
       </select>
     </label>
   );
-}
-
-function parseTagInput(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-function filterGames(games: Game[], filters: CollectionFilters) {
-  const normalizedSearch = filters.searchTerm.trim().toLowerCase();
-
-  return games
-    .filter((game) => {
-      const matchesTitle = game.title.toLowerCase().includes(normalizedSearch);
-      const matchesPlatform = filters.platform === allOption || game.platform === filters.platform;
-      const matchesStatus = filters.status === allOption || game.status === filters.status;
-      const matchesTag = filters.tag === allOption || game.tags.includes(filters.tag);
-      const matchesSource = matchesSourceFilter(game, filters.source);
-      const matchesEnrichment = matchesEnrichmentFilter(game, filters.enrichment);
-      const matchesAchievement = matchesAchievementFilter(game, filters.achievement);
-      const matchesQuickFilters = filters.quickFilters.every((quickFilter) => matchesQuickFilter(game, quickFilter));
-
-      return (
-        matchesTitle &&
-        matchesPlatform &&
-        matchesStatus &&
-        matchesTag &&
-        matchesSource &&
-        matchesEnrichment &&
-        matchesAchievement &&
-        matchesQuickFilters
-      );
-    })
-    .sort((firstGame, secondGame) => compareGames(firstGame, secondGame, filters.sortBy));
-}
-
-function didSteamPlaytimeSyncSucceed(summary: SteamPlaytimeRefreshSummary | null) {
-  return summary !== null && summary.failedCount === 0;
-}
-
-function didSteamAchievementSyncSucceed(summary: SteamAchievementSyncSummary | null) {
-  return summary !== null && summary.failedCount === 0;
-}
-
-function formatSteamDataPartialDetails(
-  playtimeSummary: SteamPlaytimeRefreshSummary | null,
-  achievementSummary: SteamAchievementSyncSummary | null,
-) {
-  const parts = [
-    playtimeSummary
-      ? `Playtime: ${playtimeSummary.updatedCount} updated, ${playtimeSummary.unchangedCount} unchanged, ${playtimeSummary.failedCount} failed${playtimeSummary.skippedNonSteamCount > 0 ? `, ${playtimeSummary.skippedNonSteamCount} non-Steam skipped` : ''}.`
-      : 'Playtime refresh did not complete.',
-    achievementSummary
-      ? `Achievements: ${achievementSummary.updatedCount} updated, ${achievementSummary.unchangedCount} unchanged, ${achievementSummary.noAchievementDataCount} no achievements, ${achievementSummary.failedCount} failed${achievementSummary.skippedNonSteamCount > 0 ? `, ${achievementSummary.skippedNonSteamCount} non-Steam skipped` : ''}.`
-      : 'Achievement sync did not complete.',
-  ];
-
-  return parts.join(' ');
 }
 
 function withSteamAchievementSyncWatchdog<T>(promise: Promise<T>, total: number) {
@@ -5993,63 +5832,6 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
   });
 }
 
-function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary) {
-  const completionPrefix = 'Steam achievements sync complete.';
-  const parts = [
-    `${summary.updatedCount} updated`,
-    summary.unchangedCount > 0 ? `${summary.unchangedCount} unchanged` : null,
-    `${summary.noAchievementDataCount} no achievements`,
-    `${summary.failedCount} failed`,
-    summary.skippedNonSteamCount > 0 ? `${summary.skippedNonSteamCount} non-Steam skipped` : null,
-  ].filter(Boolean);
-
-  return `${completionPrefix} ${parts.join(' · ')}.`;
-}
-
-function formatBulkSummary(summary: BulkActionSummary) {
-  if (summary.message) {
-    return summary.message;
-  }
-
-  const parts = [
-    summary.updatedCount ? `${summary.updatedCount} updated` : null,
-    summary.removedCount ? `${summary.removedCount} removed` : null,
-    summary.ignoredCount ? `${summary.ignoredCount} ignored` : null,
-    summary.failedCount ? `${summary.failedCount} failed` : null,
-    summary.noAchievementDataCount ? `${summary.noAchievementDataCount} no achievements` : null,
-    summary.skippedNonSteamCount ? `${summary.skippedNonSteamCount} non-Steam skipped` : null,
-    summary.wishlistedCount ? `${summary.wishlistedCount} sent to Wishlist` : null,
-    typeof summary.skippedCount === 'number' ? `${summary.skippedCount} skipped` : null,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? parts.join(' - ') : 'Bulk action complete';
-}
-
-
-function formatHltbSyncSummary(summary: HltbSyncSummary, t: TFunction) {
-  const unavailablePart = summary.unavailableCount > 0 ? ` · ${summary.unavailableCount} provider unavailable` : '';
-  return `${t('hltb.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed${unavailablePart}.`;
-}
-
-function formatSteamWishlistSyncSummary(summary: SteamWishlistSyncSummary, t: TFunction) {
-  if (summary.fetchedCount === 0) {
-    return t('collection.noSteamWishlistGames');
-  }
-
-  return `${t('collection.steamWishlistSyncComplete')}. ${summary.addedCount} added · ${summary.updatedCount} updated · ${summary.unchangedCount} unchanged · ${summary.failedCount} failed.`;
-}
-
-function formatSteamWishlistHtmlImportSummary(summary: SteamWishlistHtmlImportSummary, t: TFunction) {
-  return t('wishlist.importSummary')
-    .replace('X', summary.addedCount.toString())
-    .replace('Y', summary.existingCount.toString())
-    .replace('Z', summary.skippedCount.toString());
-}
-
-function formatCountMessage(message: string, count: number) {
-  return message.replace('X', count.toString());
-}
-
 function normalizeGameTitleForWishlistMatch(title: string) {
   return title
     .trim()
@@ -6120,248 +5902,6 @@ function shouldReplaceSteamWishlistPlaceholderTitle(existingGame: Game, syncedGa
 
 function isPlaceholderSteamWishlistTitle(title: string, appid: number) {
   return title.trim().toLowerCase() === `steam app ${appid}`.toLowerCase();
-}
-
-function matchesSourceFilter(game: Game, source: SourceFilter) {
-  if (source === 'All') {
-    return true;
-  }
-
-  if (source === 'Steam') {
-    return game.externalSource === 'steam' || game.externalSource === 'steam-wishlist' || typeof game.steamAppId === 'number';
-  }
-
-  if (source === 'Manual') {
-    return game.externalSource === 'manual';
-  }
-
-  if (source === 'Wishlist') {
-    return game.collectionType === 'wishlist';
-  }
-
-  return isRetroOrFutureReady(game);
-}
-
-function matchesEnrichmentFilter(game: Game, enrichment: EnrichmentFilter) {
-  if (enrichment === 'All') {
-    return true;
-  }
-
-  if (enrichment === 'Enriched') {
-    return game.metadataSource === 'rawg';
-  }
-
-  if (enrichment === 'Manual metadata') {
-    return Boolean(game.metadataManualManagedAt);
-  }
-
-  return isMissingRawgMetadata(game);
-}
-
-
-function matchesAchievementFilter(game: Game, achievement: AchievementFilter) {
-  if (achievement === 'All') {
-    return true;
-  }
-
-  const hasSummary = hasSteamAchievementSummary(game);
-  const percent = hasSummary ? game.steamAchievementsPercent ?? 0 : 0;
-
-  if (achievement === 'Has achievements') {
-    return hasSummary;
-  }
-
-  if (achievement === 'No achievements synced') {
-    return !hasSummary;
-  }
-
-  if (achievement === 'Nearly completed') {
-    return hasSummary && percent >= 80 && percent < 100;
-  }
-
-  if (achievement === 'Completed') {
-    return hasSummary && percent >= 100;
-  }
-
-  return hasSummary && percent > 0 && percent < 100;
-}
-
-function matchesQuickFilter(game: Game, quickFilter: QuickFilter) {
-  if (quickFilter === 'Playing Now') {
-    return game.status === 'Playing';
-  }
-
-  if (quickFilter === 'Paused') {
-    return game.status === 'Paused';
-  }
-
-  if (quickFilter === 'Queue / Want to play') {
-    return game.status === 'Want to play';
-  }
-
-  if (quickFilter === 'Missing info') {
-    return isMissingRawgMetadata(game);
-  }
-
-  if (quickFilter === 'On sale') {
-    return typeof game.itadDiscountPercent === 'number' && game.itadDiscountPercent > 0;
-  }
-
-  if (quickFilter === 'Historical low') {
-    return game.itadIsHistoricalLow === true;
-  }
-
-  if (quickFilter === 'Deal synced') {
-    return Boolean(game.itadId && game.itadLastSyncedAt);
-  }
-
-  if (quickFilter === 'No deal match') {
-    return Boolean(game.itadLastSyncedAt && !game.itadId);
-  }
-
-  const hltbHours = getPrimaryHltbHours(game);
-
-  if (quickFilter === 'Has HLTB data') {
-    return hasHltbData(game);
-  }
-
-  if (quickFilter === 'Under 10 hours') {
-    return typeof hltbHours === 'number' && hltbHours < 10;
-  }
-
-  if (quickFilter === '10–25 hours') {
-    return typeof hltbHours === 'number' && hltbHours >= 10 && hltbHours <= 25;
-  }
-
-  if (quickFilter === 'Over 25 hours') {
-    return typeof hltbHours === 'number' && hltbHours > 25;
-  }
-
-  if (quickFilter === 'Unknown length') {
-    return !hasHltbData(game);
-  }
-
-  return game.playtimeHours > 0;
-}
-
-function compareGames(firstGame: Game, secondGame: Game, sortBy: LibrarySortOption) {
-  if (sortBy === 'Recently played') {
-    return compareDateDesc(firstGame.lastPlayedAt, secondGame.lastPlayedAt) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Most playtime') {
-    return secondGame.playtimeHours - firstGame.playtimeHours || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Least playtime') {
-    return firstGame.playtimeHours - secondGame.playtimeHours || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Recently imported') {
-    return compareDateDesc(firstGame.importedAt, secondGame.importedAt) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Missing info first') {
-    return Number(isMissingRawgMetadata(secondGame)) - Number(isMissingRawgMetadata(firstGame)) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Status') {
-    return (
-      gameStatuses.indexOf(firstGame.status) - gameStatuses.indexOf(secondGame.status) ||
-      compareTitle(firstGame, secondGame)
-    );
-  }
-
-  if (sortBy === 'Achievement completion %') {
-    return getAchievementSortValue(secondGame) - getAchievementSortValue(firstGame) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Best discount') {
-    return (secondGame.itadDiscountPercent ?? -1) - (firstGame.itadDiscountPercent ?? -1) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Lowest price') {
-    return getDealPriceSortValue(firstGame) - getDealPriceSortValue(secondGame) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Shortest first') {
-    return getHltbSortValue(firstGame) - getHltbSortValue(secondGame) || compareTitle(firstGame, secondGame);
-  }
-
-  if (sortBy === 'Longest first') {
-    return getHltbSortValue(secondGame, -1) - getHltbSortValue(firstGame, -1) || compareTitle(firstGame, secondGame);
-  }
-
-  return compareTitle(firstGame, secondGame);
-}
-
-function getHltbSortValue(game: Game, fallback = Number.POSITIVE_INFINITY) {
-  return getPrimaryHltbHours(game) ?? fallback;
-}
-
-function getDealPriceSortValue(game: Game) {
-  return typeof game.itadCurrentBestPrice === 'number' ? game.itadCurrentBestPrice : Number.POSITIVE_INFINITY;
-}
-
-function getAchievementSortValue(game: Game) {
-  return hasSteamAchievementSummary(game) ? game.steamAchievementsPercent ?? 0 : -1;
-}
-
-function compareTitle(firstGame: Game, secondGame: Game) {
-  return firstGame.title.localeCompare(secondGame.title, undefined, { sensitivity: 'base' });
-}
-
-function compareDateDesc(firstDate: string | null | undefined, secondDate: string | null | undefined) {
-  return getDateTime(secondDate) - getDateTime(firstDate);
-}
-
-function getDateTime(value: string | null | undefined) {
-  if (!value) {
-    return 0;
-  }
-
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : 0;
-}
-
-function isMissingRawgMetadata(game: Game) {
-  return game.metadataSource !== 'rawg' && !game.metadataManualManagedAt;
-}
-
-function isRetroOrFutureReady(game: Game) {
-  const retroPlatforms = new Set(['PSP', 'PS2', 'GBA', 'SNES', 'Other']);
-  const planningTags = new Set(['retro', 'emulated', 'emulation', 'physical', 'future', 'future-ready']);
-
-  return retroPlatforms.has(game.platform) || game.tags.some((tag) => planningTags.has(tag.toLowerCase()));
-}
-
-function isCollectionFiltered(filters: CollectionFilters) {
-  return getActiveFilterCount(filters) > 0;
-}
-
-function getActiveFilterCount(filters: CollectionFilters) {
-  return [
-    filters.achievement !== allOption,
-    filters.enrichment !== allOption,
-    filters.platform !== allOption,
-    filters.quickFilters.length > 0,
-    filters.searchTerm.trim().length > 0,
-    filters.source !== allOption,
-    filters.status !== allOption,
-    filters.tag !== allOption,
-    filters.sortBy !== initialCollectionFilters.sortBy,
-  ].filter(Boolean).length;
-}
-
-function getActiveAdvancedFilterCount(filters: CollectionFilters) {
-  return [
-    filters.achievement !== allOption,
-    filters.enrichment !== allOption,
-    filters.quickFilters.length > 0,
-    filters.source !== allOption,
-    filters.tag !== allOption,
-    filters.sortBy !== initialCollectionFilters.sortBy,
-  ].filter(Boolean).length;
 }
 
 function loadCollectionFilters(storageKey: string): CollectionFilters {
@@ -6448,34 +5988,6 @@ function saveSettingsCategory(category: SettingsCategory) {
   } catch {
     // Settings navigation should stay usable even when preference persistence is unavailable.
   }
-}
-
-function normalizeCollectionFilters(value: unknown): CollectionFilters {
-  if (!value || typeof value !== 'object') {
-    return initialCollectionFilters;
-  }
-
-  const filters = value as Partial<CollectionFilters>;
-
-  return {
-    achievement: isOption(filters.achievement, achievementFilterOptions) ? filters.achievement : allOption,
-    enrichment: isOption(filters.enrichment, enrichmentFilterOptions) ? filters.enrichment : allOption,
-    platform: typeof filters.platform === 'string' ? filters.platform : allOption,
-    quickFilters: Array.isArray(filters.quickFilters)
-      ? filters.quickFilters.filter((quickFilter): quickFilter is QuickFilter =>
-          isOption(quickFilter, quickFilterOptions),
-        )
-      : [],
-    searchTerm: typeof filters.searchTerm === 'string' ? filters.searchTerm : '',
-    sortBy: isOption(filters.sortBy, librarySortOptions) ? filters.sortBy : 'Title A-Z',
-    source: isOption(filters.source, sourceFilterOptions) ? filters.source : allOption,
-    status: isOption(filters.status, [allOption, ...gameStatuses] as const) ? filters.status : allOption,
-    tag: typeof filters.tag === 'string' ? filters.tag : allOption,
-  };
-}
-
-function isOption<T extends string>(value: unknown, options: readonly T[]): value is T {
-  return typeof value === 'string' && options.includes(value as T);
 }
 
 function createManualGameId(title: string, existingGameIds: Set<string>) {
