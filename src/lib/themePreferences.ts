@@ -191,28 +191,17 @@ export function applyAccentColorPreference(color: AccentColorPreference, seconda
   }
 
   const root = document.documentElement;
+  const primaryColor = color ?? defaultAccentColor;
+  const primaryRgb = hexToRgb(primaryColor);
+  const secondaryResolvedColor = secondaryColor ?? defaultSecondaryAccentColor;
+  const secondaryRgb = hexToRgb(secondaryResolvedColor);
 
-  if (!color) {
-    root.style.removeProperty('--accent-rgb');
-    root.style.removeProperty('--qs-accent-primary-rgb');
-    root.style.removeProperty('--accent-contrast');
-    root.dataset.accentColor = 'default';
-  } else {
-    const rgb = hexToRgb(color);
-    root.style.setProperty('--accent-rgb', `${rgb.r} ${rgb.g} ${rgb.b}`);
-    root.style.setProperty('--qs-accent-primary-rgb', `${rgb.r} ${rgb.g} ${rgb.b}`);
-    root.style.setProperty('--accent-contrast', getReadableTextColor(rgb));
-    root.dataset.accentColor = color;
-  }
-
-  if (!secondaryColor) {
-    root.style.removeProperty('--qs-accent-secondary-rgb');
-    root.dataset.secondaryAccentColor = 'default';
-  } else {
-    const secondaryRgb = hexToRgb(secondaryColor);
-    root.style.setProperty('--qs-accent-secondary-rgb', `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`);
-    root.dataset.secondaryAccentColor = secondaryColor;
-  }
+  root.style.setProperty('--accent-rgb', `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`);
+  root.style.setProperty('--qs-accent-primary-rgb', `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`);
+  root.style.setProperty('--qs-accent-secondary-rgb', `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`);
+  root.style.setProperty('--accent-contrast', getReadableTextColor(primaryRgb));
+  root.dataset.accentColor = color ?? 'default';
+  root.dataset.secondaryAccentColor = secondaryColor ?? 'default';
 }
 
 export function applyThemePreference(
