@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
@@ -29,7 +29,7 @@ type GameCardProps = {
   platformLabel?: string;
 };
 
-export function GameCard({
+function GameCardComponent({
   game,
   highlightLabel,
   includeDetailsAction = false,
@@ -49,7 +49,7 @@ export function GameCard({
 }: GameCardProps) {
   const { t } = useI18n();
   const coverSources = useMemo(() => {
-    return getGameCoverSources(game);
+    return getGameCoverSources(game, { includeGeneratedFallback: false });
   }, [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -245,6 +245,8 @@ export function GameCard({
     </article>
   );
 }
+
+export const GameCard = memo(GameCardComponent);
 
 function isInteractiveCardChild(target: EventTarget | null, cardElement: HTMLElement) {
   if (!(target instanceof HTMLElement)) {

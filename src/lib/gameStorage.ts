@@ -63,6 +63,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     platform: normalizeLoadedPlatform(game.platform),
     playtimeHours: getNonNegativeNumber(game.playtimeHours),
     priority: normalizeWishlistPriority(game.priority),
+    romFiles: normalizeRomFiles(game.romFiles),
     status: normalizeLoadedStatus(game.status),
     tags: Array.isArray(game.tags) ? game.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     title: game.title,
@@ -137,4 +138,34 @@ function getNonNegativeNumber(value: unknown) {
 }
 function getOptionalNonNegativeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function normalizeRomFiles(value: unknown): Game['romFiles'] {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const files = value.flatMap((file): NonNullable<Game['romFiles']> => {
+    if (!file || typeof file !== 'object') {
+      return [];
+    }
+
+    const candidate = file as { extension?: unknown; fileName?: unknown; path?: unknown; role?: unknown; uri?: unknown };
+
+    if (typeof candidate.fileName !== 'string' || typeof candidate.path !== 'string') {
+      return [];
+    }
+
+    return [
+      {
+        extension: typeof candidate.extension === 'string' ? candidate.extension : undefined,
+        fileName: candidate.fileName,
+        path: candidate.path,
+        role: candidate.role === 'primary' || candidate.role === 'track' || candidate.role === 'disc' || candidate.role === 'file' ? candidate.role : undefined,
+        uri: typeof candidate.uri === 'string' ? candidate.uri : undefined,
+      },
+    ];
+  });
+
+  return files.length > 0 ? files : undefined;
 }

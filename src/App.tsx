@@ -2970,6 +2970,7 @@ function CollectionPanel({
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
+  const collectionPanelRef = useRef<HTMLElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const { t } = useI18n();
   const title = collectionType === 'wishlist' ? t('collection.wishlist') : t('collection.library');
@@ -2991,6 +2992,7 @@ function CollectionPanel({
   const canLoadProgressively = viewMode !== 'Shelf View';
   const visibleGames = canLoadProgressively ? games.slice(0, renderedGameCount) : games;
   const renderedCount = visibleGames.length;
+  const realCoverCount = useMemo(() => games.filter((game) => !isMissingOrGeneratedCover(game.coverImage)).length, [games]);
   const hasMoreGames = canLoadProgressively && renderedCount < games.length;
   const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
   const selectedCount = selectedGames.length;
@@ -3020,7 +3022,36 @@ function CollectionPanel({
 
   useEffect(() => {
     setRenderedGameCount(collectionInitialRenderCount);
+    collectionPanelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [progressiveResetKey]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    const panel = collectionPanelRef.current;
+    const panelRect = panel?.getBoundingClientRect();
+
+    console.debug('[QuestShelf Library] render window', {
+      collectionType,
+      filteredItemCount: games.length,
+      renderedItemCount: renderedCount,
+      realCoverCount,
+      placeholderCount: games.length - realCoverCount,
+      viewMode,
+      scrollContainer: panel
+        ? {
+            clientHeight: panel.clientHeight,
+            scrollHeight: panel.scrollHeight,
+            top: panelRect?.top,
+            height: panelRect?.height,
+          }
+        : null,
+      viewportHeight: window.innerHeight,
+      visualViewportHeight: window.visualViewport?.height ?? null,
+    });
+  }, [collectionType, games.length, realCoverCount, renderedCount, viewMode]);
 
   useEffect(() => {
     if (!hasMoreGames) {
@@ -3039,7 +3070,7 @@ function CollectionPanel({
           loadMoreGames();
         }
       },
-      { root: null, rootMargin: collectionLoadAheadMargin, threshold: 0 },
+      { root: collectionPanelRef.current, rootMargin: collectionLoadAheadMargin, threshold: 0 },
     );
 
     observer.observe(sentinel);
@@ -3265,7 +3296,7 @@ function CollectionPanel({
   }
 
   return (
-    <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
+    <section ref={collectionPanelRef} className="qs-collection-panel qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3">
       <CollectionToolbar
         title={title}
         searchValue={filters.searchTerm}

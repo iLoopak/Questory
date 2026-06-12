@@ -348,7 +348,7 @@ function ShelfGameCard({
   platformQueueState,
 }: ShelfGameCardProps) {
   const { t } = useI18n();
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const coverSources = useMemo(() => getGameCoverSources(game, { includeGeneratedFallback: false }), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
@@ -524,7 +524,7 @@ function CompactGameRow({
   platformQueueState,
 }: CompactGameRowProps) {
   const { t } = useI18n();
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const coverSources = useMemo(() => getGameCoverSources(game, { includeGeneratedFallback: false }), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
