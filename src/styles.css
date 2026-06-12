@@ -436,6 +436,8 @@ img {
   position: relative;
   cursor: grab;
   touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
   transform: translate3d(var(--qs-swipe-x, 0), var(--qs-swipe-y, 0), 0) rotate(var(--qs-swipe-rotate, 0deg));
   transition:
     transform 180ms cubic-bezier(0.2, 0.85, 0.25, 1),
@@ -448,6 +450,28 @@ img {
   cursor: grabbing;
   transition: none;
   filter: drop-shadow(0 24px 44px rgb(var(--overlay-rgb) / 0.4));
+}
+
+.qs-review-swipe-card img {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+}
+
+.qs-review-swipe-card :is(button, a, summary) {
+  cursor: pointer;
+}
+
+.qs-review-swipe-card :is(input, select, textarea) {
+  cursor: auto;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.qs-review-swipe-card :disabled {
+  cursor: not-allowed;
 }
 
 .qs-review-swipe-card.is-exiting {

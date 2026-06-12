@@ -693,7 +693,9 @@ function FocusedReviewCard({
                     isCoverLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   decoding="async"
+                  draggable={false}
                   loading="lazy"
+                  onDragStart={(event) => event.preventDefault()}
                   onError={() => {
                     setIsCoverLoaded(false);
                     setCoverSourceIndex((currentIndex) => currentIndex + 1);
