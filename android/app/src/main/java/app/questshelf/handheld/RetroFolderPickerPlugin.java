@@ -12,9 +12,9 @@ import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.PluginMethod;
 import java.util.Locale;
 
 @CapacitorPlugin(name = "RetroFolderPicker")
@@ -49,17 +49,21 @@ public class RetroFolderPickerPlugin extends Plugin {
             return;
         }
 
-        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+        Intent data = result.getData();
+        if (result.getResultCode() != Activity.RESULT_OK || data == null || data.getData() == null) {
             call.reject("No folder was selected.");
             return;
         }
 
-        Uri treeUri = result.getData().getData();
-        int flags = result.getData().getFlags()
-            & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        Uri treeUri = data.getData();
+        int flags = data.getFlags();
+        int persistableFlags = flags &
+            (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
         try {
-            getContext().getContentResolver().takePersistableUriPermission(treeUri, flags & Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (persistableFlags != 0) {
+                getContext().getContentResolver().takePersistableUriPermission(treeUri, persistableFlags);
+            }
         } catch (SecurityException ignored) {
             // Some providers grant one-time access only. The selected folder can still be scanned now.
         }
