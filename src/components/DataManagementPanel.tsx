@@ -107,16 +107,24 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   }
 
   async function downloadBackup() {
-    const backup = createQuestShelfBackup(includeIntegrationSettings);
-    await exportQuestShelfBackupFile(backup);
+    try {
+      const backup = createQuestShelfBackup(includeIntegrationSettings);
+      const result = await exportQuestShelfBackupFile(backup);
 
-    showMessage(
-      includeIntegrationSettings
-        ? 'Backup exported with integration settings included.'
-        : 'Backup exported without API keys or integration settings.',
-      'success',
-    );
-    onBackupExported?.();
+      showMessage(
+        includeIntegrationSettings
+          ? `Backup exported as ${result.fileName} with integration settings included.`
+          : `Backup exported as ${result.fileName} without API keys or integration settings.`,
+        'success',
+      );
+      onBackupExported?.();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('QuestShelf backup export failed.', error);
+      }
+
+      showMessage('Backup export failed. Try again, or use a different share/save target.', 'error');
+    }
   }
 
   async function chooseSyncFile() {
