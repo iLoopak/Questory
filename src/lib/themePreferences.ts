@@ -5,8 +5,10 @@ export type AppTemplatePreference = 'classic' | 'neon-deck';
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
 export const accentColorStorageKey = 'questshelf.accentColor.v1';
+export const secondaryAccentColorStorageKey = 'questshelf.secondaryAccentColor.v1';
 export const appTemplateStorageKey = 'questshelf.appTemplate.v1';
 export const defaultAccentColor = '#ff5a2c';
+export const defaultSecondaryAccentColor = '#38bdf8';
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
 
@@ -120,6 +122,18 @@ export function loadAccentColorPreference(): AccentColorPreference {
   }
 }
 
+export function loadSecondaryAccentColorPreference(): AccentColorPreference {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return normalizeAccentColor(window.localStorage.getItem(secondaryAccentColorStorageKey) ?? '');
+  } catch {
+    return null;
+  }
+}
+
 export function saveAccentColorPreference(color: AccentColorPreference) {
   if (typeof window === 'undefined') {
     return;
@@ -135,17 +149,31 @@ export function saveAccentColorPreference(color: AccentColorPreference) {
     // Accent selection should stay responsive even when storage is unavailable.
   }
 
-  void saveAccentColorPreferenceToNativeStorage(color);
+  void saveAccentColorPreferenceToNativeStorage(accentColorStorageKey, color);
+}
+
+export function saveSecondaryAccentColorPreference(color: AccentColorPreference) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (color) {
+      window.localStorage.setItem(secondaryAccentColorStorageKey, color);
+    } else {
+      window.localStorage.removeItem(secondaryAccentColorStorageKey);
+    }
+  } catch {
+    // Accent selection should stay responsive even when storage is unavailable.
+  }
+
+  void saveAccentColorPreferenceToNativeStorage(secondaryAccentColorStorageKey, color);
 }
 
 export function resolveThemePreference(
   preference: ThemePreference,
   appTemplatePreference: AppTemplatePreference = 'classic',
 ): ResolvedTheme {
-  if (appTemplatePreference === 'neon-deck') {
-    return 'dark';
-  }
-
   if (preference !== 'system') {
     return preference;
   }
@@ -157,7 +185,7 @@ export function resolveThemePreference(
   return window.matchMedia(darkThemeQuery).matches ? 'dark' : 'light';
 }
 
-export function applyAccentColorPreference(color: AccentColorPreference) {
+export function applyAccentColorPreference(color: AccentColorPreference, secondaryColor: AccentColorPreference = null) {
   if (typeof document === 'undefined') {
     return;
   }
@@ -166,15 +194,25 @@ export function applyAccentColorPreference(color: AccentColorPreference) {
 
   if (!color) {
     root.style.removeProperty('--accent-rgb');
+    root.style.removeProperty('--qs-accent-primary-rgb');
     root.style.removeProperty('--accent-contrast');
     root.dataset.accentColor = 'default';
-    return;
+  } else {
+    const rgb = hexToRgb(color);
+    root.style.setProperty('--accent-rgb', `${rgb.r} ${rgb.g} ${rgb.b}`);
+    root.style.setProperty('--qs-accent-primary-rgb', `${rgb.r} ${rgb.g} ${rgb.b}`);
+    root.style.setProperty('--accent-contrast', getReadableTextColor(rgb));
+    root.dataset.accentColor = color;
   }
 
-  const rgb = hexToRgb(color);
-  root.style.setProperty('--accent-rgb', `${rgb.r} ${rgb.g} ${rgb.b}`);
-  root.style.setProperty('--accent-contrast', getReadableTextColor(rgb));
-  root.dataset.accentColor = color;
+  if (!secondaryColor) {
+    root.style.removeProperty('--qs-accent-secondary-rgb');
+    root.dataset.secondaryAccentColor = 'default';
+  } else {
+    const secondaryRgb = hexToRgb(secondaryColor);
+    root.style.setProperty('--qs-accent-secondary-rgb', `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`);
+    root.dataset.secondaryAccentColor = secondaryColor;
+  }
 }
 
 export function applyThemePreference(
@@ -281,10 +319,10 @@ function getRelativeLuminance({ r, g, b }: { r: number; g: number; b: number }) 
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
-async function saveAccentColorPreferenceToNativeStorage(color: AccentColorPreference) {
+async function saveAccentColorPreferenceToNativeStorage(key: string, color: AccentColorPreference) {
   try {
     const preferences = (await import(/* @vite-ignore */ preferenceModuleName)) as PreferencesPlugin;
-    await preferences.Preferences.set({ key: accentColorStorageKey, value: color ?? '' });
+    await preferences.Preferences.set({ key, value: color ?? '' });
   } catch {
     // Capacitor Preferences mirrors localStorage when available; browsers continue with localStorage only.
   }

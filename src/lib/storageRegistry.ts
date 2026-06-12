@@ -16,6 +16,8 @@ export type QuestShelfStorageKey =
   | 'questshelf.settingsCategory.v1'
   | 'questshelf.themePreference.v1'
   | 'questshelf.accentColor.v1'
+  | 'questshelf.secondaryAccentColor.v1'
+  | 'questshelf.appTemplate.v1'
   | 'questshelf.appPersonalization.v1'
   | 'questshelf.languagePreference.v1'
   | 'questshelf.navigationVisibility.v1'
@@ -147,9 +149,23 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'never',
     key: 'questshelf.accentColor.v1',
-    purpose: 'Custom app-wide accent color preference.',
+    purpose: 'Custom app-wide primary accent color preference.',
     scope: 'ui',
     schema: 'Lowercase #rrggbb string or empty for default.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.secondaryAccentColor.v1',
+    purpose: 'Custom Neon secondary accent color preference.',
+    scope: 'ui',
+    schema: 'Lowercase #rrggbb string or empty for default.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.appTemplate.v1',
+    purpose: 'Selected visual app template.',
+    scope: 'ui',
+    schema: '\'classic\' | \'neon-deck\'.',
   },
   {
     backup: 'never',

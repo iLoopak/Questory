@@ -11,6 +11,7 @@ import {
   applyThemePreference,
   loadAccentColorPreference,
   loadAppTemplatePreference,
+  loadSecondaryAccentColorPreference,
   loadThemePreference,
 } from './lib/themePreferences';
 import { registerServiceWorker } from './lib/serviceWorkerRegistration';
@@ -26,11 +27,10 @@ void startApp();
 async function startApp() {
   await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
   const appTemplatePreference = loadAppTemplatePreference();
-  const isNeonTemplate = appTemplatePreference === 'neon-deck';
 
   applyAppTemplatePreference(appTemplatePreference);
   applyThemePreference(loadThemePreference(), appTemplatePreference);
-  applyAccentColorPreference(isNeonTemplate ? null : loadAccentColorPreference());
+  applyAccentColorPreference(loadAccentColorPreference(), loadSecondaryAccentColorPreference());
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
