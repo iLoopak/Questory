@@ -83,7 +83,8 @@ import {
 } from './lib/navigationVisibilityPreferences';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
-import { hasProtectedArtwork, isMissingOrGeneratedCover } from './lib/gameCoverImages';
+import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
+import { mergeRawgMetadataIntoGame } from './lib/metadataMerge';
 import { refreshRawgMetadataForGame } from './lib/rawgMetadataEnrichment';
 import { hasSteamAchievementSummary } from './lib/steamAchievementSummary';
 import { loadControllerLayoutPreference, saveControllerLayoutPreference, type ControllerLayoutPreference } from './lib/controllerLayoutPreferences';
@@ -2211,21 +2212,8 @@ function App() {
           return game;
         }
 
-        const shouldKeepExistingArtwork = Boolean(
-          metadata.coverImage && (hasProtectedArtwork(game) || !isMissingOrGeneratedCover(game.coverImage)),
-        );
-        const safeMetadata = shouldKeepExistingArtwork
-          ? {
-              ...metadata,
-              artworkSource: game.artworkSource,
-              artworkUpdatedAt: game.artworkUpdatedAt,
-              coverImage: game.coverImage,
-            }
-          : metadata;
-
         return touchGameRecord({
-          ...game,
-          ...safeMetadata,
+          ...mergeRawgMetadataIntoGame(game, metadata),
           metadataSkippedAt: undefined,
           metadataManualManagedAt: undefined,
         });
