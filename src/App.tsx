@@ -182,6 +182,7 @@ import {
   applyThemePreference,
   defaultAccentColor,
   defaultSecondaryAccentColor,
+  getAccentColorThemeVariables,
   getAppTemplateClassName,
   loadAccentColorPreference,
   loadAppTemplatePreference,
@@ -279,6 +280,10 @@ function App() {
   const personalizedQuestShelfTitle = useMemo(
     () => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName),
     [libraryOwnerNickname, steamProfileName],
+  );
+  const accentThemeStyle = useMemo(
+    () => getAccentColorThemeVariables(accentColorPreference, secondaryAccentColorPreference) as CSSProperties,
+    [accentColorPreference, secondaryAccentColorPreference],
   );
   useEffect(() => {
     document.title = personalizedQuestShelfTitle;
@@ -2325,7 +2330,7 @@ function App() {
 
   return (
     <I18nProvider language={language}>
-    <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`}>
+    <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label={personalizedQuestShelfTitle}>

@@ -185,23 +185,42 @@ export function resolveThemePreference(
   return window.matchMedia(darkThemeQuery).matches ? 'dark' : 'light';
 }
 
+export function getAccentColorThemeVariables(color: AccentColorPreference, secondaryColor: AccentColorPreference = null) {
+  const primaryColor = color ?? defaultAccentColor;
+  const primaryRgb = hexToRgb(primaryColor);
+  const primaryRgbValue = `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`;
+  const secondaryResolvedColor = secondaryColor ?? defaultSecondaryAccentColor;
+  const secondaryRgb = hexToRgb(secondaryResolvedColor);
+  const secondaryRgbValue = `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`;
+
+  return {
+    '--accent-rgb': primaryRgbValue,
+    '--qs-accent-primary': primaryColor,
+    '--qs-accent-secondary': secondaryResolvedColor,
+    '--qs-accent-primary-rgb': primaryRgbValue,
+    '--qs-accent-secondary-rgb': secondaryRgbValue,
+    '--accent-contrast': getReadableTextColor(primaryRgb),
+    '--qs-glow-primary': `0 0 28px rgb(${primaryRgbValue} / 0.26)`,
+    '--qs-glow-secondary': `0 0 32px rgb(${secondaryRgbValue} / 0.2)`,
+  };
+}
+
 export function applyAccentColorPreference(color: AccentColorPreference, secondaryColor: AccentColorPreference = null) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  const root = document.documentElement;
-  const primaryColor = color ?? defaultAccentColor;
-  const primaryRgb = hexToRgb(primaryColor);
-  const secondaryResolvedColor = secondaryColor ?? defaultSecondaryAccentColor;
-  const secondaryRgb = hexToRgb(secondaryResolvedColor);
+  const accentVariables = getAccentColorThemeVariables(color, secondaryColor);
+  const themedRoots = [document.documentElement, ...Array.from(document.querySelectorAll<HTMLElement>('.qs-app-root'))];
 
-  root.style.setProperty('--accent-rgb', `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`);
-  root.style.setProperty('--qs-accent-primary-rgb', `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`);
-  root.style.setProperty('--qs-accent-secondary-rgb', `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`);
-  root.style.setProperty('--accent-contrast', getReadableTextColor(primaryRgb));
-  root.dataset.accentColor = color ?? 'default';
-  root.dataset.secondaryAccentColor = secondaryColor ?? 'default';
+  themedRoots.forEach((root) => {
+    Object.entries(accentVariables).forEach(([property, value]) => {
+      root.style.setProperty(property, value);
+    });
+  });
+
+  document.documentElement.dataset.accentColor = color ?? 'default';
+  document.documentElement.dataset.secondaryAccentColor = secondaryColor ?? 'default';
 }
 
 export function applyThemePreference(
