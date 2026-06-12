@@ -1,5 +1,5 @@
 import { Icon } from './Icon';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
@@ -326,7 +326,7 @@ type ShelfGameCardProps = {
   platformQueueState?: PlatformQueueState;
 };
 
-function ShelfGameCard({
+const ShelfGameCard = memo(function ShelfGameCard({
   game,
   highlightLabel,
   includeDetailsAction,
@@ -478,7 +478,7 @@ function ShelfGameCard({
       ) : null}
     </div>
   );
-}
+});
 
 type CompactGameRowProps = {
   game: Game;
@@ -502,7 +502,7 @@ type CompactGameRowProps = {
   platformQueueState?: PlatformQueueState;
 };
 
-function CompactGameRow({
+const CompactGameRow = memo(function CompactGameRow({
   game,
   highlightLabel,
   includeDetailsAction,
@@ -601,7 +601,7 @@ function CompactGameRow({
       ) : null}
     </article>
   );
-}
+});
 
 function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
   return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
