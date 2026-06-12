@@ -2565,6 +2565,7 @@ function App() {
               navigationVisibility={navigationVisibility}
               platformQueueState={platformQueueState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+              steamWishlistSyncState={steamWishlistSyncState}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
@@ -2590,6 +2591,8 @@ function App() {
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamProfileNameChange={setSteamProfileName}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+              onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
+              onSyncSteamWishlist={syncSteamWishlist}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onThemePreferenceChange={setThemePreferenceState}
               onAppTemplatePreferenceChange={setAppTemplatePreference}
@@ -4384,6 +4387,7 @@ type SettingsPanelProps = {
   navigationVisibility: NavigationVisibilityPreferences;
   platformQueueState: PlatformQueueState;
   steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
+  steamWishlistSyncState: SteamWishlistSyncState;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
@@ -4413,6 +4417,8 @@ type SettingsPanelProps = {
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
+  onImportSteamWishlistHtml: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
+  onSyncSteamWishlist: () => void;
   onSteamProfileNameChange: (profileName: string) => void;
   onUnignoreSteamGame: (steamAppId: number) => void;
   onViewRetroImportedGames: (gameIds: string[]) => void;
@@ -4442,6 +4448,7 @@ function SettingsPanel({
   navigationVisibility,
   platformQueueState,
   steamPlaytimeRefreshState,
+  steamWishlistSyncState,
   onAddRetroImportedToQueue,
   onBackupExported,
   onCategoryChange,
@@ -4471,6 +4478,8 @@ function SettingsPanel({
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
+  onImportSteamWishlistHtml,
+  onSyncSteamWishlist,
   onSteamProfileNameChange,
   onUnignoreSteamGame,
   onViewRetroImportedGames,
@@ -4567,7 +4576,16 @@ function SettingsPanel({
             </div>
           ) : null}
 
-          {activeCategory === 'Wishlist' ? <WishlistSettingsPanel /> : null}
+          {activeCategory === 'Wishlist' ? (
+            <WishlistSettingsPanel
+              existingSteamAppIds={games
+                .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId === 'number')
+                .map((game) => game.steamAppId as number)}
+              steamWishlistSyncState={steamWishlistSyncState}
+              onImportSteamWishlistHtml={onImportSteamWishlistHtml}
+              onSyncSteamWishlist={onSyncSteamWishlist}
+            />
+          ) : null}
 
           {activeCategory === 'Platforms' ? (
             <QueuePlatformsSettingsPanel games={games} queueState={platformQueueState} onQueueStateChange={onPlatformQueueStateChange} />
@@ -4829,15 +4847,164 @@ function LibrarySettingsSummary() {
   return null;
 }
 
-function WishlistSettingsPanel() {
+type WishlistSettingsPanelProps = {
+  existingSteamAppIds: number[];
+  steamWishlistSyncState: SteamWishlistSyncState;
+  onImportSteamWishlistHtml: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
+  onSyncSteamWishlist: () => void;
+};
+
+function WishlistSettingsPanel({
+  existingSteamAppIds,
+  steamWishlistSyncState,
+  onImportSteamWishlistHtml,
+  onSyncSteamWishlist,
+}: WishlistSettingsPanelProps) {
   const { t } = useI18n();
+  const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
+  const [clipboardMessage, setClipboardMessage] = useState('');
+  const [clipboardError, setClipboardError] = useState('');
+  const importButtonRef = useRef<HTMLButtonElement | null>(null);
+  const steamSettings = loadSteamSettings();
+  const steamWishlistUrl = getConfiguredSteamWishlistUrl(steamSettings);
+  const hasConfiguredSteamWishlistUrl = steamWishlistUrl !== genericSteamWishlistUrl;
+
+  async function copyBookmarklet() {
+    try {
+      await navigator.clipboard.writeText(steamWishlistBookmarklet);
+      setClipboardMessage(t('wishlist.bookmarkletCopied'));
+      setClipboardError('');
+    } catch {
+      setClipboardMessage('');
+      setClipboardError(t('wishlist.bookmarkletCopyFailed'));
+    }
+  }
 
   return (
-    <section className="qs-glass rounded-lg border p-4">
-      <h2 className="text-xl font-semibold text-white">{t('settings.wishlistTitle')}</h2>
-      <p className="mt-1 text-sm text-slate-400">{t('settings.wishlistHelp')}</p>
+    <section className="qs-glass space-y-5 rounded-lg border p-4">
+      <div>
+        <h2 className="text-xl font-semibold text-white">{t('settings.wishlistTitle')}</h2>
+        <p className="mt-1 text-sm text-slate-400">{t('settings.wishlistHelp')}</p>
+      </div>
+
+      <div className="rounded-lg border border-mint/25 bg-mint/10 p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <h3 className="text-lg font-semibold text-white">{t('wishlist.settingsSteamImportTitle')}</h3>
+            <p className="text-sm leading-6 text-slate-300">{t('wishlist.settingsSteamImportHelp')}</p>
+            {!hasConfiguredSteamWishlistUrl ? (
+              <p className="text-sm leading-6 text-amber-200">{t('wishlist.settingsSteamWishlistUrlMissing')}</p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              className="h-10 rounded-md border border-skyglass/20 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-mint/40 hover:bg-mint/10"
+              href={steamWishlistUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t('wishlist.openSteamWishlist')}
+            </a>
+            <button
+              className="h-10 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-100 transition hover:border-mint/40 hover:bg-mint/10"
+              onClick={() => void copyBookmarklet()}
+              type="button"
+            >
+              {t('wishlist.copyBookmarklet')}
+            </button>
+            <button
+              className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
+              onClick={() => setIsSteamWishlistHtmlImportOpen(true)}
+              ref={importButtonRef}
+              type="button"
+            >
+              {t('wishlist.importSteamWishlist')}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
+          <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-mint">{t('wishlist.settingsSteamImportStepsTitle')}</h4>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+              <li>{t('wishlist.settingsStepOpenSteamWishlist')}</li>
+              <li>{t('wishlist.settingsStepRunBookmarklet')}</li>
+              <li>{t('wishlist.settingsStepPasteCollected')}</li>
+              <li>{t('wishlist.settingsStepImportToWishlist')}</li>
+            </ol>
+            <p className="mt-3 text-sm leading-6 text-slate-400">{t('wishlist.settingsLazyLoadNote')}</p>
+          </div>
+
+          <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-mint">{t('wishlist.bookmarkletSafetyTitle')}</h4>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-300">
+              <li>{t('wishlist.settingsBookmarkletReadsOnly')}</li>
+              <li>{t('wishlist.bookmarkletDoesNotModify')}</li>
+              <li>{t('wishlist.settingsBookmarkletOutputsPlainLinks')}</li>
+            </ul>
+          </div>
+        </div>
+
+        {clipboardMessage ? <p className="mt-3 text-sm font-semibold text-mint">{clipboardMessage}</p> : null}
+        {clipboardError ? <p className="mt-3 text-sm font-semibold text-rose-300">{clipboardError}</p> : null}
+      </div>
+
+      {isSteamWishlistHtmlImportOpen ? (
+        <SteamWishlistHtmlImportModal
+          existingSteamAppIds={existingSteamAppIds}
+          isExperimentalSyncLoading={steamWishlistSyncState.status === 'loading'}
+          onClose={() => setIsSteamWishlistHtmlImportOpen(false)}
+          onExperimentalSync={onSyncSteamWishlist}
+          onImport={onImportSteamWishlistHtml}
+          restoreFocusRef={importButtonRef}
+        />
+      ) : null}
     </section>
   );
+}
+
+const genericSteamWishlistUrl = 'https://store.steampowered.com/wishlist/';
+
+function getConfiguredSteamWishlistUrl(settings: ReturnType<typeof loadSteamSettings>) {
+  const configuredUrl = normalizeSteamWishlistUrl(settings.wishlistUrl || settings.profile?.profileUrl || '');
+
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  const steamId64 = settings.steamId64.trim();
+  if (/^\d{17}$/.test(steamId64)) {
+    return `https://store.steampowered.com/wishlist/profiles/${steamId64}/`;
+  }
+
+  return genericSteamWishlistUrl;
+}
+
+function normalizeSteamWishlistUrl(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return '';
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmedValue) ? trimmedValue : `https://steamcommunity.com/id/${encodeURIComponent(trimmedValue)}`;
+
+  try {
+    const url = new URL(withProtocol);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+
+    if (url.hostname.includes('store.steampowered.com')) {
+      return url.toString();
+    }
+
+    if (url.hostname.includes('steamcommunity.com') && pathParts.length >= 2 && (pathParts[0] === 'id' || pathParts[0] === 'profiles')) {
+      return `https://store.steampowered.com/wishlist/${pathParts[0]}/${pathParts[1]}/`;
+    }
+
+    return url.toString();
+  } catch {
+    return genericSteamWishlistUrl;
+  }
 }
 
 function QueuePlatformsSettingsPanel({
