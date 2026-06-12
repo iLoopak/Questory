@@ -188,6 +188,7 @@ import {
   loadAppTemplatePreference,
   loadSecondaryAccentColorPreference,
   loadThemePreference,
+  normalizeThemePreferenceForTemplate,
   normalizeAccentColor,
   saveAccentColorPreference,
   saveAppTemplatePreference,
@@ -262,8 +263,10 @@ function App() {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
-  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => loadThemePreference());
-  const [appTemplatePreference, setAppTemplatePreference] = useState<AppTemplatePreference>(() => loadAppTemplatePreference());
+  const [appTemplatePreference, setAppTemplatePreferenceState] = useState<AppTemplatePreference>(() => loadAppTemplatePreference());
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
+    normalizeThemePreferenceForTemplate(loadThemePreference(), appTemplatePreference),
+  );
   const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
   const [secondaryAccentColorPreference, setSecondaryAccentColorPreference] = useState<AccentColorPreference>(() => loadSecondaryAccentColorPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
@@ -273,7 +276,7 @@ function App() {
     loadNavigationVisibilityPreferences(),
   );
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    applyThemePreference(loadThemePreference(), loadAppTemplatePreference()),
+    applyThemePreference(themePreference, appTemplatePreference),
   );
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
@@ -285,6 +288,15 @@ function App() {
     () => getAccentColorThemeVariables(accentColorPreference, secondaryAccentColorPreference) as CSSProperties,
     [accentColorPreference, secondaryAccentColorPreference],
   );
+  function setThemePreference(preference: ThemePreference) {
+    setThemePreferenceState(normalizeThemePreferenceForTemplate(preference, appTemplatePreference));
+  }
+
+  function setAppTemplatePreference(preference: AppTemplatePreference) {
+    setAppTemplatePreferenceState(preference);
+    setThemePreferenceState((currentThemePreference) => normalizeThemePreferenceForTemplate(currentThemePreference, preference));
+  }
+
   useEffect(() => {
     document.title = personalizedQuestShelfTitle;
   }, [personalizedQuestShelfTitle]);
@@ -371,10 +383,16 @@ function App() {
   }, [platformQueueState]);
 
   useEffect(() => {
-    setResolvedTheme(applyThemePreference(themePreference, appTemplatePreference));
-    saveThemePreference(themePreference);
+    const normalizedThemePreference = normalizeThemePreferenceForTemplate(themePreference, appTemplatePreference);
 
-    if (themePreference !== 'system') {
+    if (normalizedThemePreference !== themePreference) {
+      setThemePreferenceState(normalizedThemePreference);
+    }
+
+    setResolvedTheme(applyThemePreference(normalizedThemePreference, appTemplatePreference));
+    saveThemePreference(normalizedThemePreference);
+
+    if (normalizedThemePreference !== 'system') {
       return undefined;
     }
 
@@ -2624,7 +2642,7 @@ function App() {
               onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
               onSyncSteamWishlist={syncSteamWishlist}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
-              onThemePreferenceChange={setThemePreferenceState}
+              onThemePreferenceChange={setThemePreference}
               onAppTemplatePreferenceChange={setAppTemplatePreference}
               onAccentColorChange={setAccentColorPreference}
               onSecondaryAccentColorChange={setSecondaryAccentColorPreference}
@@ -5372,6 +5390,7 @@ function AppearanceSettingsPanel({
   onLanguageChange: (language: AppLanguage) => void;
 }) {
   const t = useMemo(() => createTranslator(language), [language]);
+  const isNeonTemplate = appTemplatePreference === 'neon-deck';
   const themeOptions: Array<{ description: string; label: string; value: ThemePreference }> = [
     {
       description: 'Bright cards and dark text tuned for outdoor handheld sessions.',
@@ -5401,7 +5420,7 @@ function AppearanceSettingsPanel({
       value: 'neon-deck',
     },
   ];
-  const isNeonTemplate = appTemplatePreference === 'neon-deck';
+  const availableThemeOptions = isNeonTemplate ? themeOptions.filter((option) => option.value === 'dark') : themeOptions;
   const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
   const selectedSecondaryAccentColor = secondaryAccentColorPreference ?? defaultSecondaryAccentColor;
   const isDefaultAccentColor = accentColorPreference === null;
@@ -5479,8 +5498,8 @@ function AppearanceSettingsPanel({
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('settings.theme')}</div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t('settings.theme')}>
-          {themeOptions.map((option) => {
+        <div className={`mt-3 grid gap-2 ${isNeonTemplate ? 'md:grid-cols-1' : 'md:grid-cols-3'}`} role="radiogroup" aria-label={t('settings.theme')}>
+          {availableThemeOptions.map((option) => {
               const isSelected = themePreference === option.value;
 
               return (
@@ -5508,7 +5527,9 @@ function AppearanceSettingsPanel({
           })}
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.
+          {isNeonTemplate
+            ? t('settings.neonDarkOnlyNote')
+            : 'Native Android status-bar color, browser theme-color, and CSS color-scheme update immediately without reloading the current screen.'}
         </p>
       </div>
 
