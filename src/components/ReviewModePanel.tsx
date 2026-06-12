@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
@@ -67,6 +67,12 @@ const positiveActions: Array<{
 
 const decisionActions = [...negativeActions, ...positiveActions];
 const firstPositiveActionIndex = negativeActions.length;
+const defaultSwipeLeftAction: ReviewModeAction = 'skip';
+const defaultSwipeRightAction: ReviewModeAction = 'queue';
+const swipeLeftActionIndex = negativeActions.findIndex((action) => action.action === defaultSwipeLeftAction);
+const swipeRightActionIndex = firstPositiveActionIndex + positiveActions.findIndex((action) => action.action === defaultSwipeRightAction);
+const swipeReleaseThreshold = 110;
+const swipeCommitDelayMs = 180;
 
 type ReviewActionStats = {
   dropped: number;
@@ -505,11 +511,15 @@ function FocusedReviewCard({
   const coverSources = getGameCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const [swipeState, setSwipeState] = useState<SwipeState>(emptySwipeState);
+  const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
 
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
+    setSwipeState(emptySwipeState);
+    swipeStartRef.current = null;
   }, [game.id]);
 
   const releaseLabel = game.releaseDate ?? game.released ?? null;
@@ -530,9 +540,107 @@ function FocusedReviewCard({
   ].filter((row): row is [string, string] => Boolean(row[1]));
   const genreLabels = [...(game.genres ?? []), ...(game.rawgTags ?? []), ...game.tags];
 
+  const swipeDirection = getSwipeDirection(swipeState.offsetX);
+  const activeSwipeAction = getSwipeActionForDirection(swipeDirection);
+  const swipeProgress = Math.min(Math.abs(swipeState.offsetX) / swipeReleaseThreshold, 1);
+  const rotation = Math.max(-10, Math.min(10, swipeState.offsetX / 18));
+  const swipeStyle = {
+    '--qs-swipe-x': `${swipeState.offsetX}px`,
+    '--qs-swipe-y': `${swipeState.offsetY}px`,
+    '--qs-swipe-rotate': `${rotation}deg`,
+    '--qs-swipe-progress': swipeProgress,
+  } as CSSProperties;
+
+  function beginSwipe(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+
+    if (swipeState.phase === 'exiting') {
+      return;
+    }
+
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest('button, a, input, select, textarea, summary')) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    swipeStartRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    setSwipeState({ offsetX: 0, offsetY: 0, phase: 'dragging' });
+  }
+
+  function updateSwipe(event: ReactPointerEvent<HTMLElement>) {
+    const swipeStart = swipeStartRef.current;
+    if (!swipeStart || swipeStart.pointerId !== event.pointerId || swipeState.phase !== 'dragging') {
+      return;
+    }
+
+    const nextOffsetX = event.clientX - swipeStart.x;
+    const nextOffsetY = event.clientY - swipeStart.y;
+
+    if (Math.abs(nextOffsetX) > 8) {
+      event.preventDefault();
+    }
+
+    setSwipeState({ offsetX: nextOffsetX, offsetY: nextOffsetY * 0.25, phase: 'dragging' });
+
+    const direction = getSwipeDirection(nextOffsetX);
+    if (direction === 'left') {
+      onHighlight(swipeLeftActionIndex);
+    }
+
+    if (direction === 'right') {
+      onHighlight(swipeRightActionIndex);
+    }
+  }
+
+  function finishSwipe(event: ReactPointerEvent<HTMLElement>) {
+    const swipeStart = swipeStartRef.current;
+    if (!swipeStart || swipeStart.pointerId !== event.pointerId) {
+      return;
+    }
+
+    swipeStartRef.current = null;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    const direction = Math.abs(swipeState.offsetX) >= swipeReleaseThreshold ? getSwipeDirection(swipeState.offsetX) : null;
+    const action = getSwipeActionForDirection(direction);
+
+    if (!direction || !action) {
+      setSwipeState({ offsetX: 0, offsetY: 0, phase: 'settling' });
+      window.setTimeout(() => setSwipeState(emptySwipeState), swipeCommitDelayMs);
+      return;
+    }
+
+    const exitX = direction === 'left' ? -window.innerWidth : window.innerWidth;
+    setSwipeState({ offsetX: exitX, offsetY: swipeState.offsetY, phase: 'exiting' });
+    window.setTimeout(() => {
+      setSwipeState(emptySwipeState);
+      onAction(action.action);
+    }, swipeCommitDelayMs);
+  }
+
+  function cancelSwipe(event: ReactPointerEvent<HTMLElement>) {
+    if (swipeStartRef.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    swipeStartRef.current = null;
+    setSwipeState({ offsetX: 0, offsetY: 0, phase: 'settling' });
+    window.setTimeout(() => setSwipeState(emptySwipeState), swipeCommitDelayMs);
+  }
+
   return (
-    <article className="qs-review-stage min-h-full" data-swipe-left="negative" data-swipe-right="positive">
-      <section className="qs-review-zone qs-review-zone-negative" aria-label={t('review.negativeActions')}>
+    <article className="qs-review-stage min-h-full" data-swipe-active={swipeDirection ?? 'none'} data-swipe-left="negative" data-swipe-right="positive">
+      <section className={`qs-review-zone qs-review-zone-negative ${swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
         <div className="grid gap-2">
           {negativeActions.map((action, index) => (
@@ -560,8 +668,21 @@ function FocusedReviewCard({
         </div>
       </section>
 
-      <section className="qs-review-hero flex flex-col items-center" aria-label={`${game.title} Quest Queue card`}>
-        <div className="qs-review-cover overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
+      <section
+        className={`qs-review-hero qs-review-swipe-card flex flex-col items-center ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
+        aria-label={`${game.title} Quest Queue card. Drag left to Skip or right to Add to Platforms.`}
+        onPointerCancel={cancelSwipe}
+        onPointerDown={beginSwipe}
+        onPointerMove={updateSwipe}
+        onPointerUp={finishSwipe}
+        style={swipeStyle}
+      >
+        <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
+          {activeSwipeAction ? (
+            <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
+              {getReviewActionLabel(activeSwipeAction, t)}
+            </div>
+          ) : null}
           <div className="qs-review-artwork-frame relative h-full w-full">
             {activeCoverSource ? (
               <div className="relative h-full w-full">
@@ -710,7 +831,7 @@ function FocusedReviewCard({
         </details>
       </section>
 
-      <section className="qs-review-zone qs-review-zone-positive" aria-label={t('review.positiveActions')}>
+      <section className={`qs-review-zone qs-review-zone-positive ${swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
         <div className="qs-review-zone-label">{t('review.keep')}</div>
         <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
@@ -744,6 +865,52 @@ function FocusedReviewCard({
       </section>
     </article>
   );
+}
+
+type SwipeDirection = 'left' | 'right';
+
+type SwipePhase = 'idle' | 'dragging' | 'settling' | 'exiting';
+
+type SwipeState = {
+  offsetX: number;
+  offsetY: number;
+  phase: SwipePhase;
+};
+
+type SwipeStart = {
+  pointerId: number;
+  x: number;
+  y: number;
+};
+
+const emptySwipeState: SwipeState = {
+  offsetX: 0,
+  offsetY: 0,
+  phase: 'idle',
+};
+
+function getSwipeDirection(offsetX: number): SwipeDirection | null {
+  if (offsetX < -16) {
+    return 'left';
+  }
+
+  if (offsetX > 16) {
+    return 'right';
+  }
+
+  return null;
+}
+
+function getSwipeActionForDirection(direction: SwipeDirection | null) {
+  if (direction === 'left') {
+    return negativeActions.find((action) => action.action === defaultSwipeLeftAction) ?? null;
+  }
+
+  if (direction === 'right') {
+    return positiveActions.find((action) => action.action === defaultSwipeRightAction) ?? null;
+  }
+
+  return null;
 }
 
 function ReviewComplete({
