@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
@@ -60,6 +60,7 @@ export function RecommendationPanel({
   const [recommendationSearchTerm, setRecommendationSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<RecommendationViewMode>('Grid View');
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const panelRef = useRef<HTMLElement | null>(null);
   const moreFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const moreFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const queuedGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
@@ -126,8 +127,12 @@ export function RecommendationPanel({
     return undefined;
   }
 
+  useEffect(() => {
+    panelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [availableTime, includeFinishedGames, includeWishlist, mood, preferredPlatform, recommendationSearchTerm, recommendFromQueueOnly, recommendNextGame, viewMode]);
+
   return (
-    <section className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
+    <section ref={panelRef} className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
       <CollectionToolbar
         title={t('recommendations.title')}
         searchValue={recommendationSearchTerm}
@@ -242,6 +247,7 @@ export function RecommendationPanel({
       {recommendationResults.length > 0 ? (
         viewMode === 'Shelf View' ? (
           <CollectionShelf
+            debugLabel="recommendations shelf"
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
             hideRecommendationBadge
@@ -255,9 +261,11 @@ export function RecommendationPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
+            scrollElementRef={panelRef}
           />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
+            debugLabel="recommendations compact"
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
             hideRecommendationBadge
@@ -271,9 +279,11 @@ export function RecommendationPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
+            scrollElementRef={panelRef}
           />
         ) : (
           <CollectionGrid
+            debugLabel="recommendations grid"
             games={recommendationResults}
             getHighlightLabel={getHighlightLabel}
             hideRecommendationBadge
@@ -287,6 +297,7 @@ export function RecommendationPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
+            scrollElementRef={panelRef}
           />
         )
       ) : (

@@ -1,6 +1,6 @@
 import { Icon } from './Icon';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import {
   addActiveQueuePlatform,
@@ -33,6 +33,7 @@ import { PlatformIdentityFields } from './PlatformIdentityFields';
 import { HltbBadge } from './HltbBadge';
 import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
+import { useVirtualWindow } from '../hooks/useVirtualWindow';
 
 type QueuePanelProps = {
   games: Game[];
@@ -70,6 +71,7 @@ export function QueuePanel({
   const [customPlatformName, setCustomPlatformName] = useState('');
   const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
+  const queueListRef = useRef<HTMLDivElement | null>(null);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All'>('All');
@@ -271,7 +273,7 @@ export function QueuePanel({
         </div>
       ) : null}
 
-      <div className="qs-queue-list min-h-0 flex-1 overflow-y-auto pr-1">
+      <div ref={queueListRef} className="qs-queue-list min-h-0 flex-1 overflow-y-auto pr-1">
         <div className="grid gap-2 xl:grid-cols-2">
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
@@ -292,6 +294,7 @@ export function QueuePanel({
                   platformRefs.current.delete(platform);
                 }
               }}
+              queueScrollRef={queueListRef}
               queueEntries={queueState.entries
                 .filter((entry) => entry.targetPlatform === platform)
                 .filter((entry) => {
@@ -650,6 +653,7 @@ function PlatformQueueColumn({
   platformTag,
   setPlatformRef,
   queueEntries,
+  queueScrollRef,
   onHidePlatform,
   onLimitChange,
   onMovePlatform,
@@ -673,6 +677,7 @@ function PlatformQueueColumn({
   platformTag: string;
   setPlatformRef: (element: HTMLElement | null) => void;
   queueEntries: PlatformQueueEntry[];
+  queueScrollRef: RefObject<HTMLElement | null>;
   onHidePlatform: (platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onMovePlatform: (platform: GamePlatform, direction: 'up' | 'down') => void;
@@ -688,10 +693,36 @@ function PlatformQueueColumn({
   const { t } = useI18n();
   const playingNowLabel = t('nav.playingNow');
   const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
+  const queueEntriesVirtualizerRef = useRef<HTMLDivElement | null>(null);
+  const virtualQueueEntries = useVirtualWindow({
+    itemCount: queueEntries.length,
+    estimateItemSize: 148,
+    overscan: 5,
+    scrollElementRef: queueScrollRef,
+    virtualizerRef: queueEntriesVirtualizerRef,
+  });
+  const renderedQueueEntries = queueEntries.slice(virtualQueueEntries.startIndex, virtualQueueEntries.endIndex + 1);
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
   const platformAccentColor = accentColor || 'var(--accent)';
   const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
   const accentStyle = { '--platform-accent': platformAccentColor, borderColor: isHighlighted || hasGames ? platformAccentColor : undefined } as CSSProperties;
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    console.debug('[QuestShelf VirtualQueueList]', {
+      label: `${platform} queue`,
+      totalItems: queueEntries.length,
+      renderedItemCount: renderedQueueEntries.length,
+      virtualRangeStart: virtualQueueEntries.startIndex,
+      virtualRangeEnd: virtualQueueEntries.endIndex,
+      columns: 1,
+      viewportHeight: virtualQueueEntries.viewportSize,
+      containerHeight: queueScrollRef.current?.clientHeight ?? null,
+    });
+  }, [platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
 
   function renamePlatform() {
     const nextName = window.prompt(t('queue.renamePlatform'), platform);
@@ -763,29 +794,31 @@ function PlatformQueueColumn({
         </div>
       ) : null}
 
-      <div className="grid gap-2">
+      <div ref={queueEntriesVirtualizerRef} className="relative" style={{ height: virtualQueueEntries.totalSize }}>
         {queueEntries.length > 0 ? (
-          queueEntries.map((entry) => {
-            const game = gamesById.get(entry.gameId);
-            if (!game) {
-              return null;
-            }
+          <div className="absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
+            {renderedQueueEntries.map((entry) => {
+              const game = gamesById.get(entry.gameId);
+              if (!game) {
+                return null;
+              }
 
-            return (
-              <QueueEntryRow
-                key={entry.gameId}
-                entry={entry}
-                game={game}
-                platformAccentColor={accentColor}
-                platformOptions={platformOptions}
-                onMoveEntry={onMoveEntry}
-                onMoveEntryToPlatform={onMoveEntryToPlatform}
-                onOpenDetails={onOpenDetails}
-                onPlayNow={() => onPlayNow(game.id, platform)}
-                onRemoveEntry={onRemoveEntry}
-              />
-            );
-          })
+              return (
+                <QueueEntryRow
+                  key={entry.gameId}
+                  entry={entry}
+                  game={game}
+                  platformAccentColor={accentColor}
+                  platformOptions={platformOptions}
+                  onMoveEntry={onMoveEntry}
+                  onMoveEntryToPlatform={onMoveEntryToPlatform}
+                  onOpenDetails={onOpenDetails}
+                  onPlayNow={() => onPlayNow(game.id, platform)}
+                  onRemoveEntry={onRemoveEntry}
+                />
+              );
+            })}
+          </div>
         ) : (
           <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
             {t('queue.noQueue')}

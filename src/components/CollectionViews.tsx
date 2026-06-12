@@ -1,6 +1,6 @@
 import { Icon } from './Icon';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -11,6 +11,7 @@ import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { HltbBadge } from './HltbBadge';
+import { useVirtualWindow } from '../hooks/useVirtualWindow';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -42,14 +43,15 @@ type CollectionViewProps = CollectionActionHandlers &
     games: Game[];
     hideRecommendationBadge?: boolean;
     includeDetailsAction?: boolean;
+    debugLabel?: string;
     platformQueueState?: PlatformQueueState;
+    scrollElementRef?: RefObject<HTMLElement | null>;
   };
 
-const shelfInitialRenderCount = 72;
-const shelfRenderBatchSize = 48;
 
 export function CollectionGrid({
   games,
+  debugLabel = 'Collection grid',
   getHighlightLabel,
   hideRecommendationBadge = false,
   includeDetailsAction = false,
@@ -65,36 +67,101 @@ export function CollectionGrid({
   onStatusChange,
   onToggleSelected,
   platformQueueState,
+  scrollElementRef,
 }: CollectionViewProps) {
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [columns, setColumns] = useState(1);
+  const rowHeight = useMemo(() => getVirtualGridRowHeight(), []);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    function measureColumns() {
+      const grid = gridRef.current;
+      const width = grid?.clientWidth ?? 0;
+      setColumns(getVirtualGridColumns(width));
+    }
+
+    measureColumns();
+    const resizeObserver = typeof ResizeObserver !== 'undefined' && gridRef.current ? new ResizeObserver(measureColumns) : null;
+    resizeObserver?.observe(gridRef.current as Element);
+    window.addEventListener('resize', measureColumns);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measureColumns);
+    };
+  }, []);
+
+  const rowCount = Math.ceil(games.length / columns);
+  const virtualRows = useVirtualWindow({
+    itemCount: rowCount,
+    estimateItemSize: rowHeight,
+    overscan: 3,
+    scrollElementRef,
+    virtualizerRef: gridRef,
+  });
+  const startItemIndex = Math.min(games.length, virtualRows.startIndex * columns);
+  const endItemIndex = Math.min(games.length, (virtualRows.endIndex + 1) * columns);
+  const renderedGames = games.slice(startItemIndex, endItemIndex);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    const container = scrollElementRef?.current;
+    console.debug('[QuestShelf VirtualGameGrid]', {
+      label: debugLabel,
+      totalItems: games.length,
+      renderedItemCount: renderedGames.length,
+      virtualRangeStart: startItemIndex,
+      virtualRangeEnd: Math.max(startItemIndex, endItemIndex - 1),
+      rowRangeStart: virtualRows.startIndex,
+      rowRangeEnd: virtualRows.endIndex,
+      columns,
+      viewportHeight: virtualRows.viewportSize,
+      containerHeight: container?.clientHeight ?? null,
+    });
+  }, [columns, debugLabel, endItemIndex, games.length, renderedGames.length, scrollElementRef, startItemIndex, virtualRows.endIndex, virtualRows.startIndex, virtualRows.viewportSize]);
+
   return (
-    <div className="qs-game-grid grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4">
-      {games.map((game) => (
-        <GameCard
-          key={game.id}
-          game={game}
-          highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
-          includeDetailsAction={includeDetailsAction}
-          isMultiSelectMode={isMultiSelectMode}
-          isSelected={selectedGameIds.has(game.id)}
-          onAddToQueue={onAddToQueue}
-          onAddToWishlist={onAddToWishlist}
-          onFindMetadata={onFindMetadata}
-          onMoveToLibrary={onMoveToLibrary}
-          onOpenDetails={() => onOpenDetails(game.id)}
-          onRemove={onRemove}
-          onRemoveAndIgnore={onRemoveAndIgnore}
-          onStatusChange={onStatusChange}
-          onToggleSelected={() => onToggleSelected?.(game.id)}
-          platformLabel={getGamePlatformLabel(game, platformQueueState)}
-          platformQueueState={platformQueueState}
-        />
-      ))}
+    <div ref={gridRef} className="relative" style={{ height: virtualRows.totalSize }}>
+      <div
+        className="qs-game-grid absolute left-0 top-0 w-full grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4"
+        style={{ transform: `translateY(${virtualRows.offsetBefore}px)` }}
+      >
+        {renderedGames.map((game) => (
+          <GameCard
+            key={game.id}
+            game={game}
+            highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
+            includeDetailsAction={includeDetailsAction}
+            isMultiSelectMode={isMultiSelectMode}
+            isSelected={selectedGameIds.has(game.id)}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
+            onMoveToLibrary={onMoveToLibrary}
+            onOpenDetails={() => onOpenDetails(game.id)}
+            onRemove={onRemove}
+            onRemoveAndIgnore={onRemoveAndIgnore}
+            onStatusChange={onStatusChange}
+            onToggleSelected={() => onToggleSelected?.(game.id)}
+            platformLabel={getGamePlatformLabel(game, platformQueueState)}
+            platformQueueState={platformQueueState}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 export function CollectionShelf({
   games,
+  debugLabel = 'Collection shelf',
   getHighlightLabel,
   hideRecommendationBadge = false,
   includeDetailsAction = false,
@@ -112,37 +179,66 @@ export function CollectionShelf({
   platformQueueState,
 }: CollectionViewProps) {
   const { t } = useI18n();
-  const [shelfRenderCount, setShelfRenderCount] = useState(shelfInitialRenderCount);
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
   const shelfCardRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const renderedShelfGames = games.slice(0, shelfRenderCount);
-  const hasMoreShelfGames = shelfRenderCount < games.length;
+  const [cardSize, setCardSize] = useState(224);
+  const virtualItems = useVirtualWindow({
+    itemCount: games.length,
+    estimateItemSize: cardSize,
+    overscan: 4,
+    horizontal: true,
+    scrollElementRef: shelfScrollerRef,
+  });
+  const renderedShelfGames = games.slice(virtualItems.startIndex, virtualItems.endIndex + 1);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    function measureCardSize() {
+      const scrollerWidth = shelfScrollerRef.current?.clientWidth ?? window.innerWidth;
+      const cardWidth = Math.min(256, Math.max(176, scrollerWidth * 0.22));
+      setCardSize(cardWidth + 8);
+    }
+
+    measureCardSize();
+    window.addEventListener('resize', measureCardSize);
+
+    return () => window.removeEventListener('resize', measureCardSize);
+  }, []);
 
   useEffect(() => {
-    setShelfRenderCount(shelfInitialRenderCount);
+    shelfScrollerRef.current?.scrollTo({ left: 0, behavior: 'auto' });
     shelfCardRefs.current = [];
   }, [games]);
 
-  function loadMoreShelfGames() {
-    setShelfRenderCount((currentCount) => Math.min(games.length, currentCount + shelfRenderBatchSize));
-  }
-
-  function handleShelfScroll() {
-    const scroller = shelfScrollerRef.current;
-
-    if (!scroller || !hasMoreShelfGames) {
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
       return;
     }
 
-    if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 640) {
-      loadMoreShelfGames();
-    }
+    console.debug('[QuestShelf VirtualGameShelf]', {
+      label: debugLabel,
+      totalItems: games.length,
+      renderedItemCount: renderedShelfGames.length,
+      virtualRangeStart: virtualItems.startIndex,
+      virtualRangeEnd: virtualItems.endIndex,
+      columns: renderedShelfGames.length,
+      viewportHeight: shelfScrollerRef.current?.clientHeight ?? null,
+      containerHeight: shelfScrollerRef.current?.clientHeight ?? null,
+    });
+  }, [debugLabel, games.length, renderedShelfGames.length, virtualItems.endIndex, virtualItems.startIndex]);
+
+  function scrollShelfIndexIntoView(index: number) {
+    shelfScrollerRef.current?.scrollTo({ left: Math.max(0, index * cardSize - cardSize), behavior: 'smooth' });
   }
 
   function focusShelfCard(index: number) {
     const targetCard = shelfCardRefs.current[index];
 
     if (!targetCard) {
+      scrollShelfIndexIntoView(index);
       return;
     }
 
@@ -150,39 +246,28 @@ export function CollectionShelf({
     targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
-  function handleShelfKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, index: number, game: Game) {
+  function handleShelfKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, absoluteIndex: number, game: Game) {
     if (event.key === 'ArrowRight' || event.key === 'DPadRight') {
       event.preventDefault();
-
-      if (index + 1 >= renderedShelfGames.length && hasMoreShelfGames) {
-        loadMoreShelfGames();
-        window.setTimeout(() => focusShelfCard(Math.min(index + 1, games.length - 1)), 0);
-        return;
-      }
-
-      if (index >= renderedShelfGames.length - 8 && hasMoreShelfGames) {
-        loadMoreShelfGames();
-      }
-
-      focusShelfCard(Math.min(index + 1, games.length - 1));
+      focusShelfCard(Math.min(absoluteIndex + 1, games.length - 1));
       return;
     }
 
     if (event.key === 'ArrowLeft' || event.key === 'DPadLeft') {
       event.preventDefault();
-      focusShelfCard(Math.max(index - 1, 0));
+      focusShelfCard(Math.max(absoluteIndex - 1, 0));
       return;
     }
 
     if (event.key === 'ArrowDown' || event.key === 'DPadDown') {
       event.preventDefault();
-      focusShelfCard(Math.min(index + 4, games.length - 1));
+      focusShelfCard(Math.min(absoluteIndex + 4, games.length - 1));
       return;
     }
 
     if (event.key === 'ArrowUp' || event.key === 'DPadUp') {
       event.preventDefault();
-      focusShelfCard(Math.max(index - 4, 0));
+      focusShelfCard(Math.max(absoluteIndex - 4, 0));
       return;
     }
 
@@ -208,45 +293,42 @@ export function CollectionShelf({
       <div
         ref={shelfScrollerRef}
         aria-label={t('collection.shelfA11y')}
-        className="qs-shelf-scroller -mx-2 flex snap-x gap-2 overflow-x-auto px-2 pb-3 pt-1 sm:-mx-3 sm:px-3"
-        onScroll={handleShelfScroll}
+        className="qs-shelf-scroller -mx-2 overflow-x-auto px-2 pb-3 pt-1 sm:-mx-3 sm:px-3"
       >
-        {renderedShelfGames.map((game, index) => (
-          <ShelfGameCard
-            key={game.id}
-            refCallback={(element) => {
-              shelfCardRefs.current[index] = element;
-            }}
-            game={game}
-            highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
-            includeDetailsAction={includeDetailsAction}
-            index={index}
-            isMultiSelectMode={isMultiSelectMode}
-            isSelected={selectedGameIds.has(game.id)}
-            onAddToQueue={onAddToQueue}
-            onAddToWishlist={onAddToWishlist}
-            onFindMetadata={onFindMetadata}
-            onKeyDown={(event) => handleShelfKeyDown(event, index, game)}
-            onMoveToLibrary={onMoveToLibrary}
-            onOpenDetails={() => onOpenDetails(game.id)}
-            onRemove={onRemove}
-            onRemoveAndIgnore={onRemoveAndIgnore}
-            onStatusChange={onStatusChange}
-            onToggleSelected={() => onToggleSelected?.(game.id)}
-            platformLabel={getGamePlatformLabel(game, platformQueueState)}
-            platformQueueState={platformQueueState}
-          />
-        ))}
-        {hasMoreShelfGames ? (
-          <button
-            className="flex w-48 shrink-0 snap-center flex-col items-center justify-center rounded-xl border border-dashed border-skyglass/25 bg-ink-950/70 p-4 text-sm font-semibold text-slate-300 transition hover:border-mint/40 hover:bg-mint/10 hover:text-white"
-            onClick={loadMoreShelfGames}
-            type="button"
-          >
-            Load more covers
-            <span className="mt-2 block text-xs font-medium text-slate-500">{games.length - renderedShelfGames.length} {t('collection.hiddenForPerformance')}</span>
-          </button>
-        ) : null}
+        <div className="relative" style={{ height: '100%', minHeight: '27rem', width: virtualItems.totalSize }}>
+          <div className="absolute inset-y-0 left-0 flex snap-x gap-2" style={{ transform: `translateX(${virtualItems.offsetBefore}px)` }}>
+            {renderedShelfGames.map((game, visibleIndex) => {
+              const absoluteIndex = virtualItems.startIndex + visibleIndex;
+
+              return (
+                <ShelfGameCard
+                  key={game.id}
+                  refCallback={(element) => {
+                    shelfCardRefs.current[absoluteIndex] = element;
+                  }}
+                  game={game}
+                  highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
+                  includeDetailsAction={includeDetailsAction}
+                  index={absoluteIndex}
+                  isMultiSelectMode={isMultiSelectMode}
+                  isSelected={selectedGameIds.has(game.id)}
+                  onAddToQueue={onAddToQueue}
+                  onAddToWishlist={onAddToWishlist}
+                  onFindMetadata={onFindMetadata}
+                  onKeyDown={(event) => handleShelfKeyDown(event, absoluteIndex, game)}
+                  onMoveToLibrary={onMoveToLibrary}
+                  onOpenDetails={() => onOpenDetails(game.id)}
+                  onRemove={onRemove}
+                  onRemoveAndIgnore={onRemoveAndIgnore}
+                  onStatusChange={onStatusChange}
+                  onToggleSelected={() => onToggleSelected?.(game.id)}
+                  platformLabel={getGamePlatformLabel(game, platformQueueState)}
+                  platformQueueState={platformQueueState}
+                />
+              );
+            })}
+          </div>
+        </div>
       </div>
       <p className="text-xs text-slate-500">{t('collection.shelfHelp')}</p>
     </div>
@@ -255,6 +337,7 @@ export function CollectionShelf({
 
 export function CollectionList({
   games,
+  debugLabel = 'Collection list',
   getHighlightLabel,
   hideRecommendationBadge = false,
   includeDetailsAction = false,
@@ -273,33 +356,65 @@ export function CollectionList({
   onStatusChange,
   onToggleSelected,
   platformQueueState,
+  scrollElementRef,
 }: CollectionViewProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const rowHeight = 98;
+  const virtualRows = useVirtualWindow({
+    itemCount: games.length,
+    estimateItemSize: rowHeight,
+    overscan: 6,
+    scrollElementRef,
+    virtualizerRef: listRef,
+  });
+  const renderedGames = games.slice(virtualRows.startIndex, virtualRows.endIndex + 1);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    const container = scrollElementRef?.current;
+    console.debug('[QuestShelf VirtualGameList]', {
+      label: debugLabel,
+      totalItems: games.length,
+      renderedItemCount: renderedGames.length,
+      virtualRangeStart: virtualRows.startIndex,
+      virtualRangeEnd: virtualRows.endIndex,
+      columns: 1,
+      viewportHeight: virtualRows.viewportSize,
+      containerHeight: container?.clientHeight ?? null,
+    });
+  }, [debugLabel, games.length, renderedGames.length, scrollElementRef, virtualRows.endIndex, virtualRows.startIndex, virtualRows.viewportSize]);
+
   return (
-    <div className="grid gap-2">
-      {games.map((game) => (
-        <CompactGameRow
-          key={game.id}
-          game={game}
-          highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
-          includeDetailsAction={includeDetailsAction}
-          isMultiSelectMode={isMultiSelectMode}
-          isSelected={selectedGameIds.has(game.id)}
-          onAddToQueue={onAddToQueue}
-          onAddToWishlist={onAddToWishlist}
-          onFindMetadata={onFindMetadata}
-          onMoveToLibrary={onMoveToLibrary}
-          onPlayNow={onPlayNow}
-          onFinish={onFinish}
-          onDrop={onDrop}
-          onOpenDetails={() => onOpenDetails(game.id)}
-          onRemove={() => onRemove(game.id)}
-          onRemoveAndIgnore={() => onRemoveAndIgnore(game)}
-          onStatusChange={(status) => onStatusChange(game.id, status)}
-          onToggleSelected={() => onToggleSelected?.(game.id)}
-          platformLabel={getGamePlatformLabel(game, platformQueueState)}
-          platformQueueState={platformQueueState}
-        />
-      ))}
+    <div ref={listRef} className="relative" style={{ height: virtualRows.totalSize }}>
+      <div className="absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualRows.offsetBefore}px)` }}>
+        {renderedGames.map((game) => (
+          <CompactGameRow
+            key={game.id}
+            game={game}
+            highlightLabel={hideRecommendationBadge ? undefined : getHighlightLabel?.(game)}
+            includeDetailsAction={includeDetailsAction}
+            isMultiSelectMode={isMultiSelectMode}
+            isSelected={selectedGameIds.has(game.id)}
+            onAddToQueue={onAddToQueue}
+            onAddToWishlist={onAddToWishlist}
+            onFindMetadata={onFindMetadata}
+            onMoveToLibrary={onMoveToLibrary}
+            onPlayNow={onPlayNow}
+            onFinish={onFinish}
+            onDrop={onDrop}
+            onOpenDetails={() => onOpenDetails(game.id)}
+            onRemove={() => onRemove(game.id)}
+            onRemoveAndIgnore={() => onRemoveAndIgnore(game)}
+            onStatusChange={(status) => onStatusChange(game.id, status)}
+            onToggleSelected={() => onToggleSelected?.(game.id)}
+            platformLabel={getGamePlatformLabel(game, platformQueueState)}
+            platformQueueState={platformQueueState}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -602,6 +717,28 @@ const CompactGameRow = memo(function CompactGameRow({
     </article>
   );
 });
+
+
+function getVirtualGridColumns(width: number) {
+  if (width <= 0) {
+    return 1;
+  }
+
+  const minimumCardWidth = 256;
+  const gap = 8;
+  const measuredColumns = Math.max(1, Math.floor((width + gap) / (minimumCardWidth + gap)));
+  const largeScreenColumnCap = typeof window !== 'undefined' && window.innerWidth >= 1536 ? 4 : measuredColumns;
+
+  return Math.min(measuredColumns, largeScreenColumnCap);
+}
+
+function getVirtualGridRowHeight() {
+  if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
+    return 336;
+  }
+
+  return 306;
+}
 
 function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
   return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
