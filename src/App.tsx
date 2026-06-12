@@ -42,9 +42,6 @@ import { getSettingsCategoryMeta, settingsCategories, settingsCategoryStorageKey
 import {
   achievementFilterOptions,
   allOption,
-  collectionInitialRenderCount,
-  collectionLoadAheadMargin,
-  collectionRenderBatchSize,
   collectionViewModeStorageKey,
   collectionViewModes,
   enrichmentFilterOptions,
@@ -2795,13 +2792,11 @@ function CollectionPanel({
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
-  const [renderedGameCount, setRenderedGameCount] = useState(collectionInitialRenderCount);
   const activeViewModeCollectionRef = useRef(collectionType);
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
   const collectionPanelRef = useRef<HTMLElement | null>(null);
-  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const { t } = useI18n();
   const title = collectionType === 'wishlist' ? t('collection.wishlist') : t('collection.library');
   const emptyTitle = collectionType === 'wishlist' ? t('collection.emptyWishlistTitle') : t('collection.emptyLibraryTitle');
@@ -2809,7 +2804,7 @@ function CollectionPanel({
     collectionType === 'wishlist'
       ? t('collection.emptyWishlistText')
       : t('collection.emptyLibraryText');
-  const progressiveResetKey = useMemo(
+  const virtualResetKey = useMemo(
     () =>
       JSON.stringify({
         collectionType,
@@ -2819,11 +2814,8 @@ function CollectionPanel({
       }),
     [collectionType, filters, games, viewMode],
   );
-  const canLoadProgressively = viewMode !== 'Shelf View';
-  const visibleGames = canLoadProgressively ? games.slice(0, renderedGameCount) : games;
-  const renderedCount = visibleGames.length;
+  const visibleGames = games;
   const realCoverCount = useMemo(() => games.filter((game) => !isMissingOrGeneratedCover(game.coverImage)).length, [games]);
-  const hasMoreGames = canLoadProgressively && renderedCount < games.length;
   const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
   const selectedCount = selectedGames.length;
   const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
@@ -2851,9 +2843,8 @@ function CollectionPanel({
   }, [collectionType]);
 
   useEffect(() => {
-    setRenderedGameCount(collectionInitialRenderCount);
     collectionPanelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [progressiveResetKey]);
+  }, [virtualResetKey]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -2866,7 +2857,6 @@ function CollectionPanel({
     console.debug('[QuestShelf Library] render window', {
       collectionType,
       filteredItemCount: games.length,
-      renderedItemCount: renderedCount,
       realCoverCount,
       placeholderCount: games.length - realCoverCount,
       viewMode,
@@ -2881,32 +2871,7 @@ function CollectionPanel({
       viewportHeight: window.innerHeight,
       visualViewportHeight: window.visualViewport?.height ?? null,
     });
-  }, [collectionType, games.length, realCoverCount, renderedCount, viewMode]);
-
-  useEffect(() => {
-    if (!hasMoreGames) {
-      return undefined;
-    }
-
-    const sentinel = loadMoreSentinelRef.current;
-
-    if (!sentinel || typeof window.IntersectionObserver === 'undefined') {
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          loadMoreGames();
-        }
-      },
-      { root: collectionPanelRef.current, rootMargin: collectionLoadAheadMargin, threshold: 0 },
-    );
-
-    observer.observe(sentinel);
-
-    return () => observer.disconnect();
-  }, [hasMoreGames, renderedCount, games.length]);
+  }, [collectionType, games.length, realCoverCount, viewMode]);
 
   useEffect(() => {
     setSelectedGameIds((currentSelection) => {
@@ -2970,9 +2935,6 @@ function CollectionPanel({
     setSelectedGameIds(new Set(games.map((game) => game.id)));
   }
 
-  function loadMoreGames() {
-    setRenderedGameCount((currentCount) => Math.min(games.length, currentCount + collectionRenderBatchSize));
-  }
 
   function toggleQuickFilter(quickFilter: QuickFilter) {
     const nextQuickFilters = filters.quickFilters.includes(quickFilter)
@@ -3397,12 +3359,11 @@ function CollectionPanel({
         </ViewportModal>
       ) : null}
 
-      {games.length > 0 && canLoadProgressively ? (
+      {games.length > 0 ? (
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-skyglass/10 bg-ink-950/50 px-3 py-2 text-xs text-slate-500">
           <span>
-            Rendered {renderedCount} of {games.length} {games.length === 1 ? 'game' : 'games'}
+            Virtualized {games.length} {games.length === 1 ? 'game' : 'games'} for this view
           </span>
-          {hasMoreGames ? <span>{t('app.moreLoadAutomatically')}</span> : null}
         </div>
       ) : null}
 
@@ -3491,6 +3452,7 @@ function CollectionPanel({
       {games.length > 0 ? (
         viewMode === 'Shelf View' ? (
           <CollectionShelf
+            debugLabel={`${collectionType} shelf`}
             games={games}
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
@@ -3507,6 +3469,7 @@ function CollectionPanel({
           />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
+            debugLabel={`${collectionType} compact`}
             games={visibleGames}
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
@@ -3523,9 +3486,11 @@ function CollectionPanel({
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
+            scrollElementRef={collectionPanelRef}
           />
         ) : (
           <CollectionGrid
+            debugLabel={`${collectionType} grid`}
             games={visibleGames}
             isMultiSelectMode={isMultiSelectMode}
             selectedGameIds={selectedGameIds}
@@ -3539,6 +3504,7 @@ function CollectionPanel({
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
+            scrollElementRef={collectionPanelRef}
           />
         )
       ) : (
@@ -3550,19 +3516,6 @@ function CollectionPanel({
         </div>
       )}
 
-      {hasMoreGames ? (
-        <div className="mt-3 grid place-items-center gap-2 rounded-md border border-dashed border-skyglass/15 bg-ink-950/40 px-3 py-4 text-center">
-          <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-1 w-full" />
-          <p className="text-xs font-medium text-slate-500">Loading more… {games.length - renderedCount} remaining.</p>
-          <button
-            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/30 hover:bg-mint/10 hover:text-white"
-            onClick={loadMoreGames}
-            type="button"
-          >
-            Load more
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }
