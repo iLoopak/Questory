@@ -123,7 +123,8 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
         console.error('QuestShelf backup export failed.', error);
       }
 
-      showMessage('Backup export failed. Try again, or use a different share/save target.', 'error');
+      const readableMessage = error instanceof Error && error.message.trim() ? ` ${error.message}` : '';
+      showMessage(`Backup export failed.${readableMessage} Try again, or use a different share/save target.`, 'error');
     }
   }
 
