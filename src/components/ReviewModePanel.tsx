@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
+import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { PlatformBadge } from './PlatformBadge';
@@ -105,6 +106,7 @@ export function ReviewModePanel({
   onSourceChange,
 }: ReviewModePanelProps) {
   const { t } = useI18n();
+  const hasGamepad = useGamepadDetection();
   const buttonLabels = getControllerButtonLabels(controllerLayout);
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
@@ -428,6 +430,7 @@ export function ReviewModePanel({
           {activeGame ? (
             <FocusedReviewCard
               game={activeGame}
+              hasGamepad={hasGamepad}
               highlightedActionIndex={highlightedActionIndex}
               isNoteOpen={isNoteOpen}
               noteDraft={noteDraft}
@@ -471,6 +474,7 @@ export function ReviewModePanel({
 
 function FocusedReviewCard({
   game,
+  hasGamepad,
   highlightedActionIndex,
   isNoteOpen,
   noteDraft,
@@ -484,6 +488,7 @@ function FocusedReviewCard({
   queueState,
 }: {
   game: Game;
+  hasGamepad: boolean;
   highlightedActionIndex: number;
   isNoteOpen: boolean;
   noteDraft: string;
@@ -545,7 +550,7 @@ function FocusedReviewCard({
                 <Icon className="select-none" name={action.icon} />
                 <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
               </div>
-              {action.hint && (
+              {hasGamepad && action.hint && (
                 <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
                   {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                 </span>
@@ -599,15 +604,17 @@ function FocusedReviewCard({
           </h3>
         </div>
 
-        <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-          <span>{t('review.previous')}</span>
-          <span>•</span>
-          <span>{t('review.next')}</span>
-          <span>•</span>
-          <span>{t('review.dpadFocus')}</span>
-          <span>•</span>
-          <span>{buttonLabels.primary} {t('review.addToQueue')}</span>
-        </div>
+        {hasGamepad ? (
+          <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <span>{t('review.previous')}</span>
+            <span>•</span>
+            <span>{t('review.next')}</span>
+            <span>•</span>
+            <span>{t('review.dpadFocus')}</span>
+            <span>•</span>
+            <span>{buttonLabels.primary} {t('review.addToQueue')}</span>
+          </div>
+        ) : null}
 
 
         <details className="qs-review-details mt-3 rounded-2xl border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300 w-full">
@@ -725,7 +732,7 @@ function FocusedReviewCard({
                   <Icon className="select-none" name={action.icon} />
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
-                {action.hint && (
+                {hasGamepad && action.hint && (
                   <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                   </span>

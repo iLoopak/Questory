@@ -6,6 +6,7 @@ const axisRepeatMs = 150;
 const axisThreshold = 0.55;
 const triggerAxisThreshold = 0.65;
 const debugStorageKey = 'questshelf.controllerDebug.v1';
+export const controllerConnectionChangeEvent = 'questshelf:controller-connection-change';
 const focusableSelector = [
   'button:not([disabled])',
   'a[href]',
@@ -78,7 +79,9 @@ export function configureAndroidGamepadShortcuts() {
   let controllerLayoutPreference = loadControllerLayoutPreference();
 
   const removeFocusGuard = installFocusGuard();
-  updateControllerActive(false);
+  updateControllerActive(hasConnectedGamepad());
+  window.addEventListener('gamepadconnected', handleGamepadConnectionChange);
+  window.addEventListener('gamepaddisconnected', handleGamepadConnectionChange);
   window.addEventListener('questshelf:controller-debug-change', handleDebugChange);
   window.addEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
   window.addEventListener('keydown', handleKeyboardFallback, true);
@@ -161,6 +164,10 @@ export function configureAndroidGamepadShortcuts() {
     }
   }
 
+  function handleGamepadConnectionChange() {
+    updateControllerActive(hasConnectedGamepad());
+  }
+
   function handleDebugChange(event: Event) {
     isDebugEnabled = Boolean((event as CustomEvent<boolean>).detail);
     renderDebugOverlay();
@@ -197,6 +204,8 @@ export function configureAndroidGamepadShortcuts() {
 
   return () => {
     window.clearInterval(intervalId);
+    window.removeEventListener('gamepadconnected', handleGamepadConnectionChange);
+    window.removeEventListener('gamepaddisconnected', handleGamepadConnectionChange);
     window.removeEventListener('questshelf:controller-debug-change', handleDebugChange);
     window.removeEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
     window.removeEventListener('keydown', handleKeyboardFallback, true);
@@ -220,6 +229,14 @@ export function saveControllerDebugEnabled(isEnabled: boolean) {
 
   window.localStorage.setItem(debugStorageKey, String(isEnabled));
   window.dispatchEvent(new CustomEvent('questshelf:controller-debug-change', { detail: isEnabled }));
+}
+
+export function hasConnectedGamepad() {
+  if (typeof navigator === 'undefined' || !('getGamepads' in navigator)) {
+    return false;
+  }
+
+  return Array.from(navigator.getGamepads()).some((gamepad) => Boolean(gamepad?.connected));
 }
 
 function getPrimaryGamepad() {
@@ -457,7 +474,12 @@ function focusElement(element: HTMLElement | undefined) {
 }
 
 function updateControllerActive(isActive: boolean) {
+  const wasActive = document.body.classList.contains('qs-controller-active');
   document.body.classList.toggle('qs-controller-active', isActive);
+
+  if (wasActive !== isActive) {
+    window.dispatchEvent(new CustomEvent(controllerConnectionChangeEvent, { detail: isActive }));
+  }
 }
 
 function isTextEntryElement(target: EventTarget | Element | null) {
