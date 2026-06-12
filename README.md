@@ -30,7 +30,7 @@ QuestShelf is a local-first game library foundation built with React, Vite, Type
 - File-based Sync Folder / Auto Backup foundation for user-owned synced folders.
 - Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
 - Capacitor-ready Android handheld foundation with fullscreen status bar handling and mirrored native Preferences persistence.
-- QuestShelf visual branding with the official ember-orange app icon, favicon, PWA icons, and console-style dark theme.
+- QuestShelf visual branding with the official PNG app icon, favicon, PWA icons, and console-style dark theme.
 
 No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
 
@@ -288,7 +288,7 @@ Steam and RAWG API calls still require network access. The locally saved library
 
 QuestShelf uses the provided PNG app icon as the source brand asset. The primary icon files live in `public/icons/`:
 
-- `questshelf-source.png` / `questshelf-icon.png` (892x892): source brand artwork used by the app header/logo path.
+- `questshelf-source.png` / `questshelf-icon.png` (1024x1024): source brand artwork used by the app header/logo path.
 - `favicon-16.png`, `favicon-32.png`, `favicon-48.png`: browser favicon outputs.
 - `questshelf-icon-180.png`: Apple touch icon output.
 - `questshelf-icon-192.png`, `questshelf-icon-512.png`, `questshelf-maskable-512.png`: PWA manifest outputs.

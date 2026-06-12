@@ -5,7 +5,7 @@ Copy these files into `android/app/src/main/res/` after running `npx cap add and
 The adaptive icon uses:
 
 - dark launcher background: `#0D0C0C` (`@color/questshelf_launcher_background`)
-- QuestShelf ember accent: `#FF5A2C`
+- QuestShelf launcher background color: `#0D0C0C`
 - per-density raster foreground (`mipmap-*/ic_launcher_foreground.png`) generated from `assets/icon.png`
 - legacy square + round launcher rasters (`ic_launcher.png`, `ic_launcher_round.png`) for pre-API-26 launchers
 - centered splash rasters (`drawable*/splash.png`) generated from `assets/splash.png`
