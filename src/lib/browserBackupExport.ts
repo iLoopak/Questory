@@ -1,8 +1,15 @@
 import { createPortableBackupFilename, serializePortableBackup } from './portableSync';
 import type { QuestShelfBackup } from './backupStorage';
 
-export function downloadQuestShelfBackupFile(backup: QuestShelfBackup) {
-  downloadJsonFile(serializePortableBackup(backup), createPortableBackupFilename(backup));
+export type BrowserBackupExportResult = {
+  fileName: string;
+};
+
+export function downloadQuestShelfBackupFile(backup: QuestShelfBackup): BrowserBackupExportResult {
+  const fileName = createPortableBackupFilename(backup);
+  downloadJsonFile(serializePortableBackup(backup), fileName);
+
+  return { fileName };
 }
 
 export function downloadRawQuestShelfLocalData(rawData: unknown) {

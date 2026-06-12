@@ -3,13 +3,16 @@ import { downloadQuestShelfBackupFile, downloadRawQuestShelfLocalData } from './
 import { getRuntimeEnvironment } from './capacitorEnvironment';
 import { exportQuestShelfBackupOnAndroid } from './capacitorBackupExport';
 
-export async function exportQuestShelfBackupFile(backup: QuestShelfBackup) {
+export type QuestShelfBackupExportResult = {
+  fileName: string;
+};
+
+export async function exportQuestShelfBackupFile(backup: QuestShelfBackup): Promise<QuestShelfBackupExportResult> {
   if (getRuntimeEnvironment().isAndroid) {
-    await exportQuestShelfBackupOnAndroid(backup);
-    return;
+    return exportQuestShelfBackupOnAndroid(backup);
   }
 
-  downloadQuestShelfBackupFile(backup);
+  return downloadQuestShelfBackupFile(backup);
 }
 
 export { downloadRawQuestShelfLocalData };
