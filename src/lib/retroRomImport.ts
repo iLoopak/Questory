@@ -28,6 +28,12 @@ export const retroImportPlatforms = [
 export type RetroImportPlatform = (typeof retroImportPlatforms)[number];
 export type RetroPlatformOverride = typeof autoDetectPlatformOption | RetroImportPlatform;
 
+export type ScannableRomFile = Pick<File, 'name'> & {
+  path?: string;
+  uri?: string;
+  webkitRelativePath?: string;
+};
+
 export type DetectedRom = {
   duplicateReason: string | null;
   extension: string;
@@ -138,11 +144,12 @@ const folderPlatformHints: Array<[RegExp, GamePlatform]> = [
 ];
 
 export function scanRomFiles(
-  files: File[],
+  files: ScannableRomFile[],
   existingGames: Game[],
   platformOverride: RetroPlatformOverride,
 ): { detectedRoms: DetectedRom[]; summary: RetroScanSummary } {
   const scanIssues: RetroScanIssue[] = [];
+  const detectedKeys = new Set<string>();
   let unsupportedFiles = 0;
 
   const detectedRoms = files.flatMap((file, index) => {
@@ -174,7 +181,13 @@ export function scanRomFiles(
       platformOverride === autoDetectPlatformOption
         ? inferPlatform(sourcePath, extension)
         : (platformOverride as GamePlatform);
-    const duplicateReason = getDuplicateReason({ extension, platform, sourcePath, title }, existingGames);
+    const duplicateKey = getRomDuplicateKey({ extension, platform, sourcePath, title });
+    const existingDuplicateReason = getDuplicateReason({ extension, platform, sourcePath, title }, existingGames);
+    const duplicateReason = existingDuplicateReason ?? (detectedKeys.has(duplicateKey) ? 'Already selected in this scan' : null);
+
+    if (!duplicateReason) {
+      detectedKeys.add(duplicateKey);
+    }
 
     if (duplicateReason) {
       scanIssues.push({
@@ -324,14 +337,12 @@ function normalizeTitle(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function getFileSourcePath(file: File) {
-  const extendedFile = file as File & { path?: string; webkitRelativePath?: string };
-  return extendedFile.webkitRelativePath || extendedFile.path || file.name;
+function getFileSourcePath(file: ScannableRomFile) {
+  return file.webkitRelativePath || file.path || file.name;
 }
 
-function getFileUri(file: File) {
-  const extendedFile = file as File & { uri?: string };
-  return typeof extendedFile.uri === 'string' && extendedFile.uri.trim() ? extendedFile.uri.trim() : null;
+function getFileUri(file: ScannableRomFile) {
+  return typeof file.uri === 'string' && file.uri.trim() ? file.uri.trim() : null;
 }
 
 function getFileExtension(fileName: string) {

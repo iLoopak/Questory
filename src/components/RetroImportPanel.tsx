@@ -8,8 +8,10 @@ import {
   type DetectedRom,
   type RetroPlatformOverride,
   type RetroScanSummary,
+  type ScannableRomFile,
 } from '../lib/retroRomImport';
 import { getRuntimeEnvironment } from '../lib/capacitorEnvironment';
+import { RetroFolderPicker, type AndroidRetroFolderResult } from '../lib/retroFolderPicker';
 import type { Game } from '../types/game';
 import { useI18n } from '../i18n';
 
@@ -33,6 +35,8 @@ type ImportSummary = {
   unsupportedFiles: number;
   warning: string | null;
 };
+
+const androidRetroFolderStorageKey = 'questshelf:retro-import:last-android-folder-uri';
 
 const emptyScanSummary: RetroScanSummary = {
   detectedGames: 0,
@@ -62,6 +66,8 @@ export function RetroImportPanel({
   const [selectedRomIds, setSelectedRomIds] = useState<Set<string>>(new Set());
   const [scanSummary, setScanSummary] = useState<RetroScanSummary>(emptyScanSummary);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [lastAndroidFolderUri, setLastAndroidFolderUri] = useState(() => loadLastAndroidFolderUri());
+  const [isAndroidFolderScanLoading, setIsAndroidFolderScanLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     message: string;
     tone: 'error' | 'info' | 'success' | 'warning';
@@ -78,13 +84,16 @@ export function RetroImportPanel({
   const currentGames = games ?? localGames;
   const selectableRoms = detectedRoms.filter((rom) => !rom.isDuplicate);
   const selectedImportableRoms = selectableRoms.filter((rom) => selectedRomIds.has(rom.id));
-  const supportsFolderPicker =
-    !runtimeEnvironment.isAndroid &&
+  const supportsWebFolderPicker =
     typeof HTMLInputElement !== 'undefined' &&
     'webkitdirectory' in HTMLInputElement.prototype;
+  const supportsFolderPicker = runtimeEnvironment.isAndroid || supportsWebFolderPicker;
 
   function scanFiles(fileList: FileList | null) {
-    const files = Array.from(fileList ?? []);
+    scanScannableFiles(Array.from(fileList ?? []));
+  }
+
+  function scanScannableFiles(files: ScannableRomFile[]) {
     console.debug('[QuestShelf Retro Import] scan started', {
       fileCount: files.length,
       platformOverride,
@@ -121,6 +130,51 @@ export function RetroImportPanel({
     setImportSummary(null);
     setImportedGames([]);
     setStatusMessage(getScanStatusMessage(result.summary));
+  }
+
+  async function selectAndroidFolder() {
+    setIsAndroidFolderScanLoading(true);
+
+    try {
+      const result = await RetroFolderPicker.pickFolder();
+      handleAndroidFolderResult(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Android folder selection was cancelled or unavailable.';
+      setStatusMessage({ message, tone: 'warning' });
+    } finally {
+      setIsAndroidFolderScanLoading(false);
+    }
+  }
+
+  async function rescanAndroidFolder() {
+    if (!lastAndroidFolderUri) {
+      return;
+    }
+
+    setIsAndroidFolderScanLoading(true);
+
+    try {
+      const result = await RetroFolderPicker.rescanFolder({ folderUri: lastAndroidFolderUri });
+      handleAndroidFolderResult(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'QuestShelf could not rescan the saved Android folder. Select the folder again to refresh permission.';
+      setStatusMessage({ message, tone: 'warning' });
+    } finally {
+      setIsAndroidFolderScanLoading(false);
+    }
+  }
+
+  function handleAndroidFolderResult(result: AndroidRetroFolderResult) {
+    saveLastAndroidFolderUri(result.folderUri);
+    setLastAndroidFolderUri(result.folderUri);
+    scanScannableFiles(result.files.map((file) => ({ name: file.name, path: file.path, uri: file.uri })));
+
+    if (!result.persisted) {
+      setStatusMessage((currentStatus) => ({
+        message: `${currentStatus.message} Android granted one-time folder access, so rescan may require selecting the folder again.`,
+        tone: currentStatus.tone === 'error' ? 'error' : 'warning',
+      }));
+    }
   }
 
   function clearScanResults() {
@@ -304,12 +358,28 @@ export function RetroImportPanel({
           </button>
           <button
             className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-            disabled={!supportsFolderPicker}
-            onClick={() => folderInputRef.current?.click()}
+            disabled={!supportsFolderPicker || isAndroidFolderScanLoading}
+            onClick={() => {
+              if (runtimeEnvironment.isAndroid) {
+                void selectAndroidFolder();
+              } else {
+                folderInputRef.current?.click();
+              }
+            }}
             type="button"
           >
-            {runtimeEnvironment.isAndroid ? 'Folder import pending SAF' : 'Select ROM folder'}
+            {isAndroidFolderScanLoading ? 'Scanning folder…' : 'Select ROM folder'}
           </button>
+          {runtimeEnvironment.isAndroid && lastAndroidFolderUri ? (
+            <button
+              className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
+              disabled={isAndroidFolderScanLoading}
+              onClick={() => void rescanAndroidFolder()}
+              type="button"
+            >
+              Rescan folder
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -335,8 +405,10 @@ export function RetroImportPanel({
 
         <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-300">
           {runtimeEnvironment.isAndroid
-            ? 'Android APK folder import needs a later Storage Access Framework bridge. Select one or more ROM files for the current local-first workflow.'
-            : supportsFolderPicker
+            ? lastAndroidFolderUri
+              ? 'Android folder import uses Storage Access Framework with persisted read permission when the provider allows it. Use Rescan folder to refresh the saved folder.'
+              : 'Android folder import uses Storage Access Framework to scan a selected folder recursively without copying ROM data.'
+            : supportsWebFolderPicker
               ? 'Folder selection is available on this device. QuestShelf still validates every file before import.'
               : 'Folder selection is not supported on this device. Select multiple ROM files instead.'}
         </div>
@@ -493,6 +565,25 @@ function ImportResultPanel({
           </p>
         </div>
       </div>
+
+      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-4">
+        <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Found</dt>
+          <dd className="mt-1 text-lg font-semibold text-white">{summary.detectedGames}</dd>
+        </div>
+        <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Imported</dt>
+          <dd className="mt-1 text-lg font-semibold text-white">{summary.importedGames}</dd>
+        </div>
+        <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Duplicates</dt>
+          <dd className="mt-1 text-lg font-semibold text-white">{summary.skippedDuplicates}</dd>
+        </div>
+        <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Unsupported</dt>
+          <dd className="mt-1 text-lg font-semibold text-white">{summary.unsupportedFiles}</dd>
+        </div>
+      </dl>
 
       {summary.failures.length > 0 ? (
         <ul className="mt-3 space-y-1 text-sm">
@@ -672,4 +763,20 @@ function getStatusClassName(tone: 'error' | 'info' | 'success' | 'warning') {
   }
 
   return 'border-skyglass/15 bg-ink-950/80 text-slate-300';
+}
+
+function loadLastAndroidFolderUri() {
+  try {
+    return window.localStorage.getItem(androidRetroFolderStorageKey) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function saveLastAndroidFolderUri(folderUri: string) {
+  try {
+    window.localStorage.setItem(androidRetroFolderStorageKey, folderUri);
+  } catch {
+    // Folder rescans are an enhancement; import should still work if storage is unavailable.
+  }
 }

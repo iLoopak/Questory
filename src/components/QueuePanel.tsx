@@ -147,7 +147,7 @@ export function QueuePanel({
   }
 
   return (
-    <section className="qs-queue-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
+    <section className="qs-queue-shell flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
       <CollectionToolbar
         title={t('queue.platforms')}
         searchValue={queueSearchTerm}
@@ -271,46 +271,48 @@ export function QueuePanel({
         </div>
       ) : null}
 
-      <div className="grid gap-2 xl:grid-cols-2">
-        {displayedQueuePlatforms.map((platform) => (
-          <PlatformQueueColumn
-            key={platform}
-            games={games}
-            gamesById={gamesById}
-            maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
-            accentColor={getPlatformAccentColor(queueState, platform)}
-            artworkUrl={getPlatformArtworkUrl(queueState, platform)}
-            isHighlighted={platform === initialPlatform}
-            platform={platform}
-            platformTag={getPlatformTag(queueState, platform)}
-            platformOptions={movePlatformOptions}
-            setPlatformRef={(element) => {
-              if (element) {
-                platformRefs.current.set(platform, element);
-              } else {
-                platformRefs.current.delete(platform);
-              }
-            }}
-            queueEntries={queueState.entries
-              .filter((entry) => entry.targetPlatform === platform)
-              .filter((entry) => {
-                const game = gamesById.get(entry.gameId);
-                return !normalizedQueueSearch || (game ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch) : false);
-              })
-              .sort(compareQueueEntries)}
-            onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
-            onLimitChange={onLimitChange}
-            onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
-            onRemovePlatform={(platform) => onQueueStateChange(removeQueuePlatform(queueState, platform))}
-            onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
-            onMoveEntry={onMoveEntry}
-            onMoveEntryToPlatform={onMoveEntryToPlatform}
-            onPlayNow={onPlayNow}
-            onPlayingAction={onPlayingAction}
-            onOpenDetails={onOpenDetails}
-            onRemoveEntry={onRemoveEntry}
-          />
-        ))}
+      <div className="qs-queue-list min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="grid gap-2 xl:grid-cols-2">
+          {displayedQueuePlatforms.map((platform) => (
+            <PlatformQueueColumn
+              key={platform}
+              games={games}
+              gamesById={gamesById}
+              maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
+              accentColor={getPlatformAccentColor(queueState, platform)}
+              artworkUrl={getPlatformArtworkUrl(queueState, platform)}
+              isHighlighted={platform === initialPlatform}
+              platform={platform}
+              platformTag={getPlatformTag(queueState, platform)}
+              platformOptions={movePlatformOptions}
+              setPlatformRef={(element) => {
+                if (element) {
+                  platformRefs.current.set(platform, element);
+                } else {
+                  platformRefs.current.delete(platform);
+                }
+              }}
+              queueEntries={queueState.entries
+                .filter((entry) => entry.targetPlatform === platform)
+                .filter((entry) => {
+                  const game = gamesById.get(entry.gameId);
+                  return !normalizedQueueSearch || (game ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch) : false);
+                })
+                .sort(compareQueueEntries)}
+              onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
+              onLimitChange={onLimitChange}
+              onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
+              onRemovePlatform={(platform) => onQueueStateChange(removeQueuePlatform(queueState, platform))}
+              onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
+              onMoveEntry={onMoveEntry}
+              onMoveEntryToPlatform={onMoveEntryToPlatform}
+              onPlayNow={onPlayNow}
+              onPlayingAction={onPlayingAction}
+              onOpenDetails={onOpenDetails}
+              onRemoveEntry={onRemoveEntry}
+            />
+          ))}
+        </div>
       </div>
 
       {isPlatformModalOpen ? (
