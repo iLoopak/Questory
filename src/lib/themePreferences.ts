@@ -11,6 +11,7 @@ export const defaultAccentColor = '#ff5a2c';
 export const defaultSecondaryAccentColor = '#38bdf8';
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
+export const darkOnlyAppTemplatePreferences: AppTemplatePreference[] = ['neon-deck'];
 
 const preferenceModuleName = '@capacitor/preferences';
 const darkThemeQuery = '(prefers-color-scheme: dark)';
@@ -34,6 +35,17 @@ export function isAccentColor(value: unknown): value is string {
 
 export function isAppTemplatePreference(value: unknown): value is AppTemplatePreference {
   return typeof value === 'string' && appTemplatePreferences.includes(value as AppTemplatePreference);
+}
+
+export function isDarkOnlyAppTemplate(preference: AppTemplatePreference): boolean {
+  return darkOnlyAppTemplatePreferences.includes(preference);
+}
+
+export function normalizeThemePreferenceForTemplate(
+  preference: ThemePreference,
+  appTemplatePreference: AppTemplatePreference = 'classic',
+): ThemePreference {
+  return isDarkOnlyAppTemplate(appTemplatePreference) ? 'dark' : preference;
 }
 
 export function normalizeAccentColor(value: string): string | null {
@@ -174,8 +186,10 @@ export function resolveThemePreference(
   preference: ThemePreference,
   appTemplatePreference: AppTemplatePreference = 'classic',
 ): ResolvedTheme {
-  if (preference !== 'system') {
-    return preference;
+  const normalizedPreference = normalizeThemePreferenceForTemplate(preference, appTemplatePreference);
+
+  if (normalizedPreference !== 'system') {
+    return normalizedPreference;
   }
 
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -227,21 +241,22 @@ export function applyThemePreference(
   preference: ThemePreference,
   appTemplatePreference: AppTemplatePreference = 'classic',
 ): ResolvedTheme {
-  const resolvedTheme = resolveThemePreference(preference, appTemplatePreference);
+  const normalizedPreference = normalizeThemePreferenceForTemplate(preference, appTemplatePreference);
+  const resolvedTheme = resolveThemePreference(normalizedPreference, appTemplatePreference);
 
   if (typeof document === 'undefined') {
     return resolvedTheme;
   }
 
   const root = document.documentElement;
-  root.dataset.themePreference = preference;
+  root.dataset.themePreference = normalizedPreference;
   root.dataset.theme = resolvedTheme;
   root.style.colorScheme = resolvedTheme;
   updateThemeColorMeta(resolvedTheme);
 
   window.dispatchEvent(
     new CustomEvent('questshelf:theme-change', {
-      detail: { preference, theme: resolvedTheme, appTemplate: appTemplatePreference },
+      detail: { preference: normalizedPreference, theme: resolvedTheme, appTemplate: appTemplatePreference },
     }),
   );
 
