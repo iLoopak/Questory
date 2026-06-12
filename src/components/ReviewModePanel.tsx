@@ -75,7 +75,8 @@ const swipeLeftActionIndex = negativeActions.findIndex((action) => action.action
 const swipeRightActionIndex = firstPositiveActionIndex + positiveActions.findIndex((action) => action.action === defaultSwipeRightAction);
 const swipeReleaseThreshold = 110;
 const swipeCommitDelayMs = 180;
-const minDragScale = 0.94;
+const dragStartScale = 0.92;
+const minDragScale = 0.82;
 const futureSwipeZones: Record<SwipeDirection, ReviewModeAction[]> = {
   left: ['skip', 'dropped'],
   right: ['finished', 'queue'],
@@ -550,8 +551,8 @@ function FocusedReviewCard({
   const swipeDirection = getSwipeDirection(swipeState.offsetX);
   const activeSwipeAction = getSwipeActionForDirection(swipeDirection);
   const swipeProgress = Math.min(Math.abs(swipeState.offsetX) / swipeReleaseThreshold, 1);
-  const isSwipeEngaged = swipeState.phase === 'dragging' || swipeState.phase === 'exiting';
-  const dragScale = isSwipeEngaged ? 1 - (1 - minDragScale) * Math.max(swipeProgress, 0.45) : 1;
+  const isSwipeDragging = swipeState.phase === 'dragging';
+  const dragScale = isSwipeDragging ? dragStartScale - (dragStartScale - minDragScale) * swipeProgress : 1;
   const rotation = Math.max(-10, Math.min(10, swipeState.offsetX / 18));
   const swipeStyle = {
     '--qs-swipe-x': `${swipeState.offsetX}px`,
@@ -650,15 +651,15 @@ function FocusedReviewCard({
 
   return (
     <article
-      className={`qs-review-stage min-h-full ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
-      data-swipe-active={swipeDirection ?? 'none'}
+      className={`qs-review-stage min-h-full ${isSwipeDragging ? 'is-swipe-engaged' : ''}`}
+      data-swipe-active={isSwipeDragging ? swipeDirection ?? 'none' : 'none'}
       data-swipe-left="negative"
       data-swipe-right="positive"
     >
-      <section className={`qs-review-zone qs-review-zone-negative ${swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
+      <section className={`qs-review-zone qs-review-zone-negative ${isSwipeDragging && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
-        <SwipeZonePreview direction="left" activeDirection={swipeDirection} />
-        <div className="grid gap-2">
+        {isSwipeDragging ? <SwipeZonePreview direction="left" activeDirection={swipeDirection} /> : null}
+        {!isSwipeDragging ? <div className="grid gap-2">
           {negativeActions.map((action, index) => (
             <button
               key={action.action}
@@ -681,7 +682,7 @@ function FocusedReviewCard({
               )}
             </button>
           ))}
-        </div>
+        </div> : null}
       </section>
 
       <section
@@ -694,7 +695,7 @@ function FocusedReviewCard({
         style={swipeStyle}
       >
         <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
-          {activeSwipeAction ? (
+          {isSwipeDragging && activeSwipeAction ? (
             <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
               {getReviewActionLabel(activeSwipeAction, t)}
             </div>
@@ -849,10 +850,10 @@ function FocusedReviewCard({
         </details>
       </section>
 
-      <section className={`qs-review-zone qs-review-zone-positive ${swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
+      <section className={`qs-review-zone qs-review-zone-positive ${isSwipeDragging && swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
         <div className="qs-review-zone-label">{t('review.keep')}</div>
-        <SwipeZonePreview direction="right" activeDirection={swipeDirection} />
-        <div className="grid gap-2">
+        {isSwipeDragging ? <SwipeZonePreview direction="right" activeDirection={swipeDirection} /> : null}
+        {!isSwipeDragging ? <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
 
@@ -880,7 +881,7 @@ function FocusedReviewCard({
               </button>
             );
           })}
-        </div>
+        </div> : null}
       </section>
     </article>
   );
