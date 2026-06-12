@@ -2377,3 +2377,24 @@ body.qs-controller-active .qs-compact-card:focus-within {
     height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
   }
 }
+
+/* Large-library scrolling: keep Library on one native scroll container and avoid 100vh WebView traps. */
+.qs-collection-panel {
+  height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qs-game-card-artwork,
+.qs-game-card-artwork img,
+.qs-shelf-card img,
+.qs-compact-card img {
+  contain: paint;
+}
+
+@media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
+  .qs-collection-panel {
+    height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  }
+}

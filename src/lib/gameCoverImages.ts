@@ -16,11 +16,11 @@ const generatedPlaceholderMarkers = ['placeholder', 'placehold.co', 'data:image/
 const generatedFallbackMarker = 'data:image/svg+xml';
 const generatedFallbackCoverCache = new Map<string, string>();
 
-export function getGameCoverSources(game: Game) {
-  return getArtworkCandidates(game).map((candidate) => candidate.url);
+export function getGameCoverSources(game: Game, options: { includeGeneratedFallback?: boolean } = {}) {
+  return getArtworkCandidates(game, options).map((candidate) => candidate.url);
 }
 
-export function getArtworkCandidates(game: Game): Array<{ source: ArtworkSource; url: string }> {
+export function getArtworkCandidates(game: Game, options: { includeGeneratedFallback?: boolean } = {}): Array<{ source: ArtworkSource; url: string }> {
   const candidates: Array<{ source: ArtworkSource; url: string }> = [];
   const currentSource = getStoredArtworkSource(game);
   const currentCover = game.coverImage?.trim();
@@ -50,7 +50,9 @@ export function getArtworkCandidates(game: Game): Array<{ source: ArtworkSource;
     candidates.push({ source: 'imported', url: currentCover });
   }
 
-  candidates.push({ source: 'generated-fallback', url: getGeneratedFallbackCover(game) });
+  if (options.includeGeneratedFallback !== false) {
+    candidates.push({ source: 'generated-fallback', url: getGeneratedFallbackCover(game) });
+  }
 
   return dedupeCandidates(candidates);
 }

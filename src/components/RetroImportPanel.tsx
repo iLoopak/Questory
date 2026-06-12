@@ -473,11 +473,18 @@ export function RetroImportPanel({
                     type="checkbox"
                   />
                   <span className="min-w-0">
-                    <span className="block truncate font-semibold text-white" title={rom.title}>
-                      {rom.title}
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="block truncate font-semibold text-white" title={rom.title}>
+                        {rom.title}
+                      </span>
+                      {rom.fileCount > 1 ? (
+                        <span className="shrink-0 rounded-full border border-skyglass/15 bg-ink-900 px-2 py-0.5 text-[0.68rem] font-medium uppercase tracking-[0.08em] text-slate-300">
+                          {rom.discCount > 1 ? `${rom.discCount} discs` : `${rom.fileCount} files`}
+                        </span>
+                      ) : null}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500" title={rom.fileName}>
-                      {rom.fileName}
+                    <span className="mt-0.5 block truncate text-xs text-slate-500" title={rom.romFiles.map((file) => file.path).join('\n')}>
+                      {rom.fileName}{rom.fileCount > 1 ? ` + ${rom.fileCount - 1} grouped ${rom.fileCount === 2 ? 'file' : 'files'}` : ''}
                     </span>
                   </span>
                   <span className="truncate">{rom.platform}</span>

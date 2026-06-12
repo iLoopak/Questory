@@ -39,6 +39,14 @@ export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
 export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
 
+export type RomFileReference = {
+  extension?: string;
+  fileName: string;
+  path: string;
+  role?: 'primary' | 'track' | 'disc' | 'file';
+  uri?: string;
+};
+
 export type Game = {
   id: string;
   title: string;
@@ -74,6 +82,7 @@ export type Game = {
   romPath?: string;
   romUri?: string;
   romExtension?: string;
+  romFiles?: RomFileReference[];
   priority?: WishlistPriority;
   expectedPlaytime?: number | null;
   priceTarget?: string;
