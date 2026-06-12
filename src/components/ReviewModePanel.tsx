@@ -65,21 +65,28 @@ const positiveActions: Array<{
   { action: 'finished', hint: '', icon: 'trophy', label: 'Finished', tone: 'neutral' },
 ];
 
-type SwipeDirection = 'left' | 'right';
+type SwipeHorizontalDirection = 'left' | 'right';
+type SwipeVerticalDirection = 'up' | 'down';
+type SwipeQuadrant = `${SwipeHorizontalDirection}-${SwipeVerticalDirection}`;
 
 const decisionActions = [...negativeActions, ...positiveActions];
 const firstPositiveActionIndex = negativeActions.length;
 const defaultSwipeLeftAction: ReviewModeAction = 'skip';
 const defaultSwipeRightAction: ReviewModeAction = 'queue';
-const swipeLeftActionIndex = negativeActions.findIndex((action) => action.action === defaultSwipeLeftAction);
-const swipeRightActionIndex = firstPositiveActionIndex + positiveActions.findIndex((action) => action.action === defaultSwipeRightAction);
 const swipeReleaseThreshold = 110;
+const swipeVerticalDeadZone = 34;
 const swipeCommitDelayMs = 180;
-const dragStartScale = 0.92;
-const minDragScale = 0.82;
-const futureSwipeZones: Record<SwipeDirection, ReviewModeAction[]> = {
-  left: ['skip', 'dropped'],
-  right: ['finished', 'queue'],
+const dragStartScale = 0.85;
+const minDragScale = 0.74;
+const futureSwipeZones: Record<SwipeHorizontalDirection, Array<{ action: ReviewModeAction; hint: string; quadrant: SwipeQuadrant }>> = {
+  left: [
+    { action: defaultSwipeLeftAction, hint: 'Left + up', quadrant: 'left-up' },
+    { action: 'dropped', hint: 'Left + down', quadrant: 'left-down' },
+  ],
+  right: [
+    { action: 'finished', hint: 'Right + up', quadrant: 'right-up' },
+    { action: defaultSwipeRightAction, hint: 'Right + down', quadrant: 'right-down' },
+  ],
 };
 
 type ReviewActionStats = {
@@ -548,11 +555,14 @@ function FocusedReviewCard({
   ].filter((row): row is [string, string] => Boolean(row[1]));
   const genreLabels = [...(game.genres ?? []), ...(game.rawgTags ?? []), ...game.tags];
 
-  const swipeDirection = getSwipeDirection(swipeState.offsetX);
-  const activeSwipeAction = getSwipeActionForDirection(swipeDirection);
+  const swipeTarget = getSwipeTarget(swipeState.offsetX, swipeState.offsetY);
+  const swipeDirection = swipeTarget?.horizontal ?? getSwipeHorizontalDirection(swipeState.offsetX);
+  const activeSwipeAction = swipeTarget?.action ?? null;
   const swipeProgress = Math.min(Math.abs(swipeState.offsetX) / swipeReleaseThreshold, 1);
   const isSwipeDragging = swipeState.phase === 'dragging';
-  const dragScale = isSwipeDragging ? dragStartScale - (dragStartScale - minDragScale) * swipeProgress : 1;
+  const isSwipeExiting = swipeState.phase === 'exiting';
+  const isSwipeEngaged = isSwipeDragging || isSwipeExiting;
+  const dragScale = isSwipeEngaged ? dragStartScale - (dragStartScale - minDragScale) * swipeProgress : 1;
   const rotation = Math.max(-10, Math.min(10, swipeState.offsetX / 18));
   const swipeStyle = {
     '--qs-swipe-x': `${swipeState.offsetX}px`,
@@ -598,15 +608,11 @@ function FocusedReviewCard({
       event.preventDefault();
     }
 
-    setSwipeState({ offsetX: nextOffsetX, offsetY: nextOffsetY * 0.25, phase: 'dragging' });
+    setSwipeState({ offsetX: nextOffsetX, offsetY: nextOffsetY, phase: 'dragging' });
 
-    const direction = getSwipeDirection(nextOffsetX);
-    if (direction === 'left') {
-      onHighlight(swipeLeftActionIndex);
-    }
-
-    if (direction === 'right') {
-      onHighlight(swipeRightActionIndex);
+    const target = getSwipeTarget(nextOffsetX, nextOffsetY);
+    if (target) {
+      onHighlight(target.actionIndex);
     }
   }
 
@@ -622,20 +628,20 @@ function FocusedReviewCard({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    const direction = Math.abs(swipeState.offsetX) >= swipeReleaseThreshold ? getSwipeDirection(swipeState.offsetX) : null;
-    const action = getSwipeActionForDirection(direction);
+    const target = Math.abs(swipeState.offsetX) >= swipeReleaseThreshold ? getSwipeTarget(swipeState.offsetX, swipeState.offsetY) : null;
 
-    if (!direction || !action) {
+    if (!target) {
       setSwipeState({ offsetX: 0, offsetY: 0, phase: 'settling' });
       window.setTimeout(() => setSwipeState(emptySwipeState), swipeCommitDelayMs);
       return;
     }
 
-    const exitX = direction === 'left' ? -window.innerWidth : window.innerWidth;
-    setSwipeState({ offsetX: exitX, offsetY: swipeState.offsetY, phase: 'exiting' });
+    const exitX = target.horizontal === 'left' ? -window.innerWidth : window.innerWidth;
+    const exitY = target.vertical === 'up' ? -window.innerHeight * 0.45 : window.innerHeight * 0.45;
+    setSwipeState({ offsetX: exitX, offsetY: exitY, phase: 'exiting' });
     window.setTimeout(() => {
       setSwipeState(emptySwipeState);
-      onAction(action.action);
+      onAction(target.action.action);
     }, swipeCommitDelayMs);
   }
 
@@ -651,15 +657,15 @@ function FocusedReviewCard({
 
   return (
     <article
-      className={`qs-review-stage min-h-full ${isSwipeDragging ? 'is-swipe-engaged' : ''}`}
-      data-swipe-active={isSwipeDragging ? swipeDirection ?? 'none' : 'none'}
+      className={`qs-review-stage min-h-full ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
+      data-swipe-active={isSwipeEngaged ? swipeTarget?.quadrant ?? swipeDirection ?? 'none' : 'none'}
       data-swipe-left="negative"
       data-swipe-right="positive"
     >
-      <section className={`qs-review-zone qs-review-zone-negative ${isSwipeDragging && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
+      <section className={`qs-review-zone qs-review-zone-negative ${isSwipeEngaged && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
-        {isSwipeDragging ? <SwipeZonePreview direction="left" activeDirection={swipeDirection} /> : null}
-        {!isSwipeDragging ? <div className="grid gap-2">
+        {isSwipeEngaged ? <SwipeZonePreview direction="left" activeQuadrant={swipeTarget?.quadrant ?? null} /> : null}
+        {!isSwipeEngaged ? <div className="grid gap-2">
           {negativeActions.map((action, index) => (
             <button
               key={action.action}
@@ -687,7 +693,7 @@ function FocusedReviewCard({
 
       <section
         className={`qs-review-hero qs-review-swipe-card flex flex-col items-center ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
-        aria-label={`${game.title} Quest Queue card. Drag left to Skip or right to Add to Platforms.`}
+        aria-label={`${game.title} Quest Queue card. Drag left and up to Skip, left and down to Drop, right and up to Finished, or right and down to Add to Platforms.`}
         onPointerCancel={cancelSwipe}
         onPointerDown={beginSwipe}
         onPointerMove={updateSwipe}
@@ -695,7 +701,7 @@ function FocusedReviewCard({
         style={swipeStyle}
       >
         <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
-          {isSwipeDragging && activeSwipeAction ? (
+          {isSwipeEngaged && activeSwipeAction ? (
             <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
               {getReviewActionLabel(activeSwipeAction, t)}
             </div>
@@ -850,10 +856,10 @@ function FocusedReviewCard({
         </details>
       </section>
 
-      <section className={`qs-review-zone qs-review-zone-positive ${isSwipeDragging && swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
+      <section className={`qs-review-zone qs-review-zone-positive ${isSwipeEngaged && swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
         <div className="qs-review-zone-label">{t('review.keep')}</div>
-        {isSwipeDragging ? <SwipeZonePreview direction="right" activeDirection={swipeDirection} /> : null}
-        {!isSwipeDragging ? <div className="grid gap-2">
+        {isSwipeEngaged ? <SwipeZonePreview direction="right" activeQuadrant={swipeTarget?.quadrant ?? null} /> : null}
+        {!isSwipeEngaged ? <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
 
@@ -887,16 +893,16 @@ function FocusedReviewCard({
   );
 }
 
-function SwipeZonePreview({ direction, activeDirection }: { direction: SwipeDirection; activeDirection: SwipeDirection | null }) {
+function SwipeZonePreview({ direction, activeQuadrant }: { direction: SwipeHorizontalDirection; activeQuadrant: SwipeQuadrant | null }) {
   const { t } = useI18n();
-  const actions = futureSwipeZones[direction];
+  const zones = futureSwipeZones[direction];
 
   return (
     <div className={`qs-review-future-zones qs-review-future-zones-${direction}`} aria-hidden="true">
-      {actions.map((action) => (
-        <div key={action} className={`qs-review-future-zone ${activeDirection === direction ? 'qs-review-future-zone-active' : ''}`}>
-          <span className="qs-review-future-zone-kicker">{direction === 'left' ? 'Swipe left' : 'Swipe right'}</span>
-          <span className="qs-review-future-zone-label">{getReviewActionLabelByType(action, t)}</span>
+      {zones.map((zone) => (
+        <div key={zone.quadrant} className={`qs-review-future-zone ${activeQuadrant === zone.quadrant ? 'qs-review-future-zone-active' : ''}`}>
+          <span className="qs-review-future-zone-kicker">{zone.hint}</span>
+          <span className="qs-review-future-zone-label">{getReviewActionLabelByType(zone.action, t)}</span>
         </div>
       ))}
     </div>
@@ -923,7 +929,7 @@ const emptySwipeState: SwipeState = {
   phase: 'idle',
 };
 
-function getSwipeDirection(offsetX: number): SwipeDirection | null {
+function getSwipeHorizontalDirection(offsetX: number): SwipeHorizontalDirection | null {
   if (offsetX < -16) {
     return 'left';
   }
@@ -935,16 +941,41 @@ function getSwipeDirection(offsetX: number): SwipeDirection | null {
   return null;
 }
 
-function getSwipeActionForDirection(direction: SwipeDirection | null) {
-  if (direction === 'left') {
-    return negativeActions.find((action) => action.action === defaultSwipeLeftAction) ?? null;
+function getSwipeVerticalDirection(offsetY: number, horizontal: SwipeHorizontalDirection): SwipeVerticalDirection {
+  if (offsetY < -swipeVerticalDeadZone) {
+    return 'up';
   }
 
-  if (direction === 'right') {
-    return positiveActions.find((action) => action.action === defaultSwipeRightAction) ?? null;
+  if (offsetY > swipeVerticalDeadZone) {
+    return 'down';
   }
 
-  return null;
+  return horizontal === 'left' ? 'up' : 'down';
+}
+
+function getSwipeTarget(offsetX: number, offsetY: number) {
+  const horizontal = getSwipeHorizontalDirection(offsetX);
+
+  if (!horizontal) {
+    return null;
+  }
+
+  const vertical = getSwipeVerticalDirection(offsetY, horizontal);
+  const quadrant: SwipeQuadrant = `${horizontal}-${vertical}`;
+  const actionType = futureSwipeZones[horizontal].find((zone) => zone.quadrant === quadrant)?.action ?? null;
+  const action = actionType ? decisionActions.find((candidate) => candidate.action === actionType) ?? null : null;
+
+  if (!action) {
+    return null;
+  }
+
+  return {
+    action,
+    actionIndex: decisionActions.findIndex((candidate) => candidate.action === action.action),
+    horizontal,
+    quadrant,
+    vertical,
+  };
 }
 
 function ReviewComplete({
