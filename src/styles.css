@@ -356,6 +356,7 @@ img {
 }
 
 .qs-review-stage {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(9.5rem, 1fr) minmax(18rem, 2.5fr) minmax(9.5rem, 1fr);
   align-items: center;
@@ -409,6 +410,85 @@ img {
   border: 1px solid rgb(var(--skyglass-rgb) / 0.08);
   border-radius: 1.25rem;
   padding: clamp(0.75rem, 1.6vw, 1rem);
+  overflow: hidden;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease,
+    opacity 180ms ease;
+}
+
+.qs-review-stage.is-swipe-engaged .qs-review-zone {
+  border-color: rgb(var(--skyglass-rgb) / 0.2);
+  background-color: rgb(var(--ink-950-rgb) / 0.42);
+}
+
+.qs-review-future-zones {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(3.4rem, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.54;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.qs-review-stage.is-swipe-engaged .qs-review-future-zones {
+  opacity: 1;
+}
+
+.qs-review-future-zone {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px dashed rgb(var(--skyglass-rgb) / 0.18);
+  border-radius: 1rem;
+  padding: 0.6rem 0.7rem;
+  background: rgb(var(--ink-950-rgb) / 0.34);
+  box-shadow: inset 0 1px 0 rgb(var(--text-primary-rgb) / 0.04);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.qs-review-future-zone-kicker {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.qs-review-future-zone-label {
+  margin-top: 0.18rem;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: clamp(0.85rem, 1.35vw, 1rem);
+  font-weight: 900;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+}
+
+.qs-review-future-zones-left .qs-review-future-zone-active {
+  border-color: rgb(var(--danger-rgb) / 0.5);
+  background: rgb(var(--danger-rgb) / 0.14);
+  color: rgb(var(--danger-rgb));
+  transform: translateX(-0.12rem);
+}
+
+.qs-review-future-zones-right .qs-review-future-zone-active {
+  border-color: rgb(var(--accent-rgb) / 0.52);
+  background: rgb(var(--accent-rgb) / 0.16);
+  color: var(--accent);
+  transform: translateX(0.12rem);
+}
+
+.qs-review-future-zone-active .qs-review-future-zone-label {
+  color: currentColor;
 }
 
 .qs-review-zone-negative {
@@ -438,7 +518,7 @@ img {
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
-  transform: translate3d(var(--qs-swipe-x, 0), var(--qs-swipe-y, 0), 0) rotate(var(--qs-swipe-rotate, 0deg));
+  transform: translate3d(var(--qs-swipe-x, 0), var(--qs-swipe-y, 0), 0) rotate(var(--qs-swipe-rotate, 0deg)) scale(var(--qs-swipe-scale, 1));
   transition:
     transform 180ms cubic-bezier(0.2, 0.85, 0.25, 1),
     filter 180ms ease;
@@ -686,6 +766,9 @@ img {
   .qs-shelf-card,
   .qs-compact-card,
   .qs-review-cover,
+  .qs-review-swipe-card,
+  .qs-review-future-zones,
+  .qs-review-future-zone,
   .qs-setup-card {
     transition-duration: 1ms;
   }
