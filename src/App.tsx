@@ -4485,6 +4485,8 @@ function SettingsPanel({
   onViewRetroImportedGames,
 }: SettingsPanelProps) {
   const [isCategoryListOpen, setIsCategoryListOpen] = useState(false);
+  const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
+  const steamWishlistImportButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeCategoryMeta = getSettingsCategoryMeta(activeCategory);
   const t = useMemo(() => createTranslator(language), [language]);
 
@@ -4562,6 +4564,8 @@ function SettingsPanel({
                 playtimeRefreshState={steamPlaytimeRefreshState}
                 onRefreshSteamPlaytime={onRefreshSteamPlaytime}
                 onUnignoreSteamGame={onUnignoreSteamGame}
+                onOpenManualWishlistImport={() => setIsSteamWishlistHtmlImportOpen(true)}
+                manualWishlistImportButtonRef={steamWishlistImportButtonRef}
               />
             </div>
           ) : null}
@@ -4584,6 +4588,19 @@ function SettingsPanel({
               steamWishlistSyncState={steamWishlistSyncState}
               onImportSteamWishlistHtml={onImportSteamWishlistHtml}
               onSyncSteamWishlist={onSyncSteamWishlist}
+            />
+          ) : null}
+
+          {isSteamWishlistHtmlImportOpen ? (
+            <SteamWishlistHtmlImportModal
+              existingSteamAppIds={games
+                .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId === 'number')
+                .map((game) => game.steamAppId as number)}
+              isExperimentalSyncLoading={steamWishlistSyncState.status === 'loading'}
+              onClose={() => setIsSteamWishlistHtmlImportOpen(false)}
+              onExperimentalSync={onSyncSteamWishlist}
+              onImport={onImportSteamWishlistHtml}
+              restoreFocusRef={steamWishlistImportButtonRef}
             />
           ) : null}
 

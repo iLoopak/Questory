@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
@@ -48,6 +48,8 @@ type SteamSettingsPanelProps = {
   playtimeRefreshState: SteamPlaytimeRefreshState;
   onRefreshSteamPlaytime: () => Promise<unknown>;
   onUnignoreSteamGame: (steamAppId: number) => void;
+  onOpenManualWishlistImport?: () => void;
+  manualWishlistImportButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 export function SteamSettingsPanel({
@@ -62,6 +64,8 @@ export function SteamSettingsPanel({
   playtimeRefreshState,
   onRefreshSteamPlaytime,
   onUnignoreSteamGame,
+  onOpenManualWishlistImport,
+  manualWishlistImportButtonRef,
 }: SteamSettingsPanelProps) {
   const { t } = useI18n();
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
@@ -108,6 +112,11 @@ export function SteamSettingsPanel({
 
   const apiDebugEntries = connectionState.data?.apiDebugEntries ?? [];
   const latestApiDebugEntry = apiDebugEntries.at(-1);
+  const ownedGamesCount = connectionState.data?.ownedGames.length ?? 0;
+  const recentlyPlayedCount = connectionState.data?.recentlyPlayedGames.length ?? 0;
+  const hasExistingSteamLibrary = existingSteamAppIds.size > 0;
+  const canImportSteamLibrary = connectionState.status === 'success' && importableGames.length > 0;
+  const hasWishlistLocator = Boolean(settings.wishlistUrl.trim() || settings.steamId64.trim());
 
   function updateSetting(field: keyof SteamSettings, value: string) {
     setSettings((currentSettings) => ({
@@ -219,12 +228,12 @@ export function SteamSettingsPanel({
     setSelectedAppIds(new Set());
   }
 
-  function importSelectedGames() {
+  function importSelectedGames(appIds: Set<number> = selectedAppIds) {
     if (!connectionState.data) {
       return;
     }
 
-    const selectedOwnedGames = connectionState.data.ownedGames.filter((game) => selectedAppIds.has(game.appid));
+    const selectedOwnedGames = connectionState.data.ownedGames.filter((game) => appIds.has(game.appid));
     const duplicateCount = connectionState.data.ownedGames.filter((game) => existingSteamAppIds.has(game.appid)).length;
     const ignoredCount = connectionState.data.ownedGames.filter((game) => ignoredSteamAppIds.has(game.appid)).length;
     const newOwnedGames = selectedOwnedGames.filter(
@@ -249,6 +258,12 @@ export function SteamSettingsPanel({
     });
   }
 
+  function importSteamLibrary() {
+    const importableAppIds = new Set(importableGames.map((game) => game.appid));
+    setSelectedAppIds(importableAppIds);
+    importSelectedGames(importableAppIds);
+  }
+
   const statusStyles = {
     idle: 'border-white/10 bg-ink-950 text-slate-300',
     loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
@@ -261,13 +276,25 @@ export function SteamSettingsPanel({
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t('steam.integration')}</h2>
-
+          <p className="mt-1 text-sm leading-6 text-slate-400">
+            Connect Steam, test what QuestShelf can read, then choose what to import or refresh.
+          </p>
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-        <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
-          <div className="space-y-4">
+      <div className="space-y-4">
+        <section className="rounded-lg border border-mint/25 bg-ink-950 p-4">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">1</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">{t('steam.connection')}</h3>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
+              Local credentials
+            </span>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Steam Web API key <button className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setHelpTopic('steam-api-key'); }} type="button" aria-label={t('steam.apiKeyHelp')}>?</button>
@@ -306,41 +333,105 @@ export function SteamSettingsPanel({
                 spellCheck={false}
                 type="text"
               />
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Optional for Steam playtime, but Steam Wishlist sync needs either this public profile/wishlist URL (or vanity name) or a SteamID64. The Steam profile and wishlist must be public.
-              </p>
             </label>
+          </div>
 
-            <button
-              className="h-11 w-full rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-              disabled={connectionState.status === 'loading'}
-              onClick={testConnection}
-              type="button"
-            >
-              {connectionState.status === 'loading' ? 'Testing...' : 'Test connection'}
-            </button>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            The profile field is optional for playtime. Manual Steam Wishlist import can use it for a direct link, but the bookmarklet flow also works from the generic Wishlist page.
+          </p>
 
-            <div className={`rounded-md border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
-              {connectionState.message}
+          <button
+            className="mt-4 h-12 w-full rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto"
+            disabled={connectionState.status === 'loading'}
+            onClick={testConnection}
+            type="button"
+          >
+            {connectionState.status === 'loading' ? 'Testing...' : t('steam.testConnection')}
+          </button>
+        </section>
+
+        <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">2</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">{t('steam.connectionResult')}</h3>
             </div>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusStyles}`}>
+              {connectionState.status === 'success' ? 'Connected' : connectionState.status === 'error' ? 'Not connected' : connectionState.status === 'loading' ? 'Testing' : 'Not tested'}
+            </span>
+          </div>
 
-            {importSummary ? (
-              <div className="rounded-md border border-mint/40 bg-mint/10 px-3 py-3 text-sm leading-6 text-mint">
-                Imported {importSummary.importedCount} games. Skipped {importSummary.skippedDuplicateCount} duplicates and{' '}
-                {importSummary.skippedIgnoredCount} ignored games.
-              </div>
-            ) : null}
+          <div className={`rounded-md border px-3 py-3 text-sm leading-6 ${statusStyles}`}>
+            {connectionState.message}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <ResultStat label="Parsed SteamID64" value={settings.steamId64 || 'Not set'} />
+            <ResultStat label="Owned games found" value={ownedGamesCount.toString()} />
+            <ResultStat label="Recently played found" value={recentlyPlayedCount.toString()} />
+            <ResultStat label="Wishlist availability" value={hasWishlistLocator ? 'Manual import ready' : 'Add profile or open generic Wishlist'} />
+          </div>
+
+          {importSummary ? (
+            <div className="mt-4 rounded-md border border-mint/40 bg-mint/10 px-3 py-3 text-sm leading-6 text-mint">
+              Imported {importSummary.importedCount} games. Skipped {importSummary.skippedDuplicateCount} duplicates and{' '}
+              {importSummary.skippedIgnoredCount} ignored games.
+            </div>
+          ) : null}
+        </section>
+
+        <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">3</p>
+            <h3 className="mt-1 text-lg font-semibold text-white">{t('steam.nextSteps')}</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              Use the connection result to bring Steam data into your local QuestShelf library.
+            </p>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            <ActionCard
+              title={hasExistingSteamLibrary ? t('steam.updateSteamLibrary') : t('steam.importSteamLibrary')}
+              description={canImportSteamLibrary ? `${importableGames.length} new Steam games are ready to import.` : ownedGamesCount > 0 ? 'All tested Steam games are already in your library or ignored.' : 'Run Test connection to load owned games first.'}
+              actionLabel={hasExistingSteamLibrary ? t('steam.updateSteamLibrary') : t('steam.importSteamLibrary')}
+              disabled={!canImportSteamLibrary}
+              onAction={importSteamLibrary}
+            />
 
             <SteamPlaytimeRefreshCard
               librarySteamGameCount={existingSteamAppIds.size}
               refreshState={playtimeRefreshState}
               onRefresh={onRefreshSteamPlaytime}
             />
+
+            <ActionCard
+              title={t('steam.importSteamWishlistManual')}
+              description="Automatic Steam Wishlist sync is unreliable, so QuestShelf uses the manual bookmarklet helper."
+              actionLabel={t('steam.importSteamWishlistManual')}
+              disabled={!onOpenManualWishlistImport}
+              buttonRef={manualWishlistImportButtonRef}
+              onAction={onOpenManualWishlistImport ?? (() => undefined)}
+            />
           </div>
         </section>
 
+        <SteamImportSection
+          existingSteamAppIds={existingSteamAppIds}
+          ignoredSteamAppIds={ignoredSteamAppIds}
+          importableGamesCount={importableGames.length}
+          ownedGames={connectionState.data?.ownedGames ?? []}
+          recentlyPlayedByAppId={recentlyPlayedByAppId}
+          selectedAppIds={selectedAppIds}
+          onDeselectAll={deselectAllGames}
+          onImportSelected={importSelectedGames}
+          onSelectAll={selectAllImportableGames}
+          onToggleSelected={toggleSelectedAppId}
+        />
+
+        <IgnoredSteamGamesSection ignoredSteamGames={ignoredSteamGames} onUnignoreSteamGame={onUnignoreSteamGame} />
+
         <details className="rounded-lg border border-white/10 bg-ink-950 p-4">
-          <summary className="cursor-pointer font-semibold text-white">{t('steam.connectionDetails')}</summary>
+          <summary className="cursor-pointer font-semibold text-white">{t('steam.advancedConnectionDiagnostics')}</summary>
           <div className="mt-3">
             <SteamApiDebugSummary
               entries={apiDebugEntries}
@@ -348,6 +439,7 @@ export function SteamSettingsPanel({
               steamId64={settings.steamId64}
             />
 
+            <h4 className="mb-2 text-sm font-semibold text-white">{t('steam.rawApiResponse')}</h4>
             <pre className="max-h-[320px] overflow-auto rounded-md border border-white/10 bg-black/30 p-3 text-xs leading-5 text-slate-300">
               {debugOutput}
             </pre>
@@ -355,22 +447,52 @@ export function SteamSettingsPanel({
         </details>
       </div>
 
-      <IgnoredSteamGamesSection ignoredSteamGames={ignoredSteamGames} onUnignoreSteamGame={onUnignoreSteamGame} />
-
       {helpTopic ? <SteamHelpModal topic={helpTopic} onClose={() => setHelpTopic(null)} /> : null}
+    </section>
+  );
+}
 
-      <SteamImportSection
-        existingSteamAppIds={existingSteamAppIds}
-        ignoredSteamAppIds={ignoredSteamAppIds}
-        importableGamesCount={importableGames.length}
-        ownedGames={connectionState.data?.ownedGames ?? []}
-        recentlyPlayedByAppId={recentlyPlayedByAppId}
-        selectedAppIds={selectedAppIds}
-        onDeselectAll={deselectAllGames}
-        onImportSelected={importSelectedGames}
-        onSelectAll={selectAllImportableGames}
-        onToggleSelected={toggleSelectedAppId}
-      />
+type ResultStatProps = {
+  label: string;
+  value: string;
+};
+
+function ResultStat({ label, value }: ResultStatProps) {
+  return (
+    <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/80 p-3">
+      <div className="truncate text-base font-semibold text-white">{value}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+type ActionCardProps = {
+  title: string;
+  description: string;
+  actionLabel: string;
+  disabled?: boolean;
+  buttonRef?: RefObject<HTMLButtonElement | null>;
+  onAction: () => void;
+};
+
+function ActionCard({ title, description, actionLabel, disabled = false, buttonRef, onAction }: ActionCardProps) {
+  return (
+    <section className="rounded-md border border-white/10 bg-ink-900/80 p-3">
+      <div className="flex h-full flex-col gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-white">{title}</h4>
+          <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
+        </div>
+        <button
+          className="mt-auto h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
+          disabled={disabled}
+          onClick={onAction}
+          ref={buttonRef}
+          type="button"
+        >
+          {actionLabel}
+        </button>
+      </div>
     </section>
   );
 }
