@@ -16,6 +16,7 @@ export const darkOnlyAppTemplatePreferences: AppTemplatePreference[] = ['neon-de
 const preferenceModuleName = '@capacitor/preferences';
 const darkThemeQuery = '(prefers-color-scheme: dark)';
 const darkThemeColor = '#0d0c0c';
+const neonDeckThemeColor = '#030612';
 const lightThemeColor = '#FAF7F5';
 const hexColorPattern = /^#[0-9a-f]{6}$/i;
 
@@ -252,7 +253,7 @@ export function applyThemePreference(
   root.dataset.themePreference = normalizedPreference;
   root.dataset.theme = resolvedTheme;
   root.style.colorScheme = resolvedTheme;
-  updateThemeColorMeta(resolvedTheme);
+  updateThemeColorMeta(resolvedTheme, appTemplatePreference);
 
   window.dispatchEvent(
     new CustomEvent('questshelf:theme-change', {
@@ -273,12 +274,16 @@ export function watchSystemTheme(callback: () => void): () => void {
   return () => mediaQuery.removeEventListener('change', callback);
 }
 
-export function getThemeColor(theme: ResolvedTheme) {
+export function getThemeColor(theme: ResolvedTheme, appTemplatePreference: AppTemplatePreference = 'classic') {
+  if (appTemplatePreference === 'neon-deck') {
+    return neonDeckThemeColor;
+  }
+
   return theme === 'light' ? lightThemeColor : darkThemeColor;
 }
 
-function updateThemeColorMeta(theme: ResolvedTheme) {
-  const themeColor = getThemeColor(theme);
+function updateThemeColorMeta(theme: ResolvedTheme, appTemplatePreference: AppTemplatePreference) {
+  const themeColor = getThemeColor(theme, appTemplatePreference);
   let metaElement = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 
   if (!metaElement) {

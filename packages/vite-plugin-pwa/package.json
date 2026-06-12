@@ -1,0 +1,7 @@
+{
+  "name": "vite-plugin-pwa",
+  "version": "0.0.0-questshelf",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts"
+}

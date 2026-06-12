@@ -1,10 +1,11 @@
-const CACHE_NAME = 'questshelf-app-shell-v6';
+const CACHE_NAME = 'questshelf-app-shell-v7';
 const APP_SHELL_ASSETS = [
   '/',
   '/favicon.ico',
   '/index.html',
   '/manifest.webmanifest',
   '/icons/favicon-32.png',
+  '/icons/questshelf-icon-180.png',
   '/icons/questshelf-icon.png',
   '/icons/questshelf-icon-192.png',
   '/icons/questshelf-icon-512.png',
@@ -73,4 +74,10 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
