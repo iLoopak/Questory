@@ -2285,3 +2285,95 @@ textarea,
   color: rgb(15 23 42);
   box-shadow: 0 0 22px color-mix(in srgb, var(--preview-primary) 28%, transparent), 0 10px 24px rgb(0 0 0 / 0.22);
 }
+
+/* Android / Retroid scrolling and controller focus fixes. */
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.qs-app-root {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+.qs-handheld-shell {
+  min-height: 100dvh;
+  min-height: 100svh;
+  padding-bottom: max(0.75rem, var(--qs-safe-bottom));
+}
+
+.qs-handheld-shell > section {
+  min-height: 0;
+}
+
+.qs-content-panel,
+.qs-queue-shell,
+.qs-review-shell,
+.qs-settings-shell {
+  max-height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qs-queue-shell {
+  height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  overflow: hidden;
+}
+
+.qs-queue-list,
+.qs-game-action-scroll,
+.qs-viewport-modal .qs-filter-drawer,
+.qs-viewport-modal form,
+.qs-viewport-modal [class*='overflow-y-auto'] {
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qs-game-card:focus-visible,
+.qs-shelf-card:focus-visible,
+.qs-compact-card:focus-within {
+  border-color: var(--focus) !important;
+  box-shadow:
+    0 0 0 2px var(--focus-ring-inner),
+    0 0 0 5px var(--focus-ring-outer),
+    var(--shadow-glow) !important;
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+body.qs-controller-active .qs-game-card:focus,
+body.qs-controller-active .qs-shelf-card:focus,
+body.qs-controller-active .qs-compact-card:focus-within {
+  border-color: var(--focus) !important;
+  box-shadow:
+    0 0 0 2px var(--focus-ring-inner),
+    0 0 0 6px var(--focus-ring-outer),
+    var(--shadow-glow) !important;
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+@media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
+  .qs-content-panel,
+  .qs-queue-shell,
+  .qs-review-shell,
+  .qs-settings-shell {
+    max-height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  }
+
+  .qs-queue-shell {
+    height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  }
+}
