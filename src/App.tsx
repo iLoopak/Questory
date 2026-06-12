@@ -81,7 +81,6 @@ import {
   type SteamWishlistHtmlImportSummary,
 } from './utils/summaryFormatters';
 import {
-  filterGames,
   getActiveAdvancedFilterCount,
   getActiveFilterCount,
   isCollectionFiltered,
@@ -89,6 +88,7 @@ import {
   normalizeCollectionFilters,
   parseTagInput,
 } from './utils/gameFilters';
+import { filterGames, getVisibleCollectionGames } from './utils/collectionFilters';
 import { getRuntimeEnvironment } from './lib/capacitorEnvironment';
 import { I18nProvider, createTranslator, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from './i18n';
 import { loadLanguagePreference, saveLanguagePreference } from './lib/languagePreference';
@@ -468,9 +468,6 @@ function App() {
     );
   }, [games]);
 
-  const libraryGames = useMemo(() => games.filter((game) => game.collectionType === 'library'), [games]);
-  const wishlistGames = useMemo(() => games.filter((game) => game.collectionType === 'wishlist'), [games]);
-
   const platformOptions = useMemo(() => {
     return Array.from(new Set([...gamePlatforms, ...games.map((game) => game.platform)])).sort((first, second) =>
       first.localeCompare(second),
@@ -478,12 +475,12 @@ function App() {
   }, [games]);
 
   const filteredLibraryGames = useMemo(() => {
-    return filterGames(libraryGames, libraryFilters);
-  }, [libraryFilters, libraryGames]);
+    return getVisibleCollectionGames(games, libraryFilters, 'library');
+  }, [games, libraryFilters]);
 
   const filteredWishlistGames = useMemo(() => {
-    return filterGames(wishlistGames, wishlistFilters);
-  }, [wishlistFilters, wishlistGames]);
+    return getVisibleCollectionGames(games, wishlistFilters, 'wishlist');
+  }, [games, wishlistFilters]);
 
   const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
   const autoBackupSignal = useMemo(
