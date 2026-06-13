@@ -203,7 +203,8 @@ export function scanRomFiles(
 
     const normalizedTitle = normalizeRomFilename(fileName || sourcePath);
     const title = cleanupRomTitle(fileName || sourcePath);
-    if (!normalizedTitle || !title) {
+    const isTrackOnlyDescriptorCompanion = descriptorCompanionExtensions.has(extension) && isDescriptorTrackFile(fileName);
+    if ((!normalizedTitle && !isTrackOnlyDescriptorCompanion) || !title) {
       scanIssues.push({
         fileName,
         reason: 'QuestShelf could not create a readable game title from this file name.',
@@ -340,6 +341,11 @@ function groupRomEntries(entries: RomScanEntry[]): RomGroup[] {
     }
 
     const descriptorGroup = findDescriptorGroupForCompanion(entry, descriptorGroupsByFolder);
+
+    if (!descriptorGroup && !entry.normalizedTitle && isDescriptorTrackFile(entry.fileName)) {
+      continue;
+    }
+
     const group = descriptorGroup ?? getOrCreateGroup(groups, getTitleGroupKey(entry), entry);
 
     if (!group.entries.includes(entry)) {
