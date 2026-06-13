@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
+import { GameListEmptyState, GameListShell } from './GameListShell';
 import { ViewportModal } from './ViewportModal';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import {
@@ -132,9 +133,11 @@ export function RecommendationPanel({
   }, [availableTime, includeFinishedGames, includeWishlist, mood, preferredPlatform, recommendationSearchTerm, recommendFromQueueOnly, recommendNextGame, viewMode]);
 
   return (
-    <section ref={panelRef} className="qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 lg:h-[calc(100vh-74px)] lg:overflow-y-auto">
-      <CollectionToolbar
-        title={t('recommendations.title')}
+    <GameListShell
+      scrollRef={panelRef}
+      stickyChrome={
+        <CollectionToolbar
+          title={t('recommendations.title')}
         searchValue={recommendationSearchTerm}
         searchPlaceholder={t('toolbar.findTitle')}
         onSearchChange={setRecommendationSearchTerm}
@@ -181,6 +184,8 @@ export function RecommendationPanel({
           </>
         }
       />
+      }
+    >
 
       {isMoreFiltersOpen ? (
         <ViewportModal
@@ -301,14 +306,9 @@ export function RecommendationPanel({
           />
         )
       ) : (
-        <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
-          <div>
-            <h3 className="text-lg font-semibold text-white">{t('recommendations.emptyTitle')}</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{t('recommendations.emptyText')}</p>
-          </div>
-        </div>
+        <GameListEmptyState title={t('recommendations.emptyTitle')} text={t('recommendations.emptyText')} />
       )}
-    </section>
+    </GameListShell>
   );
 }
 
