@@ -283,6 +283,12 @@ img {
   min-height: min(680px, calc(100dvh - 116px));
 }
 
+.qs-settings-shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 .qs-settings-list {
   max-height: min(420px, calc(100dvh - 190px));
   overflow-y: auto;
