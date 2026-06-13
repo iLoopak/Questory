@@ -1,6 +1,6 @@
 import { Icon } from './components/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { BackToTopButton } from './components/BackToTopButton';
 import { BacklogPlatformPicker } from './components/BacklogPlatformPicker';
@@ -1606,6 +1606,8 @@ function App() {
           ) : activeNavItem === 'Home' ? (
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
+              shelfTitle={shelfIdentity.shelfTitle}
+              featuredGameId={shelfIdentity.featuredGameId}
               avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" />}
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
@@ -1626,6 +1628,9 @@ function App() {
             <CollectionPanel
               collectionType="library"
               filters={libraryFilters}
+              shelfIdentity={shelfIdentity}
+              shelfTitle={shelfIdentity.shelfTitle}
+              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               games={filteredLibraryGames}
@@ -1674,6 +1679,9 @@ function App() {
             <CollectionPanel
               collectionType="wishlist"
               filters={wishlistFilters}
+              shelfIdentity={shelfIdentity}
+              shelfTitle={shelfIdentity.shelfTitle}
+              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
               games={filteredWishlistGames}
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
@@ -1951,6 +1959,9 @@ type AddGameDialogProps = {
 type CollectionPanelProps = {
   collectionType: GameCollectionType;
   filters: CollectionFilters;
+  shelfIdentity?: ShelfIdentitySettings;
+  shelfTitle?: string;
+  shelfAvatar?: ReactNode;
   games: Game[];
   platformOptions: GamePlatform[];
   platformQueueState?: PlatformQueueState;
@@ -1991,6 +2002,9 @@ type CollectionPanelProps = {
 function CollectionPanel({
   collectionType,
   filters,
+  shelfIdentity,
+  shelfTitle = '',
+  shelfAvatar,
   games,
   platformOptions,
   platformQueueState,
@@ -2327,8 +2341,19 @@ function CollectionPanel({
     }
   }
 
+  const featuredGame = shelfIdentity?.featuredGameId ? games.find((game) => game.id === shelfIdentity.featuredGameId) : null;
+
   return (
     <section ref={collectionPanelRef} className="qs-collection-panel qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3">
+      {collectionType === 'library' && (shelfAvatar || shelfTitle || featuredGame) ? (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-mint/20 bg-ink-950/70 p-3">
+          {shelfAvatar}
+          <div className="min-w-0">
+            {shelfTitle ? <div className="text-sm font-semibold text-mint">🏆 {shelfTitle}</div> : null}
+            {featuredGame ? <button className="mt-1 text-left text-sm font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(featuredGame.id)} type="button">⭐ Featured: {featuredGame.title}</button> : null}
+          </div>
+        </div>
+      ) : null}
       <CollectionToolbar
         title={title}
         searchValue={filters.searchTerm}
@@ -3491,6 +3516,7 @@ function SettingsPanel({
                 shelfIdentity={shelfIdentity}
                 steamAvatarUrl={steamAvatarUrl}
                 steamPersonaName={steamPersonaName}
+                games={games}
                 onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange}
                 onShelfIdentityChange={onShelfIdentityChange}
                 onControllerDebugChange={onControllerDebugChange}

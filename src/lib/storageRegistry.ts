@@ -178,9 +178,9 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'default',
     key: 'questshelf.shelfIdentity.v1',
-    purpose: 'Shelf Identity avatar selection, uploaded avatar data, and optional Shelf Name.',
+    purpose: 'Shelf Identity name, avatar selection, title, featured game, and future-ready preferences.',
     scope: 'core',
-    schema: 'ShelfIdentitySettings.',
+    schema: 'ShelfIdentitySettings with shelfName, avatarSelection, customAvatarDataUrl, shelfTitle, featuredGameId, and preferences.',
   },
   {
     backup: 'never',
