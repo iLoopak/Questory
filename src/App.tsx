@@ -465,6 +465,7 @@ function App() {
       steamSettings.apiKey.trim() && steamSettings.steamId64.trim() ? 'steam-connect' : null,
       platformQueueState.activePlatforms.length > 0 ? 'platforms' : null,
       platformQueueState.entries.length > 0 || games.some((game) => game.tags.includes('queue')) ? 'queue-game' : null,
+      themePreference ? 'visual-preferences' : null,
       games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam')
         ? 'steam-import'
         : null,
@@ -475,7 +476,7 @@ function App() {
       games.some((game) => game.metadataSource === 'rawg') ? 'metadata-enriched' : null,
       games.some((game) => game.collectionType === 'wishlist') ? 'wishlist-item' : null,
     ]);
-  }, [games, platformQueueState]);
+  }, [games, platformQueueState, themePreference]);
 
   const tags = useMemo(() => {
     return Array.from(new Set(games.flatMap((game) => game.tags))).sort((first, second) =>
@@ -2771,12 +2772,23 @@ function App() {
         isOnboardingOpen ? (
           <div className="qs-setup-widget">
             <OnboardingChecklist
+              accentColorPreference={accentColorPreference}
               completedItemIds={completedOnboardingItemIds}
               skippedItemIds={skippedOnboardingItemIds}
-              onAction={handleOnboardingAction}
+              games={games}
+              onAccentColorChange={setAccentColorPreference}
               onClose={hideOnboarding}
               onComplete={markOnboardingItemComplete}
+              onImportGames={importGames}
+              onOpenLibrary={() => handleOnboardingAction('ready', 'primary')}
+              onOpenQueue={() => handleOnboardingAction('ready', 'secondary')}
+              onPlatformQueueStateChange={setPlatformQueueState}
               onSkip={skipOnboardingItem}
+              onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+              onSteamProfileNameChange={setSteamProfileName}
+              onThemePreferenceChange={setThemePreference}
+              platformQueueState={platformQueueState}
+              themePreference={themePreference}
             />
           </div>
         ) : (
@@ -4354,13 +4366,24 @@ function SettingsPanel({
               />
               {isOnboardingOpen ? (
                 <OnboardingChecklist
+                  accentColorPreference={accentColorPreference}
                   completedItemIds={completedOnboardingItemIds}
                   skippedItemIds={skippedOnboardingItemIds}
+                  games={games}
                   isSettingsPanel
-                  onAction={onOnboardingAction}
+                  onAccentColorChange={onAccentColorChange}
                   onClose={onOnboardingClose}
                   onComplete={onOnboardingComplete}
+                  onImportGames={onImportGames}
+                  onOpenLibrary={() => onOnboardingAction('ready', 'primary')}
+                  onOpenQueue={() => onOnboardingAction('ready', 'secondary')}
+                  onPlatformQueueStateChange={onPlatformQueueStateChange}
                   onSkip={onOnboardingSkip}
+                  onSteamLibraryImported={onSteamLibraryImported}
+                  onSteamProfileNameChange={onSteamProfileNameChange}
+                  onThemePreferenceChange={onThemePreferenceChange}
+                  platformQueueState={platformQueueState}
+                  themePreference={themePreference}
                 />
               ) : null}
             </div>
