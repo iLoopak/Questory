@@ -91,7 +91,7 @@ import {
   sanitizeLibraryOwnerNickname,
   saveAppPersonalizationSettings,
 } from './lib/appPersonalization';
-import { getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
+import { getComputedFeaturedGame, getComputedShelfTitle, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -225,6 +225,8 @@ function App() {
     () => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle),
     [legacyQuestShelfTitle, shelfIdentity.shelfName],
   );
+  const computedShelfTitle = useMemo(() => getComputedShelfTitle(games), [games]);
+  const computedFeaturedGame = useMemo(() => getComputedFeaturedGame(games), [games]);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
 
   function setShelfIdentity(value: ShelfIdentitySettings) {
@@ -1604,8 +1606,8 @@ function App() {
           ) : activeNavItem === 'Home' ? (
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
-              shelfTitle={shelfIdentity.shelfTitle}
-              featuredGameId={shelfIdentity.featuredGameId}
+              shelfTitle={computedShelfTitle}
+              featuredGame={computedFeaturedGame}
               avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" />}
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
@@ -1626,8 +1628,8 @@ function App() {
             <CollectionPanel
               collectionType="library"
               filters={libraryFilters}
-              shelfIdentity={shelfIdentity}
-              shelfTitle={shelfIdentity.shelfTitle}
+              featuredGame={computedFeaturedGame}
+              shelfTitle={computedShelfTitle}
               shelfName={personalizedQuestShelfTitle}
               shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               steamAchievementSyncState={steamAchievementSyncState}
@@ -1678,8 +1680,7 @@ function App() {
             <CollectionPanel
               collectionType="wishlist"
               filters={wishlistFilters}
-              shelfIdentity={shelfIdentity}
-              shelfTitle={shelfIdentity.shelfTitle}
+              shelfTitle={computedShelfTitle}
               shelfName={personalizedQuestShelfTitle}
               shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               games={filteredWishlistGames}
@@ -1959,7 +1960,7 @@ type AddGameDialogProps = {
 type CollectionPanelProps = {
   collectionType: GameCollectionType;
   filters: CollectionFilters;
-  shelfIdentity?: ShelfIdentitySettings;
+  featuredGame?: Game | null;
   shelfTitle?: string;
   shelfName?: string;
   shelfAvatar?: ReactNode;
@@ -2003,7 +2004,7 @@ type CollectionPanelProps = {
 function CollectionPanel({
   collectionType,
   filters,
-  shelfIdentity,
+  featuredGame = null,
   shelfTitle = '',
   shelfName = '',
   shelfAvatar,
@@ -2342,8 +2343,6 @@ function CollectionPanel({
       setBulkSummary({ ...summary, message: formatMessageTemplate(t('app.bulkItadSummary'), { updated: summary.updatedCount, noMatch: summary.noMatchCount, failed: summary.failedCount }) });
     }
   }
-
-  const featuredGame = shelfIdentity?.featuredGameId ? games.find((game) => game.id === shelfIdentity.featuredGameId) : null;
 
   return (
     <section ref={collectionPanelRef} className="qs-collection-panel qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3">

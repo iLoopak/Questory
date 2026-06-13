@@ -11,7 +11,7 @@ type HomePanelProps = {
   appTitle?: string;
   avatar?: ReactNode;
   shelfTitle?: string;
-  featuredGameId?: string;
+  featuredGame?: Game | null;
   games: Game[];
   ignoredReviewGameIds: Set<string>;
   queueState: PlatformQueueState;
@@ -34,7 +34,7 @@ export function HomePanel({
   appTitle = 'QuestShelf',
   avatar,
   shelfTitle = '',
-  featuredGameId = '',
+  featuredGame = null,
   games,
   ignoredReviewGameIds,
   queueState,
@@ -98,7 +98,6 @@ export function HomePanel({
       .slice(0, 5);
   }, [queueEntries]);
 
-  const featuredGame = useMemo(() => games.find((game) => game.id === featuredGameId) ?? null, [featuredGameId, games]);
   const wishlistHighlight = useMemo(() => pickWishlistHighlight(games), [games]);
 
   const recentlyAddedGames = useMemo(() => {
