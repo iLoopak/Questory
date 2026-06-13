@@ -366,10 +366,10 @@ export function SteamSettingsPanel({
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <ResultStat label="Parsed SteamID64" value={settings.steamId64 || 'Not set'} />
-            <ResultStat label="Owned games found" value={ownedGamesCount.toString()} />
-            <ResultStat label="Recently played found" value={recentlyPlayedCount.toString()} />
-            <ResultStat label="Wishlist availability" value={hasWishlistLocator ? 'Manual import ready' : 'Add profile or open generic Wishlist'} />
+            <ResultStat label={t('steam.parsedSteamId64')} value={settings.steamId64 || t('steam.notSet')} />
+            <ResultStat label={t('steam.ownedGamesFound')} value={ownedGamesCount.toString()} />
+            <ResultStat label={t('steam.recentlyPlayedFound')} value={recentlyPlayedCount.toString()} />
+            <ResultStat label={t('steam.wishlistAvailability')} value={hasWishlistLocator ? t('steam.manualImportReady') : t('steam.addProfileOrGenericWishlist')} />
           </div>
 
           {importSummary ? (
@@ -551,9 +551,9 @@ function SteamPlaytimeRefreshCard({ librarySteamGameCount, refreshState, onRefre
           ) : null}
           {refreshState.summary ? (
             <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
-              <DebugStat label="Updated" value={refreshState.summary.updatedCount.toString()} />
-              <DebugStat label="Unchanged" value={refreshState.summary.unchangedCount.toString()} />
-              <DebugStat label="Failed" value={refreshState.summary.failedCount.toString()} />
+              <DebugStat label={t('app.updated')} value={refreshState.summary.updatedCount.toString()} />
+              <DebugStat label={t('app.unchanged')} value={refreshState.summary.unchangedCount.toString()} />
+              <DebugStat label={t('app.failed')} value={refreshState.summary.failedCount.toString()} />
             </div>
           ) : null}
         </div>
@@ -581,10 +581,10 @@ function SteamApiDebugSummary({ entries, latestEntry, steamId64 }: SteamApiDebug
         </span>
       </div>
       <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
-        <DebugField label="Current SteamID64" value={steamId64 || 'Not set'} />
-        <DebugField label="Last HTTP status" value={latestEntry?.httpStatus?.toString() ?? 'n/a'} />
-        <DebugField label="Parsed game count" value={parsedGameCount === null || parsedGameCount === undefined ? 'n/a' : parsedGameCount.toString()} />
-        <DebugField label="Debug responses" value={entries.length.toString()} />
+        <DebugField label={t('steam.currentSteamId64')} value={steamId64 || t('steam.notSet')} />
+        <DebugField label={t('steam.lastHttpStatus')} value={latestEntry?.httpStatus?.toString() ?? 'n/a'} />
+        <DebugField label={t('steam.parsedGameCount')} value={parsedGameCount === null || parsedGameCount === undefined ? 'n/a' : parsedGameCount.toString()} />
+        <DebugField label={t('steam.debugResponses')} value={entries.length.toString()} />
       </div>
       {latestEntry ? (
         <div className="mt-3 min-w-0 rounded border border-white/10 bg-black/20 px-2 py-2 text-xs leading-5 text-slate-400">

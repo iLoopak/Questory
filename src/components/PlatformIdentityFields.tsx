@@ -46,7 +46,7 @@ export function PlatformIdentityFields({
         <div className="flex flex-wrap items-center gap-2">
           <input className="h-9 w-12 rounded border border-white/10 bg-transparent" type="color" value={accentColor} onChange={(event) => onAccentColorChange(event.target.value)} />
           {platformAccentPalette.map((color) => (
-            <button key={color} aria-label={`Use ${color}`} className="h-7 w-7 rounded-full border border-white/20" style={{ backgroundColor: color }} onClick={() => onAccentColorChange(color)} type="button" />
+            <button key={color} aria-label={t('settings.useColor').replace('{color}', color)} className="h-7 w-7 rounded-full border border-white/20" style={{ backgroundColor: color }} onClick={() => onAccentColorChange(color)} type="button" />
           ))}
         </div>
       </label>
@@ -70,7 +70,7 @@ export function PlatformIdentityFields({
       <label className="grid gap-1">
         <span className="text-xs font-semibold text-slate-400">{t('settings.platformTag')}</span>
         <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="handheld, pc, retro..." value={platformTag} onChange={(event) => onPlatformTagChange(event.target.value)} />
-        <span className="text-xs text-slate-500">Games added to this backlog inherit this existing custom tag. History is preserved by each game’s own tag list.</span>
+        <span className="text-xs text-slate-500">{t('settings.platformTagHelp')}</span>
       </label>
     </div>
   );

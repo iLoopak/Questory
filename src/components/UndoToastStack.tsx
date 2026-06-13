@@ -5,6 +5,7 @@ import {
   type ToastAction,
   type ToastCategory,
 } from '../lib/notifications';
+import { useI18n } from '../i18n';
 import type { PendingUndoAction } from '../lib/undoHistoryStorage';
 
 type UndoToastStackProps = {
@@ -17,6 +18,7 @@ type UndoToastStackProps = {
 };
 
 export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onUndo, onViewGame }: UndoToastStackProps) {
+  const { t } = useI18n();
   const [expandedDetailIds, setExpandedDetailIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
 
   return (
     <aside
-      aria-label="QuestShelf notifications"
+      aria-label={t('app.questShelfNotifications')}
       aria-live="polite"
       className="qs-toast-stack pointer-events-none fixed top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1300] grid justify-items-stretch gap-2 overflow-visible sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))] sm:justify-items-end"
       role="status"
@@ -113,7 +115,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
                   onClick={() => toggleToastDetails(action.id)}
                   type="button"
                 >
-                  {isDetailsExpanded ? 'Hide details' : 'Show details'}
+                  {isDetailsExpanded ? t('app.hideDetails') : t('app.showDetails')}
                 </button>
                 {isDetailsExpanded ? (
                   <div className="qs-toast-details mt-2 max-h-32 overflow-y-auto rounded-xl border border-white/10 bg-black/15 p-2 text-xs leading-5 text-slate-100">
@@ -130,7 +132,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
                   onClick={() => runToastAction(action.id, toastAction)}
                   type="button"
                 >
-                  {toastAction.label}
+                  {getLocalizedToastActionLabel(toastAction.label, t)}
                 </button>
               ))}
             </div>
@@ -173,4 +175,29 @@ function getToastButtonClass(kind: ToastAction['kind']) {
   }
 
   return `${baseClass} border border-skyglass/20 bg-white/5 text-slate-100 hover:border-mint/40 hover:bg-mint/10 hover:text-white`;
+}
+
+
+function getLocalizedToastActionLabel(label: ToastAction['label'], t: ReturnType<typeof useI18n>['t']) {
+  if (label === 'Dismiss') {
+    return t('app.dismiss');
+  }
+
+  if (label === 'Open Platforms') {
+    return t('app.openPlatforms');
+  }
+
+  if (label === 'Open Steam settings') {
+    return t('app.openSteamSettings');
+  }
+
+  if (label === 'Undo') {
+    return t('app.undo');
+  }
+
+  if (label === 'View Game') {
+    return t('app.viewGame');
+  }
+
+  return label;
 }

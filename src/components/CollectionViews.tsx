@@ -1,7 +1,7 @@
 import { Icon } from './Icon';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
-import { useI18n } from '../i18n';
+import { translateOption, useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
@@ -619,14 +619,14 @@ const ShelfGameCard = memo(function ShelfGameCard({
           queueState={platformQueueState}
         />
         {game.status === 'Playing' || game.status === 'Paused' ? (
-          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={game.status} />
+          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
         ) : null}
 
       </span>
 
       <span className="mt-3 block min-h-[3rem]">
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
-        <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{game.status}</span>
+        <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{translateOption(game.status, t)}</span>
 
       </span>
 
@@ -764,7 +764,7 @@ const CompactGameRow = memo(function CompactGameRow({
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <PlatformBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
-            <span>{game.status}</span>
+            <span>{translateOption(game.status, t)}</span>
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
 
           </span>
@@ -772,9 +772,9 @@ const CompactGameRow = memo(function CompactGameRow({
       </button>
 
       {!isMultiSelectMode ? (
-        <div className="flex flex-wrap gap-1.5 sm:justify-end" aria-label={`${game.title} quick actions`}>
+        <div className="flex flex-wrap gap-1.5 sm:justify-end" aria-label={t('app.quickActionsForGame').replace('{game}', game.title)}>
           {onAddToQueue ? <RowAction label={t('queue.platforms')} onClick={() => onAddToQueue(game)} /> : null}
-          <RowAction label="Details" onClick={openDetails} primary />
+          <RowAction label={t('action.details')} onClick={openDetails} primary />
           <GameActionMenu
             game={game}
             includeDetails={includeDetailsAction}
