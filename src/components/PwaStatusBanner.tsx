@@ -77,7 +77,7 @@ export function PwaStatusBanner({ appTitle = 'QuestShelf' }: { appTitle?: string
 
   if (!isOnline) {
     return (
-      <div className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+      <div className="hidden rounded-md border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-xs font-semibold text-amber-100 sm:block">
         {t('pwa.offline')}
       </div>
     );
@@ -88,17 +88,19 @@ export function PwaStatusBanner({ appTitle = 'QuestShelf' }: { appTitle?: string
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-      <span>{t('pwa.installHint').replace('{appTitle}', appTitle)}</span>
-      <div className="flex gap-2">
-        <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint" onClick={installApp} type="button">
-          Install {appTitle}
-        </button>
-        <button className="h-8 rounded-md border border-white/10 px-3 text-sm text-slate-300" onClick={dismissInstallHint} type="button">
-          Not now
-        </button>
-      </div>
-    </div>
+    <button
+      aria-label={t('pwa.installHint').replace('{appTitle}', appTitle)}
+      className="h-8 shrink-0 rounded-md border border-mint/30 bg-mint/10 px-2 text-xs font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow sm:px-3"
+      onClick={installApp}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        dismissInstallHint();
+      }}
+      title={`Install ${appTitle}`}
+      type="button"
+    >
+      Install
+    </button>
   );
 }
 

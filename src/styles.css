@@ -2529,3 +2529,26 @@ body.qs-controller-active .qs-compact-card:focus-within {
     scroll-snap-align: start;
   }
 }
+
+.qs-library-sticky-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  background: linear-gradient(180deg, rgb(var(--ink-950-rgb) / 0.98), rgb(var(--ink-950-rgb) / 0.9) 82%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.qs-library-sticky-chrome .qs-collection-toolbar {
+  margin-bottom: 0;
+}
+
+.qs-collection-toolbar-search input,
+.qs-collection-toolbar-select select {
+  margin-top: 0;
+}
+
+@media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
+  .qs-library-sticky-chrome {
+    padding-top: 0.125rem;
+  }
+}

@@ -134,7 +134,7 @@ export function CollectionToolbar({
       <div className="qs-collection-toolbar-row">
         {hasSearch ? (
           <label className="qs-collection-toolbar-search min-w-0">
-            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{t('toolbar.search')}</span>
+            <span className="sr-only">{t('toolbar.search')}</span>
             <input
               className="mt-1 h-9 w-full min-w-0 rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
               onChange={(event) => setLocalSearchValue(event.target.value)}
@@ -147,7 +147,7 @@ export function CollectionToolbar({
 
         {selects.map((select) => (
           <label key={select.label} className="qs-collection-toolbar-select min-w-0">
-            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{select.label}</span>
+            <span className="sr-only">{select.label}</span>
             <select
               aria-label={select.label}
               className="mt-1 h-9 w-full min-w-0 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none transition focus:border-mint"
