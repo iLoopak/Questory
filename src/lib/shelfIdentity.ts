@@ -1,5 +1,6 @@
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 import type { Game } from '../types/game';
+import { getLegacyComputedShelfTitle, isQuestShelfAchievementId, type QuestShelfAchievementId } from './questShelfAchievements';
 
 export const shelfIdentityStorageKey = 'questshelf.shelfIdentity.v1';
 export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon.png';
@@ -14,6 +15,7 @@ export type ShelfIdentitySettings = {
   shelfAvatar: ShelfAvatarSelection;
   customAvatarDataUrl: string;
   shelfName: string;
+  selectedActiveBadgeId: QuestShelfAchievementId | '';
 };
 
 export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: string; gradient: string }> = [
@@ -32,6 +34,7 @@ const emptyIdentity: ShelfIdentitySettings = {
   shelfAvatar: 'app-icon',
   customAvatarDataUrl: '',
   shelfName: '',
+  selectedActiveBadgeId: '',
 };
 
 export function loadShelfIdentitySettings(): ShelfIdentitySettings {
@@ -52,6 +55,7 @@ export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySet
     shelfAvatar: avatarSelection,
     customAvatarDataUrl,
     shelfName: sanitizeShelfName(parsed.shelfName),
+    selectedActiveBadgeId: isQuestShelfAchievementId(parsed.selectedActiveBadgeId) ? parsed.selectedActiveBadgeId : '',
   };
 }
 
@@ -77,26 +81,9 @@ export function normalizeAvatarSelection(value: unknown): ShelfAvatarSelection {
 
 
 export function getComputedShelfTitle(games: Game[]) {
-  const libraryGames = games.filter((game) => game.collectionType === 'library');
-
-  if (libraryGames.some((game) => game.platform === 'Steam' || game.externalSource === 'steam' || typeof game.steamAppId === 'number')) {
-    return 'Steam Veteran';
-  }
-
-  if (libraryGames.some((game) => game.status === 'Finished')) {
-    return 'Completionist';
-  }
-
-  if (libraryGames.length >= 25) {
-    return 'Collector';
-  }
-
-  if (libraryGames.some((game) => isRetroPlatform(game.platform))) {
-    return 'Retro Explorer';
-  }
-
-  return '';
+  return getLegacyComputedShelfTitle(games);
 }
+
 
 export function getComputedFeaturedGame(games: Game[]) {
   const libraryGames = games.filter((game) => game.collectionType === 'library');
@@ -116,9 +103,6 @@ function getFeaturedGameScore(game: Game) {
     + (game.steamAchievementsPercent ?? 0);
 }
 
-function isRetroPlatform(platform: Game['platform']) {
-  return ['PSP', 'PS2', 'PS1', 'PS Vita', 'Game Boy', 'Game Boy Color', 'Game Boy Advance', 'NES', 'SNES', 'Nintendo 64', 'Nintendo DS', 'Wii', 'Wii U', 'GameCube', 'Sega Genesis / Mega Drive', 'Master System', 'Game Gear', 'PC Engine', 'GBA'].includes(String(platform));
-}
 
 export function getResolvedShelfName(shelfName: string, legacyTitle: string) {
   return sanitizeShelfName(shelfName) || legacyTitle;

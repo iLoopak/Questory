@@ -4,6 +4,7 @@ import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionVie
 import { CollectionToolbar } from './CollectionToolbar';
 import { GameListEmptyState, GameListShell } from './GameListShell';
 import { ViewportModal } from './ViewportModal';
+import type { ReactNode } from 'react';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import {
   availableTimeOptions,
@@ -20,6 +21,9 @@ import { gamePlatforms } from '../types/game';
 type RecommendationPanelProps = {
   games: Game[];
   queueState: PlatformQueueState;
+  shelfTitle?: string;
+  shelfName?: string;
+  shelfAvatar?: ReactNode;
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
@@ -39,6 +43,9 @@ const recommendationViewModes: readonly RecommendationViewMode[] = ['Grid View',
 export function RecommendationPanel({
   games,
   queueState,
+  shelfTitle = '',
+  shelfName = '',
+  shelfAvatar,
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
@@ -136,6 +143,13 @@ export function RecommendationPanel({
     <GameListShell
       scrollRef={panelRef}
       stickyChrome={
+        <>
+          {(shelfAvatar || shelfTitle || shelfName) ? (
+            <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
+              {shelfAvatar}
+              <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || t('recommendations.title')}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> 🏆 {shelfTitle}</span> : null}</div>
+            </div>
+          ) : null}
         <CollectionToolbar
           title={t('recommendations.title')}
         searchValue={recommendationSearchTerm}
@@ -184,6 +198,7 @@ export function RecommendationPanel({
           </>
         }
       />
+        </>
       }
     >
 

@@ -180,7 +180,7 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     key: 'questshelf.shelfIdentity.v1',
     purpose: 'Shelf Identity personalization fields for shelf name and avatar selection.',
     scope: 'core',
-    schema: 'ShelfIdentitySettings with shelfName, shelfAvatar, avatarSelection, and customAvatarDataUrl only; badge/title and featured game are computed from library data.',
+    schema: 'ShelfIdentitySettings with shelfName, shelfAvatar, avatarSelection, customAvatarDataUrl, and selectedActiveBadgeId only; unlocked badges and featured game are computed from library and queue data.',
   },
   {
     backup: 'never',
