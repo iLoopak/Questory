@@ -7,6 +7,7 @@ import {
 import { maxLibraryOwnerNicknameLength } from "../../lib/appPersonalization";
 import { ShelfAvatar, ShelfIdentityEditor } from "../ShelfIdentity";
 import type { ShelfIdentitySettings } from "../../lib/shelfIdentity";
+import type { Game } from "../../types/game";
 import { getRuntimeEnvironment } from "../../lib/capacitorEnvironment";
 import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPreferences";
 import {
@@ -35,6 +36,7 @@ export function AppearanceSettingsPanel({
   shelfIdentity,
   steamAvatarUrl,
   steamPersonaName,
+  games,
   onLibraryOwnerNicknameChange,
   onShelfIdentityChange,
   onControllerDebugChange,
@@ -61,6 +63,7 @@ export function AppearanceSettingsPanel({
   shelfIdentity: ShelfIdentitySettings;
   steamAvatarUrl: string;
   steamPersonaName: string;
+  games: Game[];
   onLibraryOwnerNicknameChange: (nickname: string) => void;
   onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
   onControllerDebugChange: (isEnabled: boolean) => void;
@@ -218,9 +221,9 @@ export function AppearanceSettingsPanel({
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <div className="mb-3">
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Identity</div>
-          <p className="mt-1 text-xs text-slate-500">Choose the avatar and Shelf Name shown across QuestShelf.</p>
+          <p className="mt-1 text-xs text-slate-500">Choose the Shelf Name, avatar, title, and Featured Game shown across QuestShelf.</p>
         </div>
-        <ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={personalizedQuestShelfTitle} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} />
+        <ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={personalizedQuestShelfTitle} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} games={games} />
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">

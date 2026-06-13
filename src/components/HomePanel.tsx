@@ -10,6 +10,8 @@ import { PlatformBadge } from './PlatformBadge';
 type HomePanelProps = {
   appTitle?: string;
   avatar?: ReactNode;
+  shelfTitle?: string;
+  featuredGameId?: string;
   games: Game[];
   ignoredReviewGameIds: Set<string>;
   queueState: PlatformQueueState;
@@ -31,6 +33,8 @@ const focusSelector = '[data-home-focus="true"]';
 export function HomePanel({
   appTitle = 'QuestShelf',
   avatar,
+  shelfTitle = '',
+  featuredGameId = '',
   games,
   ignoredReviewGameIds,
   queueState,
@@ -94,6 +98,7 @@ export function HomePanel({
       .slice(0, 5);
   }, [queueEntries]);
 
+  const featuredGame = useMemo(() => games.find((game) => game.id === featuredGameId) ?? null, [featuredGameId, games]);
   const wishlistHighlight = useMemo(() => pickWishlistHighlight(games), [games]);
 
   const recentlyAddedGames = useMemo(() => {
@@ -210,7 +215,8 @@ export function HomePanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">{t('home.kicker')}</div>
-              <div className="mt-1 flex items-center gap-3">{avatar}<h2 className="text-2xl font-semibold text-white sm:text-3xl">{appTitle}</h2></div>
+              <div className="mt-1 flex items-center gap-3">{avatar}<div><h2 className="text-2xl font-semibold text-white sm:text-3xl">{appTitle}</h2>{shelfTitle ? <div className="mt-1 text-sm font-semibold text-mint">🏆 {shelfTitle}</div> : null}</div></div>
+              {featuredGame ? <button className="mt-3 rounded-full border border-mint/30 bg-mint/10 px-3 py-1.5 text-sm font-semibold text-mint transition hover:bg-mint/20" data-home-focus="true" onClick={() => onOpenDetails(featuredGame)} type="button">⭐ Featured: {featuredGame.title}</button> : null}
               <p className="mt-2 max-w-2xl text-sm text-slate-400">{t('home.subtitle')}</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">

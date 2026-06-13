@@ -4,27 +4,42 @@ export const shelfIdentityStorageKey = 'questshelf.shelfIdentity.v1';
 export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon.png';
 export const maxShelfNameLength = 48;
 export const maxCustomAvatarDataUrlLength = 700_000;
+export const maxShelfTitleLength = 32;
 
-export type BuiltInAvatarId = 'achievement-hunter' | 'retro' | 'rpg' | 'sci-fi' | 'fantasy' | 'collector' | 'backlog-slayer';
+export type BuiltInAvatarId = 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer';
 export type ShelfAvatarSelection = 'app-icon' | 'steam' | `built-in:${BuiltInAvatarId}` | 'custom';
 
 export type ShelfIdentitySettings = {
   avatarSelection: ShelfAvatarSelection;
   customAvatarDataUrl: string;
+  featuredGameId: string;
+  preferences: {
+    accentMood: string;
+  };
   shelfName: string;
+  shelfTitle: string;
 };
 
 export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: string; gradient: string }> = [
   { id: 'achievement-hunter', label: 'Achievement Hunter', glyph: '🏆', gradient: 'from-amber-300 to-mint' },
-  { id: 'retro', label: 'Retro', glyph: '👾', gradient: 'from-fuchsia-400 to-cyan-300' },
-  { id: 'rpg', label: 'RPG', glyph: '⚔️', gradient: 'from-red-400 to-amber-300' },
-  { id: 'sci-fi', label: 'Sci-Fi', glyph: '🚀', gradient: 'from-sky-300 to-violet-400' },
-  { id: 'fantasy', label: 'Fantasy', glyph: '🐉', gradient: 'from-emerald-300 to-purple-400' },
+  { id: 'retro-explorer', label: 'Retro Explorer', glyph: '👾', gradient: 'from-fuchsia-400 to-cyan-300' },
+  { id: 'rpg-adventurer', label: 'RPG Adventurer', glyph: '⚔️', gradient: 'from-red-400 to-amber-300' },
+  { id: 'sci-fi-pilot', label: 'Sci-Fi Pilot', glyph: '🚀', gradient: 'from-sky-300 to-violet-400' },
+  { id: 'fantasy-hero', label: 'Fantasy Hero', glyph: '🐉', gradient: 'from-emerald-300 to-purple-400' },
   { id: 'collector', label: 'Collector', glyph: '💎', gradient: 'from-blue-300 to-mint' },
   { id: 'backlog-slayer', label: 'Backlog Slayer', glyph: '☠️', gradient: 'from-mint to-lime-300' },
 ];
 
-const emptyIdentity: ShelfIdentitySettings = { avatarSelection: 'app-icon', customAvatarDataUrl: '', shelfName: '' };
+export const shelfTitleOptions = ['Retro Explorer', 'Steam Veteran', 'Achievement Hunter', 'RPG Sage', 'Completionist', 'Indie Discoverer', 'Backlog Slayer'] as const;
+
+const emptyIdentity: ShelfIdentitySettings = {
+  avatarSelection: 'app-icon',
+  customAvatarDataUrl: '',
+  featuredGameId: '',
+  preferences: { accentMood: '' },
+  shelfName: '',
+  shelfTitle: '',
+};
 
 export function loadShelfIdentitySettings(): ShelfIdentitySettings {
   return loadLocalJson(shelfIdentityStorageKey, emptyIdentity, normalizeShelfIdentitySettings);
@@ -39,11 +54,31 @@ export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySet
   const customAvatarDataUrl = sanitizeAvatarDataUrl(parsed.customAvatarDataUrl);
   let avatarSelection = normalizeAvatarSelection(parsed.avatarSelection);
   if (avatarSelection === 'custom' && !customAvatarDataUrl) avatarSelection = 'app-icon';
-  return { avatarSelection, customAvatarDataUrl, shelfName: sanitizeShelfName(parsed.shelfName) };
+  return {
+    avatarSelection,
+    customAvatarDataUrl,
+    featuredGameId: sanitizeFeaturedGameId(parsed.featuredGameId),
+    preferences: normalizeShelfPreferences(parsed.preferences),
+    shelfName: sanitizeShelfName(parsed.shelfName),
+    shelfTitle: sanitizeShelfTitle(parsed.shelfTitle),
+  };
 }
 
 export function sanitizeShelfName(value: unknown) {
   return typeof value === 'string' ? value.trim().slice(0, maxShelfNameLength) : '';
+}
+
+export function sanitizeShelfTitle(value: unknown) {
+  return typeof value === 'string' ? value.trim().slice(0, maxShelfTitleLength) : '';
+}
+
+export function sanitizeFeaturedGameId(value: unknown) {
+  return typeof value === 'string' ? value.trim().slice(0, 128) : '';
+}
+
+function normalizeShelfPreferences(value: unknown): ShelfIdentitySettings['preferences'] {
+  const parsed = value && typeof value === 'object' ? (value as Partial<ShelfIdentitySettings['preferences']>) : {};
+  return { accentMood: typeof parsed.accentMood === 'string' ? parsed.accentMood.trim().slice(0, 32) : '' };
 }
 
 export function sanitizeAvatarDataUrl(value: unknown) {
@@ -54,7 +89,9 @@ export function sanitizeAvatarDataUrl(value: unknown) {
 export function normalizeAvatarSelection(value: unknown): ShelfAvatarSelection {
   if (value === 'app-icon' || value === 'steam' || value === 'custom') return value;
   if (typeof value === 'string' && value.startsWith('built-in:')) {
-    const id = value.slice('built-in:'.length) as BuiltInAvatarId;
+    const legacyAvatarIds: Record<string, BuiltInAvatarId> = { retro: 'retro-explorer', rpg: 'rpg-adventurer', 'sci-fi': 'sci-fi-pilot', fantasy: 'fantasy-hero' };
+    const rawId = value.slice('built-in:'.length);
+    const id = (legacyAvatarIds[rawId] ?? rawId) as BuiltInAvatarId;
     if (builtInAvatars.some((avatar) => avatar.id === id)) return `built-in:${id}`;
   }
   return 'app-icon';
