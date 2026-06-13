@@ -1,6 +1,6 @@
 import { Icon } from './components/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { ArtworkAuditPanel } from './components/ArtworkAuditPanel';
 import { BackToTopButton } from './components/BackToTopButton';
 import { BacklogPlatformPicker } from './components/BacklogPlatformPicker';
@@ -31,26 +31,20 @@ import { QueuePlatformsSettingsPanel } from './components/settings/PlatformsSett
 import { SteamWishlistHtmlImportModal, SteamWishlistSyncNotice, WishlistSettingsPanel } from './components/settings/WishlistSettingsPanel';
 import {
   getNavDescription,
-  getVisibleNavItems,
-  isNavigationItemVisible,
-  isTopNavItem,
   navItemLabelKeys,
   type NavItem,
   type TopNavItem,
 } from './config/navigation';
-import { getSettingsCategoryMeta, settingsCategories, settingsCategoryStorageKey, type SettingsCategory } from './config/settings';
+import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } from './config/settings';
 import {
   achievementFilterOptions,
   allOption,
-  collectionViewModeStorageKey,
   collectionViewModes,
   enrichmentFilterOptions,
   initialCollectionFilters,
-  libraryFiltersStorageKey,
   librarySortOptions,
   quickFilterOptions,
   sourceFilterOptions,
-  wishlistFiltersStorageKey,
   type AchievementFilter,
   type CollectionFilters,
   type CollectionViewMode,
@@ -82,8 +76,6 @@ import {
   getActiveAdvancedFilterCount,
   getActiveFilterCount,
   isCollectionFiltered,
-  isOption,
-  normalizeCollectionFilters,
   parseTagInput,
 } from './utils/gameFilters';
 import { filterGames, getVisibleCollectionGames } from './utils/collectionFilters';
@@ -97,11 +89,6 @@ import {
   sanitizeLibraryOwnerNickname,
   saveAppPersonalizationSettings,
 } from './lib/appPersonalization';
-import {
-  loadNavigationVisibilityPreferences,
-  saveNavigationVisibilityPreferences,
-  type NavigationVisibilityPreferences,
-} from './lib/navigationVisibilityPreferences';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -149,11 +136,8 @@ import {
   getOpenQueueAction,
   getOpenSteamSettingsAction,
   getRemoveQueueToastMessage,
-  getToastDedupeKey,
   getUndoAction,
   getViewGameAction,
-  mergeToastNotifications,
-  type NotificationDraft,
 } from './lib/notifications';
 import {
   loadReviewModeState,
@@ -163,32 +147,14 @@ import {
   type ReviewSource,
 } from './lib/reviewModeStorage';
 import {
-  applyAccentColorPreference,
-  applyAppTemplatePreference,
-  applyThemePreference,
-  getAccentColorThemeVariables,
   getAppTemplateClassName,
-  loadAccentColorPreference,
-  loadAppTemplatePreference,
-  loadSecondaryAccentColorPreference,
-  loadThemePreference,
-  normalizeThemePreferenceForTemplate,
-  saveAccentColorPreference,
-  saveAppTemplatePreference,
-  saveSecondaryAccentColorPreference,
-  saveThemePreference,
-  watchSystemTheme,
   type AccentColorPreference,
   type AppTemplatePreference,
   type ResolvedTheme,
   type ThemePreference,
 } from './lib/themePreferences';
+import type { NavigationVisibilityPreferences } from './lib/navigationVisibilityPreferences';
 import {
-  createUndoActionId,
-  loadPendingUndoActions,
-  savePendingUndoActions,
-  undoActionTimeoutMs,
-  type PendingUndoAction,
   type UndoActionHistoryEntry,
 } from './lib/undoHistoryStorage';
 import {
@@ -204,6 +170,11 @@ import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriori
 import { gamePlatforms, gameStatuses, wishlistPriorities } from './types/game';
 import type { RawgMetadata } from './types/rawg';
 import type { SteamAchievementSyncState, SteamAchievementSyncSummary, SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from './types/steam';
+import { useAppAppearance } from './hooks/useAppAppearance';
+import { useAppNavigation } from './hooks/useAppNavigation';
+import { useCollectionUiState, useCollectionViewMode } from './hooks/useCollectionUiState';
+import { useGameSelection } from './hooks/useGameSelection';
+import { useQuestShelfNotifications } from './hooks/useQuestShelfNotifications';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
@@ -247,48 +218,29 @@ function App() {
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [libraryFilters, setLibraryFilters] = useState<CollectionFilters>(() =>
-    loadCollectionFilters(libraryFiltersStorageKey),
-  );
-  const [wishlistFilters, setWishlistFilters] = useState<CollectionFilters>(() =>
-    loadCollectionFilters(wishlistFiltersStorageKey),
-  );
-  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
-  const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
+  const { libraryFilters, setLibraryFilters, setWishlistFilters, wishlistFilters } = useCollectionUiState();
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
-  const [appTemplatePreference, setAppTemplatePreferenceState] = useState<AppTemplatePreference>(() => loadAppTemplatePreference());
-  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
-    normalizeThemePreferenceForTemplate(loadThemePreference(), appTemplatePreference),
-  );
-  const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
-  const [secondaryAccentColorPreference, setSecondaryAccentColorPreference] = useState<AccentColorPreference>(() => loadSecondaryAccentColorPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
   const [libraryOwnerNickname, setLibraryOwnerNicknameState] = useState(() => loadAppPersonalizationSettings().libraryOwnerNickname);
   const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(loadSteamSettings()));
-  const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
-    loadNavigationVisibilityPreferences(),
-  );
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    applyThemePreference(themePreference, appTemplatePreference),
-  );
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
+  const {
+    accentColorPreference,
+    accentThemeStyle,
+    appTemplatePreference,
+    resolvedTheme,
+    secondaryAccentColorPreference,
+    setAccentColorPreference,
+    setAppTemplatePreference,
+    setSecondaryAccentColorPreference,
+    setThemePreference,
+    themePreference,
+  } = useAppAppearance();
   const personalizedQuestShelfTitle = useMemo(
     () => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName),
     [libraryOwnerNickname, steamProfileName],
   );
-  const accentThemeStyle = useMemo(
-    () => getAccentColorThemeVariables(accentColorPreference, secondaryAccentColorPreference) as CSSProperties,
-    [accentColorPreference, secondaryAccentColorPreference],
-  );
-  function setThemePreference(preference: ThemePreference) {
-    setThemePreferenceState(normalizeThemePreferenceForTemplate(preference, appTemplatePreference));
-  }
-
-  function setAppTemplatePreference(preference: AppTemplatePreference) {
-    setAppTemplatePreferenceState(preference);
-    setThemePreferenceState((currentThemePreference) => normalizeThemePreferenceForTemplate(currentThemePreference, preference));
-  }
 
   useEffect(() => {
     document.title = personalizedQuestShelfTitle;
@@ -301,8 +253,7 @@ function App() {
   }
 
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  const [isAddGameOpen, setIsAddGameOpen] = useState(false);
+  const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
@@ -329,11 +280,30 @@ function App() {
   const [itadDealSyncState, setItadDealSyncState] = useState<ItadDealSyncState>(initialItadDealSyncState);
   const [isHltbSyncing, setIsHltbSyncing] = useState(false);
   const [refreshingMetadataGameIds, setRefreshingMetadataGameIds] = useState<Set<string>>(new Set());
-  const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
-  const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
   const isAppMountedRef = useRef(true);
   const t = useMemo(() => createTranslator(language), [language]);
-  const visibleNavItems = useMemo(() => getVisibleNavItems(navigationVisibility), [navigationVisibility]);
+  const {
+    activeNavItem,
+    activeSettingsCategory,
+    navigationVisibility,
+    setActiveNavItem,
+    setActiveSettingsCategory,
+    setNavigationVisibility,
+    visibleNavItems,
+  } = useAppNavigation({ onSectionChange: () => setSelectedGameId(null) });
+  const { addToastNotification, addUndoAction, createUndoSnapshot, dismissUndoAction, pendingUndoActions, undoAction } = useQuestShelfNotifications({
+    activeNavItem,
+    games,
+    ignoredSteamGames,
+    platformQueueState,
+    reviewModeState,
+    selectedGameId,
+    setGames,
+    setIgnoredSteamGames,
+    setPlatformQueueState,
+    setReviewModeState,
+    setSelectedGameId,
+  });
 
   useEffect(() => {
     isAppMountedRef.current = true;
@@ -367,75 +337,12 @@ function App() {
   }, [onboardingState]);
 
   useEffect(() => {
-    saveNavigationVisibilityPreferences(navigationVisibility);
-  }, [navigationVisibility]);
-
-  useEffect(() => {
     saveReviewModeState(reviewModeState);
   }, [reviewModeState]);
 
   useEffect(() => {
     savePlatformQueueState(platformQueueState);
   }, [platformQueueState]);
-
-  useEffect(() => {
-    const normalizedThemePreference = normalizeThemePreferenceForTemplate(themePreference, appTemplatePreference);
-
-    if (normalizedThemePreference !== themePreference) {
-      setThemePreferenceState(normalizedThemePreference);
-    }
-
-    setResolvedTheme(applyThemePreference(normalizedThemePreference, appTemplatePreference));
-    saveThemePreference(normalizedThemePreference);
-
-    if (normalizedThemePreference !== 'system') {
-      return undefined;
-    }
-
-    return watchSystemTheme(() => {
-      setResolvedTheme(applyThemePreference('system', appTemplatePreference));
-    });
-  }, [appTemplatePreference, themePreference]);
-
-
-  useEffect(() => {
-    applyAppTemplatePreference(appTemplatePreference);
-    saveAppTemplatePreference(appTemplatePreference);
-  }, [appTemplatePreference]);
-
-  useEffect(() => {
-    applyAccentColorPreference(accentColorPreference, secondaryAccentColorPreference);
-    saveAccentColorPreference(accentColorPreference);
-    saveSecondaryAccentColorPreference(secondaryAccentColorPreference);
-  }, [accentColorPreference, secondaryAccentColorPreference]);
-
-  useEffect(() => {
-    pendingUndoActionsRef.current = pendingUndoActions;
-    savePendingUndoActions(pendingUndoActions);
-  }, [pendingUndoActions]);
-
-  useEffect(() => {
-    if (pendingUndoActions.length === 0) {
-      return;
-    }
-
-    const now = Date.now();
-    const nextExpiry = Math.max(0, Math.min(...pendingUndoActions.map((action) => action.expiresAt)) - now);
-    const expiryTimer = window.setTimeout(() => {
-      const currentTime = Date.now();
-      setPendingUndoActions((currentActions) => currentActions.filter((action) => action.expiresAt > currentTime));
-    }, nextExpiry + 50);
-
-    return () => window.clearTimeout(expiryTimer);
-  }, [pendingUndoActions]);
-
-  useEffect(() => {
-    saveCollectionFilters(libraryFiltersStorageKey, libraryFilters);
-  }, [libraryFilters]);
-
-  useEffect(() => {
-    saveCollectionFilters(wishlistFiltersStorageKey, wishlistFilters);
-  }, [wishlistFilters]);
 
   useEffect(() => {
     const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
@@ -498,7 +405,6 @@ function App() {
     return getVisibleCollectionGames(games, wishlistFilters, 'wishlist');
   }, [games, wishlistFilters]);
 
-  const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) : null;
   const autoBackupSignal = useMemo(
     () =>
       JSON.stringify({
@@ -560,10 +466,6 @@ function App() {
   }, [isLandscapeLockEnabled]);
 
   useEffect(() => {
-    saveSettingsCategory(activeSettingsCategory);
-  }, [activeSettingsCategory]);
-
-  useEffect(() => {
     function handleControllerNavigation(event: KeyboardEvent) {
       const target = event.target;
       if (
@@ -605,15 +507,6 @@ function App() {
 
     return () => window.removeEventListener('keydown', handleControllerNavigation);
   }, [visibleNavItems]);
-
-  useEffect(() => {
-    if (!isTopNavItem(activeNavItem) || isNavigationItemVisible(activeNavItem, navigationVisibility)) {
-      return;
-    }
-
-    setActiveNavItem('Library');
-    setSelectedGameId(null);
-  }, [activeNavItem, navigationVisibility]);
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
@@ -707,100 +600,6 @@ function App() {
           [itemId]: new Date().toISOString(),
         },
       };
-    });
-  }
-
-  function createUndoSnapshot() {
-    return {
-      games,
-      ignoredSteamGames,
-      platformQueueState,
-      reviewModeState,
-      selectedGameId,
-    };
-  }
-
-  function addUndoAction(
-    message: string,
-    historyEntry: Omit<UndoActionHistoryEntry, 'createdAt'>,
-    snapshot = createUndoSnapshot(),
-    notification: Partial<NotificationDraft> = {},
-  ) {
-    const createdAt = Date.now();
-    const action: PendingUndoAction = {
-      actions: notification.actions ?? [getUndoAction()],
-      category: notification.category ?? 'success',
-      createdAt,
-      dedupeKey: notification.dedupeKey ?? (activeNavItem === 'Review Mode' ? 'quest-queue-action' : getToastDedupeKey(historyEntry.actionType, historyEntry.affectedGameIds)),
-      details: notification.details,
-      expiresAt: createdAt + undoActionTimeoutMs,
-      historyEntry: {
-        ...historyEntry,
-        createdAt: new Date(createdAt).toISOString(),
-      },
-      id: createUndoActionId(),
-      message: notification.message ?? message,
-      snapshot,
-    };
-
-    setPendingUndoActions((currentActions) => {
-      const scopedActions = activeNavItem === 'Review Mode' ? currentActions.filter((currentAction) => currentAction.dedupeKey !== 'quest-queue-action') : currentActions;
-      const nextActions = mergeToastNotifications(scopedActions, action);
-      pendingUndoActionsRef.current = nextActions;
-      return nextActions;
-    });
-  }
-
-  function addToastNotification(notification: NotificationDraft) {
-    const createdAt = Date.now();
-    const action: PendingUndoAction = {
-      actions: notification.actions ?? [getDismissAction()],
-      category: notification.category,
-      createdAt,
-      dedupeKey: notification.dedupeKey,
-      details: notification.details,
-      expiresAt: createdAt + undoActionTimeoutMs,
-      historyEntry: {
-        actionType: 'notification',
-        affectedGameIds: [],
-        description: notification.message,
-        createdAt: new Date(createdAt).toISOString(),
-      },
-      id: createUndoActionId(),
-      message: notification.message,
-      snapshot: createUndoSnapshot(),
-    };
-
-    setPendingUndoActions((currentActions) => {
-      const nextActions = mergeToastNotifications(currentActions, action);
-      pendingUndoActionsRef.current = nextActions;
-      return nextActions;
-    });
-  }
-
-  function undoAction(actionId: string) {
-    const action = pendingUndoActionsRef.current.find((currentAction) => currentAction.id === actionId);
-    if (!action) {
-      return;
-    }
-
-    setGames(action.snapshot.games);
-    setIgnoredSteamGames(action.snapshot.ignoredSteamGames);
-    setPlatformQueueState(action.snapshot.platformQueueState);
-    setReviewModeState(action.snapshot.reviewModeState);
-    setSelectedGameId(action.snapshot.selectedGameId);
-    setPendingUndoActions((currentActions) => {
-      const nextActions = currentActions.filter((currentAction) => currentAction.id !== actionId);
-      pendingUndoActionsRef.current = nextActions;
-      return nextActions;
-    });
-  }
-
-  function dismissUndoAction(actionId: string) {
-    setPendingUndoActions((currentActions) => {
-      const nextActions = currentActions.filter((currentAction) => currentAction.id !== actionId);
-      pendingUndoActionsRef.current = nextActions;
-      return nextActions;
     });
   }
 
@@ -2891,10 +2690,9 @@ function CollectionPanel({
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
-  const [viewMode, setViewMode] = useState<CollectionViewMode>(() => loadCollectionViewMode(collectionType));
+  const { setViewMode, viewMode } = useCollectionViewMode(collectionType);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
-  const activeViewModeCollectionRef = useRef(collectionType);
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -2943,15 +2741,6 @@ function CollectionPanel({
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
-
-  useEffect(() => {
-    saveCollectionViewMode(activeViewModeCollectionRef.current, viewMode);
-  }, [viewMode]);
-
-  useEffect(() => {
-    activeViewModeCollectionRef.current = collectionType;
-    setViewMode(loadCollectionViewMode(collectionType));
-  }, [collectionType]);
 
   useEffect(() => {
     collectionPanelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
@@ -4799,92 +4588,6 @@ function shouldReplaceSteamWishlistPlaceholderTitle(existingGame: Game, syncedGa
 
 function isPlaceholderSteamWishlistTitle(title: string, appid: number) {
   return title.trim().toLowerCase() === `steam app ${appid}`.toLowerCase();
-}
-
-function loadCollectionFilters(storageKey: string): CollectionFilters {
-  if (typeof window === 'undefined') {
-    return initialCollectionFilters;
-  }
-
-  try {
-    const storedFilters = window.localStorage.getItem(storageKey);
-
-    if (!storedFilters) {
-      return initialCollectionFilters;
-    }
-
-    return normalizeCollectionFilters(JSON.parse(storedFilters));
-  } catch {
-    return initialCollectionFilters;
-  }
-}
-
-function saveCollectionFilters(storageKey: string, filters: CollectionFilters) {
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(filters));
-  } catch {
-    // Filter persistence is nice to have; the library itself still works without it.
-  }
-}
-
-function getCollectionViewModeKey(collectionType: GameCollectionType) {
-  return `${collectionViewModeStorageKey}.${collectionType}`;
-}
-
-function loadCollectionViewMode(collectionType: GameCollectionType): CollectionViewMode {
-  if (typeof window === 'undefined') {
-    return 'Grid View';
-  }
-
-  try {
-    const storedViewMode = window.localStorage.getItem(getCollectionViewModeKey(collectionType));
-
-    return isCollectionViewMode(storedViewMode) ? storedViewMode : 'Grid View';
-  } catch {
-    return 'Grid View';
-  }
-}
-
-function saveCollectionViewMode(collectionType: GameCollectionType, viewMode: CollectionViewMode) {
-  try {
-    window.localStorage.setItem(getCollectionViewModeKey(collectionType), viewMode);
-  } catch {
-    // View mode persistence is optional; browsing still works without it.
-  }
-}
-
-function isCollectionViewMode(value: unknown): value is CollectionViewMode {
-  return collectionViewModes.some((viewMode) => viewMode === value);
-}
-
-function loadSettingsCategory(): SettingsCategory {
-  if (typeof window === 'undefined') {
-    return 'Integrations';
-  }
-
-  try {
-    const storedCategory = window.localStorage.getItem(settingsCategoryStorageKey);
-
-    if (storedCategory === 'Data') {
-      return 'Data & Backup';
-    }
-
-    if (storedCategory === 'Queue Platforms') {
-      return 'Platforms';
-    }
-
-    return isOption(storedCategory, settingsCategories) ? storedCategory : 'Integrations';
-  } catch {
-    return 'Integrations';
-  }
-}
-
-function saveSettingsCategory(category: SettingsCategory) {
-  try {
-    window.localStorage.setItem(settingsCategoryStorageKey, category);
-  } catch {
-    // Settings navigation should stay usable even when preference persistence is unavailable.
-  }
 }
 
 function createManualGameId(title: string, existingGameIds: Set<string>) {
