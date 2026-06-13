@@ -6,6 +6,7 @@ import { BackToTopButton } from './components/BackToTopButton';
 import { BacklogPlatformPicker } from './components/BacklogPlatformPicker';
 import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
+import { GameListEmptyState, GameListShell } from './components/GameListShell';
 import { CollectionToolbar } from './components/CollectionToolbar';
 import { ViewportModal } from './components/ViewportModal';
 import { UndoToastStack } from './components/UndoToastStack';
@@ -2345,17 +2346,19 @@ function CollectionPanel({
   }
 
   return (
-    <section ref={collectionPanelRef} className="qs-collection-panel qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3">
-      <div className="qs-library-sticky-chrome -mx-2 mb-2 px-2 pt-1 sm:-mx-3 sm:px-3">
-        {collectionType === 'library' && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
+    <GameListShell
+      scrollRef={collectionPanelRef}
+      stickyChrome={
+        <>
+          {collectionType === 'library' && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
           <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
             {shelfAvatar}
             <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || title}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> 🏆 {shelfTitle}</span> : null}</div>
             {featuredGame ? <button className="h-7 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 hover:bg-mint/10 hover:text-mint" onClick={() => onOpenDetails(featuredGame.id)} type="button">Featured</button> : null}
           </div>
         ) : null}
-        <CollectionToolbar
-        title={title}
+          <CollectionToolbar
+            title={title}
         searchValue={filters.searchTerm}
         searchPlaceholder={t('toolbar.findTitle')}
         onSearchChange={(value) => onFiltersChange({ searchTerm: value })}
@@ -2476,7 +2479,9 @@ function CollectionPanel({
           </>
         }
         />
-      </div>
+        </>
+      }
+    >
 
       {collectionType === 'library' && steamAchievementSyncState && steamAchievementSyncState.status === 'loading' ? (
         <SteamAchievementSyncNotice syncState={steamAchievementSyncState} />
@@ -2767,15 +2772,10 @@ function CollectionPanel({
           />
         )
       ) : (
-        <div className="grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
-          <div>
-            <h3 className="text-lg font-semibold text-white">{emptyTitle}</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{emptyText}</p>
-          </div>
-        </div>
+        <GameListEmptyState title={emptyTitle} text={emptyText} />
       )}
 
-    </section>
+    </GameListShell>
   );
 }
 

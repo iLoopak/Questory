@@ -2385,6 +2385,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 /* Large-library scrolling: keep Library on one native scroll container and avoid 100vh WebView traps. */
+.qs-game-list-shell,
 .qs-collection-panel {
   height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
   overflow-y: auto;
@@ -2400,6 +2401,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 @media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
+  .qs-game-list-shell,
   .qs-collection-panel {
     height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
   }
@@ -2530,6 +2532,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
   }
 }
 
+.qs-game-list-sticky-chrome,
 .qs-library-sticky-chrome {
   position: sticky;
   top: 0;
@@ -2538,6 +2541,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
   backdrop-filter: blur(16px);
 }
 
+.qs-game-list-sticky-chrome .qs-collection-toolbar,
 .qs-library-sticky-chrome .qs-collection-toolbar {
   margin-bottom: 0;
 }
@@ -2548,6 +2552,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 @media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
+  .qs-game-list-sticky-chrome,
   .qs-library-sticky-chrome {
     padding-top: 0.125rem;
   }
