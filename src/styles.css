@@ -2536,9 +2536,41 @@ body.qs-controller-active .qs-compact-card:focus-within {
 .qs-library-sticky-chrome {
   position: sticky;
   top: 0;
-  z-index: 35;
-  background: linear-gradient(180deg, rgb(var(--ink-950-rgb) / 0.98), rgb(var(--ink-950-rgb) / 0.9) 82%, transparent);
+  z-index: 60;
+  isolation: isolate;
+  background: linear-gradient(180deg, rgb(var(--ink-950-rgb) / 1), rgb(var(--ink-950-rgb) / 0.98));
+  background-clip: padding-box;
   backdrop-filter: blur(16px);
+}
+
+.qs-game-list-sticky-chrome::before,
+.qs-library-sticky-chrome::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgb(var(--ink-950-rgb));
+  pointer-events: none;
+}
+
+.qs-game-list-sticky-chrome::after,
+.qs-library-sticky-chrome::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  z-index: -1;
+  height: 2px;
+  background: rgb(var(--ink-950-rgb));
+  pointer-events: none;
+}
+
+.qs-game-list-sticky-chrome > *,
+.qs-library-sticky-chrome > * {
+  position: relative;
+  z-index: 1;
 }
 
 .qs-game-list-sticky-chrome .qs-collection-toolbar,
