@@ -20,7 +20,7 @@ import { IsThereAnyDealSettingsPanel } from './components/IsThereAnyDealSettings
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
 import { RetroImportPanel } from './components/RetroImportPanel';
-import { ReviewModePanel, type ReviewModeAction } from './components/ReviewModePanel';
+import { ReviewModePanel } from './components/ReviewModePanel';
 import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { AboutSettingsPanel } from './components/settings/AboutSettingsPanel';
@@ -130,8 +130,6 @@ import {
 } from './lib/notifications';
 import {
   loadReviewModeState,
-  saveReviewModeState,
-  type ReviewDecision,
   type ReviewModeState,
   type ReviewSource,
 } from './lib/reviewModeStorage';
@@ -165,6 +163,7 @@ import { useQuestShelfNotifications } from './hooks/useQuestShelfNotifications';
 import { useQueueActions } from './hooks/useQueueActions';
 import { useGameLibraryActions } from './hooks/useGameLibraryActions';
 import { useMetadataArtworkActions, type MetadataSelectionRequest } from './hooks/useMetadataArtworkActions';
+import { useReviewModeActions } from './hooks/useReviewModeActions';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
@@ -352,10 +351,6 @@ function App() {
   useEffect(() => {
     saveOnboardingState(onboardingState);
   }, [onboardingState]);
-
-  useEffect(() => {
-    saveReviewModeState(reviewModeState);
-  }, [reviewModeState]);
 
   useEffect(() => {
     savePlatformQueueState(platformQueueState);
@@ -1431,145 +1426,8 @@ function App() {
     return summary;
   }
 
-  function startReviewMode(source: ReviewSource) {
-    setActiveReviewSource(source);
-    setReviewModeState((currentState) => ({
-      ...currentState,
-      lastSource: source,
-    }));
-    setSelectedGameId(null);
-    setActiveNavItem('Review Mode');
-  }
-
-  function setReviewSource(source: ReviewSource) {
-    setActiveReviewSource(source);
-    setReviewModeState((currentState) => ({
-      ...currentState,
-      lastSource: source,
-    }));
-  }
-
-  function recordReviewDecision(decision: ReviewDecision) {
-    setReviewModeState((currentState) => ({
-      ...currentState,
-      stats: {
-        ...currentState.stats,
-        [decision]: currentState.stats[decision] + 1,
-      },
-    }));
-  }
-
   function openBacklogPicker(game: Game) {
     setBacklogPickerGame(game);
-  }
-
-  function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
-    if (action === 'skip') {
-      addToastNotification({
-        actions: [getDismissAction(), getViewGameAction(game.id)],
-        category: 'info',
-        dedupeKey: `review-skip:${game.id}`,
-        message: formatGameToastMessage(t('toast.skipped'), game),
-      });
-      recordReviewDecision('skipped');
-      return;
-    }
-
-    if (action === 'open-details') {
-      setSelectedGameId(game.id);
-      setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-      return;
-    }
-
-    if (action === 'enrich') {
-      recordReviewDecision('enriched');
-      startMetadataWorkflow([game.id]);
-      return;
-    }
-
-    if (action === 'find-artwork') {
-      openArtworkAudit();
-      return;
-    }
-
-    if (action === 'wishlist') {
-      addToWishlist(game);
-      recordReviewDecision('wishlisted');
-      recordReviewDecision('reviewed');
-      return;
-    }
-
-    if (action === 'ignore') {
-      addUndoAction(formatGameToastMessage(t('toast.ignored'), game), {
-        actionType: 'ignore-game',
-        affectedGameIds: [game.id],
-        description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
-      });
-
-      setReviewModeState((currentState) => ({
-        ...currentState,
-        ignoredGameIds: Array.from(new Set([...currentState.ignoredGameIds, game.id])),
-      }));
-
-      if (typeof game.steamAppId === 'number') {
-        setIgnoredSteamGames((currentIgnoredGames) => addIgnoredSteamGame(currentIgnoredGames, game.steamAppId as number, game.title));
-      }
-
-      recordReviewDecision('ignored');
-      recordReviewDecision('reviewed');
-      return;
-    }
-
-    if (action === 'note' && note) {
-      updateGameReviewFields(game.id, {
-        notes: appendReviewNote(game.notes, note),
-      });
-      recordReviewDecision('reviewed');
-      return;
-    }
-
-    if (action === 'queue') {
-      if (targetPlatform) {
-        addGameToQueue(game, targetPlatform);
-      }
-      recordReviewDecision('queueCandidates');
-      recordReviewDecision('reviewed');
-      return;
-    }
-
-    if (action === 'playing') {
-      updateGameReviewFields(game.id, {
-        status: 'Playing',
-      });
-      recordReviewDecision('playing');
-      recordReviewDecision('reviewed');
-      return;
-    }
-
-    if (action === 'finished') {
-      updateGameReviewFields(game.id, {
-        finishedAt: new Date().toISOString(),
-        status: 'Finished',
-      });
-      recordReviewDecision('reviewed');
-      return;
-    }
-
-    if (action === 'dropped') {
-      updateGameReviewFields(game.id, {
-        droppedAt: new Date().toISOString(),
-        status: 'Dropped',
-      });
-      recordReviewDecision('dropped');
-      recordReviewDecision('reviewed');
-    }
-  }
-
-  function restoreReviewIgnoredGames() {
-    setReviewModeState((currentState) => ({
-      ...currentState,
-      ignoredGameIds: [],
-    }));
   }
 
   const {
@@ -1593,6 +1451,24 @@ function App() {
     setGames,
     setPlatformQueueState,
     t,
+  });
+
+
+  const { handleReviewAction, restoreReviewIgnoredGames, setReviewSource, startReviewMode } = useReviewModeActions({
+    addGameToQueue,
+    addToastNotification,
+    addToWishlist,
+    addUndoAction,
+    openArtworkAudit,
+    reviewModeState,
+    setActiveNavItem,
+    setActiveReviewSource,
+    setIgnoredSteamGames,
+    setReviewModeState,
+    setSelectedGameId,
+    startMetadataWorkflow,
+    t,
+    updateGameReviewFields,
   });
 
   function openQueueFromToast() {
@@ -3833,12 +3709,6 @@ function getRetroDuplicateKey(game: Game) {
   return `fallback:${game.platform}:${game.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}:${extension}`;
 }
 
-function appendReviewNote(existingNotes: string, note: string) {
-  const timestamp = new Date().toISOString().slice(0, 10);
-  const reviewNote = `[Quest Queue ${timestamp}] ${note}`;
-
-  return existingNotes.trim() ? `${existingNotes.trim()}\n\n${reviewNote}` : reviewNote;
-}
 
 type FilterSelectProps = {
   label: string;
