@@ -1581,12 +1581,9 @@ function App() {
             ))}
           </nav>
 
+          <PwaStatusBanner appTitle={personalizedQuestShelfTitle} />
           <BackToTopButton />
         </header>
-
-        <div className="pt-2">
-          <PwaStatusBanner appTitle={personalizedQuestShelfTitle} />
-        </div>
 
         <section className="flex-1 py-2">
           {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
@@ -1631,7 +1628,8 @@ function App() {
               filters={libraryFilters}
               shelfIdentity={shelfIdentity}
               shelfTitle={shelfIdentity.shelfTitle}
-              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
+              shelfName={personalizedQuestShelfTitle}
+              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               games={filteredLibraryGames}
@@ -1682,7 +1680,8 @@ function App() {
               filters={wishlistFilters}
               shelfIdentity={shelfIdentity}
               shelfTitle={shelfIdentity.shelfTitle}
-              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
+              shelfName={personalizedQuestShelfTitle}
+              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               games={filteredWishlistGames}
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
@@ -1962,6 +1961,7 @@ type CollectionPanelProps = {
   filters: CollectionFilters;
   shelfIdentity?: ShelfIdentitySettings;
   shelfTitle?: string;
+  shelfName?: string;
   shelfAvatar?: ReactNode;
   games: Game[];
   platformOptions: GamePlatform[];
@@ -2005,6 +2005,7 @@ function CollectionPanel({
   filters,
   shelfIdentity,
   shelfTitle = '',
+  shelfName = '',
   shelfAvatar,
   games,
   platformOptions,
@@ -2346,16 +2347,15 @@ function CollectionPanel({
 
   return (
     <section ref={collectionPanelRef} className="qs-collection-panel qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3">
-      {collectionType === 'library' && (shelfAvatar || shelfTitle || featuredGame) ? (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-mint/20 bg-ink-950/70 p-3">
-          {shelfAvatar}
-          <div className="min-w-0">
-            {shelfTitle ? <div className="text-sm font-semibold text-mint">🏆 {shelfTitle}</div> : null}
-            {featuredGame ? <button className="mt-1 text-left text-sm font-semibold text-white hover:text-mint" onClick={() => onOpenDetails(featuredGame.id)} type="button">⭐ Featured: {featuredGame.title}</button> : null}
+      <div className="qs-library-sticky-chrome -mx-2 mb-2 px-2 pt-1 sm:-mx-3 sm:px-3">
+        {collectionType === 'library' && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
+          <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
+            {shelfAvatar}
+            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || title}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> 🏆 {shelfTitle}</span> : null}</div>
+            {featuredGame ? <button className="h-7 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 hover:bg-mint/10 hover:text-mint" onClick={() => onOpenDetails(featuredGame.id)} type="button">Featured</button> : null}
           </div>
-        </div>
-      ) : null}
-      <CollectionToolbar
+        ) : null}
+        <CollectionToolbar
         title={title}
         searchValue={filters.searchTerm}
         searchPlaceholder={t('toolbar.findTitle')}
@@ -2476,7 +2476,8 @@ function CollectionPanel({
             </button>
           </>
         }
-      />
+        />
+      </div>
 
       {collectionType === 'library' && steamAchievementSyncState && steamAchievementSyncState.status === 'loading' ? (
         <SteamAchievementSyncNotice syncState={steamAchievementSyncState} />
@@ -2625,13 +2626,6 @@ function CollectionPanel({
         </ViewportModal>
       ) : null}
 
-      {games.length > 0 ? (
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-skyglass/10 bg-ink-950/50 px-3 py-2 text-xs text-slate-500">
-          <span>
-            Virtualized {games.length} {games.length === 1 ? 'game' : 'games'} for this view
-          </span>
-        </div>
-      ) : null}
 
       {isMultiSelectMode ? (
         <div className="mb-2 rounded-md border border-mint/20 bg-ink-950/80 p-2 shadow-glow">
