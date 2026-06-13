@@ -2,7 +2,9 @@ import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.onboarding.v1';
 
-export const onboardingItemIds = [
+export const onboardingItemIds = ['steam-connect', 'platforms', 'queue-game', 'retro-import', 'ready'] as const;
+
+const legacyOnboardingItemIds = [
   'manual-game',
   'steam-api-key',
   'steam-id64',
@@ -14,18 +16,22 @@ export const onboardingItemIds = [
   'backup-exported',
 ] as const;
 
-export type OnboardingItemId = (typeof onboardingItemIds)[number];
+export const allOnboardingItemIds = [...onboardingItemIds, ...legacyOnboardingItemIds] as const;
+
+export type OnboardingItemId = (typeof allOnboardingItemIds)[number];
 
 export type OnboardingState = {
   completedAt: Partial<Record<OnboardingItemId, string>>;
   hasSeenChecklist: boolean;
   skipped: boolean;
+  skippedAt: Partial<Record<OnboardingItemId, string>>;
 };
 
 const emptyOnboardingState: OnboardingState = {
   completedAt: {},
   hasSeenChecklist: false,
   skipped: false,
+  skippedAt: {},
 };
 
 export function loadOnboardingState(): OnboardingState {
@@ -42,18 +48,27 @@ export function normalizeOnboardingState(value: unknown): OnboardingState {
     parsedState.completedAt && typeof parsedState.completedAt === 'object'
       ? parsedState.completedAt
       : {};
+  const skippedAt =
+    parsedState.skippedAt && typeof parsedState.skippedAt === 'object'
+      ? parsedState.skippedAt
+      : {};
 
   return {
-    completedAt: onboardingItemIds.reduce<OnboardingState['completedAt']>((normalizedItems, itemId) => {
-      const completedValue = completedAt[itemId];
-
-      if (typeof completedValue === 'string') {
-        normalizedItems[itemId] = completedValue;
-      }
-
-      return normalizedItems;
-    }, {}),
+    completedAt: normalizeOnboardingTimestamps(completedAt),
     hasSeenChecklist: Boolean(parsedState.hasSeenChecklist),
     skipped: Boolean(parsedState.skipped),
+    skippedAt: normalizeOnboardingTimestamps(skippedAt),
   };
+}
+
+function normalizeOnboardingTimestamps(value: Partial<Record<OnboardingItemId, string>>) {
+  return allOnboardingItemIds.reduce<OnboardingState['completedAt']>((normalizedItems, itemId) => {
+    const itemValue = value[itemId];
+
+    if (typeof itemValue === 'string') {
+      normalizedItems[itemId] = itemValue;
+    }
+
+    return normalizedItems;
+  }, {});
 }

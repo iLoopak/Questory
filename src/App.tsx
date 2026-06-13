@@ -311,7 +311,10 @@ function App() {
   const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
     const initialState = loadOnboardingState();
-    return !initialState.hasSeenChecklist && !initialState.skipped;
+    const hasExistingLibrary = loadGames().some((game) => !isMockGame(game));
+    const steamSettings = loadSteamSettings();
+    const hasExistingSettings = Boolean(steamSettings.apiKey.trim() || steamSettings.steamId64.trim());
+    return !initialState.hasSeenChecklist && !initialState.skipped && !hasExistingLibrary && !hasExistingSettings;
   });
   const [metadataSelectionRequest, setMetadataSelectionRequest] = useState<MetadataSelectionRequest | null>(null);
   const [steamWishlistSyncState, setSteamWishlistSyncState] = useState<SteamWishlistSyncState>(
@@ -459,14 +462,20 @@ function App() {
         : null,
       steamSettings.apiKey.trim() ? 'steam-api-key' : null,
       steamSettings.steamId64.trim() ? 'steam-id64' : null,
+      steamSettings.apiKey.trim() && steamSettings.steamId64.trim() ? 'steam-connect' : null,
+      platformQueueState.activePlatforms.length > 0 ? 'platforms' : null,
+      platformQueueState.entries.length > 0 || games.some((game) => game.tags.includes('queue')) ? 'queue-game' : null,
       games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam')
         ? 'steam-import'
+        : null,
+      games.some((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom')
+        ? 'retro-import'
         : null,
       rawgSettings.apiKey.trim() ? 'rawg-api-key' : null,
       games.some((game) => game.metadataSource === 'rawg') ? 'metadata-enriched' : null,
       games.some((game) => game.collectionType === 'wishlist') ? 'wishlist-item' : null,
     ]);
-  }, [games]);
+  }, [games, platformQueueState]);
 
   const tags = useMemo(() => {
     return Array.from(new Set(games.flatMap((game) => game.tags))).sort((first, second) =>
@@ -508,7 +517,13 @@ function App() {
   const completedOnboardingItemIds = useMemo(() => {
     return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId])));
   }, [onboardingState.completedAt]);
-  const isOnboardingComplete = completedOnboardingItemIds.size === onboardingItemIds.length;
+  const skippedOnboardingItemIds = useMemo(() => {
+    return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.skippedAt[itemId])));
+  }, [onboardingState.skippedAt]);
+  const finishedOnboardingItemIds = useMemo(() => {
+    return new Set(onboardingItemIds.filter((itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId)));
+  }, [completedOnboardingItemIds, skippedOnboardingItemIds]);
+  const isOnboardingComplete = finishedOnboardingItemIds.size === onboardingItemIds.length;
   const reviewIgnoredGameIds = useMemo(() => new Set(reviewModeState.ignoredGameIds), [reviewModeState.ignoredGameIds]);
   const queueSummary = useMemo(() => getQueueSummary(platformQueueState, games), [games, platformQueueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, platformQueueState), [games, platformQueueState]);
@@ -625,7 +640,16 @@ function App() {
         }
       });
 
-      return changed ? { ...currentState, completedAt: nextCompletedAt } : currentState;
+      if (!changed) {
+        return currentState;
+      }
+
+      const nextSkippedAt = { ...currentState.skippedAt };
+      nextItemIds.forEach((itemId) => {
+        delete nextSkippedAt[itemId];
+      });
+
+      return { ...currentState, completedAt: nextCompletedAt, skippedAt: nextSkippedAt };
     });
   }
 
@@ -638,6 +662,28 @@ function App() {
     setIsOnboardingOpen(true);
   }
 
+
+  function restartOnboarding() {
+    updateOnboardingState((currentState) => {
+      const nextCompletedAt = { ...currentState.completedAt };
+      const nextSkippedAt = { ...currentState.skippedAt };
+
+      onboardingItemIds.forEach((itemId) => {
+        delete nextCompletedAt[itemId];
+        delete nextSkippedAt[itemId];
+      });
+
+      return {
+        ...currentState,
+        completedAt: nextCompletedAt,
+        hasSeenChecklist: true,
+        skipped: false,
+        skippedAt: nextSkippedAt,
+      };
+    });
+    setIsOnboardingOpen(true);
+  }
+
   function hideOnboarding() {
     updateOnboardingState((currentState) => ({
       ...currentState,
@@ -646,13 +692,21 @@ function App() {
     setIsOnboardingOpen(false);
   }
 
-  function skipOnboarding() {
-    updateOnboardingState((currentState) => ({
-      ...currentState,
-      hasSeenChecklist: true,
-      skipped: true,
-    }));
-    setIsOnboardingOpen(false);
+  function skipOnboardingItem(itemId: OnboardingItemId) {
+    updateOnboardingState((currentState) => {
+      if (currentState.completedAt[itemId] || currentState.skippedAt[itemId]) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        hasSeenChecklist: true,
+        skippedAt: {
+          ...currentState.skippedAt,
+          [itemId]: new Date().toISOString(),
+        },
+      };
+    });
   }
 
   function createUndoSnapshot() {
@@ -749,11 +803,18 @@ function App() {
     });
   }
 
-  function handleOnboardingAction(itemId: OnboardingItemId) {
-    if (itemId === 'manual-game' || itemId === 'wishlist-item') {
+  function handleOnboardingAction(itemId: OnboardingItemId, action: 'primary' | 'secondary' = 'primary') {
+    if (itemId === 'queue-game' || itemId === 'manual-game' || itemId === 'wishlist-item') {
       setActiveNavItem(itemId === 'wishlist-item' ? 'Wishlist' : 'Library');
       setSelectedGameId(null);
       setIsAddGameOpen(true);
+      return;
+    }
+
+    if (itemId === 'ready') {
+      setActiveNavItem(action === 'secondary' ? 'Queue' : 'Library');
+      setSelectedGameId(null);
+      setIsOnboardingOpen(false);
       return;
     }
 
@@ -765,6 +826,17 @@ function App() {
 
     setActiveNavItem('Settings');
     setSelectedGameId(null);
+
+    if (itemId === 'platforms') {
+      setActiveSettingsCategory('Platforms');
+      return;
+    }
+
+    if (itemId === 'retro-import') {
+      setActiveSettingsCategory('Retro');
+      return;
+    }
+
     if (itemId === 'backup-exported') {
       setActiveSettingsCategory('Data & Backup');
       return;
@@ -886,6 +958,9 @@ function App() {
 
   function handleRetroImportGames(importedGames: Game[]) {
     const createdGames = importGames(importedGames);
+    if (createdGames.length > 0) {
+      markOnboardingItemComplete('retro-import');
+    }
     setLastRetroImportGameIds(createdGames.map((game) => game.id));
     return createdGames;
   }
@@ -1927,6 +2002,7 @@ function App() {
 
   function addQueuePlatform(platform: GamePlatform) {
     setPlatformQueueState((currentState) => addActiveQueuePlatform(currentState, platform));
+    markOnboardingItemComplete('platforms');
   }
 
   function openBacklogPicker(game: Game) {
@@ -1955,6 +2031,7 @@ function App() {
     }
 
     setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
+    markOnboardingItemComplete('queue-game');
   }
 
   function playQueueGameNow(gameId: string, platform: GamePlatform) {
@@ -2583,6 +2660,7 @@ function App() {
               activeCategory={activeSettingsCategory}
               autoBackupSignal={autoBackupSignal}
               completedOnboardingItemIds={completedOnboardingItemIds}
+              skippedOnboardingItemIds={skippedOnboardingItemIds}
               demoGameCount={games.filter(isMockGame).length}
               games={games}
               ignoredSteamGames={ignoredSteamGames}
@@ -2621,7 +2699,10 @@ function App() {
               onLoadDemoData={loadDemoData}
               onOnboardingAction={handleOnboardingAction}
               onOnboardingClose={hideOnboarding}
+              onOnboardingComplete={markOnboardingItemComplete}
+              onOnboardingSkip={skipOnboardingItem}
               onOpenOnboarding={openOnboarding}
+              onRestartOnboarding={restartOnboarding}
               onPlatformQueueStateChange={setPlatformQueueState}
               onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
               onRemoveDemoGames={removeDemoGames}
@@ -2666,7 +2747,7 @@ function App() {
           onClose={() => setIsAddGameOpen(false)}
           onSave={(game) => {
             addManualGame(game);
-            markOnboardingItemComplete(game.collectionType === 'wishlist' ? 'wishlist-item' : 'manual-game');
+            markOnboardingItemsComplete([game.collectionType === 'wishlist' ? 'wishlist-item' : 'manual-game', 'queue-game']);
             setIsAddGameOpen(false);
             setSelectedGameId(game.id);
             setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
@@ -2691,19 +2772,17 @@ function App() {
           <div className="qs-setup-widget">
             <OnboardingChecklist
               completedItemIds={completedOnboardingItemIds}
+              skippedItemIds={skippedOnboardingItemIds}
               onAction={handleOnboardingAction}
               onClose={hideOnboarding}
-              onConnectionTested={() => markOnboardingItemComplete('steam-test')}
-              onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
-              onSkip={skipOnboarding}
-              onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
-              onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
+              onComplete={markOnboardingItemComplete}
+              onSkip={skipOnboardingItem}
             />
           </div>
         ) : (
-          <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: completedOnboardingItemIds.size, total: onboardingItemIds.length })}>
+          <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
             <Icon name="settings" />
-            <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: completedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
+            <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
           </button>
         )
       ) : null}
@@ -3956,6 +4035,7 @@ type SettingsPanelProps = {
   activeCategory: SettingsCategory;
   autoBackupSignal: string;
   completedOnboardingItemIds: Set<OnboardingItemId>;
+  skippedOnboardingItemIds: Set<OnboardingItemId>;
   demoGameCount: number;
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
@@ -3992,9 +4072,12 @@ type SettingsPanelProps = {
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
   onLoadDemoData: () => void;
-  onOnboardingAction: (itemId: OnboardingItemId) => void;
+  onOnboardingAction: (itemId: OnboardingItemId, action?: 'primary' | 'secondary') => void;
   onOnboardingClose: () => void;
+  onOnboardingComplete: (itemId: OnboardingItemId) => void;
+  onOnboardingSkip: (itemId: OnboardingItemId) => void;
   onOpenOnboarding: () => void;
+  onRestartOnboarding: () => void;
   onPlatformQueueStateChange: (state: PlatformQueueState) => void;
   onRawgApiKeyConfigured: () => void;
   onRemoveDemoGames: () => void;
@@ -4019,6 +4102,7 @@ function SettingsPanel({
   activeCategory,
   autoBackupSignal,
   completedOnboardingItemIds,
+  skippedOnboardingItemIds,
   demoGameCount,
   games,
   ignoredSteamGames,
@@ -4057,7 +4141,10 @@ function SettingsPanel({
   onLoadDemoData,
   onOnboardingAction,
   onOnboardingClose,
+  onOnboardingComplete,
+  onOnboardingSkip,
   onOpenOnboarding,
+  onRestartOnboarding,
   onPlatformQueueStateChange,
   onRawgApiKeyConfigured,
   onRemoveDemoGames,
@@ -4082,6 +4169,9 @@ function SettingsPanel({
   const steamWishlistImportButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeCategoryMeta = getSettingsCategoryMeta(activeCategory);
   const t = useMemo(() => createTranslator(language), [language]);
+  const onboardingFinishedCount = onboardingItemIds.filter(
+    (itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId),
+  ).length;
 
   function selectCategory(category: SettingsCategory) {
     onCategoryChange(category);
@@ -4257,20 +4347,20 @@ function SettingsPanel({
             <div className="space-y-4">
               <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} />
               <OnboardingSettingsPanel
-                completedCount={completedOnboardingItemIds.size}
+                completedCount={onboardingFinishedCount}
                 isComplete={isOnboardingComplete}
                 onOpenOnboarding={onOpenOnboarding}
+                onRestartOnboarding={onRestartOnboarding}
               />
               {isOnboardingOpen ? (
                 <OnboardingChecklist
                   completedItemIds={completedOnboardingItemIds}
+                  skippedItemIds={skippedOnboardingItemIds}
                   isSettingsPanel
                   onAction={onOnboardingAction}
                   onClose={onOnboardingClose}
-                  onConnectionTested={onConnectionTested}
-                  onRawgApiKeyConfigured={onRawgApiKeyConfigured}
-                  onSteamApiKeyConfigured={onSteamApiKeyConfigured}
-                  onSteamIdConfigured={onSteamIdConfigured}
+                  onComplete={onOnboardingComplete}
+                  onSkip={onOnboardingSkip}
                 />
               ) : null}
             </div>
@@ -4401,10 +4491,12 @@ function OnboardingSettingsPanel({
   completedCount,
   isComplete,
   onOpenOnboarding,
+  onRestartOnboarding,
 }: {
   completedCount: number;
   isComplete: boolean;
   onOpenOnboarding: () => void;
+  onRestartOnboarding: () => void;
 }) {
   const { t } = useI18n();
 
@@ -4415,13 +4507,22 @@ function OnboardingSettingsPanel({
           <h2 className="text-xl font-semibold text-white">{isComplete ? t('settings.setupComplete') : t('settings.setupAssistant')}</h2>
         </div>
 
-        <button
-          className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
-          onClick={onOpenOnboarding}
-          type="button"
-        >
-          {t('settings.reopenSetup')}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+            onClick={onOpenOnboarding}
+            type="button"
+          >
+            {t('settings.reopenSetup')}
+          </button>
+          <button
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={onRestartOnboarding}
+            type="button"
+          >
+            Restart setup
+          </button>
+        </div>
       </div>
     </section>
   );
