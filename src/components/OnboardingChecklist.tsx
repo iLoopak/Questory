@@ -8,7 +8,9 @@ import { RetroFolderPicker } from '../lib/retroFolderPicker';
 import { loadRawgSettings, saveRawgSettings } from '../lib/rawgSettingsStorage';
 import { createQuestShelfBackup } from '../lib/backupStorage';
 import { exportQuestShelfBackupFile } from '../lib/backupExport';
+import { formatPersonalizedQuestShelfTitle, maxLibraryOwnerNicknameLength } from '../lib/appPersonalization';
 import { onboardingItemIds, type OnboardingItemId } from '../lib/onboardingStorage';
+import { defaultAccentColor, normalizeAccentColor, type AccentColorPreference, type AppTemplatePreference } from '../lib/themePreferences';
 import type { Game } from '../types/game';
 import type { SteamSettings } from '../types/steam';
 import type { RawgSettings } from '../types/rawg';
@@ -25,6 +27,13 @@ type OnboardingChecklistProps = {
   onSkip: (itemId: OnboardingItemId) => void;
   onSteamLibraryImported?: () => void;
   onSteamProfileNameChange?: (profileName: string) => void;
+  libraryOwnerNickname: string;
+  personalizedQuestShelfTitle: string;
+  appTemplatePreference: AppTemplatePreference;
+  accentColorPreference: AccentColorPreference;
+  onLibraryOwnerNicknameChange: (nickname: string) => void;
+  onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
+  onAccentColorChange: (color: AccentColorPreference) => void;
   skippedItemIds: Set<OnboardingItemId>;
 };
 
@@ -47,6 +56,13 @@ export function OnboardingChecklist({
   onSkip,
   onSteamLibraryImported,
   onSteamProfileNameChange,
+  libraryOwnerNickname,
+  personalizedQuestShelfTitle,
+  appTemplatePreference,
+  accentColorPreference,
+  onLibraryOwnerNicknameChange,
+  onAppTemplatePreferenceChange,
+  onAccentColorChange,
   skippedItemIds,
 }: OnboardingChecklistProps) {
   const steamImported = games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam');
@@ -57,12 +73,13 @@ export function OnboardingChecklist({
     { id: 'rawg-api-key', title: 'RAWG enrichment setup', summary: 'Add a RAWG API key so covers and metadata can enrich your games.', isConfigured: () => Boolean(loadRawgSettings().apiKey.trim()) || rawgEnriched },
     { id: 'retro-import', title: 'Retro folder import', summary: 'Pick a ROM folder or files to add retro entries without leaving the wizard.', isConfigured: () => retroFolderCount > 0 },
     { id: 'backup-exported', title: 'Backup / export reminder', summary: 'Export a portable backup before large imports or destructive testing.', isConfigured: () => completedItemIds.has('backup-exported') },
-    { id: 'ready', title: 'Finish', summary: 'Review setup progress and jump back into your library or queue.', isConfigured: () => completedItemIds.has('ready') },
+    { id: 'make-it-yours', title: 'Make it yours', summary: 'Name your shelf and choose the visual identity that makes QuestShelf feel like your collection.', isConfigured: () => completedItemIds.has('make-it-yours') },
+    { id: 'ready', title: 'Finish', summary: 'Celebrate setup completion and jump into your personalized library.', isConfigured: () => completedItemIds.has('ready') },
   ], [completedItemIds, rawgEnriched, retroFolderCount, steamImported]);
 
   useEffect(() => {
     steps.forEach((step) => {
-      if (step.id !== 'backup-exported' && step.id !== 'ready' && step.isConfigured() && !completedItemIds.has(step.id)) {
+      if (step.id !== 'backup-exported' && step.id !== 'make-it-yours' && step.id !== 'ready' && step.isConfigured() && !completedItemIds.has(step.id)) {
         onComplete(step.id);
       }
     });
@@ -99,7 +116,7 @@ export function OnboardingChecklist({
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-mint" style={{ width: `${progressPercent}%` }} /></div>
         </div>
 
-        <ol className="qs-setup-steps mt-4 grid gap-2 sm:grid-cols-5">
+        <ol className="qs-setup-steps mt-4 grid gap-2 sm:grid-cols-6">
           {steps.map((step, index) => {
             const isDone = completedItemIds.has(step.id);
             const isSkipped = skippedItemIds.has(step.id);
@@ -116,7 +133,8 @@ export function OnboardingChecklist({
           {activeStep.id === 'rawg-api-key' ? <RawgStep onComplete={() => onComplete('rawg-api-key')} onOpenSettings={() => openRelatedSettings('rawg-api-key')} /> : null}
           {activeStep.id === 'retro-import' ? <RetroStep games={games} onComplete={() => onComplete('retro-import')} onImportGames={onImportGames} onSkip={skipStep} /> : null}
           {activeStep.id === 'backup-exported' ? <BackupStep onComplete={() => onComplete('backup-exported')} onOpenSettings={() => openRelatedSettings('backup-exported')} /> : null}
-          {activeStep.id === 'ready' ? <FinishStep onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} progress={`${finishedCount}/${steps.length}`} /> : null}
+          {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} gameCount={games.filter((game) => game.collectionType === 'library').length} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => onComplete('make-it-yours')} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={new Set(games.filter((game) => game.collectionType === 'library').map((game) => game.platform)).size} /> : null}
+          {activeStep.id === 'ready' ? <FinishStep gameCount={games.filter((game) => game.collectionType === 'library').length} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={new Set(games.filter((game) => game.collectionType === 'library').map((game) => game.platform)).size} progress={`${finishedCount}/${steps.length}`} /> : null}
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3">
@@ -169,7 +187,18 @@ function BackupStep({ onComplete, onOpenSettings }: { onComplete: () => void; on
   return <div><Status text={status} /><Actions primary="Export backup" onPrimary={() => { void exportBackup(); }} /><button className="mt-3 h-10 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onOpenSettings} type="button">Open backup settings</button></div>;
 }
 
-function FinishStep({ onComplete, onOpenLibrary, onOpenQueue, progress }: { onComplete: () => void; onOpenLibrary: () => void; onOpenQueue: () => void; progress: string }) { return <div><Status text={`Setup progress: ${progress} steps complete or skipped.`} /><div className="mt-5 flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => { onComplete(); onOpenLibrary(); }} type="button">Open Library</button><button className="h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint" onClick={() => { onComplete(); onOpenQueue(); }} type="button">Open Queue</button></div></div>; }
+
+function PersonalizeStep({ accentColorPreference, appTemplatePreference, gameCount, libraryOwnerNickname, onAccentColorChange, onAppTemplatePreferenceChange, onComplete, onLibraryOwnerNicknameChange, personalizedQuestShelfTitle, platformCount }: { accentColorPreference: AccentColorPreference; appTemplatePreference: AppTemplatePreference; gameCount: number; libraryOwnerNickname: string; onAccentColorChange: (color: AccentColorPreference) => void; onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void; onComplete: () => void; onLibraryOwnerNicknameChange: (nickname: string) => void; personalizedQuestShelfTitle: string; platformCount: number }) {
+  const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
+  const accentPresets = [defaultAccentColor, '#ec4899', '#8b5cf6', '#22d3ee', '#22c55e', '#f59e0b'];
+  const shelfExamples = ["Loopak's QuestShelf", "Viktor's QuestShelf", 'My QuestShelf'];
+  const previewTitle = libraryOwnerNickname ? personalizedQuestShelfTitle : formatPersonalizedQuestShelfTitle('My QuestShelf');
+  const chooseAccent = (color: string) => { const normalizedColor = normalizeAccentColor(color); if (normalizedColor) onAccentColorChange(normalizedColor === defaultAccentColor ? null : normalizedColor); };
+
+  return <div className="space-y-5"><div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]"><div className="space-y-4"><label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Display name (optional)</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" maxLength={maxLibraryOwnerNicknameLength} onChange={(event) => onLibraryOwnerNicknameChange(event.target.value)} placeholder="Loopak's QuestShelf" value={libraryOwnerNickname} /></label><div className="flex flex-wrap gap-2">{shelfExamples.map((example) => <button className="rounded-full border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10" key={example} onClick={() => onLibraryOwnerNicknameChange(example)} type="button">{example}</button>)}</div><div><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme selection</div><div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Theme selection"><button aria-pressed={appTemplatePreference === 'classic'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'classic' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('classic')} type="button"><strong>Default</strong><span className="mt-1 block text-xs text-slate-400">Clean dark QuestShelf identity.</span></button><button aria-pressed={appTemplatePreference === 'neon-deck'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'neon-deck' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('neon-deck')} type="button"><strong>Neon</strong><span className="mt-1 block text-xs text-slate-400">Arcade glow and deck-style panels.</span></button></div></div><div><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Accent color</div><div className="mt-2 flex flex-wrap items-center gap-2"><input className="h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1" onChange={(event) => chooseAccent(event.target.value)} type="color" value={selectedAccentColor} />{accentPresets.map((color) => <button aria-label={`Use ${color} accent`} aria-pressed={selectedAccentColor === color} className={`h-11 w-11 rounded-md border ${selectedAccentColor === color ? 'border-white shadow-glow' : 'border-white/10'}`} key={color} onClick={() => chooseAccent(color)} style={{ backgroundColor: color }} type="button" />)}</div></div></div><div className="rounded-2xl border border-mint/25 bg-ink-950/80 p-4 shadow-glow"><div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Live preview</div><h4 className="mt-3 text-2xl font-semibold text-white">{previewTitle}</h4><p className="mt-2 text-sm text-slate-400">Welcome back — your backlog, wishlist, and queue now share this identity.</p><div className="mt-5 grid gap-2 text-sm"><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{gameCount} games imported</span><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{platformCount} platforms configured</span><span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-mint">Avatar/icon placeholder ready for later</span></div></div></div><div className="flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={onComplete} type="button">Save personalization</button><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onComplete} type="button">Skip for now</button></div></div>;
+}
+
+function FinishStep({ gameCount, onComplete, onOpenLibrary, onOpenQueue, personalizedQuestShelfTitle, platformCount, progress }: { gameCount: number; onComplete: () => void; onOpenLibrary: () => void; onOpenQueue: () => void; personalizedQuestShelfTitle: string; platformCount: number; progress: string }) { return <div className="rounded-2xl border border-mint/30 bg-mint/10 p-5 text-center shadow-glow"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-mint text-2xl text-ink-950">✓</div><h3 className="mt-4 text-3xl font-semibold text-white">Your QuestShelf is ready.</h3><p className="mt-2 text-lg text-mint">{personalizedQuestShelfTitle}</p><div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-slate-200"><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{gameCount} games imported</span><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{platformCount} platforms configured</span><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">Setup progress: {progress}</span></div><div className="mt-5 flex flex-wrap justify-center gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => { onComplete(); onOpenLibrary(); }} type="button">Start exploring</button><button className="h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint" onClick={() => { onComplete(); onOpenLibrary(); }} type="button">Open Library</button></div></div>; }
 function Input({ label, onChange, type = 'text', value }: { label: string; onChange: (value: string) => void; type?: string; value: string }) { return <label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" onChange={(e) => onChange(e.target.value)} type={type} value={value} /></label>; }
 function Status({ text }: { text: string }) { return <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm text-slate-300">{text}</div>; }
 function Actions({ disabled = false, loading = false, onPrimary, onSkip, primary }: { disabled?: boolean; loading?: boolean; onPrimary: () => void; onSkip?: () => void; primary: string }) { return <div className="mt-5 flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 disabled:bg-slate-600" disabled={disabled || loading} onClick={onPrimary} type="button">{loading ? 'Working...' : primary}</button>{onSkip ? <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip</button> : null}</div>; }

@@ -1895,6 +1895,13 @@ function App() {
           onSkip={skipOnboardingItem}
           onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
           onSteamProfileNameChange={setSteamProfileName}
+          libraryOwnerNickname={libraryOwnerNickname}
+          personalizedQuestShelfTitle={personalizedQuestShelfTitle}
+          appTemplatePreference={appTemplatePreference}
+          accentColorPreference={accentColorPreference}
+          onLibraryOwnerNicknameChange={setLibraryOwnerNickname}
+          onAppTemplatePreferenceChange={setAppTemplatePreference}
+          onAccentColorChange={setAccentColorPreference}
         />
       ) : null}
       <button className={`qs-setup-launcher ${isOnboardingComplete ? 'is-complete' : ''}`} onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
