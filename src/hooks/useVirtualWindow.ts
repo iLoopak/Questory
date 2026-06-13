@@ -34,8 +34,7 @@ export function useVirtualWindow({
   virtualizerRef,
   enabled = true,
 }: VirtualWindowOptions) {
-  const [viewportSize, setViewportSize] = useState(0);
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [metrics, setMetrics] = useState({ scrollOffset: 0, viewportSize: 0 });
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
@@ -68,8 +67,25 @@ export function useVirtualWindow({
         }
       }
 
-      setViewportSize(nextViewportSize);
-      setScrollOffset(Math.max(0, rawScrollOffset - itemOffset));
+      const nextScrollOffset = Math.max(0, rawScrollOffset - itemOffset);
+      const safeItemSize = Math.max(1, estimateItemSize);
+
+      setMetrics((currentMetrics) => {
+        const currentVisibleStart = Math.floor(currentMetrics.scrollOffset / safeItemSize);
+        const nextVisibleStart = Math.floor(nextScrollOffset / safeItemSize);
+        const currentVisibleEnd = Math.ceil((currentMetrics.scrollOffset + currentMetrics.viewportSize) / safeItemSize);
+        const nextVisibleEnd = Math.ceil((nextScrollOffset + nextViewportSize) / safeItemSize);
+
+        if (
+          currentMetrics.viewportSize === nextViewportSize &&
+          currentVisibleStart === nextVisibleStart &&
+          currentVisibleEnd === nextVisibleEnd
+        ) {
+          return currentMetrics;
+        }
+
+        return { scrollOffset: nextScrollOffset, viewportSize: nextViewportSize };
+      });
     }
 
     function scheduleMeasure() {
@@ -102,13 +118,13 @@ export function useVirtualWindow({
         offsetBefore: 0,
         offsetAfter: 0,
         totalSize: itemCount * estimateItemSize,
-        viewportSize,
+        viewportSize: metrics.viewportSize,
       };
     }
 
     const safeItemSize = Math.max(1, estimateItemSize);
-    const visibleStartIndex = Math.min(itemCount - 1, Math.max(0, Math.floor(scrollOffset / safeItemSize)));
-    const visibleEndIndex = Math.min(itemCount - 1, Math.max(visibleStartIndex, Math.ceil((scrollOffset + viewportSize) / safeItemSize) - 1));
+    const visibleStartIndex = Math.min(itemCount - 1, Math.max(0, Math.floor(metrics.scrollOffset / safeItemSize)));
+    const visibleEndIndex = Math.min(itemCount - 1, Math.max(visibleStartIndex, Math.ceil((metrics.scrollOffset + metrics.viewportSize) / safeItemSize) - 1));
     const startIndex = Math.max(0, visibleStartIndex - overscan);
     const endIndex = Math.min(itemCount - 1, visibleEndIndex + overscan);
     const renderedCount = endIndex >= startIndex ? endIndex - startIndex + 1 : 0;
@@ -125,7 +141,7 @@ export function useVirtualWindow({
       offsetBefore,
       offsetAfter,
       totalSize,
-      viewportSize,
+      viewportSize: metrics.viewportSize,
     };
-  }, [enabled, estimateItemSize, itemCount, overscan, scrollOffset, viewportSize]);
+  }, [enabled, estimateItemSize, itemCount, metrics.scrollOffset, metrics.viewportSize, overscan]);
 }
