@@ -12,7 +12,7 @@ import {
   integrationBackupStorageKeys,
 } from './storageRegistry';
 import { normalizeSteamSettings } from './steamSettingsStorage';
-import { normalizeShelfIdentitySettings } from './shelfIdentity';
+import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
 import { normalizeAppPersonalizationSettings } from './appPersonalization';
 import type { Game } from '../types/game';
 
@@ -78,7 +78,9 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
       const value = readStorageJson(key);
 
       if (typeof value !== 'undefined') {
-        backupData[key] = value;
+        backupData[key] = key === shelfIdentityStorageKey ? normalizeShelfIdentitySettings(value) : value;
+      } else if (key === shelfIdentityStorageKey) {
+        backupData[key] = normalizeShelfIdentitySettings(undefined);
       }
 
       return backupData;

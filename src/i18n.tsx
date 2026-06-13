@@ -204,6 +204,7 @@ const en = {
   'settings.category.platforms': 'Platforms',
   'settings.category.retro': 'Retro',
   'settings.category.appearance': 'Appearance',
+  'settings.category.personalization': 'Personalization',
   'settings.category.dataBackup': 'Data & Backup',
   'settings.category.about': 'About',
   'settings.language': 'Language',
@@ -1606,6 +1607,7 @@ const settingsCategoryKeyByValue = {
   Platforms: 'settings.category.platforms',
   Retro: 'settings.category.retro',
   Appearance: 'settings.category.appearance',
+  Personalization: 'settings.category.personalization',
   'Data & Backup': 'settings.category.dataBackup',
   About: 'settings.category.about',
 } satisfies Record<string, TranslationKey>;

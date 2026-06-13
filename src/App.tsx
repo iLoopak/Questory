@@ -28,6 +28,7 @@ import { AboutSettingsPanel } from './components/settings/AboutSettingsPanel';
 import { AppearanceSettingsPanel } from './components/settings/AppearanceSettingsPanel';
 import { DemoDataPanel } from './components/settings/LibrarySettingsPanel';
 import { NavigationVisibilitySettingsPanel } from './components/settings/NavigationVisibilitySettingsPanel';
+import { PersonalizationSettingsPanel } from './components/settings/PersonalizationSettingsPanel';
 import { QueuePlatformsSettingsPanel } from './components/settings/PlatformsSettingsPanel';
 import { SteamWishlistHtmlImportModal, SteamWishlistSyncNotice, WishlistSettingsPanel } from './components/settings/WishlistSettingsPanel';
 import {
@@ -3489,6 +3490,16 @@ function SettingsPanel({
             </div>
           ) : null}
 
+          {activeCategory === 'Personalization' ? (
+            <div className="space-y-4">
+              <PersonalizationSettingsPanel
+                personalizedQuestShelfTitle={personalizedQuestShelfTitle}
+                shelfIdentity={shelfIdentity}
+                onShelfIdentityChange={onShelfIdentityChange}
+              />
+            </div>
+          ) : null}
+
           {activeCategory === 'Data & Backup' ? (
             <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
           ) : null}
@@ -3511,14 +3522,6 @@ function SettingsPanel({
                 accentColorPreference={accentColorPreference}
                 secondaryAccentColorPreference={secondaryAccentColorPreference}
                 language={language}
-                libraryOwnerNickname={libraryOwnerNickname}
-                personalizedQuestShelfTitle={personalizedQuestShelfTitle}
-                shelfIdentity={shelfIdentity}
-                steamAvatarUrl={steamAvatarUrl}
-                steamPersonaName={steamPersonaName}
-                games={games}
-                onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange}
-                onShelfIdentityChange={onShelfIdentityChange}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
                 onLandscapeLockChange={onLandscapeLockChange}
@@ -3641,6 +3644,16 @@ function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
     return (
       <svg {...commonProps} aria-hidden="true">
         <path d="M12 3a9 9 0 1 0 9 9 4.5 4.5 0 0 1-9-9z" />
+      </svg>
+    );
+  }
+
+  if (category === 'Personalization') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M5 21a7 7 0 0 1 14 0" />
+        <path d="M17.5 6.5h.01" />
       </svg>
     );
   }

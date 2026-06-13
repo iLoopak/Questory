@@ -6,11 +6,12 @@ export const maxShelfNameLength = 48;
 export const maxCustomAvatarDataUrlLength = 700_000;
 export const maxShelfTitleLength = 32;
 
-export type BuiltInAvatarId = 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer';
+export type BuiltInAvatarId = 'controller' | 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer';
 export type ShelfAvatarSelection = 'app-icon' | 'steam' | `built-in:${BuiltInAvatarId}` | 'custom';
 
 export type ShelfIdentitySettings = {
   avatarSelection: ShelfAvatarSelection;
+  shelfAvatar: ShelfAvatarSelection;
   customAvatarDataUrl: string;
   featuredGameId: string;
   preferences: {
@@ -21,6 +22,7 @@ export type ShelfIdentitySettings = {
 };
 
 export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: string; gradient: string }> = [
+  { id: 'controller', label: 'Controller', glyph: '🎮', gradient: 'from-mint to-sky-300' },
   { id: 'achievement-hunter', label: 'Achievement Hunter', glyph: '🏆', gradient: 'from-amber-300 to-mint' },
   { id: 'retro-explorer', label: 'Retro Explorer', glyph: '👾', gradient: 'from-fuchsia-400 to-cyan-300' },
   { id: 'rpg-adventurer', label: 'RPG Adventurer', glyph: '⚔️', gradient: 'from-red-400 to-amber-300' },
@@ -34,6 +36,7 @@ export const shelfTitleOptions = ['Retro Explorer', 'Steam Veteran', 'Achievemen
 
 const emptyIdentity: ShelfIdentitySettings = {
   avatarSelection: 'app-icon',
+  shelfAvatar: 'app-icon',
   customAvatarDataUrl: '',
   featuredGameId: '',
   preferences: { accentMood: '' },
@@ -52,10 +55,11 @@ export function saveShelfIdentitySettings(settings: ShelfIdentitySettings) {
 export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySettings {
   const parsed = value && typeof value === 'object' ? (value as Partial<ShelfIdentitySettings>) : {};
   const customAvatarDataUrl = sanitizeAvatarDataUrl(parsed.customAvatarDataUrl);
-  let avatarSelection = normalizeAvatarSelection(parsed.avatarSelection);
+  let avatarSelection = normalizeAvatarSelection(parsed.avatarSelection ?? parsed.shelfAvatar);
   if (avatarSelection === 'custom' && !customAvatarDataUrl) avatarSelection = 'app-icon';
   return {
     avatarSelection,
+    shelfAvatar: avatarSelection,
     customAvatarDataUrl,
     featuredGameId: sanitizeFeaturedGameId(parsed.featuredGameId),
     preferences: normalizeShelfPreferences(parsed.preferences),
