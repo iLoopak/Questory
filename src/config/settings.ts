@@ -5,6 +5,7 @@ export const settingsCategories = [
   'Platforms',
   'Retro',
   'Appearance',
+  'Personalization',
   'Data & Backup',
   'About',
 ] as const;
@@ -49,6 +50,11 @@ export const settingsCategoryMeta: Record<SettingsCategory, SettingsCategoryMeta
     description: 'Adjust handheld presentation, landscape preference, theme, language, and UI behavior.',
     label: 'Appearance',
     shortDescription: 'Theme and UI feel',
+  },
+  Personalization: {
+    description: 'Set the shelf name and avatar shown across QuestShelf.',
+    label: 'Personalization',
+    shortDescription: 'Shelf identity',
   },
   'Data & Backup': {
     description: 'Export, restore, import, reset, and sync QuestShelf data without a backend.',

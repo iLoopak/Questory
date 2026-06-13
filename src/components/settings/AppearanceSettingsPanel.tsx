@@ -4,10 +4,6 @@ import {
   languageOptions,
   type AppLanguage,
 } from "../../i18n";
-import { maxLibraryOwnerNicknameLength } from "../../lib/appPersonalization";
-import { ShelfAvatar, ShelfIdentityEditor } from "../ShelfIdentity";
-import type { ShelfIdentitySettings } from "../../lib/shelfIdentity";
-import type { Game } from "../../types/game";
 import { getRuntimeEnvironment } from "../../lib/capacitorEnvironment";
 import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPreferences";
 import {
@@ -31,14 +27,6 @@ export function AppearanceSettingsPanel({
   accentColorPreference,
   secondaryAccentColorPreference,
   language,
-  libraryOwnerNickname,
-  personalizedQuestShelfTitle,
-  shelfIdentity,
-  steamAvatarUrl,
-  steamPersonaName,
-  games,
-  onLibraryOwnerNicknameChange,
-  onShelfIdentityChange,
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
@@ -58,14 +46,6 @@ export function AppearanceSettingsPanel({
   accentColorPreference: AccentColorPreference;
   secondaryAccentColorPreference: AccentColorPreference;
   language: AppLanguage;
-  libraryOwnerNickname: string;
-  personalizedQuestShelfTitle: string;
-  shelfIdentity: ShelfIdentitySettings;
-  steamAvatarUrl: string;
-  steamPersonaName: string;
-  games: Game[];
-  onLibraryOwnerNicknameChange: (nickname: string) => void;
-  onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
@@ -189,41 +169,6 @@ export function AppearanceSettingsPanel({
         <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
           {resolvedTheme} {t("settings.active")}
         </span>
-      </div>
-
-      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <label className="block">
-          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            {t("settings.libraryOwnerNickname")}
-          </span>
-          <input
-            className="mt-3 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-            maxLength={maxLibraryOwnerNicknameLength}
-            onChange={(event) =>
-              onLibraryOwnerNicknameChange(event.target.value)
-            }
-            placeholder={t("settings.libraryOwnerNicknamePlaceholder")}
-            value={libraryOwnerNickname}
-          />
-          <span className="mt-2 block text-xs leading-5 text-slate-500">
-            {t("settings.libraryOwnerNicknameHelp")}
-          </span>
-        </label>
-        <div className="mt-3 flex items-center gap-3 rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm text-mint">
-          <ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-10 w-10" />
-          <span>{t("settings.libraryOwnerNicknamePreview").replace(
-            "{appTitle}",
-            personalizedQuestShelfTitle
-          )}</span>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="mb-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Identity</div>
-          <p className="mt-1 text-xs text-slate-500">Choose the Shelf Name, avatar, title, and Featured Game shown across QuestShelf.</p>
-        </div>
-        <ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={personalizedQuestShelfTitle} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} games={games} />
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
