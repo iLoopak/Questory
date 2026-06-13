@@ -38,7 +38,7 @@ export function PersonalizationSettingsPanel({
   }
 
   function updateShelfAvatar(avatarSelection: ShelfAvatarSelection) {
-    onShelfIdentityChange({ ...shelfIdentity, avatarSelection });
+    onShelfIdentityChange({ ...shelfIdentity, avatarSelection, shelfAvatar: avatarSelection });
   }
 
   return (

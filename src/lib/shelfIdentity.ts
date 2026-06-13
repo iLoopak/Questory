@@ -1,10 +1,10 @@
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import type { Game } from '../types/game';
 
 export const shelfIdentityStorageKey = 'questshelf.shelfIdentity.v1';
 export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon.png';
 export const maxShelfNameLength = 48;
 export const maxCustomAvatarDataUrlLength = 700_000;
-export const maxShelfTitleLength = 32;
 
 export type BuiltInAvatarId = 'controller' | 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer';
 export type ShelfAvatarSelection = 'app-icon' | 'steam' | `built-in:${BuiltInAvatarId}` | 'custom';
@@ -13,12 +13,7 @@ export type ShelfIdentitySettings = {
   avatarSelection: ShelfAvatarSelection;
   shelfAvatar: ShelfAvatarSelection;
   customAvatarDataUrl: string;
-  featuredGameId: string;
-  preferences: {
-    accentMood: string;
-  };
   shelfName: string;
-  shelfTitle: string;
 };
 
 export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: string; gradient: string }> = [
@@ -32,16 +27,11 @@ export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: 
   { id: 'backlog-slayer', label: 'Backlog Slayer', glyph: '☠️', gradient: 'from-mint to-lime-300' },
 ];
 
-export const shelfTitleOptions = ['Retro Explorer', 'Steam Veteran', 'Achievement Hunter', 'RPG Sage', 'Completionist', 'Indie Discoverer', 'Backlog Slayer'] as const;
-
 const emptyIdentity: ShelfIdentitySettings = {
   avatarSelection: 'app-icon',
   shelfAvatar: 'app-icon',
   customAvatarDataUrl: '',
-  featuredGameId: '',
-  preferences: { accentMood: '' },
   shelfName: '',
-  shelfTitle: '',
 };
 
 export function loadShelfIdentitySettings(): ShelfIdentitySettings {
@@ -61,28 +51,12 @@ export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySet
     avatarSelection,
     shelfAvatar: avatarSelection,
     customAvatarDataUrl,
-    featuredGameId: sanitizeFeaturedGameId(parsed.featuredGameId),
-    preferences: normalizeShelfPreferences(parsed.preferences),
     shelfName: sanitizeShelfName(parsed.shelfName),
-    shelfTitle: sanitizeShelfTitle(parsed.shelfTitle),
   };
 }
 
 export function sanitizeShelfName(value: unknown) {
   return typeof value === 'string' ? value.trim().slice(0, maxShelfNameLength) : '';
-}
-
-export function sanitizeShelfTitle(value: unknown) {
-  return typeof value === 'string' ? value.trim().slice(0, maxShelfTitleLength) : '';
-}
-
-export function sanitizeFeaturedGameId(value: unknown) {
-  return typeof value === 'string' ? value.trim().slice(0, 128) : '';
-}
-
-function normalizeShelfPreferences(value: unknown): ShelfIdentitySettings['preferences'] {
-  const parsed = value && typeof value === 'object' ? (value as Partial<ShelfIdentitySettings['preferences']>) : {};
-  return { accentMood: typeof parsed.accentMood === 'string' ? parsed.accentMood.trim().slice(0, 32) : '' };
 }
 
 export function sanitizeAvatarDataUrl(value: unknown) {
@@ -99,6 +73,51 @@ export function normalizeAvatarSelection(value: unknown): ShelfAvatarSelection {
     if (builtInAvatars.some((avatar) => avatar.id === id)) return `built-in:${id}`;
   }
   return 'app-icon';
+}
+
+
+export function getComputedShelfTitle(games: Game[]) {
+  const libraryGames = games.filter((game) => game.collectionType === 'library');
+
+  if (libraryGames.some((game) => game.platform === 'Steam' || game.externalSource === 'steam' || typeof game.steamAppId === 'number')) {
+    return 'Steam Veteran';
+  }
+
+  if (libraryGames.some((game) => game.status === 'Finished')) {
+    return 'Completionist';
+  }
+
+  if (libraryGames.length >= 25) {
+    return 'Collector';
+  }
+
+  if (libraryGames.some((game) => isRetroPlatform(game.platform))) {
+    return 'Retro Explorer';
+  }
+
+  return '';
+}
+
+export function getComputedFeaturedGame(games: Game[]) {
+  const libraryGames = games.filter((game) => game.collectionType === 'library');
+
+  return libraryGames
+    .map((game) => ({ game, score: getFeaturedGameScore(game) }))
+    .filter(({ score }) => score > 0)
+    .sort((first, second) => second.score - first.score || first.game.title.localeCompare(second.game.title))[0]?.game ?? null;
+}
+
+function getFeaturedGameScore(game: Game) {
+  return (game.favorite ? 10_000 : 0)
+    + Math.max(0, game.playtimeHours ?? 0) * 100
+    + (game.status === 'Playing' ? 750 : 0)
+    + (game.status === 'Finished' ? 500 : 0)
+    + (game.rating ?? 0) * 50
+    + (game.steamAchievementsPercent ?? 0);
+}
+
+function isRetroPlatform(platform: Game['platform']) {
+  return ['PSP', 'PS2', 'PS1', 'PS Vita', 'Game Boy', 'Game Boy Color', 'Game Boy Advance', 'NES', 'SNES', 'Nintendo 64', 'Nintendo DS', 'Wii', 'Wii U', 'GameCube', 'Sega Genesis / Mega Drive', 'Master System', 'Game Gear', 'PC Engine', 'GBA'].includes(String(platform));
 }
 
 export function getResolvedShelfName(shelfName: string, legacyTitle: string) {
