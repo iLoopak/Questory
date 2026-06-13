@@ -37,7 +37,12 @@ export function sanitizeLibraryOwnerNickname(value: unknown) {
 
 export function formatPersonalizedQuestShelfTitle(name: string | null | undefined) {
   const normalizedName = sanitizeLibraryOwnerNickname(name);
-  return normalizedName ? `${normalizedName}’s QuestShelf` : 'QuestShelf';
+
+  if (!normalizedName) {
+    return 'QuestShelf';
+  }
+
+  return /questshelf/i.test(normalizedName) ? normalizedName : `${normalizedName}’s QuestShelf`;
 }
 
 export function getPersonalizedQuestShelfTitle(nickname: string, steamProfileName?: string | null) {
