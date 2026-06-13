@@ -4,6 +4,7 @@ export type SteamProfileMetadata = {
   personaName?: string;
   profileName?: string;
   profileUrl?: string;
+  avatarUrl?: string;
   updatedAt?: string;
 };
 
@@ -46,6 +47,7 @@ export type SteamPlayerSummary = {
   personaName?: string;
   profileName?: string;
   profileUrl?: string;
+  avatarUrl?: string;
 };
 
 export type SteamDebugResult = {

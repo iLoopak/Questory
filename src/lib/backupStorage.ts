@@ -12,6 +12,8 @@ import {
   integrationBackupStorageKeys,
 } from './storageRegistry';
 import { normalizeSteamSettings } from './steamSettingsStorage';
+import { normalizeShelfIdentitySettings } from './shelfIdentity';
+import { normalizeAppPersonalizationSettings } from './appPersonalization';
 import type { Game } from '../types/game';
 
 export const questShelfBackupVersion = 1;
@@ -334,6 +336,8 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
     case 'questshelf.onboarding.v1':
     case 'questshelf.platformQueues.v1':
     case 'questshelf.reviewMode.v1':
+    case 'questshelf.appPersonalization.v1':
+    case 'questshelf.shelfIdentity.v1':
       return isPlainObject(value);
   }
 
@@ -360,6 +364,10 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
       return normalizePlatformQueueState(value);
     case 'questshelf.reviewMode.v1':
       return normalizeReviewModeState(value);
+    case 'questshelf.appPersonalization.v1':
+      return normalizeAppPersonalizationSettings(value);
+    case 'questshelf.shelfIdentity.v1':
+      return normalizeShelfIdentitySettings(value);
     case 'questshelf.libraryFilters.v1':
     case 'questshelf.wishlistFilters.v1':
       return isPlainObject(value) ? value : {};

@@ -41,6 +41,7 @@ function normalizeSteamProfileMetadata(value: unknown): SteamSettings['profile']
     ...(typeof parsedProfile.personaName === 'string' && parsedProfile.personaName.trim() ? { personaName: parsedProfile.personaName.trim() } : {}),
     ...(typeof parsedProfile.profileName === 'string' && parsedProfile.profileName.trim() ? { profileName: parsedProfile.profileName.trim() } : {}),
     ...(typeof parsedProfile.profileUrl === 'string' && parsedProfile.profileUrl.trim() ? { profileUrl: parsedProfile.profileUrl.trim() } : {}),
+    ...(typeof parsedProfile.avatarUrl === 'string' && parsedProfile.avatarUrl.trim() ? { avatarUrl: parsedProfile.avatarUrl.trim() } : {}),
     ...(typeof parsedProfile.updatedAt === 'string' && parsedProfile.updatedAt.trim() ? { updatedAt: parsedProfile.updatedAt.trim() } : {}),
   };
 

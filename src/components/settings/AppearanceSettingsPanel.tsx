@@ -5,6 +5,8 @@ import {
   type AppLanguage,
 } from "../../i18n";
 import { maxLibraryOwnerNicknameLength } from "../../lib/appPersonalization";
+import { ShelfAvatar, ShelfIdentityEditor } from "../ShelfIdentity";
+import type { ShelfIdentitySettings } from "../../lib/shelfIdentity";
 import { getRuntimeEnvironment } from "../../lib/capacitorEnvironment";
 import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPreferences";
 import {
@@ -30,7 +32,11 @@ export function AppearanceSettingsPanel({
   language,
   libraryOwnerNickname,
   personalizedQuestShelfTitle,
+  shelfIdentity,
+  steamAvatarUrl,
+  steamPersonaName,
   onLibraryOwnerNicknameChange,
+  onShelfIdentityChange,
   onControllerDebugChange,
   onControllerLayoutChange,
   onLandscapeLockChange,
@@ -52,7 +58,11 @@ export function AppearanceSettingsPanel({
   language: AppLanguage;
   libraryOwnerNickname: string;
   personalizedQuestShelfTitle: string;
+  shelfIdentity: ShelfIdentitySettings;
+  steamAvatarUrl: string;
+  steamPersonaName: string;
   onLibraryOwnerNicknameChange: (nickname: string) => void;
+  onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
@@ -196,12 +206,21 @@ export function AppearanceSettingsPanel({
             {t("settings.libraryOwnerNicknameHelp")}
           </span>
         </label>
-        <div className="mt-3 rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm text-mint">
-          {t("settings.libraryOwnerNicknamePreview").replace(
+        <div className="mt-3 flex items-center gap-3 rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm text-mint">
+          <ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-10 w-10" />
+          <span>{t("settings.libraryOwnerNicknamePreview").replace(
             "{appTitle}",
             personalizedQuestShelfTitle
-          )}
+          )}</span>
         </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div className="mb-3">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Identity</div>
+          <p className="mt-1 text-xs text-slate-500">Choose the avatar and Shelf Name shown across QuestShelf.</p>
+        </div>
+        <ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={personalizedQuestShelfTitle} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} />
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
