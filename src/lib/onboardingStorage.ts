@@ -2,7 +2,7 @@ import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.onboarding.v1';
 
-export const onboardingItemIds = ['steam-connect', 'platforms', 'retro-import', 'visual-preferences', 'queue-game', 'ready'] as const;
+export const onboardingItemIds = ['steam-connect', 'rawg-api-key', 'retro-import', 'backup-exported', 'ready'] as const;
 
 const legacyOnboardingItemIds = [
   'manual-game',
@@ -10,10 +10,11 @@ const legacyOnboardingItemIds = [
   'steam-id64',
   'steam-test',
   'steam-import',
-  'rawg-api-key',
   'metadata-enriched',
   'wishlist-item',
-  'backup-exported',
+  'platforms',
+  'visual-preferences',
+  'queue-game',
 ] as const;
 
 export const allOnboardingItemIds = [...onboardingItemIds, ...legacyOnboardingItemIds] as const;

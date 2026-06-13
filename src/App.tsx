@@ -1881,36 +1881,26 @@ function App() {
         />
       ) : null}
 
-      {!isOnboardingComplete ? (
-        isOnboardingOpen ? (
-          <div className="qs-setup-widget">
-            <OnboardingChecklist
-              accentColorPreference={accentColorPreference}
-              completedItemIds={completedOnboardingItemIds}
-              skippedItemIds={skippedOnboardingItemIds}
-              games={games}
-              onAccentColorChange={setAccentColorPreference}
-              onClose={hideOnboarding}
-              onComplete={markOnboardingItemComplete}
-              onImportGames={importGames}
-              onOpenLibrary={() => handleOnboardingAction('ready', 'primary')}
-              onOpenQueue={() => handleOnboardingAction('ready', 'secondary')}
-              onPlatformQueueStateChange={setPlatformQueueState}
-              onSkip={skipOnboardingItem}
-              onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
-              onSteamProfileNameChange={setSteamProfileName}
-              onThemePreferenceChange={setThemePreference}
-              platformQueueState={platformQueueState}
-              themePreference={themePreference}
-            />
-          </div>
-        ) : (
-          <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
-            <Icon name="settings" />
-            <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
-          </button>
-        )
+      {isOnboardingOpen ? (
+        <OnboardingChecklist
+          completedItemIds={completedOnboardingItemIds}
+          skippedItemIds={skippedOnboardingItemIds}
+          games={games}
+          onAction={handleOnboardingAction}
+          onClose={hideOnboarding}
+          onComplete={markOnboardingItemComplete}
+          onImportGames={importGames}
+          onOpenLibrary={() => handleOnboardingAction('ready', 'primary')}
+          onOpenQueue={() => handleOnboardingAction('ready', 'secondary')}
+          onSkip={skipOnboardingItem}
+          onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+          onSteamProfileNameChange={setSteamProfileName}
+        />
       ) : null}
+      <button className={`qs-setup-launcher ${isOnboardingComplete ? 'is-complete' : ''}`} onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
+        <Icon name={isOnboardingComplete ? 'check' : 'settings'} />
+        <strong>{isOnboardingComplete ? 'Setup complete' : formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
+      </button>
     </main>
     </I18nProvider>
   );
@@ -3476,28 +3466,6 @@ function SettingsPanel({
                 onOpenOnboarding={onOpenOnboarding}
                 onRestartOnboarding={onRestartOnboarding}
               />
-              {isOnboardingOpen ? (
-                <OnboardingChecklist
-                  accentColorPreference={accentColorPreference}
-                  completedItemIds={completedOnboardingItemIds}
-                  skippedItemIds={skippedOnboardingItemIds}
-                  games={games}
-                  isSettingsPanel
-                  onAccentColorChange={onAccentColorChange}
-                  onClose={onOnboardingClose}
-                  onComplete={onOnboardingComplete}
-                  onImportGames={onImportGames}
-                  onOpenLibrary={() => onOnboardingAction('ready', 'primary')}
-                  onOpenQueue={() => onOnboardingAction('ready', 'secondary')}
-                  onPlatformQueueStateChange={onPlatformQueueStateChange}
-                  onSkip={onOnboardingSkip}
-                  onSteamLibraryImported={onSteamLibraryImported}
-                  onSteamProfileNameChange={onSteamProfileNameChange}
-                  onThemePreferenceChange={onThemePreferenceChange}
-                  platformQueueState={platformQueueState}
-                  themePreference={themePreference}
-                />
-              ) : null}
             </div>
           ) : null}
         </div>
