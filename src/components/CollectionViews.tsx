@@ -82,7 +82,10 @@ export function CollectionGrid({
     function measureColumns() {
       const grid = gridRef.current;
       const width = grid?.clientWidth ?? 0;
-      setColumns(getVirtualGridColumns(width));
+      setColumns((currentColumns) => {
+        const nextColumns = getVirtualGridColumns(width);
+        return currentColumns === nextColumns ? currentColumns : nextColumns;
+      });
     }
 
     measureColumns();
@@ -203,7 +206,10 @@ export function CollectionShelf({
     function measureCardSize() {
       const scrollerWidth = shelfScrollerRef.current?.clientWidth ?? window.innerWidth;
       const cardWidth = Math.min(256, Math.max(176, scrollerWidth * 0.22));
-      setCardSize(cardWidth + 8);
+      setCardSize((currentSize) => {
+        const nextSize = cardWidth + 8;
+        return currentSize === nextSize ? currentSize : nextSize;
+      });
     }
 
     measureCardSize();

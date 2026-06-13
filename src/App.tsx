@@ -2906,25 +2906,34 @@ function CollectionPanel({
     collectionType === 'wishlist'
       ? t('collection.emptyWishlistText')
       : t('collection.emptyLibraryText');
+  const visibleGameIdsSignature = useMemo(() => games.map((game) => game.id).join('|'), [games]);
   const virtualResetKey = useMemo(
     () =>
-      JSON.stringify({
+      [
         collectionType,
-        filters,
-        gameIds: games.map((game) => game.id),
         viewMode,
-      }),
-    [collectionType, filters, games, viewMode],
+        filters.searchTerm,
+        filters.status,
+        filters.platform,
+        filters.tag,
+        filters.source,
+        filters.enrichment,
+        filters.achievement,
+        filters.sortBy,
+        filters.quickFilters.join('|'),
+        visibleGameIdsSignature,
+      ].join(':'),
+    [collectionType, filters, viewMode, visibleGameIdsSignature],
   );
   const visibleGames = games;
-  const realCoverCount = useMemo(() => games.filter((game) => !isMissingOrGeneratedCover(game.coverImage)).length, [games]);
-  const selectedGames = games.filter((game) => selectedGameIds.has(game.id));
+  const realCoverCount = useMemo(() => games.reduce((count, game) => count + (isMissingOrGeneratedCover(game.coverImage) ? 0 : 1), 0), [games]);
+  const selectedGames = useMemo(() => games.filter((game) => selectedGameIds.has(game.id)), [games, selectedGameIds]);
   const selectedCount = selectedGames.length;
-  const selectedSteamCount = selectedGames.filter((game) => typeof game.steamAppId === 'number').length;
-  const selectedAchievementSteamCount = selectedGames.filter(isSteamAchievementSyncableGame).length;
-  const selectedRefreshableSteamCount = selectedGames.filter(isRefreshableSteamGame).length;
-  const visibleRefreshableSteamCount = games.filter(isRefreshableSteamGame).length;
-  const visibleAchievementSteamCount = games.filter(isSteamAchievementSyncableGame).length;
+  const selectedSteamCount = useMemo(() => selectedGames.reduce((count, game) => count + (typeof game.steamAppId === 'number' ? 1 : 0), 0), [selectedGames]);
+  const selectedAchievementSteamCount = useMemo(() => selectedGames.reduce((count, game) => count + (isSteamAchievementSyncableGame(game) ? 1 : 0), 0), [selectedGames]);
+  const selectedRefreshableSteamCount = useMemo(() => selectedGames.reduce((count, game) => count + (isRefreshableSteamGame(game) ? 1 : 0), 0), [selectedGames]);
+  const visibleRefreshableSteamCount = useMemo(() => games.reduce((count, game) => count + (isRefreshableSteamGame(game) ? 1 : 0), 0), [games]);
+  const visibleAchievementSteamCount = useMemo(() => games.reduce((count, game) => count + (isSteamAchievementSyncableGame(game) ? 1 : 0), 0), [games]);
   const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
   const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
   const isItadDealSyncing = itadDealSyncState?.status === 'loading';
