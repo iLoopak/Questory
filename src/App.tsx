@@ -14,6 +14,7 @@ import { HltbSettingsPanel } from './components/HltbSettingsPanel';
 import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
+import { ShelfAvatar } from './components/ShelfIdentity';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
 import { QueuePanel } from './components/QueuePanel';
 import { IsThereAnyDealSettingsPanel } from './components/IsThereAnyDealSettingsPanel';
@@ -89,6 +90,7 @@ import {
   sanitizeLibraryOwnerNickname,
   saveAppPersonalizationSettings,
 } from './lib/appPersonalization';
+import { getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -197,7 +199,9 @@ function App() {
   const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
   const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
   const [libraryOwnerNickname, setLibraryOwnerNicknameState] = useState(() => loadAppPersonalizationSettings().libraryOwnerNickname);
-  const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(loadSteamSettings()));
+  const [shelfIdentity, setShelfIdentityState] = useState<ShelfIdentitySettings>(() => loadShelfIdentitySettings());
+  const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
+  const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(steamSettingsSnapshot));
   const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
   const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
   const {
@@ -212,14 +216,30 @@ function App() {
     setThemePreference,
     themePreference,
   } = useAppAppearance();
-  const personalizedQuestShelfTitle = useMemo(
+  const legacyQuestShelfTitle = useMemo(
     () => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName),
     [libraryOwnerNickname, steamProfileName],
   );
+  const personalizedQuestShelfTitle = useMemo(
+    () => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle),
+    [legacyQuestShelfTitle, shelfIdentity.shelfName],
+  );
+  const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
+
+  function setShelfIdentity(value: ShelfIdentitySettings) {
+    setShelfIdentityState(value);
+    saveShelfIdentitySettings(value);
+  }
 
   useEffect(() => {
     document.title = personalizedQuestShelfTitle;
   }, [personalizedQuestShelfTitle]);
+
+
+  function handleSteamProfileNameChange(profileName: string) {
+    setSteamProfileName(profileName);
+    setSteamSettingsSnapshot(loadSteamSettings());
+  }
 
   function setLibraryOwnerNickname(value: string) {
     const libraryOwnerNickname = sanitizeLibraryOwnerNickname(value);
@@ -1534,7 +1554,7 @@ function App() {
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label={personalizedQuestShelfTitle}>
-            <QuestShelfLogo className="h-7 w-7 rounded-md border border-mint/30" fallbackClassName="text-[9px]" />
+            <ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />
             <div className="hidden min-w-0 truncate text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">{personalizedQuestShelfTitle}</div>
           </div>
 
@@ -1586,6 +1606,7 @@ function App() {
           ) : activeNavItem === 'Home' ? (
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
+              avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" />}
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
               queueState={platformQueueState}
@@ -1780,6 +1801,9 @@ function App() {
               ignoredSteamGames={ignoredSteamGames}
               libraryOwnerNickname={libraryOwnerNickname}
               personalizedQuestShelfTitle={personalizedQuestShelfTitle}
+              shelfIdentity={shelfIdentity}
+              steamAvatarUrl={steamAvatarUrl}
+              steamPersonaName={steamProfileName}
               controllerLayoutPreference={controllerLayoutPreference}
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
@@ -1801,6 +1825,7 @@ function App() {
               onBackupExported={() => markOnboardingItemComplete('backup-exported')}
               onCategoryChange={setActiveSettingsCategory}
               onLibraryOwnerNicknameChange={setLibraryOwnerNickname}
+              onShelfIdentityChange={setShelfIdentity}
               onConnectionTested={() => markOnboardingItemComplete('steam-test')}
               onClearLibraryFilters={() => setLibraryFilters(initialCollectionFilters)}
               onEnrichRetroImportedGames={enrichRetroImportedGames}
@@ -1823,7 +1848,7 @@ function App() {
               onRefreshSteamPlaytime={() => refreshSteamPlaytime()}
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
-              onSteamProfileNameChange={setSteamProfileName}
+              onSteamProfileNameChange={handleSteamProfileNameChange}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
               onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
               onSyncSteamWishlist={syncSteamWishlist}
@@ -1894,12 +1919,16 @@ function App() {
           onOpenQueue={() => handleOnboardingAction('ready', 'secondary')}
           onSkip={skipOnboardingItem}
           onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
-          onSteamProfileNameChange={setSteamProfileName}
+          onSteamProfileNameChange={handleSteamProfileNameChange}
           libraryOwnerNickname={libraryOwnerNickname}
           personalizedQuestShelfTitle={personalizedQuestShelfTitle}
+          shelfIdentity={shelfIdentity}
+          steamAvatarUrl={steamAvatarUrl}
+          steamPersonaName={steamProfileName}
           appTemplatePreference={appTemplatePreference}
           accentColorPreference={accentColorPreference}
           onLibraryOwnerNicknameChange={setLibraryOwnerNickname}
+          onShelfIdentityChange={setShelfIdentity}
           onAppTemplatePreferenceChange={setAppTemplatePreference}
           onAccentColorChange={setAccentColorPreference}
         />
@@ -3162,6 +3191,9 @@ type SettingsPanelProps = {
   ignoredSteamGames: IgnoredSteamGame[];
   libraryOwnerNickname: string;
   personalizedQuestShelfTitle: string;
+  shelfIdentity: ShelfIdentitySettings;
+  steamAvatarUrl: string;
+  steamPersonaName: string;
   controllerLayoutPreference: ControllerLayoutPreference;
   isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
@@ -3183,6 +3215,7 @@ type SettingsPanelProps = {
   onBackupExported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
   onLibraryOwnerNicknameChange: (nickname: string) => void;
+  onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
   onClearLibraryFilters: () => void;
   onConnectionTested: () => void;
   onEnrichRetroImportedGames: (gameIds: string[]) => void;
@@ -3229,6 +3262,9 @@ function SettingsPanel({
   ignoredSteamGames,
   libraryOwnerNickname,
   personalizedQuestShelfTitle,
+  shelfIdentity,
+  steamAvatarUrl,
+  steamPersonaName,
   controllerLayoutPreference,
   isControllerDebugEnabled,
   isLandscapeLockEnabled,
@@ -3250,6 +3286,7 @@ function SettingsPanel({
   onBackupExported,
   onCategoryChange,
   onLibraryOwnerNicknameChange,
+  onShelfIdentityChange,
   onClearLibraryFilters,
   onConnectionTested,
   onEnrichRetroImportedGames,
@@ -3451,7 +3488,11 @@ function SettingsPanel({
                 language={language}
                 libraryOwnerNickname={libraryOwnerNickname}
                 personalizedQuestShelfTitle={personalizedQuestShelfTitle}
+                shelfIdentity={shelfIdentity}
+                steamAvatarUrl={steamAvatarUrl}
+                steamPersonaName={steamPersonaName}
                 onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange}
+                onShelfIdentityChange={onShelfIdentityChange}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
                 onLandscapeLockChange={onLandscapeLockChange}

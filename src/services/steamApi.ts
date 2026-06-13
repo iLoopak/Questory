@@ -75,6 +75,8 @@ type PlayerSummaryResponse = {
     profilestate?: number;
     profileurl?: string;
     realname?: string;
+    avatarfull?: string;
+    avatarmedium?: string;
   }>;
 };
 
@@ -446,11 +448,13 @@ export async function getSteamPlayerSummary(settings: SteamSettings): Promise<St
   const personaName = typeof player.personaname === 'string' ? player.personaname.trim() : '';
   const profileName = typeof player.realname === 'string' ? player.realname.trim() : '';
   const profileUrl = typeof player.profileurl === 'string' ? player.profileurl.trim() : '';
+  const avatarUrl = typeof player.avatarfull === 'string' ? player.avatarfull.trim() : typeof player.avatarmedium === 'string' ? player.avatarmedium.trim() : '';
 
   return {
     ...(personaName ? { personaName } : {}),
     ...(profileName ? { profileName } : {}),
     ...(profileUrl ? { profileUrl } : {}),
+    ...(avatarUrl ? { avatarUrl } : {}),
   };
 }
 

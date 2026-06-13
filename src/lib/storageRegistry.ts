@@ -19,6 +19,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.secondaryAccentColor.v1'
   | 'questshelf.appTemplate.v1'
   | 'questshelf.appPersonalization.v1'
+  | 'questshelf.shelfIdentity.v1'
   | 'questshelf.languagePreference.v1'
   | 'questshelf.navigationVisibility.v1'
   | 'questshelf.storageIssues.v1';
@@ -168,11 +169,18 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     schema: '\'classic\' | \'neon-deck\'.',
   },
   {
-    backup: 'never',
+    backup: 'default',
     key: 'questshelf.appPersonalization.v1',
     purpose: 'Library owner nickname used for personalized app titles.',
     scope: 'ui',
     schema: 'AppPersonalizationSettings.',
+  },
+  {
+    backup: 'default',
+    key: 'questshelf.shelfIdentity.v1',
+    purpose: 'Shelf Identity avatar selection, uploaded avatar data, and optional Shelf Name.',
+    scope: 'core',
+    schema: 'ShelfIdentitySettings.',
   },
   {
     backup: 'never',
