@@ -92,7 +92,8 @@ import {
   sanitizeLibraryOwnerNickname,
   saveAppPersonalizationSettings,
 } from './lib/appPersonalization';
-import { getComputedFeaturedGame, getComputedShelfTitle, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
+import { getComputedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
+import { getActiveQuestShelfAchievement, getQuestShelfAchievements } from './lib/questShelfAchievements';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
 import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -226,7 +227,6 @@ function App() {
     () => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle),
     [legacyQuestShelfTitle, shelfIdentity.shelfName],
   );
-  const computedShelfTitle = useMemo(() => getComputedShelfTitle(games), [games]);
   const computedFeaturedGame = useMemo(() => getComputedFeaturedGame(games), [games]);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
 
@@ -257,6 +257,9 @@ function App() {
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
+  const questShelfAchievements = useMemo(() => getQuestShelfAchievements(games, platformQueueState), [games, platformQueueState]);
+  const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
+  const computedShelfTitle = activeShelfAchievement?.title ?? '';
   const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
   const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
@@ -1776,6 +1779,9 @@ function App() {
             <RecommendationPanel
               games={games}
               queueState={platformQueueState}
+              shelfTitle={computedShelfTitle}
+              shelfName={personalizedQuestShelfTitle}
+              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -1812,6 +1818,8 @@ function App() {
               libraryOwnerNickname={libraryOwnerNickname}
               personalizedQuestShelfTitle={personalizedQuestShelfTitle}
               shelfIdentity={shelfIdentity}
+              questShelfAchievements={questShelfAchievements}
+              activeAchievementTitle={computedShelfTitle}
               steamAvatarUrl={steamAvatarUrl}
               steamPersonaName={steamProfileName}
               controllerLayoutPreference={controllerLayoutPreference}
@@ -2350,7 +2358,7 @@ function CollectionPanel({
       scrollRef={collectionPanelRef}
       stickyChrome={
         <>
-          {collectionType === 'library' && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
+          {(collectionType === 'library' || collectionType === 'wishlist') && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
           <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
             {shelfAvatar}
             <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || title}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> 🏆 {shelfTitle}</span> : null}</div>
@@ -3211,6 +3219,8 @@ type SettingsPanelProps = {
   libraryOwnerNickname: string;
   personalizedQuestShelfTitle: string;
   shelfIdentity: ShelfIdentitySettings;
+  questShelfAchievements: ReturnType<typeof getQuestShelfAchievements>;
+  activeAchievementTitle: string;
   steamAvatarUrl: string;
   steamPersonaName: string;
   controllerLayoutPreference: ControllerLayoutPreference;
@@ -3282,6 +3292,8 @@ function SettingsPanel({
   libraryOwnerNickname,
   personalizedQuestShelfTitle,
   shelfIdentity,
+  questShelfAchievements,
+  activeAchievementTitle,
   steamAvatarUrl,
   steamPersonaName,
   controllerLayoutPreference,
@@ -3488,6 +3500,8 @@ function SettingsPanel({
               <PersonalizationSettingsPanel
                 personalizedQuestShelfTitle={personalizedQuestShelfTitle}
                 shelfIdentity={shelfIdentity}
+                achievements={questShelfAchievements}
+                activeAchievementTitle={activeAchievementTitle}
                 onShelfIdentityChange={onShelfIdentityChange}
               />
             </div>
