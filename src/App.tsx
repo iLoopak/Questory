@@ -15,7 +15,7 @@ import { HomePanel } from './components/HomePanel';
 import { MetadataEnrichmentPanel } from './components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
-import { QueuePanel, type PlayingGameAction } from './components/QueuePanel';
+import { QueuePanel } from './components/QueuePanel';
 import { IsThereAnyDealSettingsPanel } from './components/IsThereAnyDealSettingsPanel';
 import { RawgSettingsPanel } from './components/RawgSettingsPanel';
 import { RecommendationPanel } from './components/RecommendationPanel';
@@ -105,19 +105,11 @@ import {
   type OnboardingState,
 } from './lib/onboardingStorage';
 import {
-  addActiveQueuePlatform,
-  addGameToPlatformQueue,
-  addGameToPlatformQueueTop,
-  getPlatformTag,
   getActiveQueuePlatforms,
   getQueuePlatforms,
   getQueueSummary,
   loadPlatformQueueState,
-  moveQueueEntry,
-  moveQueueEntryToPlatform,
-  removeGameFromPlatformQueue,
   savePlatformQueueState,
-  updatePlatformQueueSetting,
   type PlatformQueueState,
 } from './lib/platformQueueStorage';
 import { loadIsThereAnyDealSettings } from './lib/isThereAnyDealSettingsStorage';
@@ -175,6 +167,7 @@ import { useAppNavigation } from './hooks/useAppNavigation';
 import { useCollectionUiState, useCollectionViewMode } from './hooks/useCollectionUiState';
 import { useGameSelection } from './hooks/useGameSelection';
 import { useQuestShelfNotifications } from './hooks/useQuestShelfNotifications';
+import { useQueueActions } from './hooks/useQueueActions';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
@@ -1800,124 +1793,8 @@ function App() {
     }));
   }
 
-  function addQueuePlatform(platform: GamePlatform) {
-    setPlatformQueueState((currentState) => addActiveQueuePlatform(currentState, platform));
-    markOnboardingItemComplete('platforms');
-  }
-
   function openBacklogPicker(game: Game) {
     setBacklogPickerGame(game);
-  }
-
-  function addGameToQueue(game: Game, platform: GamePlatform) {
-    addUndoAction(formatGameToastMessage(t('toast.addedToPlatforms'), game), {
-      actionType: 'add-to-queue',
-      affectedGameIds: [game.id],
-      description: formatMessageTemplate(t('app.removeFromPlatformBacklog'), { game: game.title, platform }),
-    }, undefined, { actions: [getUndoAction()] });
-
-    const platformTag = getPlatformTag(platformQueueState, platform);
-    if (platformTag && !game.tags.includes(platformTag)) {
-      setGames((currentGames) =>
-        currentGames.map((currentGame) =>
-          currentGame.id === game.id
-            ? touchGameRecord({
-                ...currentGame,
-                tags: Array.from(new Set([...currentGame.tags, platformTag])),
-              })
-            : currentGame,
-        ),
-      );
-    }
-
-    setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
-    markOnboardingItemComplete('queue-game');
-  }
-
-  function playQueueGameNow(gameId: string, platform: GamePlatform) {
-    const game = games.find((currentGame) => currentGame.id === gameId);
-    if (!game) {
-      return;
-    }
-
-    addUndoAction(formatGameToastMessage(t('toast.markedPlayingNow'), game), {
-      actionType: 'play-now',
-      affectedGameIds: [game.id],
-      description: formatMessageTemplate(t('app.restoreToPlatformBacklog'), { game: game.title, platform }),
-    }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
-
-    const today = new Date().toISOString().slice(0, 10);
-    const platformTag = getPlatformTag(platformQueueState, platform);
-    setGames((currentGames) =>
-      currentGames.map((currentGame) => {
-        if (currentGame.id !== gameId) {
-          return currentGame;
-        }
-
-        return touchGameRecord({
-          ...currentGame,
-          platform,
-          status: 'Playing',
-          tags: platformTag ? Array.from(new Set([...currentGame.tags, platformTag])) : currentGame.tags,
-          lastPlayedAt: today,
-        });
-      }),
-    );
-
-    setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId));
-  }
-
-  function updateCurrentlyPlayingGame(gameId: string, platform: GamePlatform, action: PlayingGameAction) {
-    const game = games.find((currentGame) => currentGame.id === gameId);
-    if (!game) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const nextStatus: GameStatus = action === 'finished' ? 'Finished' : action === 'drop' ? 'Dropped' : 'Want to play';
-    const actionLabels: Record<PlayingGameAction, string> = {
-      'move-to-backlog': formatGameToastMessage(t('toast.addedToPlatforms'), game),
-      finished: formatGameToastMessage(t('toast.markedFinished'), game),
-      drop: formatGameToastMessage(t('toast.dropped'), game),
-      'remove-from-playing': `${formatGameToastMessage(t('toast.removedFromPlayingNow'), game)} on ${platform}`,
-    };
-
-    addUndoAction(actionLabels[action], {
-      actionType: 'playing-action',
-      affectedGameIds: [game.id],
-      description: formatMessageTemplate(t('app.restoreToPlayingNow'), { game: game.title }),
-    }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
-
-    setGames((currentGames) =>
-      currentGames.map((currentGame) => {
-        if (currentGame.id !== gameId) {
-          return currentGame;
-        }
-
-        return touchGameRecord({
-          ...currentGame,
-          status: nextStatus,
-          finishedAt: action === 'finished' ? now : currentGame.finishedAt,
-          droppedAt: action === 'drop' ? now : currentGame.droppedAt,
-        });
-      }),
-    );
-
-    setPlatformQueueState((currentState) =>
-      action === 'move-to-backlog' ? addGameToPlatformQueueTop(currentState, { ...game, status: 'Want to play' }, platform) : removeGameFromPlatformQueue(currentState, gameId),
-    );
-  }
-
-  function playGameFromCompactRow(game: Game) {
-    playQueueGameNow(game.id, game.platform);
-  }
-
-  function finishGameFromCompactRow(game: Game) {
-    updateCurrentlyPlayingGame(game.id, game.platform, 'finished');
-  }
-
-  function dropGameFromCompactRow(game: Game) {
-    updateCurrentlyPlayingGame(game.id, game.platform, 'drop');
   }
 
   function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
@@ -2055,45 +1932,28 @@ function App() {
     }));
   }
 
-  function moveQueueGame(gameId: string, direction: 'top' | 'up' | 'down') {
-    setPlatformQueueState((currentState) => moveQueueEntry(currentState, gameId, direction));
-  }
-
-  function moveQueueGameToPlatform(gameId: string, platform: GamePlatform) {
-    if (!activeQueuePlatforms.includes(platform)) {
-      return;
-    }
-
-    const game = games.find((currentGame) => currentGame.id === gameId);
-    const currentEntry = platformQueueState.entries.find((entry) => entry.gameId === gameId);
-    if (game && currentEntry && currentEntry.targetPlatform !== platform) {
-      addUndoAction(getMoveQueueToastMessage(game, platform), {
-        actionType: 'move-between-collections',
-        affectedGameIds: [gameId],
-        description: formatMessageTemplate(t('app.restoreToPlatformBacklog'), { game: game.title, platform: currentEntry.targetPlatform }),
-      }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
-    }
-
-    setPlatformQueueState((currentState) => moveQueueEntryToPlatform(currentState, gameId, platform));
-  }
-
-  function removeQueueGame(gameId: string) {
-    const game = games.find((currentGame) => currentGame.id === gameId);
-    const entry = platformQueueState.entries.find((queueEntry) => queueEntry.gameId === gameId);
-    if (game && entry) {
-      addUndoAction(getRemoveQueueToastMessage(game, entry.targetPlatform), {
-        actionType: 'remove-from-queue',
-        affectedGameIds: [gameId],
-        description: formatMessageTemplate(t('app.restoreToPlanPosition'), { game: game.title, position: entry.queuePosition }),
-      }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
-    }
-
-    setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId));
-  }
-
-  function updateQueueLimit(platform: GamePlatform, maxActiveGames: number) {
-    setPlatformQueueState((currentState) => updatePlatformQueueSetting(currentState, platform, maxActiveGames));
-  }
+  const {
+    addGameToQueue,
+    addQueuePlatform,
+    dropGameFromCompactRow,
+    finishGameFromCompactRow,
+    moveQueueGame,
+    moveQueueGameToPlatform,
+    playGameFromCompactRow,
+    playQueueGameNow,
+    removeQueueGame,
+    updateCurrentlyPlayingGame,
+    updateQueueLimit,
+  } = useQueueActions({
+    activeQueuePlatforms,
+    addUndoAction,
+    games,
+    markOnboardingItemComplete,
+    platformQueueState,
+    setGames,
+    setPlatformQueueState,
+    t,
+  });
 
   function openQueueFromToast() {
     setSelectedGameId(null);
