@@ -70,19 +70,17 @@ export function AppearanceSettingsPanel({
     value: ThemePreference;
   }> = [
     {
-      description:
-        "Bright cards and dark text tuned for outdoor handheld sessions.",
+      description: t("settings.lightThemeDescription"),
       label: t("settings.light"),
       value: "light",
     },
     {
-      description: "The classic QuestShelf brand glow on dark gaming panels.",
+      description: t("settings.darkThemeDescription"),
       label: t("settings.dark"),
       value: "dark",
     },
     {
-      description:
-        "Automatically follows Android, PWA, browser, and desktop OS theme changes.",
+      description: t("settings.systemThemeDescription"),
       label: t("settings.followDevice"),
       value: "system",
     },
@@ -414,16 +412,16 @@ export function AppearanceSettingsPanel({
                     className="h-4 w-4 rounded-full"
                     style={{ backgroundColor: selectedAccentColor }}
                   />
-                  <span>Primary</span>
+                  <span>{t("settings.primaryAccent")}</span>
                   <span
                     className="h-4 w-4 rounded-full"
                     style={{ backgroundColor: selectedSecondaryAccentColor }}
                   />
-                  <span>Secondary</span>
+                  <span>{t("settings.secondaryAccent")}</span>
                 </div>
                 <div className="mt-3 rounded-lg border p-3">
                   <div className="qs-neon-preview-button inline-flex rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.12em]">
-                    Button sample
+                    {t("settings.buttonSample")}
                   </div>
                   <div className="mt-3 text-xs text-slate-400">
                     Card border and glow sample
@@ -434,13 +432,13 @@ export function AppearanceSettingsPanel({
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <label className="rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
-                <span className="font-semibold text-white">Primary accent</span>
+                <span className="font-semibold text-white">{t("settings.primaryAccent")}</span>
                 <span className="mt-1 block text-xs text-slate-500">
-                  Main glow, CTA fill, selected borders.
+                  {t("settings.primaryAccentHelp")}
                 </span>
                 <div className="mt-3 flex items-center gap-3">
                   <input
-                    aria-label="Primary accent color"
+                    aria-label={t("settings.primaryAccentColor")}
                     className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
                     onChange={(event) => selectAccentColor(event.target.value)}
                     type="color"
@@ -453,14 +451,14 @@ export function AppearanceSettingsPanel({
               </label>
               <label className="rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
                 <span className="font-semibold text-white">
-                  Secondary accent
+                  {t("settings.secondaryAccent")}
                 </span>
                 <span className="mt-1 block text-xs text-slate-500">
-                  Counter-glow, gradients, card highlights.
+                  {t("settings.secondaryAccentHelp")}
                 </span>
                 <div className="mt-3 flex items-center gap-3">
                   <input
-                    aria-label="Secondary accent color"
+                    aria-label={t("settings.secondaryAccentColor")}
                     className="qs-accent-color-input h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1"
                     onChange={(event) =>
                       selectSecondaryAccentColor(event.target.value)

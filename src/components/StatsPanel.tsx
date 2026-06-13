@@ -131,13 +131,13 @@ function QueueStatsPanel({ queueSummary }: { queueSummary: PlatformQueueSummary 
           <p className="mt-1 text-sm text-slate-400">{t('stats.platformsPlanningHelp')}</p>
         </div>
         <span className="rounded-md border border-mint/30 bg-mint/10 px-2.5 py-1 text-sm font-semibold text-mint">
-          {queueSummary.queuedCount} planned
+          {queueSummary.queuedCount} {t('stats.planned')}
         </span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Total planned games" value={queueSummary.queuedCount.toString()} compact />
-        <MetricCard label="Estimated planned hours" value={`${queueSummary.estimatedBacklogHours}h`} compact />
-        <MetricCard label="Average plan age" value={`${queueSummary.averageQueueAgeDays}d`} compact />
+        <MetricCard label={t('stats.totalPlannedGames')} value={queueSummary.queuedCount.toString()} compact />
+        <MetricCard label={t('stats.estimatedPlannedHours')} value={`${queueSummary.estimatedBacklogHours}h`} compact />
+        <MetricCard label={t('stats.averagePlanAge')} value={`${queueSummary.averageQueueAgeDays}d`} compact />
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {queueSummary.platformSizes.slice(0, 8).map((item) => (
@@ -149,27 +149,31 @@ function QueueStatsPanel({ queueSummary }: { queueSummary: PlatformQueueSummary 
 }
 
 function SummaryGrid({ stats }: { stats: QuestShelfStats }) {
+  const { t } = useI18n();
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="Total games in Library" value={stats.libraryTotal.toString()} />
-      <MetricCard label="Total Wishlist items" value={stats.wishlistTotal.toString()} />
-      <MetricCard label="Playing Now" value={stats.statusCounts.Playing.toString()} />
-      <MetricCard label="Paused" value={stats.statusCounts.Paused.toString()} />
-      <MetricCard label="Finished" value={stats.statusCounts.Finished.toString()} />
-      <MetricCard label="Dropped" value={stats.statusCounts.Dropped.toString()} />
-      <MetricCard label="Want to play" value={stats.statusCounts['Want to play'].toString()} />
-      <MetricCard label="Total tracked playtime" value={`${stats.totalTrackedPlaytime}h`} />
+      <MetricCard label={t('stats.totalLibraryGames')} value={stats.libraryTotal.toString()} />
+      <MetricCard label={t('stats.totalWishlistItems')} value={stats.wishlistTotal.toString()} />
+      <MetricCard label={t('quick.playingNow')} value={stats.statusCounts.Playing.toString()} />
+      <MetricCard label={t('status.paused')} value={stats.statusCounts.Paused.toString()} />
+      <MetricCard label={t('status.finished')} value={stats.statusCounts.Finished.toString()} />
+      <MetricCard label={t('status.dropped')} value={stats.statusCounts.Dropped.toString()} />
+      <MetricCard label={t('stats.wantToPlay')} value={stats.statusCounts['Want to play'].toString()} />
+      <MetricCard label={t('stats.totalTrackedPlaytime')} value={`${stats.totalTrackedPlaytime}h`} />
     </div>
   );
 }
 
 function ProgressGrid({ stats }: { stats: QuestShelfStats }) {
+  const { t } = useI18n();
+
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <ProgressCard label="Finished percentage" value={`${stats.finishedPercent}%`} percent={stats.finishedPercent} />
-      <MetricCard label="Active Platforms" value={stats.activeBacklogCount.toString()} />
-      <MetricCard label="Played but not finished" value={stats.gamesWithPlaytimeNotFinished.toString()} />
-      <MetricCard label="Never played" value={stats.gamesNeverPlayed.toString()} />
+      <ProgressCard label={t('stats.finishedPercentage')} value={`${stats.finishedPercent}%`} percent={stats.finishedPercent} />
+      <MetricCard label={t('stats.activePlatforms')} value={stats.activeBacklogCount.toString()} />
+      <MetricCard label={t('stats.playedNotFinished')} value={stats.gamesWithPlaytimeNotFinished.toString()} />
+      <MetricCard label={t('stats.neverPlayed')} value={stats.gamesNeverPlayed.toString()} />
     </div>
   );
 }
@@ -182,7 +186,7 @@ function AchievementStatsPanel({ stats }: { stats: QuestShelfStats }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-white">{t('collection.achievements')}</h3>
-          <p className="mt-1 text-sm text-slate-400">Lightweight Steam achievement overview from synced summaries.</p>
+          <p className="mt-1 text-sm text-slate-400">{t('stats.achievementOverviewHelp')}</p>
         </div>
         <span className="rounded-md border border-mint/30 bg-ink-950/60 px-2.5 py-1 text-sm font-semibold text-mint">
           {stats.achievementAverageCompletionPercent}%
@@ -208,17 +212,17 @@ function HltbStatsPanel({ stats }: { stats: QuestShelfStats }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-white">HowLongToBeat</h3>
-          <p className="mt-1 text-sm text-slate-400">{t('hltb.estimatedTime')} overview for the current scope.</p>
+          <p className="mt-1 text-sm text-slate-400">{t('stats.hltbOverview')}</p>
         </div>
         <span className="rounded-md border border-skyglass/30 bg-ink-950/60 px-2.5 py-1 text-sm font-semibold text-sky-100">
           {stats.hltbGamesWithDataCount}
         </span>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricCard label="Games with HLTB data" value={stats.hltbGamesWithDataCount.toString()} compact />
-        <MetricCard label="Average game length" value={stats.hltbAverageGameLength ? `${stats.hltbAverageGameLength}h` : 'n/a'} compact />
+        <MetricCard label={t('stats.gamesWithHltbData')} value={stats.hltbGamesWithDataCount.toString()} compact />
+        <MetricCard label={t('stats.averageGameLength')} value={stats.hltbAverageGameLength ? `${stats.hltbAverageGameLength}h` : t('detail.notAvailable')} compact />
         <MetricCard label={t('hltb.shortGame')} value={stats.hltbShortGameCount.toString()} compact />
-        <MetricCard label="Medium games" value={stats.hltbMediumGameCount.toString()} compact />
+        <MetricCard label={t('stats.mediumGames')} value={stats.hltbMediumGameCount.toString()} compact />
         <MetricCard label={t('hltb.longGame')} value={stats.hltbLongGameCount.toString()} compact />
       </div>
     </section>
@@ -243,8 +247,8 @@ function EnrichmentPanel({ stats }: { stats: QuestShelfStats }) {
         <div className="h-full rounded-full bg-mint shadow-glow" style={{ width: `${stats.enrichmentCompletionPercent}%` }} />
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <MetricCard label="RAWG enriched" value={stats.rawgEnrichedCount.toString()} compact />
-        <MetricCard label="Missing metadata" value={stats.missingMetadataCount.toString()} compact />
+        <MetricCard label={t('stats.rawgEnriched')} value={stats.rawgEnrichedCount.toString()} compact />
+        <MetricCard label={t('stats.missingMetadata')} value={stats.missingMetadataCount.toString()} compact />
       </div>
     </section>
   );

@@ -5,7 +5,7 @@ import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameActionMenu } from './GameActionMenu';
 import { PlatformBadge } from './PlatformBadge';
-import { useI18n } from '../i18n';
+import { translateOption, useI18n } from '../i18n';
 
 type GameCardProps = {
   game: Game;
@@ -200,7 +200,7 @@ function GameCardComponent({
             {game.title}
           </h3>
 
-          <div className="qs-game-card-status mt-2 inline-flex rounded-full text-sm text-slate-400">{game.status}</div>
+          <div className="qs-game-card-status mt-2 inline-flex rounded-full text-sm text-slate-400">{translateOption(game.status, t)}</div>
 
         </div>
 

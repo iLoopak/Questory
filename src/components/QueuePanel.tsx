@@ -175,7 +175,7 @@ export function QueuePanel({
             onClick={() => setIsPlatformModalOpen(true)}
             type="button"
           >
-            ＋ Add Platform
+            ＋ {t('queue.addPlatform')}
           </button>
         }
         actionMenu={
@@ -265,10 +265,10 @@ export function QueuePanel({
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">
-          <div className="font-semibold text-white">No platforms yet</div>
-          <p className="mt-1 text-slate-300">Create your first platform to make Platforms personal.</p>
+          <div className="font-semibold text-white">{t('queue.noPlatformsYet')}</div>
+          <p className="mt-1 text-slate-300">{t('queue.noPlatformsCreateHelp')}</p>
           <button className="mt-3 h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => setIsPlatformModalOpen(true)} type="button">
-            ＋ Add Platform
+            ＋ {t('queue.addPlatform')}
           </button>
         </div>
       ) : null}
@@ -368,6 +368,7 @@ function AddPlatformModal({
   onClose: () => void;
   onCreate: (state: PlatformQueueState, platform: GamePlatform) => void;
 }) {
+  const { t } = useI18n();
   const [platformName, setPlatformName] = useState('');
   const [accentColor, setAccentColor] = useState('#2563eb');
   const [artworkUrl, setArtworkUrl] = useState('');
@@ -403,14 +404,14 @@ function AddPlatformModal({
     const platformDraft = platformName.trim() as GamePlatform;
 
     if (!platformDraft) {
-      setValidationMessage('Platform name is required.');
+      setValidationMessage(t('queue.platformNameRequired'));
       nameInputRef.current?.focus();
       return;
     }
 
     const existingActivePlatform = activePlatformNames.get(platformDraft.toLowerCase());
     if (existingActivePlatform) {
-      setValidationMessage(`“${existingActivePlatform}” already exists in Platforms. Choose a unique platform name.`);
+      setValidationMessage(t('queue.platformAlreadyExists').replace('{platform}', existingActivePlatform));
       nameInputRef.current?.focus();
       return;
     }
@@ -425,13 +426,13 @@ function AddPlatformModal({
   }
 
   return (
-    <ViewportModal ariaLabel="Add Platform" initialFocusRef={nameInputRef} onClose={onClose} placement="center">
+    <ViewportModal ariaLabel={t('queue.addPlatform')} initialFocusRef={nameInputRef} onClose={onClose} placement="center">
       <form className="max-h-[85vh] overflow-y-auto p-4" onSubmit={submitPlatform}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Platforms</div>
-            <h2 className="mt-1 text-xl font-semibold text-white">Add Platform</h2>
-            <p className="mt-1 text-sm text-slate-400">Create a platform with its accent color, artwork, and preset image before adding games.</p>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('queue.platforms')}</div>
+            <h2 className="mt-1 text-xl font-semibold text-white">{t('queue.addPlatform')}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t('queue.addPlatformHelp')}</p>
           </div>
           <button className="rounded-md border border-white/10 px-2 py-1 text-sm text-slate-300 hover:bg-white/10" onClick={onClose} type="button">
             <Icon name="x" />
@@ -452,7 +453,7 @@ function AddPlatformModal({
         </div>
 
         <label className="mt-4 grid gap-1">
-          <span className="text-xs font-semibold text-slate-400">Platform name <span className="text-red-300">*</span></span>
+          <span className="text-xs font-semibold text-slate-400">{t('queue.platformName')} <span className="text-red-300">*</span></span>
           <input
             ref={nameInputRef}
             aria-invalid={Boolean(validationMessage)}
@@ -468,7 +469,7 @@ function AddPlatformModal({
         </label>
 
         <div className="mt-4">
-          <div className="text-xs font-semibold text-slate-400">Platform presets</div>
+          <div className="text-xs font-semibold text-slate-400">{t('queue.platformPresets')}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {platformPresetSuggestions.map((platform) => (
               <button key={platform} className="min-h-9 rounded-md border border-white/10 px-3 py-1 text-xs text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint" onClick={() => applyPresetPlatform(platform)} type="button">
@@ -492,10 +493,10 @@ function AddPlatformModal({
 
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button className="h-10 rounded-md border border-white/10 px-4 text-sm font-semibold text-slate-200 hover:bg-white/10" onClick={onClose} type="button">
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90" type="submit">
-            Add Platform
+            {t('queue.addPlatform')}
           </button>
         </div>
       </form>

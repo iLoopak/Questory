@@ -6,7 +6,7 @@ import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
-import { useI18n } from '../i18n';
+import { translateOption, useI18n } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
 import { formatHltbBadge, hasHltbData } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
@@ -251,7 +251,7 @@ export function GameDetailView({
 
                   <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
-                    <HeroStat label={t('detail.currentStatus')} value={game.status} accent />
+                    <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
                     {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                     {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} badge={<AchievementProgressBadge game={game} />} /> : null}
@@ -291,8 +291,8 @@ export function GameDetailView({
               <div className="grid gap-3 md:grid-cols-3">
                 <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} />
                 {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt)} />
-                <PersonalStatField label={t('toolbar.status')} value={game.status} />
+                <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
+                <PersonalStatField label={t('toolbar.status')} value={translateOption(game.status, t)} />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
@@ -338,21 +338,21 @@ export function GameDetailView({
               {game.collectionType === 'wishlist' ? (
                 <MetadataAccordion title={t('detail.wishlistPlanning')} summary={t('detail.wishlistPlanningSummary')}>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label="Priority" value={game.priority ?? 'medium'} />
-                    <ReadOnlyField label="Expected playtime" value={formatHours(game.expectedPlaytime)} />
-                    <ReadOnlyField label="Price target" value={game.priceTarget || 'n/a'} />
-                    <ReadOnlyField label="Release date" value={game.releaseDate || 'n/a'} />
-                    <ReadOnlyField label="Steam price" value={game.steamPriceInfo || 'n/a'} />
-                    <ReadOnlyField label="Steam discount" value={game.steamDiscountInfo || 'n/a'} />
-                    <ReadOnlyField label="Steam reviews" value={game.steamReviewInfo || 'n/a'} />
-                    <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || 'n/a'} />
-                    <ReadOnlyField label="Deal store" value={game.itadCurrentBestShop || 'n/a'} />
-                    <ReadOnlyField label="Discount" value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : 'n/a'} />
-                    <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || 'n/a'} />
-                    <ReadOnlyField label="Historical low status" value={game.itadIsHistoricalLow ? t('itad.historicalLow') : 'n/a'} />
-                    <ReadOnlyField label="Wishlist imported" value={formatDateTime(game.wishlistImportedAt)} />
-                    <ReadOnlyField label="Wishlist synced" value={formatDateTime(game.wishlistSyncedAt)} />
-                    <ReadOnlyLink label="Store URL" value={game.storeUrl} />
+                    <ReadOnlyField label={t('detail.priority')} value={t(`priority.${game.priority ?? 'medium'}` as 'priority.low' | 'priority.medium' | 'priority.high')} />
+                    <ReadOnlyField label={t('detail.expectedPlaytime')} value={formatHours(game.expectedPlaytime, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('detail.priceTarget')} value={game.priceTarget || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.releaseDate')} value={game.releaseDate || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.steamPrice')} value={game.steamPriceInfo || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.steamDiscount')} value={game.steamDiscountInfo || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.steamReviews')} value={game.steamReviewInfo || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.dealStore')} value={game.itadCurrentBestShop || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.discount')} value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.historicalLowStatus')} value={game.itadIsHistoricalLow ? t('itad.historicalLow') : t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.wishlistImported')} value={formatDateTime(game.wishlistImportedAt, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('detail.wishlistSynced')} value={formatDateTime(game.wishlistSyncedAt, t('detail.notAvailable'))} />
+                    <ReadOnlyLink label={t('detail.storeUrl')} value={game.storeUrl} />
                     <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
                   </div>
                 </MetadataAccordion>
@@ -361,14 +361,14 @@ export function GameDetailView({
               <MetadataAccordion title={t('detail.steamData')} summary={t('detail.steamDataSummary')}>
                 {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? 'n/a'} />
-                    <ReadOnlyField label="Imported" value={formatDateTime(game.importedAt)} />
-                    <ReadOnlyField label="Source" value={game.externalSource ?? 'n/a'} />
+                    <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.imported')} value={formatDateTime(game.importedAt, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('detail.source')} value={game.externalSource ?? t('detail.notAvailable')} />
                     {achievementSummary ? <ReadOnlyField label={t('collection.achievements')} value={achievementSummary} /> : null}
                     {game.steamLastAchievementUnlockTime ? (
-                      <ReadOnlyField label="Last achievement unlock" value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString())} />
+                      <ReadOnlyField label={t('detail.lastAchievementUnlock')} value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString(), t('detail.notAvailable'))} />
                     ) : null}
-                    <ReadOnlyLink label="External URL" value={game.externalUrl} />
+                    <ReadOnlyLink label={t('detail.externalUrl')} value={game.externalUrl} />
                   </div>
                 ) : (
                   <EmptyState text={t('detail.noSteamMetadata')} />
@@ -379,13 +379,13 @@ export function GameDetailView({
               {hasHltbData(game) ? (
                 <MetadataAccordion title="HowLongToBeat" summary={t('hltb.estimatedTime')}>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours)} />
-                    <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours)} />
-                    <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours)} />
-                    <ReadOnlyField label="Matched title" value={game.hltbTitle ?? 'n/a'} />
-                    <ReadOnlyField label="Match confidence" value={formatConfidence(game.hltbMatchConfidence)} />
-                    <ReadOnlyField label="Last synced" value={formatDateTime(game.hltbLastSyncedAt)} />
-                    {game.hltbSourceUrl ? <ReadOnlyLink label="Source" value={game.hltbSourceUrl} /> : null}
+                    <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('detail.matchedTitle')} value={game.hltbTitle ?? t('detail.notAvailable')} />
+                    <ReadOnlyField label={t('detail.matchConfidence')} value={formatConfidence(game.hltbMatchConfidence, t('detail.notAvailable'))} />
+                    <ReadOnlyField label={t('detail.lastSynced')} value={formatDateTime(game.hltbLastSyncedAt, t('detail.notAvailable'))} />
+                    {game.hltbSourceUrl ? <ReadOnlyLink label={t('detail.source')} value={game.hltbSourceUrl} /> : null}
                   </div>
                 </MetadataAccordion>
               ) : null}
@@ -394,16 +394,16 @@ export function GameDetailView({
                 {game.metadataSource === 'rawg' ? (
                   <div className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <ReadOnlyField label="Released" value={game.released ?? 'Unknown'} />
-                      <ReadOnlyField label="Metacritic" value={game.metacritic?.toString() ?? 'n/a'} />
-                      <ReadOnlyField label="Average playtime" value={formatHours(game.averagePlaytime)} />
-                      <ReadOnlyField label="Updated" value={formatDateTime(game.metadataUpdatedAt)} />
-                      <ReadOnlyField label="Developers" value={formatList(game.developers)} />
-                      <ReadOnlyField label="Publishers" value={formatList(game.publishers)} />
+                      <ReadOnlyField label={t('detail.released')} value={game.released ?? t('detail.unknown')} />
+                      <ReadOnlyField label="Metacritic" value={game.metacritic?.toString() ?? t('detail.notAvailable')} />
+                      <ReadOnlyField label={t('detail.averagePlaytime')} value={formatHours(game.averagePlaytime, t('detail.notAvailable'))} />
+                      <ReadOnlyField label={t('detail.updated')} value={formatDateTime(game.metadataUpdatedAt, t('detail.notAvailable'))} />
+                      <ReadOnlyField label={t('detail.developers')} value={formatList(game.developers, t('detail.notAvailable'))} />
+                      <ReadOnlyField label={t('detail.publishers')} value={formatList(game.publishers, t('detail.notAvailable'))} />
                     </div>
 
-                    <ChipGroup label="Genres" values={game.genres} accent="mint" />
-                    <ChipGroup label="RAWG tags" values={game.rawgTags} />
+                    <ChipGroup label={t('detail.genres')} values={game.genres} accent="mint" />
+                    <ChipGroup label={t('detail.rawgTags')} values={game.rawgTags} />
                     {canApplyRawgCover ? (
                       <button
                         className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
@@ -626,17 +626,17 @@ function formatPlatformSource(game: Game) {
   return game.platform;
 }
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null, notStartedText: string) {
   if (!value) {
-    return 'Not started';
+    return notStartedText;
   }
 
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
 }
 
-function formatDateTime(value?: string) {
+function formatDateTime(value: string | undefined, unavailableText: string) {
   if (!value) {
-    return 'n/a';
+    return unavailableText;
   }
 
   return new Intl.DateTimeFormat('en', {
@@ -648,15 +648,14 @@ function formatDateTime(value?: string) {
   }).format(new Date(value));
 }
 
-function formatHours(value?: number | null) {
-  return typeof value === 'number' ? `${value}h` : 'n/a';
+function formatHours(value: number | null | undefined, unavailableText: string) {
+  return typeof value === 'number' ? `${value}h` : unavailableText;
 }
 
-function formatList(value?: string[]) {
-  return value && value.length > 0 ? value.join(', ') : 'n/a';
+function formatList(value: string[] | undefined, unavailableText: string) {
+  return value && value.length > 0 ? value.join(', ') : unavailableText;
 }
 
-
-function formatConfidence(value?: number) {
-  return typeof value === 'number' ? `${Math.round(value * 100)}%` : 'n/a';
+function formatConfidence(value: number | undefined, unavailableText: string) {
+  return typeof value === 'number' ? `${Math.round(value * 100)}%` : unavailableText;
 }

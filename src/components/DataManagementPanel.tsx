@@ -30,6 +30,10 @@ import {
 import { useI18n } from '../i18n';
 import { downloadRawQuestShelfLocalData, exportQuestShelfBackupFile } from '../lib/backupExport';
 
+function formatMessageTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, String(value)), template);
+}
+
 type DataManagementPanelProps = {
   autoBackupSignal?: string;
   onBackupExported?: () => void;
@@ -247,31 +251,31 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
 
   function showBackupReadyMessage(summary: QuestShelfBackupSummary) {
     showMessage(
-      `Backup ready: exported ${formatDateTime(summary.exportedAt)}, schema ${summary.schemaVersion}, ${summary.gameCount} library games, ${summary.wishlistCount} wishlist items.`,
+      formatMessageTemplate(t('data.backupReady'), { exported: formatDateTime(summary.exportedAt), schema: summary.schemaVersion, libraryCount: summary.gameCount, wishlistCount: summary.wishlistCount }),
       'success',
     );
   }
 
   function restoreBackup() {
     if (!selectedBackup) {
-      showMessage('Choose a valid QuestShelf backup JSON file first.', 'error');
+      showMessage(t('data.chooseBackupFirst'), 'error');
       return;
     }
 
     const summary = getQuestShelfBackupSummary(selectedBackup);
     const confirmation = window.prompt(
       [
-        `${importMode === 'merge' ? 'Merge' : 'Replace'} local QuestShelf data with this backup?`,
-        `Exported: ${formatDateTime(summary.exportedAt)}`,
-        `Schema: ${summary.schemaVersion}`,
-        `Library games: ${summary.gameCount}`,
-        `Wishlist items: ${summary.wishlistCount}`,
-        `Type ${importMode === 'merge' ? 'MERGE' : 'REPLACE'} to continue.`,
+        formatMessageTemplate(t('data.confirmBackupImport'), { mode: importMode === 'merge' ? t('data.merge') : t('data.replace') }),
+        `${t('data.exported')}: ${formatDateTime(summary.exportedAt)}`,
+        `${t('data.schema')}: ${summary.schemaVersion}`,
+        `${t('data.libraryGames')}: ${summary.gameCount}`,
+        `${t('data.wishlistItems')}: ${summary.wishlistCount}`,
+        formatMessageTemplate(t('data.typeToContinue'), { command: importMode === 'merge' ? 'MERGE' : 'REPLACE' }),
       ].join('\n'),
     );
 
     if (confirmation !== (importMode === 'merge' ? 'MERGE' : 'REPLACE')) {
-      showMessage('Import cancelled. Local data was not changed.');
+      showMessage(t('data.importCancelled'));
       return;
     }
 
@@ -388,10 +392,10 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
       {selectedBackupSummary ? (
         <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
           <div className="grid gap-2 sm:grid-cols-4">
-            <BackupSummaryStat label="Exported" value={formatDateTime(selectedBackupSummary.exportedAt)} />
-            <BackupSummaryStat label="Schema" value={selectedBackupSummary.schemaVersion.toString()} />
-            <BackupSummaryStat label="Library" value={selectedBackupSummary.gameCount.toString()} />
-            <BackupSummaryStat label="Wishlist" value={selectedBackupSummary.wishlistCount.toString()} />
+            <BackupSummaryStat label={t('data.exported')} value={formatDateTime(selectedBackupSummary.exportedAt)} />
+            <BackupSummaryStat label={t('data.schema')} value={selectedBackupSummary.schemaVersion.toString()} />
+            <BackupSummaryStat label={t('collection.library')} value={selectedBackupSummary.gameCount.toString()} />
+            <BackupSummaryStat label={t('collection.wishlist')} value={selectedBackupSummary.wishlistCount.toString()} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <label className="flex items-center gap-2 rounded-md border border-skyglass/15 px-3 py-2">

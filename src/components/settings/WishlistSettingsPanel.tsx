@@ -21,6 +21,7 @@ export function SteamWishlistSyncNotice({
 }: {
   syncState: SteamWishlistSyncState;
 }) {
+  const { t } = useI18n();
   const statusStyles = {
     idle: "border-skyglass/15 bg-ink-950/70 text-slate-400",
     loading: "border-skyglass/40 bg-skyglass/10 text-skyglass",
@@ -35,22 +36,22 @@ export function SteamWishlistSyncNotice({
       <div>{syncState.message}</div>
       {syncState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-6">
-          <SyncStat label="Fetched" value={syncState.summary.fetchedCount} />
-          <SyncStat label="Added" value={syncState.summary.addedCount} />
-          <SyncStat label="Updated" value={syncState.summary.updatedCount} />
+          <SyncStat label={t('app.fetched')} value={syncState.summary.fetchedCount} />
+          <SyncStat label={t('app.added')} value={syncState.summary.addedCount} />
+          <SyncStat label={t('app.updated')} value={syncState.summary.updatedCount} />
           <SyncStat
-            label="Unchanged"
+            label={t('app.unchanged')}
             value={syncState.summary.unchangedCount}
           />
           <SyncStat
-            label="In library"
+            label={t('app.inLibrary')}
             value={syncState.summary.skippedAlreadyInLibraryCount}
           />
           <SyncStat
-            label="Ignored"
+            label={t('app.ignored')}
             value={syncState.summary.skippedIgnoredCount}
           />
-          <SyncStat label="Failed" value={syncState.summary.failedCount} />
+          <SyncStat label={t('app.failed')} value={syncState.summary.failedCount} />
         </div>
       ) : null}
     </div>

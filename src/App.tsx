@@ -207,6 +207,16 @@ import type { SteamAchievementSyncState, SteamAchievementSyncSummary, SteamPlayt
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
+
+function formatMessageTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, String(value)), template);
+}
+
+function getLocalizedCollectionName(collectionType: GameCollectionType, t: ReturnType<typeof createTranslator>) {
+  return collectionType === 'wishlist' ? t('collection.wishlist') : t('collection.library');
+}
+
+
 type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>;
 
 function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { className: string; fallbackClassName?: string }) {
@@ -777,7 +787,7 @@ function App() {
       return formatGameToastMessage(t('toast.dropped'), game);
     }
 
-    return `${formatGameToastMessage('{game}', game)} marked as ${status}`;
+    return formatMessageTemplate(t('app.statusUpdatedSingle'), { game: formatGameToastMessage('{game}', game), status: translateOption(status, t) });
   }
 
   function updateGameStatus(gameId: string, status: GameStatus) {
@@ -786,7 +796,7 @@ function App() {
       addUndoAction(getLocalizedStatusToastMessage(game, status), {
         actionType: `mark-${status.toLowerCase()}`,
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to ${game.status}`,
+        description: formatMessageTemplate(t('app.restoreGameStatus'), { game: game.title, status: translateOption(game.status, t) }),
       }, undefined, { actions: [getUndoAction(), getViewGameAction(gameId)] });
     }
 
@@ -807,10 +817,10 @@ function App() {
     const targetGameIds = new Set(gameIds);
     const updatedGames = games.filter((game) => targetGameIds.has(game.id));
     if (updatedGames.length > 0 && (status === 'Playing' || status === 'Finished' || status === 'Dropped')) {
-      addUndoAction(updatedGames.length === 1 ? getLocalizedStatusToastMessage(updatedGames[0], status) : `${updatedGames.length} games marked as ${status}`, {
+      addUndoAction(updatedGames.length === 1 ? getLocalizedStatusToastMessage(updatedGames[0], status) : formatMessageTemplate(t('app.statusUpdated'), { count: updatedGames.length, status: translateOption(status, t) }), {
         actionType: `bulk-mark-${status.toLowerCase()}`,
         affectedGameIds: updatedGames.map((game) => game.id),
-        description: `Restore statuses for ${updatedGames.length} games`,
+        description: formatMessageTemplate(t('app.restoreGameStatuses'), { count: updatedGames.length }),
       });
     }
     const today = new Date().toISOString().slice(0, 10);
@@ -942,7 +952,7 @@ function App() {
       const message =
         error instanceof SteamWishlistError
           ? error.message
-          : 'Steam wishlist sync failed. Check profile privacy, Steam profile settings, and connection.';
+          : t('app.steamWishlistSyncFailedDetails');
 
       setSteamWishlistSyncState({
         status: 'error',
@@ -1100,7 +1110,7 @@ function App() {
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'Steam achievement sync failed. Check your Steam credentials, profile privacy, and connection.';
+            : t('app.steamAchievementSyncFailedDetails');
       const failedSummary: SteamAchievementSyncSummary = {
         failedCount: total,
         noAchievementDataCount: 0,
@@ -1126,9 +1136,9 @@ function App() {
         category: isCredentialError ? 'warning' : 'error',
         dedupeKey: isCredentialError ? 'steam-achievements:credentials' : 'steam-achievements:error',
         details: isCredentialError
-          ? 'Add your Steam API key and SteamID64 so QuestShelf can sync achievements. Your Steam profile may also need public game details.'
+          ? t('app.steamAchievementCredentialsHelp')
           : message,
-        message: isCredentialError ? 'Steam credentials needed' : 'Steam achievement sync failed',
+        message: isCredentialError ? t('app.steamCredentialsNeeded') : t('app.steamAchievementSyncFailed'),
       });
 
       return summaryToReturn;
@@ -1147,7 +1157,7 @@ function App() {
         setSteamAchievementSyncState(
           terminalState ?? {
             status: 'error',
-            message: 'Steam achievement sync stopped before it could finish. Try again.',
+            message: t('app.steamAchievementSyncStopped'),
             progress: { completed: total, total },
             summary: summaryToReturn,
           },
@@ -1176,7 +1186,7 @@ function App() {
       };
       setSteamPlaytimeRefreshState({
         status: 'success',
-        message: options.emptyToastMessage ?? 'No Steam library games were selected for playtime refresh.',
+        message: options.emptyToastMessage ?? t('app.noSteamLibraryGamesSelectedPlaytime'),
         progress: { completed: 0, total },
         summary,
       });
@@ -1184,14 +1194,14 @@ function App() {
         actions: [getDismissAction()],
         category: 'warning',
         dedupeKey: 'steam-playtime-refresh:no-steam-games',
-        message: options.emptyToastMessage ?? 'Select Steam library games to refresh playtime.',
+        message: options.emptyToastMessage ?? t('app.selectSteamLibraryGamesPlaytime'),
       });
       return summary;
     }
 
     setSteamPlaytimeRefreshState((currentState) => ({
       status: 'loading',
-      message: `Fetching Steam playtime for ${total} game${total === 1 ? '' : 's'}...`,
+      message: formatMessageTemplate(t('app.fetchingSteamPlaytime'), { count: total }),
       progress: { completed: 0, total },
       summary: currentState.summary,
     }));
@@ -1207,7 +1217,7 @@ function App() {
       setGames(result.games);
       setSteamPlaytimeRefreshState({
         status: 'success',
-        message: `Steam playtime refresh complete. Updated ${result.summary.updatedCount}, unchanged ${result.summary.unchangedCount}, failed ${result.summary.failedCount}.`,
+        message: formatMessageTemplate(t('app.steamPlaytimeRefreshComplete'), { updated: result.summary.updatedCount, unchanged: result.summary.unchangedCount, failed: result.summary.failedCount }),
         progress: { completed, total },
         summary: result.summary,
       });
@@ -1218,10 +1228,10 @@ function App() {
           actions: [getViewGameAction(refreshableGames[0].id)],
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-playtime-refresh:${refreshableGames[0].id}`,
-          details: options.completionToastMessage?.(result.summary) ?? `Updated playtime for ${result.summary.updatedCount} game${result.summary.updatedCount === 1 ? '' : 's'}`,
+          details: options.completionToastMessage?.(result.summary) ?? formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: result.summary.updatedCount }),
           message: refreshableGames.length === 1
             ? formatGameToastMessage(hasPartialFailures ? t('toast.steamPlaytimePartiallyRefreshed') : t('toast.steamPlaytimeRefreshed'), refreshableGames[0])
-            : hasPartialFailures ? 'Steam playtime partially refreshed' : 'Steam playtime refreshed',
+            : hasPartialFailures ? t('app.steamPlaytimePartiallyRefreshed') : t('app.steamPlaytimeRefreshed'),
         });
       }
 
@@ -1231,7 +1241,7 @@ function App() {
       const message =
         error instanceof SteamApiError
           ? error.message
-          : 'Steam playtime refresh failed. Check your Steam credentials, profile privacy, and connection.';
+          : t('app.steamPlaytimeRefreshFailedDetails');
 
       setSteamPlaytimeRefreshState((currentState) => ({
         status: 'error',
@@ -1246,7 +1256,7 @@ function App() {
         details: isCredentialError
           ? 'Add your Steam API key and SteamID64 so QuestShelf can refresh playtime. Your Steam profile may also need public game details.'
           : message,
-        message: isCredentialError ? 'Steam credentials needed' : 'Steam playtime refresh failed',
+        message: isCredentialError ? t('app.steamCredentialsNeeded') : t('app.steamPlaytimeRefreshFailed'),
       });
 
       return null;
@@ -1390,7 +1400,7 @@ function App() {
         };
       }));
 
-      const message = `${t('itad.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed.`;
+      const message = formatMessageTemplate(t('app.bulkItadSummary'), { updated: summary.updatedCount, noMatch: summary.noMatchCount, failed: summary.failedCount });
       setItadDealSyncState({ status: summary.failedCount > 0 ? 'error' : 'success', message, summary });
       addToastNotification({ category: summary.failedCount > 0 ? 'warning' : 'success', dedupeKey: 'itad-deal-sync-complete', message });
       return summary;
@@ -1399,7 +1409,7 @@ function App() {
         ? t('itad.missingApiKey')
         : error instanceof Error
           ? error.message
-          : 'Deal sync failed.';
+          : t('app.dealSyncFailed');
       setItadDealSyncState({ status: 'error', message, summary: null });
       addToastNotification({ category: 'error', dedupeKey: 'itad-deal-sync-error', message });
       return null;
@@ -1594,11 +1604,11 @@ function App() {
   }
 
   function addManualGame(game: Game) {
-    const collectionName = game.collectionType === 'wishlist' ? 'Wishlist' : 'Library';
-    addUndoAction(`${game.title} added to ${collectionName}`, {
+    const collectionName = getLocalizedCollectionName(game.collectionType, t);
+    addUndoAction(formatMessageTemplate(t('app.gameAddedToCollection'), { game: game.title, collection: collectionName }), {
       actionType: 'add-manual-game',
       affectedGameIds: [game.id],
-      description: `Remove ${game.title} from ${collectionName}`,
+      description: formatMessageTemplate(t('app.removeGameFromCollection'), { game: game.title, collection: collectionName }),
     }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
     setGames((currentGames) => [...currentGames, touchGameRecord(game)]);
   }
@@ -1621,7 +1631,7 @@ function App() {
       addUndoAction(formatGameToastMessage(t('toast.addedToWishlist'), game), {
         actionType: 'add-to-wishlist',
         affectedGameIds: [game.id],
-        description: `Remove ${game.title} from Wishlist`,
+        description: formatMessageTemplate(t('app.removeGameFromCollection'), { game: game.title, collection: t('collection.wishlist') }),
       }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
     }
 
@@ -1663,7 +1673,7 @@ function App() {
       addUndoAction(targetGames.length === 1 ? formatGameToastMessage(t('toast.addedToWishlist'), targetGames[0]) : getBulkWishlistToastMessage(targetGames.length), {
         actionType: 'bulk-add-to-wishlist',
         affectedGameIds: targetGames.map((game) => game.id),
-        description: `Remove ${targetGames.length} wishlist copies`,
+        description: formatMessageTemplate(t('app.removeWishlistCopies'), { count: targetGames.length }),
       });
     }
 
@@ -1712,7 +1722,7 @@ function App() {
     addUndoAction(`${game.title} moved to Library`, {
       actionType: 'move-to-library',
       affectedGameIds: [game.id],
-      description: `Restore ${game.title} to Wishlist`,
+      description: formatMessageTemplate(t('app.restoreGameToCollection'), { game: game.title, collection: t('collection.wishlist') }),
     }, undefined, { actions: [getUndoAction(), getViewGameAction(game.id)] });
 
     setGames((currentGames) =>
@@ -1737,7 +1747,7 @@ function App() {
       addUndoAction(`${game.title} removed from ${game.collectionType === 'wishlist' ? 'Wishlist' : 'Library'}`, {
         actionType: game.collectionType === 'wishlist' ? 'remove-wishlist-item' : 'delete-game',
         affectedGameIds: [gameId],
-        description: `Restore ${game.title}`,
+        description: formatMessageTemplate(t('app.restoreGame'), { game: game.title }),
       });
     }
 
@@ -1753,7 +1763,7 @@ function App() {
     addUndoAction(`${game.title} hidden from Steam imports`, {
       actionType: 'ignore-game',
       affectedGameIds: [game.id],
-      description: `Restore ${game.title} and remove it from ignored Steam imports`,
+      description: formatMessageTemplate(t('app.restoreGameRemoveIgnored'), { game: game.title }),
     });
 
     setIgnoredSteamGames((currentIgnoredGames) =>
@@ -1770,7 +1780,7 @@ function App() {
       addUndoAction(`${removedGames.length} games removed from Library`, {
         actionType: 'bulk-remove-games',
         affectedGameIds: removedGames.map((game) => game.id),
-        description: `Restore ${removedGames.length} removed games`,
+        description: formatMessageTemplate(t('app.restoreRemovedGames'), { count: removedGames.length }),
       });
     }
     setGames((currentGames) => currentGames.filter((game) => !targetGameIds.has(game.id)));
@@ -1784,7 +1794,7 @@ function App() {
       addUndoAction(`${targetGames.length} games hidden from Steam imports`, {
         actionType: 'bulk-remove-and-ignore-games',
         affectedGameIds: targetGames.map((game) => game.id),
-        description: `Restore ${targetGames.length} removed games and ignored imports`,
+        description: formatMessageTemplate(t('app.restoreRemovedGamesAndIgnored'), { count: targetGames.length }),
       });
     }
 
@@ -1824,7 +1834,7 @@ function App() {
       addToastNotification({
         category: 'error',
         dedupeKey: toastKey,
-        message: isArtworkRefresh ? t('artwork.notFoundGame') : 'Could not find that game to refresh metadata.',
+        message: isArtworkRefresh ? t('artwork.notFoundGame') : t('app.metadataRefreshGameNotFound'),
       });
       return 'error';
     }
@@ -1871,7 +1881,7 @@ function App() {
     } catch (error) {
       const message = error instanceof RawgApiError
         ? error.message
-        : 'Metadata refresh failed. Please check your connection and try again.';
+        : t('app.metadataRefreshFailed');
       addToastNotification({
         category: error instanceof RawgApiError && error.code === 'missing-api-key' ? 'warning' : 'error',
         dedupeKey: toastKey,
@@ -1927,7 +1937,7 @@ function App() {
     addUndoAction(formatGameToastMessage(t('toast.addedToPlatforms'), game), {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
-      description: `Remove ${game.title} from ${platform} backlog and restore positions`,
+      description: formatMessageTemplate(t('app.removeFromPlatformBacklog'), { game: game.title, platform }),
     }, undefined, { actions: [getUndoAction()] });
 
     const platformTag = getPlatformTag(platformQueueState, platform);
@@ -1956,7 +1966,7 @@ function App() {
     addUndoAction(formatGameToastMessage(t('toast.markedPlayingNow'), game), {
       actionType: 'play-now',
       affectedGameIds: [game.id],
-      description: `Restore ${game.title} to ${platform} backlog`,
+      description: formatMessageTemplate(t('app.restoreToPlatformBacklog'), { game: game.title, platform }),
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
 
     const today = new Date().toISOString().slice(0, 10);
@@ -1998,7 +2008,7 @@ function App() {
     addUndoAction(actionLabels[action], {
       actionType: 'playing-action',
       affectedGameIds: [game.id],
-      description: `Restore ${game.title} to Playing Now`,
+      description: formatMessageTemplate(t('app.restoreToPlayingNow'), { game: game.title }),
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
 
     setGames((currentGames) =>
@@ -2073,7 +2083,7 @@ function App() {
       addUndoAction(formatGameToastMessage(t('toast.ignored'), game), {
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
-        description: `Restore ${game.title} to Quest Queue`,
+        description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
       });
 
       setReviewModeState((currentState) => ({
@@ -2141,7 +2151,7 @@ function App() {
       addUndoAction(getLocalizedStatusToastMessage(game, changes.status), {
         actionType: `mark-${changes.status.toLowerCase()}`,
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to ${game.status}`,
+        description: formatMessageTemplate(t('app.restoreGameStatus'), { game: game.title, status: translateOption(game.status, t) }),
       }, undefined, { actions: [getUndoAction(), getViewGameAction(gameId)] });
     }
 
@@ -2183,7 +2193,7 @@ function App() {
       addUndoAction(getMoveQueueToastMessage(game, platform), {
         actionType: 'move-between-collections',
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to ${currentEntry.targetPlatform} backlog`,
+        description: formatMessageTemplate(t('app.restoreToPlatformBacklog'), { game: game.title, platform: currentEntry.targetPlatform }),
       }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
@@ -2197,7 +2207,7 @@ function App() {
       addUndoAction(getRemoveQueueToastMessage(game, entry.targetPlatform), {
         actionType: 'remove-from-queue',
         affectedGameIds: [gameId],
-        description: `Restore ${game.title} to plan position ${entry.queuePosition}`,
+        description: formatMessageTemplate(t('app.restoreToPlanPosition'), { game: game.title, position: entry.queuePosition }),
       }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
 
@@ -2222,10 +2232,10 @@ function App() {
   function unignoreSteamGame(steamAppId: number) {
     const ignoredGame = ignoredSteamGames.find((game) => game.steamAppId === steamAppId);
     if (ignoredGame) {
-      addUndoAction('Restored from ignore list', {
+      addUndoAction(t('app.restoredFromIgnoreList'), {
         actionType: 'restore-ignored-steam-game',
         affectedGameIds: [String(steamAppId)],
-        description: `Re-ignore ${ignoredGame.title || `Steam app ${steamAppId}`}`,
+        description: formatMessageTemplate(t('app.reignoreSteamApp'), { game: ignoredGame.title || `Steam app ${steamAppId}` }),
       }, undefined, { dedupeKey: `restore-ignored-steam-game:${steamAppId}` });
     }
 
@@ -2431,7 +2441,7 @@ function App() {
               }
               onBulkRefreshSteamPlaytime={(gameIds, options) =>
                 refreshSteamPlaytime(gameIds, {
-                  completionToastMessage: (summary) => `Updated playtime for ${summary.updatedCount} game${summary.updatedCount === 1 ? '' : 's'}`,
+                  completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
                   emptyToastMessage: options?.emptyToastMessage,
                   showToast: true,
                 })
@@ -2691,9 +2701,9 @@ function App() {
             />
           </div>
         ) : (
-          <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={`Open setup checklist, ${completedOnboardingItemIds.size} of ${onboardingItemIds.length} complete`}>
+          <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: completedOnboardingItemIds.size, total: onboardingItemIds.length })}>
             <Icon name="settings" />
-            <strong>Setup {completedOnboardingItemIds.size}/{onboardingItemIds.length}</strong>
+            <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: completedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
           </button>
         )
       ) : null}
@@ -3084,7 +3094,7 @@ function CollectionPanel({
     const summary = await onSyncItadDeals(targetGames.map((game) => game.id));
 
     if (summary) {
-      setBulkSummary({ ...summary, message: `${t('itad.syncComplete')}. ${summary.updatedCount} updated · ${summary.noMatchCount} no match · ${summary.failedCount} failed.` });
+      setBulkSummary({ ...summary, message: formatMessageTemplate(t('app.bulkItadSummary'), { updated: summary.updatedCount, noMatch: summary.noMatchCount, failed: summary.failedCount }) });
     }
   }
 
@@ -3559,7 +3569,7 @@ function SteamAchievementSyncNotice({ syncState }: { syncState: SteamAchievement
       {syncState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-5">
           <NoticeStat label={t('collection.steamAchievementsUpdated')} value={syncState.summary.updatedCount.toString()} />
-          <NoticeStat label="Unchanged" value={syncState.summary.unchangedCount.toString()} />
+          <NoticeStat label={t('app.unchanged')} value={syncState.summary.unchangedCount.toString()} />
           <NoticeStat label={t('collection.steamAchievementsNoAchievements')} value={syncState.summary.noAchievementDataCount.toString()} />
           <NoticeStat label={t('collection.steamAchievementsFailed')} value={syncState.summary.failedCount.toString()} />
           <NoticeStat label={t('collection.steamAchievementsNonSteamSkipped')} value={syncState.summary.skippedNonSteamCount.toString()} />
@@ -3597,10 +3607,10 @@ function SteamPlaytimeRefreshNotice({ refreshState }: { refreshState: SteamPlayt
       ) : null}
       {refreshState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3 xl:grid-cols-4">
-          <NoticeStat label="Updated" value={refreshState.summary.updatedCount.toString()} />
-          <NoticeStat label="Unchanged" value={refreshState.summary.unchangedCount.toString()} />
-          <NoticeStat label="Failed" value={refreshState.summary.failedCount.toString()} />
-          <NoticeStat label="Non-Steam skipped" value={refreshState.summary.skippedNonSteamCount.toString()} />
+          <NoticeStat label={t('app.updated')} value={refreshState.summary.updatedCount.toString()} />
+          <NoticeStat label={t('app.unchanged')} value={refreshState.summary.unchangedCount.toString()} />
+          <NoticeStat label={t('app.failed')} value={refreshState.summary.failedCount.toString()} />
+          <NoticeStat label={t('app.nonSteamSkipped')} value={refreshState.summary.skippedNonSteamCount.toString()} />
         </div>
       ) : null}
     </div>
@@ -3608,6 +3618,7 @@ function SteamPlaytimeRefreshNotice({ refreshState }: { refreshState: SteamPlayt
 }
 
 function ItadDealSyncNotice({ syncState }: { syncState: ItadDealSyncState }) {
+  const { t } = useI18n();
   const statusStyles = {
     idle: 'border-skyglass/15 bg-ink-950/70 text-slate-400',
     loading: 'border-skyglass/40 bg-skyglass/10 text-skyglass',
@@ -3620,9 +3631,9 @@ function ItadDealSyncNotice({ syncState }: { syncState: ItadDealSyncState }) {
       <div>{syncState.message}</div>
       {syncState.summary ? (
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
-          <SyncStat label="Updated" value={syncState.summary.updatedCount} />
-          <SyncStat label="No match" value={syncState.summary.noMatchCount} />
-          <SyncStat label="Failed" value={syncState.summary.failedCount} />
+          <SyncStat label={t('app.updated')} value={syncState.summary.updatedCount} />
+          <SyncStat label={t('app.noMatch')} value={syncState.summary.noMatchCount} />
+          <SyncStat label={t('app.failed')} value={syncState.summary.failedCount} />
         </div>
       ) : null}
     </div>
@@ -3678,22 +3689,22 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
     const resolvedPlatform = platform === 'Other' ? customPlatform.trim() : platform;
 
     if (!trimmedTitle) {
-      setError('Title is required.');
+      setError(t('addGame.errorTitleRequired'));
       return;
     }
 
     if (!resolvedPlatform) {
-      setError('Custom platform is required when Other is selected.');
+      setError(t('addGame.errorCustomPlatformRequired'));
       return;
     }
 
     if (!Number.isFinite(parsedPlaytime) || parsedPlaytime < 0) {
-      setError('Playtime must be zero or positive.');
+      setError(t('addGame.errorPlaytimePositive'));
       return;
     }
 
     if (parsedExpectedPlaytime !== null && (!Number.isFinite(parsedExpectedPlaytime) || parsedExpectedPlaytime < 0)) {
-      setError('Expected playtime must be zero or positive.');
+      setError(t('addGame.errorExpectedPlaytimePositive'));
       return;
     }
 
@@ -3736,7 +3747,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             onClick={onClose}
             type="button"
           >
-            Close
+            {t('action.close')}
           </button>
         </div>
 
@@ -3774,7 +3785,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
               >
                 {gamePlatforms.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {translateOption(option, t)}
                   </option>
                 ))}
               </select>
@@ -3801,7 +3812,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
               >
                 {gameStatuses.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {translateOption(option, t)}
                   </option>
                 ))}
               </select>
@@ -3835,7 +3846,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setTagText(event.target.value)}
-                placeholder="physical, handheld, retro"
+                placeholder={t('addGame.tagsPlaceholder')}
                 value={tagText}
               />
             </label>
@@ -3861,7 +3872,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                   >
                     {wishlistPriorities.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {t(`priority.${option}` as 'priority.low' | 'priority.medium' | 'priority.high')}
                       </option>
                     ))}
                   </select>
@@ -3885,7 +3896,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setPriceTarget(event.target.value)}
-                    placeholder="$20, 50%, Game Pass"
+                    placeholder={t('addGame.priceTargetPlaceholder')}
                     value={priceTarget}
                   />
                 </label>
@@ -3926,13 +3937,13 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
               onClick={onClose}
               type="button"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
             className="h-9 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
               type="submit"
             >
-              Save game
+              {t('common.saveGame')}
             </button>
           </div>
         </form>

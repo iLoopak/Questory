@@ -318,7 +318,7 @@ export function RetroImportPanel({
     });
     setImportedGames(createdGames);
     setStatusMessage({
-      message: `Imported ${createdGames.length} retro ${createdGames.length === 1 ? 'game' : 'games'} into Library.`,
+      message: t('retro.importedIntoLibrary').replace('{count}', String(createdGames.length)),
       tone: 'success',
     });
     setDetectedRoms((currentRoms) =>
@@ -326,7 +326,7 @@ export function RetroImportPanel({
         selectedRomIds.has(rom.id)
           ? {
               ...rom,
-              duplicateReason: 'Imported this session',
+              duplicateReason: t('retro.importedThisSession'),
               isDuplicate: true,
             }
           : rom,
@@ -564,30 +564,30 @@ function ImportResultPanel({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-white">
-            {isSuccess ? 'Retro import complete' : 'Retro import needs attention'}
+            {isSuccess ? t('retro.importComplete') : t('retro.importNeedsAttention')}
           </h3>
           <p className="mt-1 text-sm leading-6">
             {summary.warning ??
-              `Imported ${summary.importedGames} of ${summary.detectedGames} detected games into Library.`}
+              t('retro.importSummary').replace('{imported}', String(summary.importedGames)).replace('{detected}', String(summary.detectedGames))}
           </p>
         </div>
       </div>
 
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-4">
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Found</dt>
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">{t('retro.found')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.detectedGames}</dd>
         </div>
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Imported</dt>
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">{t('retro.imported')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.importedGames}</dd>
         </div>
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Duplicates</dt>
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">{t('retro.duplicates')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.skippedDuplicates}</dd>
         </div>
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">Unsupported</dt>
+          <dt className="text-xs uppercase tracking-[0.12em] opacity-75">{t('retro.unsupported')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.unsupportedFiles}</dd>
         </div>
       </dl>
