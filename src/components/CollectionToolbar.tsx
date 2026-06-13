@@ -56,6 +56,7 @@ export function CollectionToolbar({
   const selectedViewLabel = viewMode ? translateOption(viewMode.value, t) : t('toolbar.view');
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [localSearchValue, setLocalSearchValue] = useState(searchValue ?? '');
   const viewMenuRef = useRef<HTMLDetailsElement | null>(null);
   const actionsMenuRef = useRef<HTMLDetailsElement | null>(null);
 
@@ -63,6 +64,22 @@ export function CollectionToolbar({
     setIsViewMenuOpen(false);
     setIsActionsMenuOpen(false);
   }, [title]);
+
+  useEffect(() => {
+    setLocalSearchValue(searchValue ?? '');
+  }, [searchValue]);
+
+  useEffect(() => {
+    if (!hasSearch || localSearchValue === searchValue) {
+      return undefined;
+    }
+
+    const debounceTimer = window.setTimeout(() => {
+      onSearchChange(localSearchValue);
+    }, 180);
+
+    return () => window.clearTimeout(debounceTimer);
+  }, [hasSearch, localSearchValue, onSearchChange, searchValue]);
 
   function closeActionMenuAfterClick(event: MouseEvent<HTMLDivElement>) {
     const target = event.target;
@@ -120,10 +137,10 @@ export function CollectionToolbar({
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{t('toolbar.search')}</span>
             <input
               className="mt-1 h-9 w-full min-w-0 rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:shadow-glow"
-              onChange={(event) => onSearchChange(event.target.value)}
+              onChange={(event) => setLocalSearchValue(event.target.value)}
               placeholder={searchPlaceholder}
               type="search"
-              value={searchValue}
+              value={localSearchValue}
             />
           </label>
         ) : null}

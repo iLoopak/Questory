@@ -4,10 +4,7 @@ import { getGameCoverSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameActionMenu } from './GameActionMenu';
-import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
-import { DealCoverBadges } from './DealCoverBadges';
-import { HltbBadge } from './HltbBadge';
 import { useI18n } from '../i18n';
 
 type GameCardProps = {
@@ -187,11 +184,11 @@ function GameCardComponent({
           queueState={platformQueueState}
         />
         {game.collectionType === 'wishlist' ? (
-          <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-mint shadow-panel backdrop-blur-md">
+          <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-mint">
             Wishlist
           </span>
         ) : null}
-        <DealCoverBadges game={game} variant="grid" />
+
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
@@ -204,10 +201,7 @@ function GameCardComponent({
           </h3>
 
           <div className="qs-game-card-status mt-2 inline-flex rounded-full text-sm text-slate-400">{game.status}</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <AchievementProgressBadge className="px-2.5 py-1" game={game} showLabel />
-            <HltbBadge game={game} includeLabel />
-          </div>
+
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-3">

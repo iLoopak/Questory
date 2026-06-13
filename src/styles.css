@@ -2398,3 +2398,53 @@ body.qs-controller-active .qs-compact-card:focus-within {
     height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
   }
 }
+
+/* Large-library performance mode: virtualized cards should be cheap to paint on Android WebView. */
+.qs-game-grid,
+.qs-game-card,
+.qs-shelf-card,
+.qs-compact-card {
+  contain: layout paint style;
+}
+
+.qs-game-card,
+.qs-shelf-card,
+.qs-compact-card {
+  box-shadow: none;
+  will-change: auto;
+}
+
+.qs-game-card:hover,
+.qs-game-card:focus-within,
+.qs-shelf-card:hover,
+.qs-shelf-card:focus-visible,
+.qs-compact-card:hover,
+.qs-compact-card:focus-within {
+  box-shadow: none;
+  transform: none;
+}
+
+.qs-game-card img,
+.qs-shelf-card img,
+.qs-compact-card img {
+  aspect-ratio: inherit;
+  filter: none;
+}
+
+@media (pointer: coarse), (max-width: 940px) {
+  .qs-game-card,
+  .qs-shelf-card,
+  .qs-compact-card,
+  .qs-game-card *,
+  .qs-shelf-card *,
+  .qs-compact-card * {
+    backdrop-filter: none !important;
+    filter: none !important;
+  }
+
+  .qs-game-card,
+  .qs-shelf-card,
+  .qs-compact-card {
+    transition-property: border-color, background-color;
+  }
+}

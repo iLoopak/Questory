@@ -43,9 +43,29 @@ export function matchesCollectionFilters(game: Game, filters: CollectionFilters)
   );
 }
 
+const normalizedTitleCache = new WeakMap<Game, { title: string; normalizedTitle: string }>();
+
 export function matchesSearchFilter(game: Game, searchTerm: string): boolean {
   const normalizedSearch = searchTerm.trim().toLowerCase();
-  return game.title.toLowerCase().includes(normalizedSearch);
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return getNormalizedSearchTitle(game).includes(normalizedSearch);
+}
+
+function getNormalizedSearchTitle(game: Game): string {
+  const cachedTitle = normalizedTitleCache.get(game);
+
+  if (cachedTitle?.title === game.title) {
+    return cachedTitle.normalizedTitle;
+  }
+
+  const normalizedTitle = game.title.toLowerCase();
+  normalizedTitleCache.set(game, { title: game.title, normalizedTitle });
+
+  return normalizedTitle;
 }
 
 export function matchesPlatformFilter(game: Game, platform: CollectionFilters['platform']): boolean {

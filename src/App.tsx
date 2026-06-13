@@ -432,7 +432,8 @@ function App() {
 
   useEffect(() => {
     function handleScroll() {
-      setIsScrolled(window.scrollY > 15);
+      const nextIsScrolled = window.scrollY > 15;
+      setIsScrolled((currentIsScrolled) => (currentIsScrolled === nextIsScrolled ? currentIsScrolled : nextIsScrolled));
     }
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
