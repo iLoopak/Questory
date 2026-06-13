@@ -4201,7 +4201,7 @@ function SettingsPanel({
 
   return (
     <section className="qs-settings-shell min-w-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900/45 lg:h-[calc(100vh-116px)]">
-      <div className="border-b border-skyglass/15 bg-ink-950/80 px-3 py-3 sm:px-4">
+      <div className="qs-settings-shell-header border-b border-skyglass/15 bg-ink-950/90 px-3 py-3 backdrop-blur sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('settings.title')}</div>
