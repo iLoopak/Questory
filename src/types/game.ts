@@ -50,6 +50,9 @@ export type RomFileReference = {
 export type Game = {
   id: string;
   title: string;
+  displayTitleOverride?: string;
+  metadataSearchTitle?: string;
+  originalImportedTitle?: string;
   platform: GamePlatform;
   status: GameStatus;
   coverImage: string;

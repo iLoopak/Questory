@@ -11,7 +11,7 @@ import { addIgnoredSteamGame, type IgnoredSteamGame } from '../lib/steamIgnoredG
 import type { UndoActionHistoryEntry, UndoActionSnapshot } from '../lib/undoHistoryStorage';
 import type { Game, GameCollectionType, GameStatus } from '../types/game';
 
-type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>;
+type GameTrackingUpdate = Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Game>;
 
 type AddUndoAction = (
   message: string,
