@@ -11,7 +11,7 @@ export type GameListShellProps = {
 export function GameListShell({ children, className = '', scrollRef, stickyChrome, topChrome }: GameListShellProps) {
   return (
     <section ref={scrollRef} className={`qs-game-list-shell qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 ${className}`.trim()}>
-      {stickyChrome ? <div className="qs-game-list-sticky-chrome -mx-2 px-2 pb-2 pt-1 sm:-mx-3 sm:px-3">{stickyChrome}</div> : null}
+      {stickyChrome ? <div className="qs-game-list-sticky-chrome -mx-2 px-2 pb-2 sm:-mx-3 sm:px-3">{stickyChrome}</div> : null}
       {topChrome}
       <div className="qs-game-list-content">{children}</div>
     </section>
