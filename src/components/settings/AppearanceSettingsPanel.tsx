@@ -15,6 +15,7 @@ import {
   type ResolvedTheme,
   type ThemePreference,
 } from "../../lib/themePreferences";
+import { SettingsSection } from "./SettingsSection";
 
 export function AppearanceSettingsPanel({
   controllerLayoutPreference,
@@ -156,20 +157,15 @@ export function AppearanceSettingsPanel({
   };
 
   return (
-    <section className="qs-glass rounded-lg border p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">
-            {t("settings.appearanceTitle")}
-          </h2>
-          <p className="mt-1 text-sm text-slate-400">
-            {t("settings.appearanceHelp")}
-          </p>
-        </div>
+    <SettingsSection
+      title={t("settings.appearanceTitle")}
+      description={t("settings.appearanceHelp")}
+      meta={(
         <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
           {resolvedTheme} {t("settings.active")}
         </span>
-      </div>
+      )}
+    >
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -590,6 +586,6 @@ export function AppearanceSettingsPanel({
           </span>
         </span>
       </label>
-    </section>
+    </SettingsSection>
   );
 }

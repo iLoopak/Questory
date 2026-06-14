@@ -28,6 +28,7 @@ import {
   type SyncFolderSettings,
 } from '../lib/syncFolderStorage';
 import { useI18n } from '../i18n';
+import { SettingsSection, SettingsStatusBlock } from './settings/SettingsSection';
 import { downloadRawQuestShelfLocalData, exportQuestShelfBackupFile } from '../lib/backupExport';
 
 function formatMessageTemplate(template: string, values: Record<string, string | number>) {
@@ -311,22 +312,36 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
   }
 
   return (
-    <section className="qs-glass rounded-lg border p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">{t('data.title')}</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-            {t('data.subtitle')}
+    <SettingsSection
+      title={t('data.title')}
+      description={t('data.subtitle')}
+      actions={(
+        <>
+          <button
+            className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            onClick={() => void downloadBackup()}
+            type="button"
+          >
+            {t('data.exportBackup')}
+          </button>
+          <button
+            className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20"
+            onClick={() => void resetLocalData()}
+            type="button"
+          >
+            {t('data.resetLocal')}
+          </button>
+        </>
+      )}
+      status={(
+        <>
+          <SettingsStatusBlock tone={messageTone}>{message}</SettingsStatusBlock>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Reset removes only known QuestShelf local data from this device. It does not touch data from other apps.
           </p>
-        </div>
-        <button
-          className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-          onClick={() => void downloadBackup()}
-          type="button"
-        >
-          {t('data.exportBackup')}
-        </button>
-      </div>
+        </>
+      )}
+    >
 
       <StorageRecoveryPanel
         issues={storageIssues}
@@ -435,31 +450,9 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
 
         {supportsFileSystemAccess ? (
           <>
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div className="rounded-md border border-skyglass/15 bg-ink-900 p-3 text-sm leading-6 text-slate-300">
-                <div>Selected file: {syncSettings.selectedFileName ?? 'None selected'}</div>
-                <div>Last backup: {syncSettings.lastBackupAt ? formatDateTime(syncSettings.lastBackupAt) : 'Never'}</div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={chooseSyncFile} type="button">
-                  Choose backup file
-                </button>
-                <button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => void saveBackupNow()} type="button">
-                  Save backup now
-                </button>
-                <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={() => void loadBackupWithPicker()} type="button">
-                  Load backup from file
-                </button>
-                {syncSettings.autoBackupEnabled ? (
-                  <button className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm text-red-200 hover:bg-red-500/20" onClick={disableAutoBackup} type="button">
-                    Disable auto-backup
-                  </button>
-                ) : (
-                  <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint hover:bg-mint/20" onClick={enableAutoBackup} type="button">
-                    Enable auto-backup
-                  </button>
-                )}
-              </div>
+            <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-900 p-3 text-sm leading-6 text-slate-300">
+              <div>Selected file: {syncSettings.selectedFileName ?? 'None selected'}</div>
+              <div>Last backup: {syncSettings.lastBackupAt ? formatDateTime(syncSettings.lastBackupAt) : 'Never'}</div>
             </div>
 
             <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-900 p-3 text-sm text-slate-300">
@@ -479,6 +472,27 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
                 <span className="mt-1 block text-slate-500">{t('data.includeAutoBackupHelp')}</span>
               </span>
             </label>
+
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+              <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={chooseSyncFile} type="button">
+                Choose backup file
+              </button>
+              <button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => void saveBackupNow()} type="button">
+                Save backup now
+              </button>
+              <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10 hover:text-white" onClick={() => void loadBackupWithPicker()} type="button">
+                Load backup from file
+              </button>
+              {syncSettings.autoBackupEnabled ? (
+                <button className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm text-red-200 hover:bg-red-500/20" onClick={disableAutoBackup} type="button">
+                  Disable auto-backup
+                </button>
+              ) : (
+                <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint hover:bg-mint/20" onClick={enableAutoBackup} type="button">
+                  Enable auto-backup
+                </button>
+              )}
+            </div>
           </>
         ) : (
           <div className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
@@ -487,31 +501,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
         )}
       </section>
 
-      <div
-        className={`mt-4 rounded-md border px-3 py-2 text-sm ${
-          messageTone === 'error'
-            ? 'border-red-400/40 bg-red-500/10 text-red-200'
-            : messageTone === 'success'
-              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-              : 'border-skyglass/15 bg-ink-950/80 text-slate-300'
-        }`}
-      >
-        {message}
-      </div>
-
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <button
-          className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20"
-          onClick={() => void resetLocalData()}
-          type="button"
-        >
-          {t('data.resetLocal')}
-        </button>
-        <p className="mt-2 text-xs leading-5 text-slate-500">
-          Reset removes only known QuestShelf local data from this device. It does not touch data from other apps.
-        </p>
-      </div>
-    </section>
+    </SettingsSection>
   );
 }
 

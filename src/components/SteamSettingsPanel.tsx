@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
 import { ViewportModal } from './ViewportModal';
+import { SettingsSection } from './settings/SettingsSection';
 import { useI18n } from '../i18n';
 import type { IgnoredSteamGame } from '../lib/steamIgnoredGamesStorage';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
@@ -272,17 +273,11 @@ export function SteamSettingsPanel({
   }[connectionState.status];
 
   return (
-    <section className="min-w-0 rounded-lg border border-white/10 bg-ink-900/70 p-4">
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">{t('steam.integration')}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-400">
-            Connect Steam, test what QuestShelf can read, then choose what to import or refresh.
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
+    <SettingsSection
+      title={t('steam.integration')}
+      description="Connect Steam, test what QuestShelf can read, then choose what to import or refresh."
+      className="min-w-0 border-white/10 bg-ink-900/70"
+    >
         <section className="rounded-lg border border-mint/25 bg-ink-950 p-4">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -340,14 +335,16 @@ export function SteamSettingsPanel({
             The profile field is optional for playtime. Manual Steam Wishlist import can use it for a direct link, but the bookmarklet flow also works from the generic Wishlist page.
           </p>
 
-          <button
-            className="mt-4 h-12 w-full rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto"
-            disabled={connectionState.status === 'loading'}
-            onClick={testConnection}
-            type="button"
-          >
-            {connectionState.status === 'loading' ? 'Testing...' : t('steam.testConnection')}
-          </button>
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+            <button
+              className="h-12 w-full rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto"
+              disabled={connectionState.status === 'loading'}
+              onClick={testConnection}
+              type="button"
+            >
+              {connectionState.status === 'loading' ? 'Testing...' : t('steam.testConnection')}
+            </button>
+          </div>
         </section>
 
         <section className="rounded-lg border border-white/10 bg-ink-950 p-4">
@@ -445,10 +442,9 @@ export function SteamSettingsPanel({
             </pre>
           </div>
         </details>
-      </div>
 
       {helpTopic ? <SteamHelpModal topic={helpTopic} onClose={() => setHelpTopic(null)} /> : null}
-    </section>
+    </SettingsSection>
   );
 }
 

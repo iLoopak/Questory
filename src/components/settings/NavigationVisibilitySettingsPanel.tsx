@@ -8,6 +8,7 @@ import {
   type ConfigurableNavigationItem,
   type NavigationVisibilityPreferences,
 } from "../../lib/navigationVisibilityPreferences";
+import { SettingsSection } from "./SettingsSection";
 
 type NavigationVisibilitySettingsPanelProps = {
   navigationVisibility: NavigationVisibilityPreferences;
@@ -33,15 +34,7 @@ export function NavigationVisibilitySettingsPanel({
   }
 
   return (
-    <section className="rounded-xl border border-skyglass/15 bg-ink-950/70 p-4 shadow-inner">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-white">
-          {t("settings.navigation.title")}
-        </h3>
-        <p className="mt-1 text-sm text-slate-400">
-          {t("settings.navigation.help")}
-        </p>
-      </div>
+    <SettingsSection title={t("settings.navigation.title")} description={t("settings.navigation.help")} className="border-skyglass/15 bg-ink-950/70 shadow-inner">
       <div className="grid gap-2 sm:grid-cols-2">
         {configurableNavigationItems.map((item) => (
           <label
@@ -65,6 +58,6 @@ export function NavigationVisibilitySettingsPanel({
       <p className="mt-3 text-xs text-slate-500">
         {t("settings.navigation.alwaysVisible")}
       </p>
-    </section>
+    </SettingsSection>
   );
 }
