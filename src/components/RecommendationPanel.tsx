@@ -4,7 +4,6 @@ import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionVie
 import { CollectionToolbar } from './CollectionToolbar';
 import { GameListEmptyState, GameListShell } from './GameListShell';
 import { ViewportModal } from './ViewportModal';
-import type { ReactNode } from 'react';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import {
   availableTimeOptions,
@@ -21,9 +20,8 @@ import { gamePlatforms } from '../types/game';
 type RecommendationPanelProps = {
   games: Game[];
   queueState: PlatformQueueState;
+  featuredGame?: Game | null;
   shelfTitle?: string;
-  shelfName?: string;
-  shelfAvatar?: ReactNode;
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
@@ -43,9 +41,8 @@ const recommendationViewModes: readonly RecommendationViewMode[] = ['Grid View',
 export function RecommendationPanel({
   games,
   queueState,
+  featuredGame = null,
   shelfTitle = '',
-  shelfName = '',
-  shelfAvatar,
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
@@ -116,7 +113,29 @@ export function RecommendationPanel({
         .filter((game) => game.id !== recommendation.game.id),
     ];
   }, [recommendation, recommendations]);
-  const activeMoreFilterCount = [includeFinishedGames, includeWishlist, recommendFromQueueOnly, recommendNextGame].filter(Boolean).length;
+  const activeMoreFilterCount = [
+    availableTime !== '30 min',
+    includeFinishedGames,
+    includeWishlist,
+    mood !== 'comfort',
+    preferredPlatform !== anyPlatform,
+    recommendFromQueueOnly,
+    recommendNextGame,
+    viewMode !== 'Grid View',
+  ].filter(Boolean).length;
+  const hasActiveMoreFilters = activeMoreFilterCount > 0;
+
+  function clearMoreFilters() {
+    setAvailableTime('30 min');
+    setMood('comfort');
+    setPreferredPlatform(anyPlatform);
+    setIncludeFinishedGames(false);
+    setIncludeWishlist(false);
+    setRecommendFromQueueOnly(false);
+    setRecommendNextGame(false);
+    setViewMode('Grid View');
+    setRerollIndex(0);
+  }
 
   function updatePreference(update: () => void) {
     update();
@@ -144,10 +163,15 @@ export function RecommendationPanel({
       scrollRef={panelRef}
       stickyChrome={
         <>
-          {(shelfAvatar || shelfTitle || shelfName) ? (
-            <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
-              {shelfAvatar}
-              <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || t('recommendations.title')}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> {shelfTitle}</span> : null}</div>
+          {(shelfTitle || featuredGame) ? (
+            <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-mint/20 bg-ink-950/90 px-2 py-1.5 text-sm font-semibold text-slate-200">
+              {shelfTitle ? <span className="truncate text-mint">{shelfTitle}</span> : null}
+              {shelfTitle && featuredGame ? <span className="text-slate-500" aria-hidden="true">•</span> : null}
+              {featuredGame ? (
+                <button className="min-w-0 truncate rounded px-1 text-left text-slate-300 transition hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60" onClick={() => onOpenDetails(featuredGame.id)} type="button">
+                  Featured: {featuredGame.title}
+                </button>
+              ) : null}
             </div>
           ) : null}
         <CollectionToolbar
@@ -155,30 +179,11 @@ export function RecommendationPanel({
         searchValue={recommendationSearchTerm}
         searchPlaceholder={t('toolbar.findTitle')}
         onSearchChange={setRecommendationSearchTerm}
-        selects={[
-          {
-            label: t('toolbar.status'),
-            value: availableTime,
-            options: availableTimeOptions,
-            onChange: (value) => updatePreference(() => setAvailableTime(value as AvailableTime)),
-          },
-          {
-            label: t('toolbar.platform'),
-            value: preferredPlatform,
-            options: [anyPlatform, ...platformOptions],
-            onChange: (value) => updatePreference(() => setPreferredPlatform(value as GamePlatform | typeof anyPlatform)),
-          },
-        ]}
         moreFiltersActiveCount={activeMoreFilterCount}
         moreFiltersOpen={isMoreFiltersOpen}
         moreFiltersButtonRef={moreFiltersButtonRef}
         onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
-        viewMode={{
-          label: `${t('recommendations.title')} ${t('toolbar.viewMode')}`,
-          options: recommendationViewModes,
-          value: viewMode,
-          onChange: (mode) => setViewMode(mode as RecommendationViewMode),
-        }}
+        onClearFilters={hasActiveMoreFilters ? clearMoreFilters : undefined}
         actionMenu={
           <>
             <button
@@ -225,7 +230,28 @@ export function RecommendationPanel({
             </div>
 
             <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
-              <div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-sm font-medium text-slate-300">
+                  <span>{t('toolbar.status')}</span>
+                  <select className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint" value={availableTime} onChange={(event) => updatePreference(() => setAvailableTime(event.target.value as AvailableTime))}>
+                    {availableTimeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-slate-300">
+                  <span>{t('toolbar.platform')}</span>
+                  <select className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint" value={preferredPlatform} onChange={(event) => updatePreference(() => setPreferredPlatform(event.target.value as GamePlatform | typeof anyPlatform))}>
+                    {[anyPlatform, ...platformOptions].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-slate-300">
+                  <span>{t('toolbar.viewMode')}</span>
+                  <select className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint" value={viewMode} onChange={(event) => setViewMode(event.target.value as RecommendationViewMode)}>
+                    {recommendationViewModes.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('recommendations.mood')}</div>
                 <div className="mt-2 flex gap-1 overflow-x-auto rounded-md border border-white/10 bg-ink-900 p-1">
                   {moodOptions.map((option) => (
@@ -250,7 +276,20 @@ export function RecommendationPanel({
                 <RecommendationToggle checked={recommendNextGame} label={t('recommendations.nextPlanned')} onChange={(checked) => updatePreference(() => setRecommendNextGame(checked))} />
               </div>
 
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-400">
+                  {hasActiveMoreFilters ? `${activeMoreFilterCount} ${activeMoreFilterCount === 1 ? 'filter' : 'filters'} active` : 'No filters active'}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {hasActiveMoreFilters ? (
+                    <button
+                      className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                      onClick={clearMoreFilters}
+                      type="button"
+                    >
+                      Clear filters
+                    </button>
+                  ) : null}
                 <button
                   className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
                   onClick={() => setIsMoreFiltersOpen(false)}
@@ -258,6 +297,7 @@ export function RecommendationPanel({
                 >
                   Show games
                 </button>
+                </div>
               </div>
           </div>
         </ViewportModal>
