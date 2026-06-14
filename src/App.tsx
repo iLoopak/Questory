@@ -93,7 +93,7 @@ import {
   saveAppPersonalizationSettings,
 } from './lib/appPersonalization';
 import { getComputedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
-import { getActiveQuestShelfAchievement, getQuestShelfAchievements } from './lib/questShelfAchievements';
+import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from './lib/questShelfAchievements';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
 import { isMockGame, loadGames, saveGames } from './lib/gameStorage';
 import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
@@ -1622,6 +1622,8 @@ function App() {
               collectionType="library"
               filters={libraryFilters}
               featuredGame={computedFeaturedGame}
+              activeAchievement={activeShelfAchievement}
+              onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
               shelfTitle={computedShelfTitle}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
@@ -1672,6 +1674,8 @@ function App() {
               collectionType="wishlist"
               filters={wishlistFilters}
               featuredGame={computedFeaturedGame}
+              activeAchievement={activeShelfAchievement}
+              onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
               shelfTitle={computedShelfTitle}
               games={filteredWishlistGames}
               platformOptions={platformOptions}
@@ -1766,6 +1770,8 @@ function App() {
               games={games}
               queueState={platformQueueState}
               featuredGame={computedFeaturedGame}
+              activeAchievement={activeShelfAchievement}
+              onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
               shelfTitle={computedShelfTitle}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
@@ -1951,7 +1957,9 @@ type AddGameDialogProps = {
 type CollectionPanelProps = {
   collectionType: GameCollectionType;
   filters: CollectionFilters;
+  activeAchievement?: QuestShelfAchievementProgress | null;
   featuredGame?: Game | null;
+  onOpenAchievementSettings?: () => void;
   shelfTitle?: string;
   games: Game[];
   platformOptions: GamePlatform[];
@@ -1993,7 +2001,9 @@ type CollectionPanelProps = {
 function CollectionPanel({
   collectionType,
   filters,
+  activeAchievement = null,
   featuredGame = null,
+  onOpenAchievementSettings,
   shelfTitle = '',
   games,
   platformOptions,
@@ -2353,9 +2363,6 @@ function CollectionPanel({
       scrollRef={collectionPanelRef}
       stickyChrome={
         <>
-          {(collectionType === 'library' || collectionType === 'wishlist') && (shelfTitle || featuredGame) ? (
-            <ShelfHighlights featuredGame={featuredGame} shelfTitle={shelfTitle} onOpenDetails={onOpenDetails} />
-          ) : null}
           <CollectionToolbar
             title={title}
         searchValue={filters.searchTerm}
@@ -2366,6 +2373,16 @@ function CollectionPanel({
         moreFiltersButtonRef={advancedFiltersButtonRef}
         onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
+        leadingAccessory={
+          (collectionType === 'library' || collectionType === 'wishlist') && (activeAchievement || featuredGame) ? (
+            <ToolbarHighlights
+              activeAchievement={activeAchievement}
+              featuredGame={featuredGame}
+              onOpenAchievementSettings={onOpenAchievementSettings}
+              onOpenDetails={onOpenDetails}
+            />
+          ) : null
+        }
         primaryAction={
           <button
             aria-label={collectionType === 'wishlist' ? t('toolbar.addWishlistGame') : t('toolbar.addGame')}
@@ -2778,33 +2795,56 @@ function CollectionPanel({
 }
 
 
-function ShelfHighlights({
+function ToolbarHighlights({
+  activeAchievement,
   featuredGame,
+  onOpenAchievementSettings,
   onOpenDetails,
-  shelfTitle,
 }: {
+  activeAchievement?: QuestShelfAchievementProgress | null;
   featuredGame?: Game | null;
+  onOpenAchievementSettings?: () => void;
   onOpenDetails: (gameId: string) => void;
-  shelfTitle?: string;
 }) {
-  if (!shelfTitle && !featuredGame) {
+  if (!activeAchievement && !featuredGame) {
     return null;
   }
 
   return (
-    <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-mint/20 bg-ink-950/90 px-2 py-1.5 text-sm font-semibold text-slate-200">
-      {shelfTitle ? <span className="truncate text-mint">{shelfTitle}</span> : null}
-      {shelfTitle && featuredGame ? <span className="text-slate-500" aria-hidden="true">•</span> : null}
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      {activeAchievement ? <ActiveAchievementBadge achievement={activeAchievement} onClick={onOpenAchievementSettings} /> : null}
       {featuredGame ? (
         <button
-          className="min-w-0 truncate rounded px-1 text-left text-slate-300 transition hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60"
+          className="inline-flex h-9 min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border border-skyglass/15 bg-ink-900/70 px-2.5 text-xs font-semibold text-slate-300 transition hover:border-mint/30 hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60"
           onClick={() => onOpenDetails(featuredGame.id)}
+          title={`Featured: ${featuredGame.title}`}
           type="button"
         >
-          Featured: {featuredGame.title}
+          <Icon name="check-circle" size={14} />
+          <span className="truncate">Featured: {featuredGame.title}</span>
         </button>
       ) : null}
     </div>
+  );
+}
+
+function ActiveAchievementBadge({ achievement, onClick }: { achievement: QuestShelfAchievementProgress; onClick?: () => void }) {
+  const content = (
+    <>
+      <Icon name={achievement.icon} size={15} strokeWidth={2.2} />
+      <span className="truncate">{achievement.title}</span>
+    </>
+  );
+  const className = "inline-flex h-9 min-w-0 max-w-[12rem] items-center gap-1.5 rounded-full border border-mint/35 bg-mint/10 px-2.5 text-xs font-semibold text-mint shadow-glow transition focus:outline-none focus:ring-2 focus:ring-mint/60";
+
+  if (!onClick) {
+    return <span className={className} title={achievement.title}>{content}</span>;
+  }
+
+  return (
+    <button className={`${className} hover:bg-mint/20`} onClick={onClick} title={`${achievement.title} - choose active badge`} type="button">
+      {content}
+    </button>
   );
 }
 

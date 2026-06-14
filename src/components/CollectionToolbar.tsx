@@ -20,6 +20,7 @@ type ToolbarViewMode = {
 type CollectionToolbarProps = {
   actionMenu?: ReactNode;
   children?: ReactNode;
+  leadingAccessory?: ReactNode;
   moreFiltersActiveCount?: number;
   moreFiltersOpen?: boolean;
   moreFiltersButtonRef?: Ref<HTMLButtonElement>;
@@ -37,6 +38,7 @@ type CollectionToolbarProps = {
 export function CollectionToolbar({
   actionMenu,
   children,
+  leadingAccessory,
   moreFiltersActiveCount = 0,
   moreFiltersOpen = false,
   moreFiltersButtonRef,
@@ -144,6 +146,8 @@ export function CollectionToolbar({
             />
           </label>
         ) : null}
+
+        {leadingAccessory ? <div className="qs-collection-toolbar-accessory min-w-0">{leadingAccessory}</div> : null}
 
         {selects.map((select) => (
           <label key={select.label} className="qs-collection-toolbar-select min-w-0">
