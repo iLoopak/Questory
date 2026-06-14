@@ -147,7 +147,7 @@ export function RecommendationPanel({
           {(shelfAvatar || shelfTitle || shelfName) ? (
             <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
               {shelfAvatar}
-              <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || t('recommendations.title')}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> 🏆 {shelfTitle}</span> : null}</div>
+              <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || t('recommendations.title')}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> {shelfTitle}</span> : null}</div>
             </div>
           ) : null}
         <CollectionToolbar

@@ -18,6 +18,11 @@ const personalizationAvatarOptions: Array<{
   { label: 'Sci-Fi', value: 'built-in:sci-fi-pilot' },
   { label: 'Fantasy', value: 'built-in:fantasy-hero' },
   { label: 'Collector', value: 'built-in:collector' },
+  { label: 'Backlog Slayer', value: 'built-in:backlog-slayer' },
+  { label: 'Curator', value: 'built-in:curator' },
+  { label: 'Platform Hopper', value: 'built-in:platform-hopper' },
+  { label: 'Handheld Hero', value: 'built-in:handheld-hero' },
+  { label: 'Playing Right Now', value: 'built-in:playing-right-now' },
 ];
 
 export function PersonalizationSettingsPanel({
@@ -117,7 +122,7 @@ export function PersonalizationSettingsPanel({
             </button>
           </div>
           <div className="mt-2 rounded-lg border border-mint/20 bg-mint/10 p-3 text-sm font-semibold text-white">
-            Current active badge: <span className="text-mint">{activeAchievementTitle || 'No badge unlocked yet'}</span>
+            Preview active badge: <span className="text-mint">{activeAchievementTitle || 'No badge unlocked yet'}</span>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {achievements.map((achievement) => {
@@ -153,7 +158,7 @@ export function PersonalizationSettingsPanel({
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Preview</div>
           <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
             <ShelfAvatar {...previewIdentity} sizeClassName="h-10 w-10" />
-            <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="text-mint"> · 🏆 {activeAchievementTitle}</span> : null}</span>
+            <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="text-mint"> · {activeAchievementTitle}</span> : null}</span>
           </div>
         </div>
       </div>
