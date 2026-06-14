@@ -1592,7 +1592,7 @@ function App() {
         </header>
 
         <section className="flex-1 py-2">
-          {(activeNavItem === 'Library' || activeNavItem === 'Wishlist') && selectedGame ? (
+          {(activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
             <GameDetailView
               game={selectedGame}
               onAddToQueue={openBacklogPicker}

@@ -112,7 +112,6 @@ export function useReviewModeActions({
 
     if (action === 'open-details') {
       setSelectedGameId(game.id);
-      setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
       return;
     }
 
