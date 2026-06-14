@@ -17,6 +17,7 @@ export type IconName =
   | 'more-horizontal'
   | 'panel-top-open'
   | 'pencil'
+  | 'plus'
   | 'plus-square'
   | 'refresh-cw'
   | 'search'
@@ -71,6 +72,7 @@ const iconPaths: Record<IconName, ReactNode> = {
   'more-horizontal': <><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></>,
   'panel-top-open': <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /><path d="m9 15 3-3 3 3" /></>,
   pencil: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></>,
+  plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
   'plus-square': <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 8v8" /><path d="M8 12h8" /></>,
   'refresh-cw': <><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /></>,
   search: <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>,

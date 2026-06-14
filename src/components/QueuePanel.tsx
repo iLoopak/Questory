@@ -171,11 +171,13 @@ export function QueuePanel({
         ]}
         primaryAction={
           <button
-            className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            aria-label={t('queue.addPlatform')}
+            className="grid h-9 w-9 place-items-center rounded-md bg-mint text-ink-950 transition hover:bg-mint/90"
             onClick={() => setIsPlatformModalOpen(true)}
+            title={t('queue.addPlatform')}
             type="button"
           >
-            ＋ {t('queue.addPlatform')}
+            <Icon name="plus" size={18} strokeWidth={2.5} />
           </button>
         }
         actionMenu={
