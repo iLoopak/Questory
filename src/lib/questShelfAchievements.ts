@@ -25,6 +25,7 @@ export type QuestShelfAchievement = {
   description: string;
   unlockCondition: string;
   priority: number;
+  colorVariant: 'primary' | 'secondary' | 'mixed' | 'success';
   target?: number;
   getProgress: (games: Game[], queueState?: PlatformQueueState) => number;
 };
@@ -52,6 +53,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Your shelf includes games from Steam.',
     unlockCondition: 'Add at least one Steam game to your Library.',
     priority: 110,
+    colorVariant: 'primary',
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && (game.platform === 'Steam' || game.externalSource === 'steam' || typeof game.steamAppId === 'number')).length,
   },
@@ -62,6 +64,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'You have finished at least one game.',
     unlockCondition: 'Mark at least one Library game as Finished.',
     priority: 100,
+    colorVariant: 'success',
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && game.status === 'Finished').length,
   },
@@ -72,6 +75,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Your QuestShelf library has grown into a collection.',
     unlockCondition: 'Keep 25 or more games in your Library.',
     priority: 90,
+    colorVariant: 'mixed',
     target: 25,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library').length,
   },
@@ -82,6 +86,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Your shelf includes at least one retro platform.',
     unlockCondition: 'Add a Library game from a retro platform.',
     priority: 80,
+    colorVariant: 'secondary',
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && isRetroPlatform(game.platform)).length,
   },
@@ -92,6 +97,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Steam achievement completion is actively tracked.',
     unlockCondition: 'Have at least one Steam game with achievement data.',
     priority: 70,
+    colorVariant: 'primary',
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && (game.steamAchievementsLastCheckedAt || (game.steamAchievementsTotal ?? 0) > 0 || typeof game.steamAchievementsPercent === 'number')).length,
   },
@@ -102,6 +108,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Making progress through the queue.',
     unlockCondition: `Finish or drop ${backlogSlayerTarget} games from Quest Queue.`,
     priority: 60,
+    colorVariant: 'success',
     target: backlogSlayerTarget,
     getProgress: (games, queueState) => {
       const queuedGameIds = new Set(queueState?.entries.map((entry) => entry.gameId) ?? []);
@@ -115,6 +122,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'A carefully maintained wishlist.',
     unlockCondition: `Add ${wishlistCuratorTarget} games to your Wishlist.`,
     priority: 50,
+    colorVariant: 'secondary',
     target: wishlistCuratorTarget,
     getProgress: (games) => games.filter((game) => game.collectionType === 'wishlist').length,
   },
@@ -125,6 +133,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Gaming across many systems.',
     unlockCondition: `Add games across at least ${platformHopperTarget} platforms.`,
     priority: 45,
+    colorVariant: 'mixed',
     target: platformHopperTarget,
     getProgress: (games) => new Set(games.filter((game) => game.collectionType === 'library').map((game) => String(game.platform).trim()).filter(Boolean)).size,
   },
@@ -135,6 +144,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Built a significant handheld/retro collection.',
     unlockCondition: `Add ${handheldHeroTarget} games across retro or handheld platforms.`,
     priority: 44,
+    colorVariant: 'secondary',
     target: handheldHeroTarget,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && isRetroPlatform(game.platform)).length,
   },
@@ -145,6 +155,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Actively gaming instead of collecting.',
     unlockCondition: 'Mark at least one Library game as Playing.',
     priority: 43,
+    colorVariant: 'primary',
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing').length,
   },
@@ -155,6 +166,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'A well-maintained collection.',
     unlockCondition: `Enrich metadata for ${metadataMasterTarget} Library games.`,
     priority: 42,
+    colorVariant: 'mixed',
     target: metadataMasterTarget,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && (game.metadataSource || game.metadataUpdatedAt || game.rawgId || game.hltbId)).length,
   },
@@ -165,6 +177,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Artwork coverage is under control.',
     unlockCondition: `Assign artwork to ${artConservatorTarget} Library games.`,
     priority: 41,
+    colorVariant: 'secondary',
     target: artConservatorTarget,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && hasAssignedArtwork(game)).length,
   },
@@ -175,6 +188,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'Quest Queue is actively managed.',
     unlockCondition: `Configure at least ${queueCommanderTarget} queue platforms.`,
     priority: 40,
+    colorVariant: 'primary',
     target: queueCommanderTarget,
     getProgress: (_games, queueState) => queueState?.activePlatforms.length ?? 0,
   },
@@ -185,6 +199,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     description: 'A major collection milestone.',
     unlockCondition: `Keep ${centuryClubTarget} games in your Library.`,
     priority: 39,
+    colorVariant: 'mixed',
     target: centuryClubTarget,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library').length,
   },
