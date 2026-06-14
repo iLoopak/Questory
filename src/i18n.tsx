@@ -199,7 +199,6 @@ const en = {
   'settings.showDetail': 'Show detail',
   'settings.backToCategories': 'Back to categories',
   'settings.category.integrations': 'Integrations',
-  'settings.category.library': 'Library',
   'settings.category.wishlist': 'Wishlist',
   'settings.category.platforms': 'Platforms',
   'settings.category.retro': 'Retro',
@@ -969,7 +968,6 @@ const cs: Dictionary = {
   'settings.showDetail': 'Zobrazit detail',
   'settings.backToCategories': 'Zpět na kategorie',
   'settings.category.integrations': 'Integrace',
-  'settings.category.library': 'Knihovna',
   'settings.category.wishlist': 'Seznam přání',
   'settings.category.platforms': 'Platformy',
   'settings.category.retro': 'Retro',
@@ -1602,7 +1600,6 @@ const optionKeyByValue = {
 
 const settingsCategoryKeyByValue = {
   Integrations: 'settings.category.integrations',
-  Library: 'settings.category.library',
   Wishlist: 'settings.category.wishlist',
   Platforms: 'settings.category.platforms',
   Retro: 'settings.category.retro',

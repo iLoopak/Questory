@@ -1,6 +1,5 @@
 export const settingsCategories = [
   'Integrations',
-  'Library',
   'Wishlist',
   'Platforms',
   'Retro',
@@ -25,11 +24,6 @@ export const settingsCategoryMeta: Record<SettingsCategory, SettingsCategoryMeta
     description: 'Connect local credentials and import helpers for Steam, RAWG, and future providers.',
     label: 'Integrations',
     shortDescription: 'Steam, RAWG, providers',
-  },
-  Library: {
-    description: 'Manage local library data, demo content, and library-specific defaults.',
-    label: 'Library',
-    shortDescription: 'Owned games and demos',
   },
   Wishlist: {
     description: 'Tune wishlist behavior, planning defaults, and future wishlist integrations.',
