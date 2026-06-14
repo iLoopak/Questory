@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
-import type { Game, GamePlatform, GameStatus } from '../types/game';
+import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
@@ -23,6 +23,8 @@ type GameDetailViewProps = {
   isSteamDataSyncing?: boolean;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
+  onGameEdit?: (gameId: string, changes: Partial<Game>) => void;
+  onGameEditSaved?: (game: Game) => void;
   platformQueueState?: PlatformQueueState;
 };
 
@@ -47,11 +49,16 @@ export function GameDetailView({
   onStatusChange,
   onTrackingChange,
   platformQueueState,
+  onGameEdit,
+  onGameEditSaved,
 }: GameDetailViewProps) {
   const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
+  const [editError, setEditError] = useState('');
 
   const coverSources = useMemo(() => {
     return getGameCoverSources(game);
@@ -61,6 +68,9 @@ export function GameDetailView({
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
     setTagText(game.tags.join(', '));
+    setEditDraft(createEditDraft(game));
+    setIsEditing(false);
+    setEditError('');
   }, [coverSources, game.id, game.tags]);
 
   const activeCoverSource = coverSources[coverSourceIndex];
@@ -79,6 +89,7 @@ export function GameDetailView({
     ? formatDealPrice(game.itadHistoricalLowPrice, game.itadHistoricalLowCurrency)
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
+  const canEditGame = isGameEditable(game);
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -86,6 +97,25 @@ export function GameDetailView({
       status: changes.status ?? game.status,
       tags: changes.tags ?? game.tags,
     });
+  }
+
+
+
+  function updateEditDraft<K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) {
+    setEditDraft((currentDraft) => ({ ...currentDraft, [field]: value }));
+  }
+
+  function saveEditDraft() {
+    const validationError = validateEditDraft(editDraft);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+
+    onGameEdit?.(game.id, getGameEditChanges(game, editDraft));
+    setIsEditing(false);
+    setEditError('');
+    onGameEditSaved?.({ ...game, ...getGameEditChanges(game, editDraft) });
   }
 
   function useRawgImageAsCover() {
@@ -246,7 +276,16 @@ export function GameDetailView({
                   </button>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
-                    <h2 className="mt-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{game.title}</h2>
+                    <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
+                      <h2 className="min-w-0 flex-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
+                      {canEditGame ? (
+                        <button className="min-h-10 rounded-xl border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-bold text-mint transition hover:bg-mint/20" onClick={() => setIsEditing(true)} type="button">
+                          <span className="flex items-center gap-2"><Icon name="pencil" /> Edit</span>
+                        </button>
+                      ) : isSteamLibraryGame ? (
+                        <button className="min-h-10 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-slate-500" disabled title="Steam imported games are managed from Steam data." type="button">Edit</button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
@@ -286,6 +325,10 @@ export function GameDetailView({
                 </div>
               </div>
             </section>
+
+            {isEditing ? (
+              <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
+            ) : null}
 
             <DetailSection kicker={t('detail.editable')} title={t('detail.myInformation')} description={t('detail.myInformationHelp')}>
               <div className="grid gap-3 md:grid-cols-3">
@@ -354,6 +397,19 @@ export function GameDetailView({
                     <ReadOnlyField label={t('detail.wishlistSynced')} value={formatDateTime(game.wishlistSyncedAt, t('detail.notAvailable'))} />
                     <ReadOnlyLink label={t('detail.storeUrl')} value={game.storeUrl} />
                     <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
+                  </div>
+                </MetadataAccordion>
+              ) : null}
+
+              {isRetroGame(game) ? (
+                <MetadataAccordion title="Retro ROM source" summary="Original import files preserved read-only">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <ReadOnlyField label="Original imported title" value={game.originalImportedTitle ?? game.romFileName ?? game.title} />
+                    <ReadOnlyField label="ROM file name" value={game.romFileName ?? t('detail.notAvailable')} />
+                    <ReadOnlyField label="ROM path" value={game.romPath ?? t('detail.notAvailable')} />
+                    {(game.romFiles ?? []).map((file, index) => (
+                      <ReadOnlyField key={`${file.path}-${index}`} label={`ROM file ${index + 1}${file.role ? ` · ${file.role}` : ''}`} value={file.path} />
+                    ))}
                   </div>
                 </MetadataAccordion>
               ) : null}
@@ -438,6 +494,65 @@ export function GameDetailView({
   );
 }
 
+
+type GameEditDraft = {
+  title: string;
+  platform: GamePlatform;
+  status: GameStatus;
+  collectionType: GameCollectionType;
+  coverImage: string;
+  metadataSearchTitle: string;
+  notes: string;
+  tags: string;
+  rating: string;
+  favorite: boolean;
+  hltbMainHours: string;
+  hltbMainExtraHours: string;
+  hltbCompletionistHours: string;
+};
+
+function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game) => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
+  return (
+    <DetailSection kicker="Edit mode" title="Edit game details" description="Update user-managed display data. Source IDs, Steam fields, and ROM paths stay read-only.">
+      {error ? <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div> : null}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <EditText label="Title" value={draft.title} onChange={(value) => onUpdate('title', value)} />
+        <EditSelect label="Platform" value={draft.platform} options={gamePlatforms} onChange={(value) => onUpdate('platform', value as GamePlatform)} />
+        <EditSelect label="Status" value={draft.status} options={gameStatuses} onChange={(value) => onUpdate('status', value as GameStatus)} />
+        <EditSelect label="Collection" value={draft.collectionType} options={gameCollectionTypes} onChange={(value) => onUpdate('collectionType', value as GameCollectionType)} />
+        <EditText label="Cover image URL" value={draft.coverImage} onChange={(value) => onUpdate('coverImage', value)} />
+        <EditText label="RAWG / metadata search title" value={draft.metadataSearchTitle} onChange={(value) => onUpdate('metadataSearchTitle', value)} />
+        <EditText label="Rating (0-5)" inputMode="decimal" value={draft.rating} onChange={(value) => onUpdate('rating', value)} />
+        <EditText label="HLTB main story hours" inputMode="decimal" value={draft.hltbMainHours} onChange={(value) => onUpdate('hltbMainHours', value)} />
+        <EditText label="HLTB main + extra hours" inputMode="decimal" value={draft.hltbMainExtraHours} onChange={(value) => onUpdate('hltbMainExtraHours', value)} />
+        <EditText label="HLTB completionist hours" inputMode="decimal" value={draft.hltbCompletionistHours} onChange={(value) => onUpdate('hltbCompletionistHours', value)} />
+        <label className="flex min-h-12 items-center gap-3 rounded-lg border border-white/10 bg-ink-950/80 px-3 py-2 text-sm text-slate-200">
+          <input checked={draft.favorite} onChange={(event) => onUpdate('favorite', event.target.checked)} type="checkbox" />
+          Favorite
+        </label>
+      </div>
+      <EditText label="Tags" value={draft.tags} onChange={(value) => onUpdate('tags', value)} />
+      <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Notes</span>
+        <textarea className="mt-2 min-h-28 w-full rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm text-white outline-none focus:border-mint" value={draft.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
+      </label>
+      {isRetroGame(game) ? <ReadOnlyField label="Original ROM path" value={game.romPath ?? game.romFiles?.[0]?.path ?? 'n/a'} /> : null}
+      <div className="flex flex-wrap gap-2">
+        <button className="min-h-10 rounded-xl border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-bold text-mint" onClick={onSave} type="button">Save</button>
+        <button className="min-h-10 rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200" onClick={onCancel} type="button">Cancel</button>
+        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game)} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh metadata'}</button> : null}
+      </div>
+    </DetailSection>
+  );
+}
+
+function EditText({ inputMode, label, onChange, value }: { inputMode?: 'decimal'; label: string; onChange: (value: string) => void; value: string }) {
+  return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span><input className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} type="text" /></label>;
+}
+
+function EditSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: readonly string[]; value: string }) {
+  return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+}
 
 function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
   return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
@@ -616,6 +731,85 @@ function parseTags(value: string) {
         .filter(Boolean),
     ),
   );
+}
+
+function getDisplayTitle(game: Game) {
+  return game.displayTitleOverride?.trim() || game.title;
+}
+
+function isRetroGame(game: Game) {
+  return game.externalSource === 'retro-rom' || Boolean(game.romPath || game.romFiles?.length);
+}
+
+export function isGameEditable(game: Game) {
+  if (game.externalSource === 'steam' || (game.collectionType === 'library' && typeof game.steamAppId === 'number')) {
+    return false;
+  }
+
+  return !game.externalSource || game.externalSource === 'manual' || game.externalSource === 'retro-rom' || isRetroGame(game);
+}
+
+function createEditDraft(game: Game): GameEditDraft {
+  return {
+    collectionType: game.collectionType,
+    coverImage: game.coverImage ?? '',
+    favorite: Boolean(game.favorite),
+    hltbCompletionistHours: formatOptionalNumberForInput(game.hltbCompletionistHours),
+    hltbMainExtraHours: formatOptionalNumberForInput(game.hltbMainExtraHours),
+    hltbMainHours: formatOptionalNumberForInput(game.hltbMainHours),
+    metadataSearchTitle: game.metadataSearchTitle ?? '',
+    notes: game.notes ?? '',
+    platform: game.platform,
+    rating: formatOptionalNumberForInput(game.rating),
+    status: game.status,
+    tags: (game.tags ?? []).join(', '),
+    title: getDisplayTitle(game),
+  };
+}
+
+function getGameEditChanges(game: Game, draft: GameEditDraft): Partial<Game> {
+  const title = draft.title.trim();
+  return {
+    collectionType: draft.collectionType,
+    coverImage: draft.coverImage.trim(),
+    displayTitleOverride: title === game.title ? undefined : title,
+    favorite: draft.favorite,
+    hltbCompletionistHours: parseOptionalNonNegativeNumber(draft.hltbCompletionistHours),
+    hltbMainExtraHours: parseOptionalNonNegativeNumber(draft.hltbMainExtraHours),
+    hltbMainHours: parseOptionalNonNegativeNumber(draft.hltbMainHours),
+    metadataSearchTitle: draft.metadataSearchTitle.trim() || title,
+    notes: draft.notes,
+    originalImportedTitle: isRetroGame(game) ? game.originalImportedTitle ?? game.title : game.originalImportedTitle,
+    platform: draft.platform,
+    rating: parseOptionalNonNegativeNumber(draft.rating) ?? null,
+    status: draft.status,
+    tags: parseTags(draft.tags),
+    title,
+  };
+}
+
+function validateEditDraft(draft: GameEditDraft) {
+  if (!draft.title.trim()) return 'Title cannot be empty.';
+  if (!gamePlatforms.includes(draft.platform as never)) return 'Platform must be valid.';
+  if (draft.coverImage.trim() && !isValidUrl(draft.coverImage.trim())) return 'Cover image must be a valid URL.';
+  const rating = parseOptionalNonNegativeNumber(draft.rating);
+  if (draft.rating.trim() && rating === undefined) return 'Rating must be a number between 0 and 5.';
+  if (rating !== undefined && rating > 5) return 'Rating must be between 0 and 5.';
+  return '';
+}
+
+function formatOptionalNumberForInput(value: number | null | undefined) {
+  return typeof value === 'number' ? String(value) : '';
+}
+
+function parseOptionalNonNegativeNumber(value: string) {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function isValidUrl(value: string) {
+  try { new URL(value); return true; } catch { return false; }
 }
 
 function formatPlatformSource(game: Game) {

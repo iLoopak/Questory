@@ -20,13 +20,14 @@ export async function refreshRawgMetadataForGame(game: Game): Promise<SingleGame
     return { metadata, status: 'updated' };
   }
 
-  const cachedMetadata = getCachedRawgMetadata(game.title);
+  const searchTitle = getMetadataSearchTitle(game);
+  const cachedMetadata = getCachedRawgMetadata(searchTitle);
 
   if (cachedMetadata) {
     return { metadata: cachedMetadata.metadata, status: 'updated' };
   }
 
-  const matches = rankRawgMatches(game, await searchRawgWithFallback(game.title));
+  const matches = rankRawgMatches({ ...game, title: searchTitle }, await searchRawgWithFallback(searchTitle));
   const bestMatch = matches[0];
 
   if (!bestMatch || !isHighConfidenceMatch(bestMatch)) {
@@ -36,12 +37,16 @@ export async function refreshRawgMetadataForGame(game: Game): Promise<SingleGame
   const metadata = await fetchRawgMetadataForGame(game, bestMatch.result.id);
   saveRawgMetadataCacheEntry({
     cachedAt: new Date().toISOString(),
-    gameTitle: game.title,
+    gameTitle: searchTitle,
     metadata,
     rawgId: bestMatch.result.id,
   });
 
   return { metadata, status: 'updated' };
+}
+
+function getMetadataSearchTitle(game: Game) {
+  return (game.metadataSearchTitle || game.displayTitleOverride || game.title).trim() || game.title;
 }
 
 async function fetchRawgMetadataForGame(game: Game, rawgId: number) {

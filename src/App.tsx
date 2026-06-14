@@ -1605,6 +1605,8 @@ function App() {
               isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
               onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
+              onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
+              onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
               platformQueueState={platformQueueState}
             />
           ) : activeNavItem === 'Home' ? (
