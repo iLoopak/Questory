@@ -1531,12 +1531,14 @@ textarea,
 
 .qs-collection-toolbar-search,
 .qs-collection-toolbar-select,
+.qs-collection-toolbar-accessory,
 .qs-collection-primary-action,
 .qs-collection-toolbar-extra {
   min-width: 0;
 }
 
 .qs-collection-toolbar-button,
+.qs-collection-toolbar-accessory > button,
 .qs-collection-primary-action > button {
   min-width: 0;
   white-space: nowrap;
