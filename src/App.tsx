@@ -31,7 +31,7 @@ import { NavigationVisibilitySettingsPanel } from './components/settings/Navigat
 import { PersonalizationSettingsPanel } from './components/settings/PersonalizationSettingsPanel';
 import { SettingsSection } from './components/settings/SettingsSection';
 import { QueuePlatformsSettingsPanel } from './components/settings/PlatformsSettingsPanel';
-import { SteamWishlistHtmlImportModal, SteamWishlistSyncNotice, WishlistSettingsPanel } from './components/settings/WishlistSettingsPanel';
+import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from './components/settings/WishlistSettingsPanel';
 import {
   getNavDescription,
   navItemLabelKeys,
@@ -2045,6 +2045,8 @@ function CollectionPanel({
   const { setViewMode, viewMode } = useCollectionViewMode(collectionType);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
+  const [isCollectionSteamAchievementSyncVisible, setIsCollectionSteamAchievementSyncVisible] = useState(false);
+  const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -2261,12 +2263,17 @@ function CollectionPanel({
     }
 
     setBulkSummary(null);
-    const summary = await onBulkRefreshSteamPlaytime(selectedGames.map((game) => game.id), {
-      emptyToastMessage: 'No selected Steam games are eligible for playtime sync.',
-    });
+    setIsCollectionSteamPlaytimeSyncVisible(true);
+    try {
+      const summary = await onBulkRefreshSteamPlaytime(selectedGames.map((game) => game.id), {
+        emptyToastMessage: 'No selected Steam games are eligible for playtime sync.',
+      });
 
-    if (summary) {
-      setBulkSummary(summary);
+      if (summary) {
+        setBulkSummary(summary);
+      }
+    } finally {
+      setIsCollectionSteamPlaytimeSyncVisible(false);
     }
   }
 
@@ -2279,14 +2286,19 @@ function CollectionPanel({
     const targetGames = hasSelection ? selectedGames : games;
 
     setBulkSummary(null);
-    const summary = await onBulkSyncSteamAchievements(targetGames.map((game) => game.id), {
-      emptyToastMessage: hasSelection
-        ? 'No selected Steam games are eligible for achievement sync.'
-        : t('collection.noEligibleSteamGames'),
-    });
+    setIsCollectionSteamAchievementSyncVisible(true);
+    try {
+      const summary = await onBulkSyncSteamAchievements(targetGames.map((game) => game.id), {
+        emptyToastMessage: hasSelection
+          ? 'No selected Steam games are eligible for achievement sync.'
+          : t('collection.noEligibleSteamGames'),
+      });
 
-    if (summary) {
-      setBulkSummary({ ...summary, message: formatSteamAchievementSyncSummary(summary) });
+      if (summary) {
+        setBulkSummary({ ...summary, message: formatSteamAchievementSyncSummary(summary) });
+      }
+    } finally {
+      setIsCollectionSteamAchievementSyncVisible(false);
     }
   }
 
@@ -2299,14 +2311,19 @@ function CollectionPanel({
     const targetGames = hasSelection ? selectedGames : games;
 
     setBulkSummary(null);
-    const summary = await onBulkRefreshSteamPlaytime(targetGames.map((game) => game.id), {
-      emptyToastMessage: hasSelection
-        ? 'No selected Steam games are eligible for playtime sync.'
-        : 'No visible Steam games are eligible for playtime sync.',
-    });
+    setIsCollectionSteamPlaytimeSyncVisible(true);
+    try {
+      const summary = await onBulkRefreshSteamPlaytime(targetGames.map((game) => game.id), {
+        emptyToastMessage: hasSelection
+          ? 'No selected Steam games are eligible for playtime sync.'
+          : 'No visible Steam games are eligible for playtime sync.',
+      });
 
-    if (summary) {
-      setBulkSummary(summary);
+      if (summary) {
+        setBulkSummary(summary);
+      }
+    } finally {
+      setIsCollectionSteamPlaytimeSyncVisible(false);
     }
   }
 
@@ -2477,16 +2494,12 @@ function CollectionPanel({
       }
     >
 
-      {collectionType === 'library' && steamAchievementSyncState && steamAchievementSyncState.status === 'loading' ? (
+      {collectionType === 'library' && isCollectionSteamAchievementSyncVisible && steamAchievementSyncState && steamAchievementSyncState.status === 'loading' ? (
         <SteamAchievementSyncNotice syncState={steamAchievementSyncState} />
       ) : null}
 
-      {collectionType === 'library' && steamPlaytimeRefreshState && steamPlaytimeRefreshState.status !== 'idle' ? (
+      {collectionType === 'library' && isCollectionSteamPlaytimeSyncVisible && steamPlaytimeRefreshState && steamPlaytimeRefreshState.status === 'loading' ? (
         <SteamPlaytimeRefreshNotice refreshState={steamPlaytimeRefreshState} />
-      ) : null}
-
-      {collectionType === 'wishlist' && steamWishlistSyncState && steamWishlistSyncState.status !== 'idle' ? (
-        <SteamWishlistSyncNotice syncState={steamWishlistSyncState} />
       ) : null}
 
       {isSteamWishlistHtmlImportOpen && onImportSteamWishlistHtml ? (
