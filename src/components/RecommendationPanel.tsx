@@ -397,11 +397,11 @@ function RecommendationToolbarHighlights({
   }
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
       {activeAchievement ? <RecommendationAchievementBadge achievement={activeAchievement} onClick={onOpenAchievementSettings} /> : null}
       {featuredGame ? (
         <button
-          className="inline-flex h-9 min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border border-skyglass/15 bg-ink-900/70 px-2.5 text-xs font-semibold text-slate-300 transition hover:border-mint/30 hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60"
+          className="inline-flex h-9 min-w-0 max-w-[14rem] shrink-0 items-center gap-1.5 rounded-full border border-skyglass/15 bg-ink-900/70 px-2.5 text-xs font-semibold text-slate-300 transition hover:border-mint/30 hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60"
           onClick={() => onOpenDetails(featuredGame.id)}
           title={`Featured: ${featuredGame.title}`}
           type="button"
@@ -421,7 +421,7 @@ function RecommendationAchievementBadge({ achievement, onClick }: { achievement:
       <span className="truncate">{achievement.title}</span>
     </>
   );
-  const className = "inline-flex h-9 min-w-0 max-w-[12rem] items-center gap-1.5 rounded-full border border-mint/35 bg-mint/10 px-2.5 text-xs font-semibold text-mint shadow-glow transition focus:outline-none focus:ring-2 focus:ring-mint/60";
+  const className = "inline-flex h-9 min-w-0 max-w-[12rem] shrink-0 items-center gap-1.5 rounded-full border border-mint/35 bg-mint/10 px-2.5 text-xs font-semibold text-mint shadow-glow transition focus:outline-none focus:ring-2 focus:ring-mint/60";
 
   if (!onClick) {
     return <span className={className} title={achievement.title}>{content}</span>;

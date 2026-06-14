@@ -1517,30 +1517,48 @@ textarea,
 }
 
 .qs-collection-toolbar-row {
-  display: grid;
-  grid-template-columns:
-    minmax(6.25rem, 1.6fr)
-    repeat(2, minmax(5rem, 0.76fr))
-    repeat(4, max-content);
-  align-items: end;
-  gap: 0.375rem;
+  display: flex;
   min-width: 0;
   width: 100%;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.375rem;
   overflow: visible;
 }
 
-.qs-collection-toolbar-search,
-.qs-collection-toolbar-select,
-.qs-collection-toolbar-accessory,
+.qs-collection-toolbar-search {
+  min-width: min(13rem, 100%);
+  flex: 1 1 14rem;
+}
+
+.qs-collection-toolbar-select {
+  min-width: 5rem;
+  flex: 0 1 8rem;
+}
+
+.qs-collection-toolbar-accessory {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .qs-collection-primary-action,
-.qs-collection-toolbar-extra {
+.qs-collection-toolbar-extra,
+.qs-toolbar-menu,
+.qs-collection-toolbar-button,
+.qs-collection-toolbar-accessory > button,
+.qs-collection-primary-action > button {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.qs-collection-toolbar-accessory > *,
+.qs-collection-toolbar-extra > * {
   min-width: 0;
 }
 
 .qs-collection-toolbar-button,
 .qs-collection-toolbar-accessory > button,
 .qs-collection-primary-action > button {
-  min-width: 0;
   white-space: nowrap;
 }
 
@@ -1550,7 +1568,6 @@ textarea,
 
 .qs-toolbar-menu {
   position: relative;
-  min-width: 0;
 }
 
 .qs-toolbar-menu > summary {
@@ -1618,11 +1635,17 @@ textarea,
 
 @media (max-width: 760px) {
   .qs-collection-toolbar-row {
-    grid-template-columns:
-      minmax(5.25rem, 1.2fr)
-      repeat(2, minmax(4.35rem, 0.68fr))
-      repeat(4, max-content);
+    flex-wrap: wrap;
     gap: 0.25rem;
+  }
+
+  .qs-collection-toolbar-search {
+    min-width: min(100%, 12rem);
+    flex: 999 1 12rem;
+  }
+
+  .qs-collection-toolbar-accessory {
+    flex-shrink: 1;
   }
 
   .qs-collection-toolbar-search span,
@@ -1668,15 +1691,13 @@ textarea,
 }
 
 @media (max-width: 420px) {
-  .qs-collection-toolbar-row {
-    grid-template-columns:
-      minmax(3.9rem, 1fr)
-      repeat(2, minmax(3.1rem, 0.48fr))
-      repeat(4, max-content);
-  }
-
   .qs-collection-toolbar {
     padding: 0.25rem;
+  }
+
+  .qs-collection-toolbar-search {
+    min-width: 100%;
+    flex-basis: 100%;
   }
 
   .qs-collection-toolbar-button,
