@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
+import { SettingsSection } from './settings/SettingsSection';
 import { loadIsThereAnyDealSettings, saveIsThereAnyDealSettings } from '../lib/isThereAnyDealSettingsStorage';
 import type { IsThereAnyDealSettings } from '../types/itad';
 
@@ -12,12 +13,7 @@ export function IsThereAnyDealSettingsPanel() {
   }, [settings]);
 
   return (
-    <section className="qs-glass rounded-lg border p-4">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-white">{t('itad.title')}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-400">{t('itad.settingsHelp')}</p>
-      </div>
-
+    <SettingsSection title={t('itad.title')} description={t('itad.settingsHelp')}>
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('integrations.apiKey')}</span>
         <input
@@ -30,7 +26,7 @@ export function IsThereAnyDealSettingsPanel() {
         />
       </label>
 
-      <p className="mt-3 text-xs text-slate-500">{t('itad.attribution')}</p>
-    </section>
+      <p className="text-xs text-slate-500">{t('itad.attribution')}</p>
+    </SettingsSection>
   );
 }

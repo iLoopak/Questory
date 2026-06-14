@@ -5,6 +5,7 @@ import {
   type ShelfIdentitySettings,
 } from '../../lib/shelfIdentity';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
+import { SettingsSection } from './SettingsSection';
 
 const personalizationAvatarOptions: Array<{
   label: string;
@@ -56,15 +57,11 @@ export function PersonalizationSettingsPanel({
   }
 
   return (
-    <section className="qs-glass rounded-lg border p-4">
-      <div>
-        <h2 className="text-xl font-semibold text-white">Personalization</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Set the shelf identity shown in places like Library and Home without changing Appearance theme or accent settings.
-        </p>
-      </div>
-
-      <div className="mt-4 space-y-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+    <SettingsSection
+      title="Personalization"
+      description="Set the shelf identity shown in places like Library and Home without changing Appearance theme or accent settings."
+    >
+      <div className="space-y-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Name</span>
           <input
@@ -162,6 +159,6 @@ export function PersonalizationSettingsPanel({
           </div>
         </div>
       </div>
-    </section>
+    </SettingsSection>
   );
 }

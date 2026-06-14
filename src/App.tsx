@@ -30,6 +30,7 @@ import { AppearanceSettingsPanel } from './components/settings/AppearanceSetting
 import { DemoDataPanel } from './components/settings/LibrarySettingsPanel';
 import { NavigationVisibilitySettingsPanel } from './components/settings/NavigationVisibilitySettingsPanel';
 import { PersonalizationSettingsPanel } from './components/settings/PersonalizationSettingsPanel';
+import { SettingsSection } from './components/settings/SettingsSection';
 import { QueuePlatformsSettingsPanel } from './components/settings/PlatformsSettingsPanel';
 import { SteamWishlistHtmlImportModal, SteamWishlistSyncNotice, WishlistSettingsPanel } from './components/settings/WishlistSettingsPanel';
 import {
@@ -3700,13 +3701,11 @@ function OnboardingSettingsPanel({
   const { t } = useI18n();
 
   return (
-    <section className="qs-glass rounded-lg border p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">{isComplete ? t('settings.setupComplete') : t('settings.setupAssistant')}</h2>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
+    <SettingsSection
+      title={isComplete ? t('settings.setupComplete') : t('settings.setupAssistant')}
+      description={`${completedCount} setup items finished or skipped. Reopen the assistant to continue guidance, or restart it from the beginning.`}
+      actions={(
+        <>
           <button
             className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
             onClick={onOpenOnboarding}
@@ -3721,9 +3720,9 @@ function OnboardingSettingsPanel({
           >
             Restart setup
           </button>
-        </div>
-      </div>
-    </section>
+        </>
+      )}
+    />
   );
 }
 
