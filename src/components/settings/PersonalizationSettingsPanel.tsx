@@ -121,20 +121,20 @@ export function PersonalizationSettingsPanel({
               Auto badge
             </button>
           </div>
-          <div className="mt-2 rounded-lg border border-mint/20 bg-mint/10 p-3 text-sm font-semibold text-white">
-            Preview active badge: <span className="inline-flex items-center gap-1.5 text-mint">{activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle || 'No badge unlocked yet'}</span>
+          <div className="qs-achievement-preview mt-2">
+            Preview active badge: <span className="qs-achievement-inline-badge">{activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle || 'No badge unlocked yet'}</span>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {achievements.map((achievement) => {
               const isSelected = shelfIdentity.selectedActiveBadgeId === achievement.id;
               return (
-                <div className={`rounded-lg border p-3 transition ${achievement.isUnlocked ? 'border-skyglass/15 bg-ink-900/70 text-slate-200' : 'border-white/5 bg-ink-950/60 text-slate-500 opacity-75'}`} key={achievement.id}>
+                <div className={`qs-achievement-card ${achievement.isUnlocked ? 'qs-achievement-card--unlocked' : 'qs-achievement-card--locked'} ${isSelected ? 'qs-achievement-card--active' : ''}`} key={achievement.id}>
                   <div className="flex items-start gap-3">
-                    <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border ${achievement.isUnlocked ? 'border-mint/35 bg-mint/10 text-mint shadow-glow' : 'border-white/10 bg-ink-900 text-slate-500'}`}><Icon name={achievement.icon} size={20} /></div>
+                    <div className="qs-achievement-card__icon"><Icon name={achievement.icon} size={20} /></div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <strong className={`inline-flex items-center gap-1.5 ${achievement.isUnlocked ? 'text-white' : 'text-slate-400'}`}><Icon name={achievement.icon} />{achievement.title}</strong>
-                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${achievement.isUnlocked ? 'border-mint/30 text-mint' : 'border-white/10 text-slate-500'}`}>{achievement.progressLabel}</span>
+                        <strong className="qs-achievement-card__title"><Icon name={achievement.icon} />{achievement.title}</strong>
+                        <span className="qs-achievement-card__progress">{achievement.progressLabel}</span>
                       </div>
                       <p className="mt-1 text-xs leading-5">{achievement.description}</p>
                       <p className="mt-1 text-xs leading-5 text-slate-500">{achievement.unlockCondition}</p>
@@ -154,11 +154,11 @@ export function PersonalizationSettingsPanel({
           </div>
         </div>
 
-        <div className="rounded-lg border border-mint/20 bg-mint/10 p-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Preview</div>
+        <div className="qs-achievement-preview">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em]">Preview</div>
           <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
             <ShelfAvatar {...previewIdentity} sizeClassName="h-10 w-10" />
-            <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="inline-flex items-center gap-1.5 text-mint"> · {activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle}</span> : null}</span>
+            <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="qs-achievement-inline-badge ml-1"> · {activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle}</span> : null}</span>
           </div>
         </div>
       </div>

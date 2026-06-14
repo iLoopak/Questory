@@ -49,7 +49,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'steam-veteran',
     title: 'Steam Veteran',
-    icon: 'gamepad-2',
+    icon: 'steam',
     description: 'Your shelf includes games from Steam.',
     unlockCondition: 'Add at least one Steam game to your Library.',
     priority: 110,
@@ -71,7 +71,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'collector',
     title: 'Collector',
-    icon: 'library',
+    icon: 'archive',
     description: 'Your QuestShelf library has grown into a collection.',
     unlockCondition: 'Keep 25 or more games in your Library.',
     priority: 90,
@@ -82,7 +82,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'retro-explorer',
     title: 'Retro Explorer',
-    icon: 'gamepad-2',
+    icon: 'joystick',
     description: 'Your shelf includes at least one retro platform.',
     unlockCondition: 'Add a Library game from a retro platform.',
     priority: 80,
@@ -118,7 +118,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'curator',
     title: 'Curator',
-    icon: 'pencil',
+    icon: 'bookmark-pen',
     description: 'A carefully maintained wishlist.',
     unlockCondition: `Add ${wishlistCuratorTarget} games to your Wishlist.`,
     priority: 50,
@@ -129,7 +129,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'platform-hopper',
     title: 'Platform Hopper',
-    icon: 'gamepad-2',
+    icon: 'layers',
     description: 'Gaming across many systems.',
     unlockCondition: `Add games across at least ${platformHopperTarget} platforms.`,
     priority: 45,
@@ -140,7 +140,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'handheld-hero',
     title: 'Handheld Hero',
-    icon: 'panel-top-open',
+    icon: 'handheld',
     description: 'Built a significant handheld/retro collection.',
     unlockCondition: `Add ${handheldHeroTarget} games across retro or handheld platforms.`,
     priority: 44,
@@ -151,7 +151,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'playing-right-now',
     title: 'Playing Right Now',
-    icon: 'chevrons-right',
+    icon: 'play-circle',
     description: 'Actively gaming instead of collecting.',
     unlockCondition: 'Mark at least one Library game as Playing.',
     priority: 43,
@@ -162,7 +162,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'metadata-master',
     title: 'Metadata Master',
-    icon: 'library',
+    icon: 'database-sparkles',
     description: 'A well-maintained collection.',
     unlockCondition: `Enrich metadata for ${metadataMasterTarget} Library games.`,
     priority: 42,
@@ -173,7 +173,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'art-conservator',
     title: 'Art Conservator',
-    icon: 'image',
+    icon: 'image-frame',
     description: 'Artwork coverage is under control.',
     unlockCondition: `Assign artwork to ${artConservatorTarget} Library games.`,
     priority: 41,
@@ -184,7 +184,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'queue-commander',
     title: 'Queue Commander',
-    icon: 'list-plus',
+    icon: 'list-ordered',
     description: 'Quest Queue is actively managed.',
     unlockCondition: `Configure at least ${queueCommanderTarget} queue platforms.`,
     priority: 40,
@@ -195,7 +195,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
     id: 'century-club',
     title: 'Century Club',
-    icon: 'check-circle',
+    icon: 'badge-100',
     description: 'A major collection milestone.',
     unlockCondition: `Keep ${centuryClubTarget} games in your Library.`,
     priority: 39,
