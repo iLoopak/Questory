@@ -1623,8 +1623,6 @@ function App() {
               filters={libraryFilters}
               featuredGame={computedFeaturedGame}
               shelfTitle={computedShelfTitle}
-              shelfName={personalizedQuestShelfTitle}
-              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               games={filteredLibraryGames}
@@ -1673,9 +1671,8 @@ function App() {
             <CollectionPanel
               collectionType="wishlist"
               filters={wishlistFilters}
+              featuredGame={computedFeaturedGame}
               shelfTitle={computedShelfTitle}
-              shelfName={personalizedQuestShelfTitle}
-              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               games={filteredWishlistGames}
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
@@ -1768,9 +1765,8 @@ function App() {
             <RecommendationPanel
               games={games}
               queueState={platformQueueState}
+              featuredGame={computedFeaturedGame}
               shelfTitle={computedShelfTitle}
-              shelfName={personalizedQuestShelfTitle}
-              shelfAvatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -1957,8 +1953,6 @@ type CollectionPanelProps = {
   filters: CollectionFilters;
   featuredGame?: Game | null;
   shelfTitle?: string;
-  shelfName?: string;
-  shelfAvatar?: ReactNode;
   games: Game[];
   platformOptions: GamePlatform[];
   platformQueueState?: PlatformQueueState;
@@ -2001,8 +1995,6 @@ function CollectionPanel({
   filters,
   featuredGame = null,
   shelfTitle = '',
-  shelfName = '',
-  shelfAvatar,
   games,
   platformOptions,
   platformQueueState,
@@ -2361,43 +2353,19 @@ function CollectionPanel({
       scrollRef={collectionPanelRef}
       stickyChrome={
         <>
-          {(collectionType === 'library' || collectionType === 'wishlist') && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
-          <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
-            {shelfAvatar}
-            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || title}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> {shelfTitle}</span> : null}</div>
-            {featuredGame ? <button className="h-7 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 hover:bg-mint/10 hover:text-mint" onClick={() => onOpenDetails(featuredGame.id)} type="button">Featured</button> : null}
-          </div>
-        ) : null}
+          {(collectionType === 'library' || collectionType === 'wishlist') && (shelfTitle || featuredGame) ? (
+            <ShelfHighlights featuredGame={featuredGame} shelfTitle={shelfTitle} onOpenDetails={onOpenDetails} />
+          ) : null}
           <CollectionToolbar
             title={title}
         searchValue={filters.searchTerm}
         searchPlaceholder={t('toolbar.findTitle')}
         onSearchChange={(value) => onFiltersChange({ searchTerm: value })}
-        selects={[
-          {
-            label: t('toolbar.status'),
-            value: filters.status,
-            options: [allOption, ...gameStatuses],
-            onChange: (value) => onFiltersChange({ status: value as GameStatus | typeof allOption }),
-          },
-          {
-            label: t('toolbar.platform'),
-            value: filters.platform,
-            options: [allOption, ...platformOptions],
-            onChange: (value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption }),
-          },
-        ]}
         moreFiltersActiveCount={activeAdvancedFilterCount}
         moreFiltersOpen={isAdvancedFiltersOpen}
         moreFiltersButtonRef={advancedFiltersButtonRef}
         onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
-        viewMode={{
-          label: `${title} ${t('toolbar.viewMode')}`,
-          options: collectionViewModes,
-          value: viewMode,
-          onChange: (mode) => setViewMode(mode as CollectionViewMode),
-        }}
         primaryAction={
           <button
             className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
@@ -2544,10 +2512,31 @@ function CollectionPanel({
             <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <FilterSelect
+                  label={t('toolbar.status')}
+                  value={filters.status}
+                  options={[allOption, ...gameStatuses]}
+                  onChange={(value) => onFiltersChange({ status: value as GameStatus | typeof allOption })}
+                />
+
+                <FilterSelect
+                  label={t('toolbar.platform')}
+                  value={filters.platform}
+                  options={[allOption, ...platformOptions]}
+                  onChange={(value) => onFiltersChange({ platform: value as GamePlatform | typeof allOption })}
+                />
+
+                <FilterSelect
                   label={t('sort.status')}
                   value={filters.sortBy}
                   options={[...librarySortOptions]}
                   onChange={(value) => onFiltersChange({ sortBy: value as LibrarySortOption })}
+                />
+
+                <FilterSelect
+                  label={t('toolbar.viewMode')}
+                  value={viewMode}
+                  options={[...collectionViewModes]}
+                  onChange={(value) => setViewMode(value as CollectionViewMode)}
                 />
 
                 <FilterSelect
@@ -2783,6 +2772,37 @@ function CollectionPanel({
       )}
 
     </GameListShell>
+  );
+}
+
+
+function ShelfHighlights({
+  featuredGame,
+  onOpenDetails,
+  shelfTitle,
+}: {
+  featuredGame?: Game | null;
+  onOpenDetails: (gameId: string) => void;
+  shelfTitle?: string;
+}) {
+  if (!shelfTitle && !featuredGame) {
+    return null;
+  }
+
+  return (
+    <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-mint/20 bg-ink-950/90 px-2 py-1.5 text-sm font-semibold text-slate-200">
+      {shelfTitle ? <span className="truncate text-mint">{shelfTitle}</span> : null}
+      {shelfTitle && featuredGame ? <span className="text-slate-500" aria-hidden="true">•</span> : null}
+      {featuredGame ? (
+        <button
+          className="min-w-0 truncate rounded px-1 text-left text-slate-300 transition hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60"
+          onClick={() => onOpenDetails(featuredGame.id)}
+          type="button"
+        >
+          Featured: {featuredGame.title}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

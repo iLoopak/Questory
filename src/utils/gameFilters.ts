@@ -68,8 +68,10 @@ export function getActiveAdvancedFilterCount(filters: CollectionFilters) {
   return [
     filters.achievement !== allOption,
     filters.enrichment !== allOption,
+    filters.platform !== allOption,
     filters.quickFilters.length > 0,
     filters.source !== allOption,
+    filters.status !== allOption,
     filters.tag !== allOption,
     filters.sortBy !== initialCollectionFilters.sortBy,
   ].filter(Boolean).length;
