@@ -2368,11 +2368,13 @@ function CollectionPanel({
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
         primaryAction={
           <button
-            className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90"
+            aria-label={collectionType === 'wishlist' ? t('toolbar.addWishlistGame') : t('toolbar.addGame')}
+            className="grid h-9 w-9 place-items-center rounded-md bg-mint text-ink-950 shadow-glow transition hover:bg-mint/90"
             onClick={onAddGame}
+            title={collectionType === 'wishlist' ? t('toolbar.addWishlistGame') : t('toolbar.addGame')}
             type="button"
           >
-            {t('toolbar.add')}
+            <Icon name="plus" size={18} strokeWidth={2.5} />
           </button>
         }
         actionMenu={
