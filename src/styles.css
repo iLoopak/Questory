@@ -1514,6 +1514,7 @@ textarea,
 
 .qs-collection-toolbar {
   overflow: visible;
+  background: rgb(var(--ink-950-rgb));
 }
 
 .qs-collection-toolbar-row {
@@ -2416,6 +2417,10 @@ body.qs-controller-active .qs-compact-card:focus-within {
   -webkit-overflow-scrolling: touch;
 }
 
+.qs-game-list-shell {
+  padding-top: 0;
+}
+
 .qs-game-card-artwork,
 .qs-game-card-artwork img,
 .qs-shelf-card img,
@@ -2559,18 +2564,19 @@ body.qs-controller-active .qs-compact-card:focus-within {
 .qs-library-sticky-chrome {
   position: sticky;
   top: 0;
-  z-index: 60;
+  z-index: 80;
   isolation: isolate;
-  background: linear-gradient(180deg, rgb(var(--ink-950-rgb) / 1), rgb(var(--ink-950-rgb) / 0.98));
+  padding-top: 0.5rem;
+  background: rgb(var(--ink-950-rgb));
   background-clip: padding-box;
-  backdrop-filter: blur(16px);
 }
 
 .qs-game-list-sticky-chrome::before,
 .qs-library-sticky-chrome::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto;
+  height: 100%;
   z-index: -1;
   border-radius: inherit;
   background: rgb(var(--ink-950-rgb));
@@ -2604,6 +2610,13 @@ body.qs-controller-active .qs-compact-card:focus-within {
 .qs-collection-toolbar-search input,
 .qs-collection-toolbar-select select {
   margin-top: 0;
+}
+
+@media (min-width: 640px) {
+  .qs-game-list-sticky-chrome,
+  .qs-library-sticky-chrome {
+    padding-top: 0.75rem;
+  }
 }
 
 @media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
