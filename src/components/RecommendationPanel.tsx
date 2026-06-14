@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
+import { AchievementToolbarChips } from './AchievementToolbarChips';
 import { Icon } from './Icon';
 import { GameListEmptyState, GameListShell } from './GameListShell';
 import { ViewportModal } from './ViewportModal';
@@ -181,7 +182,7 @@ export function RecommendationPanel({
         onClearFilters={hasActiveMoreFilters ? clearMoreFilters : undefined}
         leadingAccessory={
           activeAchievement || featuredGame ? (
-          <RecommendationToolbarHighlights
+          <AchievementToolbarChips
             activeAchievement={activeAchievement}
             featuredGame={featuredGame}
             onOpenAchievementSettings={onOpenAchievementSettings}
@@ -378,58 +379,5 @@ function RecommendationToggle({ checked, label, onChange }: { checked: boolean; 
       <input checked={checked} className="h-4 w-4 accent-mint" onChange={(event) => onChange(event.target.checked)} type="checkbox" />
       {label}
     </label>
-  );
-}
-
-function RecommendationToolbarHighlights({
-  activeAchievement,
-  featuredGame,
-  onOpenAchievementSettings,
-  onOpenDetails,
-}: {
-  activeAchievement?: QuestShelfAchievementProgress | null;
-  featuredGame?: Game | null;
-  onOpenAchievementSettings?: () => void;
-  onOpenDetails: (gameId: string) => void;
-}) {
-  if (!activeAchievement && !featuredGame) {
-    return null;
-  }
-
-  return (
-    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
-      {activeAchievement ? <RecommendationAchievementBadge achievement={activeAchievement} onClick={onOpenAchievementSettings} /> : null}
-      {featuredGame ? (
-        <button
-          className="inline-flex h-9 min-w-0 max-w-[14rem] shrink-0 items-center gap-1.5 rounded-full border border-skyglass/15 bg-ink-900/70 px-2.5 text-xs font-semibold text-slate-300 transition hover:border-mint/30 hover:bg-mint/10 hover:text-mint focus:outline-none focus:ring-2 focus:ring-mint/60"
-          onClick={() => onOpenDetails(featuredGame.id)}
-          title={`Featured: ${featuredGame.title}`}
-          type="button"
-        >
-          <Icon name="check-circle" size={14} />
-          <span className="truncate">Featured: {featuredGame.title}</span>
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function RecommendationAchievementBadge({ achievement, onClick }: { achievement: QuestShelfAchievementProgress; onClick?: () => void }) {
-  const content = (
-    <>
-      <Icon name={achievement.icon} size={15} strokeWidth={2.2} />
-      <span className="truncate">{achievement.title}</span>
-    </>
-  );
-  const className = "inline-flex h-9 min-w-0 max-w-[12rem] shrink-0 items-center gap-1.5 rounded-full border border-mint/35 bg-mint/10 px-2.5 text-xs font-semibold text-mint shadow-glow transition focus:outline-none focus:ring-2 focus:ring-mint/60";
-
-  if (!onClick) {
-    return <span className={className} title={achievement.title}>{content}</span>;
-  }
-
-  return (
-    <button className={`${className} hover:bg-mint/20`} onClick={onClick} title={`${achievement.title} - choose active badge`} type="button">
-      {content}
-    </button>
   );
 }
