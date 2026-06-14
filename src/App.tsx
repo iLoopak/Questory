@@ -259,7 +259,7 @@ function App() {
   const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
   const questShelfAchievements = useMemo(() => getQuestShelfAchievements(games, platformQueueState), [games, platformQueueState]);
   const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
-  const computedShelfTitle = activeShelfAchievement?.title ?? '';
+  const computedShelfTitle = activeShelfAchievement ? `${activeShelfAchievement.glyph} ${activeShelfAchievement.title}` : '';
   const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
   const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
@@ -2361,7 +2361,7 @@ function CollectionPanel({
           {(collectionType === 'library' || collectionType === 'wishlist') && (shelfAvatar || shelfTitle || shelfName || featuredGame) ? (
           <div className="mb-1.5 flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-mint/20 bg-ink-950/80 px-2 py-1.5">
             {shelfAvatar}
-            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || title}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> 🏆 {shelfTitle}</span> : null}</div>
+            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">🎮 {shelfName || title}{shelfTitle ? <span className="text-mint"> <span className="text-slate-500">•</span> {shelfTitle}</span> : null}</div>
             {featuredGame ? <button className="h-7 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 hover:bg-mint/10 hover:text-mint" onClick={() => onOpenDetails(featuredGame.id)} type="button">Featured</button> : null}
           </div>
         ) : null}

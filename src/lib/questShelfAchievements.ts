@@ -6,9 +6,16 @@ export type QuestShelfAchievementId =
   | 'completionist'
   | 'collector'
   | 'retro-explorer'
+  | 'achievement-hunter'
   | 'backlog-slayer'
-  | 'wishlist-curator'
-  | 'achievement-hunter';
+  | 'curator'
+  | 'platform-hopper'
+  | 'handheld-hero'
+  | 'playing-right-now'
+  | 'metadata-master'
+  | 'art-conservator'
+  | 'queue-commander'
+  | 'century-club';
 
 export type QuestShelfAchievement = {
   id: QuestShelfAchievementId;
@@ -27,8 +34,14 @@ export type QuestShelfAchievementProgress = QuestShelfAchievement & {
   progressLabel: string;
 };
 
-const backlogSlayerTarget = 5;
-const wishlistCuratorTarget = 5;
+const backlogSlayerTarget = 10;
+const wishlistCuratorTarget = 25;
+const platformHopperTarget = 5;
+const handheldHeroTarget = 25;
+const metadataMasterTarget = 100;
+const artConservatorTarget = 100;
+const queueCommanderTarget = 5;
+const centuryClubTarget = 100;
 
 export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
   {
@@ -37,7 +50,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     glyph: '🎮',
     description: 'Your shelf includes games from Steam.',
     unlockCondition: 'Add at least one Steam game to your Library.',
-    priority: 100,
+    priority: 110,
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && (game.platform === 'Steam' || game.externalSource === 'steam' || typeof game.steamAppId === 'number')).length,
   },
@@ -47,7 +60,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     glyph: '✅',
     description: 'You have finished at least one game.',
     unlockCondition: 'Mark at least one Library game as Finished.',
-    priority: 90,
+    priority: 100,
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && game.status === 'Finished').length,
   },
@@ -57,7 +70,7 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     glyph: '💎',
     description: 'Your QuestShelf library has grown into a collection.',
     unlockCondition: 'Keep 25 or more games in your Library.',
-    priority: 80,
+    priority: 90,
     target: 25,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library').length,
   },
@@ -67,16 +80,26 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     glyph: '👾',
     description: 'Your shelf includes at least one retro platform.',
     unlockCondition: 'Add a Library game from a retro platform.',
-    priority: 70,
+    priority: 80,
     target: 1,
     getProgress: (games) => games.filter((game) => game.collectionType === 'library' && isRetroPlatform(game.platform)).length,
+  },
+  {
+    id: 'achievement-hunter',
+    title: 'Achievement Hunter',
+    glyph: '🏆',
+    description: 'Steam achievement completion is actively tracked.',
+    unlockCondition: 'Have at least one Steam game with achievement data.',
+    priority: 70,
+    target: 1,
+    getProgress: (games) => games.filter((game) => game.collectionType === 'library' && (game.steamAchievementsLastCheckedAt || (game.steamAchievementsTotal ?? 0) > 0 || typeof game.steamAchievementsPercent === 'number')).length,
   },
   {
     id: 'backlog-slayer',
     title: 'Backlog Slayer',
     glyph: '☠️',
-    description: 'You are clearing games from the backlog queue.',
-    unlockCondition: `Finish or drop ${backlogSlayerTarget} queued Library games.`,
+    description: 'Making progress through the queue.',
+    unlockCondition: `Finish or drop ${backlogSlayerTarget} games from Quest Queue.`,
     priority: 60,
     target: backlogSlayerTarget,
     getProgress: (games, queueState) => {
@@ -85,24 +108,84 @@ export const questShelfAchievementRegistry: QuestShelfAchievement[] = [
     },
   },
   {
-    id: 'wishlist-curator',
-    title: 'Wishlist Curator',
+    id: 'curator',
+    title: 'Curator',
     glyph: '📝',
-    description: 'You keep a deliberate wishlist for future quests.',
+    description: 'A carefully maintained wishlist.',
     unlockCondition: `Add ${wishlistCuratorTarget} games to your Wishlist.`,
     priority: 50,
     target: wishlistCuratorTarget,
     getProgress: (games) => games.filter((game) => game.collectionType === 'wishlist').length,
   },
   {
-    id: 'achievement-hunter',
-    title: 'Achievement Hunter',
-    glyph: '🏆',
-    description: 'Steam achievement data is powering your shelf.',
-    unlockCondition: 'Sync Steam achievement data or reach high achievement completion.',
-    priority: 40,
+    id: 'platform-hopper',
+    title: 'Platform Hopper',
+    glyph: '🕹️',
+    description: 'Gaming across many systems.',
+    unlockCondition: `Add games across at least ${platformHopperTarget} platforms.`,
+    priority: 45,
+    target: platformHopperTarget,
+    getProgress: (games) => new Set(games.filter((game) => game.collectionType === 'library').map((game) => String(game.platform).trim()).filter(Boolean)).size,
+  },
+  {
+    id: 'handheld-hero',
+    title: 'Handheld Hero',
+    glyph: '📟',
+    description: 'Built a significant handheld/retro collection.',
+    unlockCondition: `Add ${handheldHeroTarget} games across retro or handheld platforms.`,
+    priority: 44,
+    target: handheldHeroTarget,
+    getProgress: (games) => games.filter((game) => game.collectionType === 'library' && isRetroPlatform(game.platform)).length,
+  },
+  {
+    id: 'playing-right-now',
+    title: 'Playing Right Now',
+    glyph: '🔥',
+    description: 'Actively gaming instead of collecting.',
+    unlockCondition: 'Mark at least one Library game as Playing.',
+    priority: 43,
     target: 1,
-    getProgress: (games) => games.filter((game) => game.collectionType === 'library' && ((game.steamAchievementsTotal ?? 0) > 0 || (game.steamAchievementsPercent ?? 0) >= 75)).length,
+    getProgress: (games) => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing').length,
+  },
+  {
+    id: 'metadata-master',
+    title: 'Metadata Master',
+    glyph: '📚',
+    description: 'A well-maintained collection.',
+    unlockCondition: `Enrich metadata for ${metadataMasterTarget} Library games.`,
+    priority: 42,
+    target: metadataMasterTarget,
+    getProgress: (games) => games.filter((game) => game.collectionType === 'library' && (game.metadataSource || game.metadataUpdatedAt || game.rawgId || game.hltbId)).length,
+  },
+  {
+    id: 'art-conservator',
+    title: 'Art Conservator',
+    glyph: '🖼️',
+    description: 'Artwork coverage is under control.',
+    unlockCondition: `Assign artwork to ${artConservatorTarget} Library games.`,
+    priority: 41,
+    target: artConservatorTarget,
+    getProgress: (games) => games.filter((game) => game.collectionType === 'library' && hasAssignedArtwork(game)).length,
+  },
+  {
+    id: 'queue-commander',
+    title: 'Queue Commander',
+    glyph: '🎯',
+    description: 'Quest Queue is actively managed.',
+    unlockCondition: `Configure at least ${queueCommanderTarget} queue platforms.`,
+    priority: 40,
+    target: queueCommanderTarget,
+    getProgress: (_games, queueState) => queueState?.activePlatforms.length ?? 0,
+  },
+  {
+    id: 'century-club',
+    title: 'Century Club',
+    glyph: '💯',
+    description: 'A major collection milestone.',
+    unlockCondition: `Keep ${centuryClubTarget} games in your Library.`,
+    priority: 39,
+    target: centuryClubTarget,
+    getProgress: (games) => games.filter((game) => game.collectionType === 'library').length,
   },
 ];
 
@@ -123,7 +206,13 @@ export function getQuestShelfAchievements(games: Game[], queueState?: PlatformQu
 export function getActiveQuestShelfAchievement(games: Game[], selectedActiveBadgeId?: string, queueState?: PlatformQueueState) {
   const achievements = getQuestShelfAchievements(games, queueState);
   const unlocked = achievements.filter((achievement) => achievement.isUnlocked).sort((first, second) => second.priority - first.priority);
-  return unlocked.find((achievement) => achievement.id === selectedActiveBadgeId) ?? unlocked[0] ?? null;
+
+  if (selectedActiveBadgeId) {
+    const selectedAchievement = unlocked.find((achievement) => achievement.id === selectedActiveBadgeId);
+    if (selectedAchievement) return selectedAchievement;
+  }
+
+  return unlocked[0] ?? null;
 }
 
 export function isQuestShelfAchievementId(value: unknown): value is QuestShelfAchievementId {
@@ -136,4 +225,9 @@ export function getLegacyComputedShelfTitle(games: Game[]) {
 
 function isRetroPlatform(platform: Game['platform']) {
   return ['PSP', 'PS2', 'PS1', 'PS Vita', 'Game Boy', 'Game Boy Color', 'Game Boy Advance', 'NES', 'SNES', 'Nintendo 64', 'Nintendo DS', 'Wii', 'Wii U', 'GameCube', 'Sega Genesis / Mega Drive', 'Master System', 'Game Gear', 'PC Engine', 'GBA'].includes(String(platform));
+}
+
+function hasAssignedArtwork(game: Game) {
+  const coverImage = game.coverImage.trim();
+  return Boolean(game.artworkSource || game.artworkUpdatedAt || (coverImage && !coverImage.startsWith('data:image/svg+xml')));
 }

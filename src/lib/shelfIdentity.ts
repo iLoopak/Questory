@@ -7,7 +7,7 @@ export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon.png';
 export const maxShelfNameLength = 48;
 export const maxCustomAvatarDataUrlLength = 700_000;
 
-export type BuiltInAvatarId = 'controller' | 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer';
+export type BuiltInAvatarId = 'controller' | 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer' | 'curator' | 'platform-hopper' | 'handheld-hero' | 'playing-right-now' | 'metadata-master' | 'art-conservator' | 'queue-commander' | 'century-club';
 export type ShelfAvatarSelection = 'app-icon' | 'steam' | `built-in:${BuiltInAvatarId}` | 'custom';
 
 export type ShelfIdentitySettings = {
@@ -27,6 +27,10 @@ export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: 
   { id: 'fantasy-hero', label: 'Fantasy Hero', glyph: '🐉', gradient: 'from-emerald-300 to-purple-400' },
   { id: 'collector', label: 'Collector', glyph: '💎', gradient: 'from-blue-300 to-mint' },
   { id: 'backlog-slayer', label: 'Backlog Slayer', glyph: '☠️', gradient: 'from-mint to-lime-300' },
+  { id: 'curator', label: 'Curator', glyph: '📝', gradient: 'from-rose-300 to-amber-300' },
+  { id: 'platform-hopper', label: 'Platform Hopper', glyph: '🕹️', gradient: 'from-cyan-300 to-violet-400' },
+  { id: 'handheld-hero', label: 'Handheld Hero', glyph: '📟', gradient: 'from-lime-300 to-cyan-300' },
+  { id: 'playing-right-now', label: 'Playing Right Now', glyph: '🔥', gradient: 'from-orange-300 to-red-400' },
 ];
 
 const emptyIdentity: ShelfIdentitySettings = {
@@ -55,8 +59,13 @@ export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySet
     shelfAvatar: avatarSelection,
     customAvatarDataUrl,
     shelfName: sanitizeShelfName(parsed.shelfName),
-    selectedActiveBadgeId: isQuestShelfAchievementId(parsed.selectedActiveBadgeId) ? parsed.selectedActiveBadgeId : '',
+    selectedActiveBadgeId: normalizeActiveBadgeId(parsed.selectedActiveBadgeId),
   };
+}
+
+function normalizeActiveBadgeId(value: unknown): ShelfIdentitySettings['selectedActiveBadgeId'] {
+  if (value === 'wishlist-curator') return 'curator';
+  return isQuestShelfAchievementId(value) ? value : '';
 }
 
 export function sanitizeShelfName(value: unknown) {
