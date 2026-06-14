@@ -259,7 +259,7 @@ function App() {
   const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
   const questShelfAchievements = useMemo(() => getQuestShelfAchievements(games, platformQueueState), [games, platformQueueState]);
   const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
-  const computedShelfTitle = activeShelfAchievement ? `${activeShelfAchievement.glyph} ${activeShelfAchievement.title}` : '';
+  const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
   const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
   const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
