@@ -27,7 +27,6 @@ import { StatsPanel } from './components/StatsPanel';
 import { SteamSettingsPanel } from './components/SteamSettingsPanel';
 import { AboutSettingsPanel } from './components/settings/AboutSettingsPanel';
 import { AppearanceSettingsPanel } from './components/settings/AppearanceSettingsPanel';
-import { DemoDataPanel } from './components/settings/LibrarySettingsPanel';
 import { NavigationVisibilitySettingsPanel } from './components/settings/NavigationVisibilitySettingsPanel';
 import { PersonalizationSettingsPanel } from './components/settings/PersonalizationSettingsPanel';
 import { SettingsSection } from './components/settings/SettingsSection';
@@ -96,7 +95,7 @@ import {
 import { getComputedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from './lib/shelfIdentity';
 import { getActiveQuestShelfAchievement, getQuestShelfAchievements } from './lib/questShelfAchievements';
 import { loadControllerDebugEnabled, saveControllerDebugEnabled } from './lib/androidGamepadShortcuts';
-import { getMockGames, isMockGame, loadGames, removeMockGames, saveGames } from './lib/gameStorage';
+import { isMockGame, loadGames, saveGames } from './lib/gameStorage';
 import { isMissingOrGeneratedCover } from './lib/gameCoverImages';
 import { hasSteamAchievementSummary } from './lib/steamAchievementSummary';
 import { loadControllerLayoutPreference, saveControllerLayoutPreference, type ControllerLayoutPreference } from './lib/controllerLayoutPreferences';
@@ -1523,19 +1522,6 @@ function App() {
     setIgnoredSteamGames((currentIgnoredGames) => removeIgnoredSteamGame(currentIgnoredGames, steamAppId));
   }
 
-  function loadDemoData() {
-    setGames((currentGames) => {
-      const existingIds = new Set(currentGames.map((game) => game.id));
-      const newMockGames = getMockGames().filter((game) => !existingIds.has(game.id));
-
-      return [...currentGames, ...newMockGames];
-    });
-  }
-
-  function removeDemoGames() {
-    setGames((currentGames) => removeMockGames(currentGames));
-  }
-
   function openArtworkAudit() {
     setSelectedGameId(null);
     setActiveNavItem('Artwork');
@@ -1815,7 +1801,6 @@ function App() {
               autoBackupSignal={autoBackupSignal}
               completedOnboardingItemIds={completedOnboardingItemIds}
               skippedOnboardingItemIds={skippedOnboardingItemIds}
-              demoGameCount={games.filter(isMockGame).length}
               games={games}
               ignoredSteamGames={ignoredSteamGames}
               libraryOwnerNickname={libraryOwnerNickname}
@@ -1856,7 +1841,6 @@ function App() {
               onControllerLayoutChange={setControllerLayoutPreference}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
               onNavigationVisibilityChange={setNavigationVisibility}
-              onLoadDemoData={loadDemoData}
               onOnboardingAction={handleOnboardingAction}
               onOnboardingClose={hideOnboarding}
               onOnboardingComplete={markOnboardingItemComplete}
@@ -1865,7 +1849,6 @@ function App() {
               onRestartOnboarding={restartOnboarding}
               onPlatformQueueStateChange={setPlatformQueueState}
               onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
-              onRemoveDemoGames={removeDemoGames}
               onRefreshSteamPlaytime={() => refreshSteamPlaytime()}
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
@@ -3216,7 +3199,6 @@ type SettingsPanelProps = {
   autoBackupSignal: string;
   completedOnboardingItemIds: Set<OnboardingItemId>;
   skippedOnboardingItemIds: Set<OnboardingItemId>;
-  demoGameCount: number;
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
   libraryOwnerNickname: string;
@@ -3257,7 +3239,6 @@ type SettingsPanelProps = {
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
-  onLoadDemoData: () => void;
   onOnboardingAction: (itemId: OnboardingItemId, action?: 'primary' | 'secondary') => void;
   onOnboardingClose: () => void;
   onOnboardingComplete: (itemId: OnboardingItemId) => void;
@@ -3266,7 +3247,6 @@ type SettingsPanelProps = {
   onRestartOnboarding: () => void;
   onPlatformQueueStateChange: (state: PlatformQueueState) => void;
   onRawgApiKeyConfigured: () => void;
-  onRemoveDemoGames: () => void;
   onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
   onReviewRetroImportedGames: () => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
@@ -3289,7 +3269,6 @@ function SettingsPanel({
   autoBackupSignal,
   completedOnboardingItemIds,
   skippedOnboardingItemIds,
-  demoGameCount,
   games,
   ignoredSteamGames,
   libraryOwnerNickname,
@@ -3330,7 +3309,6 @@ function SettingsPanel({
   onControllerLayoutChange,
   onLandscapeLockChange,
   onNavigationVisibilityChange,
-  onLoadDemoData,
   onOnboardingAction,
   onOnboardingClose,
   onOnboardingComplete,
@@ -3339,7 +3317,6 @@ function SettingsPanel({
   onRestartOnboarding,
   onPlatformQueueStateChange,
   onRawgApiKeyConfigured,
-  onRemoveDemoGames,
   onRefreshSteamPlaytime,
   onReviewRetroImportedGames,
   onThemePreferenceChange,
@@ -3445,15 +3422,6 @@ function SettingsPanel({
             </div>
           ) : null}
 
-          {activeCategory === 'Library' ? (
-            <div className="space-y-4">
-              <DemoDataPanel
-                demoGameCount={demoGameCount}
-                onLoadDemoData={onLoadDemoData}
-                onRemoveDemoGames={onRemoveDemoGames}
-              />
-            </div>
-          ) : null}
 
           {activeCategory === 'Wishlist' ? (
             <WishlistSettingsPanel
@@ -3620,15 +3588,6 @@ function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
     );
   }
 
-  if (category === 'Library') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <path d="M5 4h4v16H5z" />
-        <path d="M10 4h4v16h-4z" />
-        <path d="M15 5l4 1v14l-4-1z" />
-      </svg>
-    );
-  }
 
   if (category === 'Wishlist') {
     return (
