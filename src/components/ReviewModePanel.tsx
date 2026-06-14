@@ -105,13 +105,6 @@ const emptyReviewActionStats: ReviewActionStats = {
   wishlisted: 0,
 };
 
-const secondaryActions: Array<{ action: ReviewModeAction; icon: IconName; label: string }> = [
-  { action: 'open-details', icon: 'info', label: 'Open full details' },
-  { action: 'enrich', icon: 'refresh-cw', label: 'Enrich metadata' },
-  { action: 'find-artwork', icon: 'image', label: 'Find Artwork' },
-  { action: 'note', icon: 'pencil', label: 'Add note' },
-];
-
 export function ReviewModePanel({
   controllerLayout,
   games,
@@ -537,24 +530,6 @@ function FocusedReviewCard({
     swipeStartRef.current = null;
   }, [game.id]);
 
-  const releaseLabel = game.releaseDate ?? game.released ?? null;
-  const metadataRows = [
-    ['Status', game.status],
-    ['Collection', game.collectionType === 'wishlist' ? 'Wishlist' : 'Library'],
-    ['Source', game.externalSource ?? 'manual'],
-    ['Steam app', typeof game.steamAppId === 'number' ? String(game.steamAppId) : null],
-    ['Imported', game.importedAt ?? null],
-    ['Updated', game.updatedAt ?? null],
-  ].filter((row): row is [string, string] => Boolean(row[1]));
-  const releaseRows = [
-    ['Release date', releaseLabel],
-    ['Developers', game.developers?.join(', ') ?? null],
-    ['Publishers', game.publishers?.join(', ') ?? null],
-    ['Steam reviews', game.steamReviewInfo ?? null],
-    ['Metacritic', typeof game.metacritic === 'number' ? String(game.metacritic) : null],
-  ].filter((row): row is [string, string] => Boolean(row[1]));
-  const genreLabels = [...(game.genres ?? []), ...(game.rawgTags ?? []), ...game.tags];
-
   const swipeTarget = getSwipeTarget(swipeState.offsetX, swipeState.offsetY);
   const swipeDirection = swipeTarget?.horizontal ?? getSwipeHorizontalDirection(swipeState.offsetX);
   const activeSwipeAction = swipeTarget?.action ?? null;
@@ -763,97 +738,70 @@ function FocusedReviewCard({
         ) : null}
 
 
-        <details className="qs-review-details mt-3 rounded-2xl border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300 w-full">
-          <summary className="cursor-pointer select-none font-semibold text-slate-100">{t('review.details')}</summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.metadata')}</div>
-              <dl className="mt-2 grid gap-1 text-xs text-slate-400">
-                {metadataRows.map(([label, value]) => (
-                  <div key={label} className="grid grid-cols-[6.5rem_1fr] gap-2">
-                    <dt className="text-slate-500">{label}</dt>
-                    <dd className="min-w-0 break-words text-slate-300">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.releaseInfo')}</div>
-              <dl className="mt-2 grid gap-1 text-xs text-slate-400">
-                {releaseRows.length ? (
-                  releaseRows.map(([label, value]) => (
-                    <div key={label} className="grid grid-cols-[6.5rem_1fr] gap-2">
-                      <dt className="text-slate-500">{label}</dt>
-                      <dd className="min-w-0 break-words text-slate-300">{value}</dd>
-                    </div>
-                  ))
-                ) : (
-                  <div>{t('review.noReleaseInfo')}</div>
-                )}
-              </dl>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.genresTags')}</div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {genreLabels.length ? (
-                  genreLabels.slice(0, 16).map((label) => (
-                    <span key={label} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300">
-                      {label}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-500">{t('review.noGenreData')}</span>
-                )}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.notes')}</div>
-              <p className="mt-2 whitespace-pre-wrap rounded-xl border border-white/10 bg-ink-950/70 p-3 text-xs text-slate-300">
-                {game.notes || t('review.noNotes')}
-              </p>
-            </div>
-            <div className="md:col-span-2">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.enrichEdit')}</div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {secondaryActions.map((action) => (
-                  <button
-                    key={action.action}
-                    className="min-h-11 rounded-lg border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-                    onClick={() => onAction(action.action)}
-                    type="button"
-                  >
-                    <span className="inline-flex items-center justify-center gap-1.5">
-                      <Icon name={action.icon} />
-                      <span>{action.label}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="mt-3 grid w-full gap-2 px-2 sm:grid-cols-2">
+          <button
+            className="min-h-11 rounded-xl border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:text-white focus-visible:border-mint"
+            onClick={() => onAction('open-details')}
+            type="button"
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Icon name="info" />
+              <span>{t('review.details')}</span>
+            </span>
+          </button>
+          <button
+            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint"
+            onClick={() => onAction('note')}
+            type="button"
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Icon name="pencil" />
+              <span>{t('review.quickNote')}</span>
+            </span>
+          </button>
+          <button
+            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint"
+            onClick={() => onAction('enrich')}
+            type="button"
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Icon name="refresh-cw" />
+              <span>Enrich metadata</span>
+            </span>
+          </button>
+          <button
+            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint"
+            onClick={() => onAction('find-artwork')}
+            type="button"
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Icon name="image" />
+              <span>Find Artwork</span>
+            </span>
+          </button>
+        </div>
 
-          {isNoteOpen ? (
-            <div className="mt-3 rounded-xl border border-mint/20 bg-ink-950/80 p-3">
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('review.quickNote')}</span>
-                <textarea
-                  className="mt-2 min-h-24 w-full rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                  onChange={(event) => onNoteDraftChange(event.target.value)}
-                  placeholder={t('review.notePlaceholder')}
-                  value={noteDraft}
-                />
-              </label>
-              <button
-                className="mt-2 min-h-11 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-                disabled={!noteDraft.trim()}
-                onClick={onSubmitNote}
-                type="button"
-              >
-                Save note and continue
-              </button>
-            </div>
-          ) : null}
-        </details>
+        {isNoteOpen ? (
+          <div className="mt-3 w-full rounded-xl border border-mint/20 bg-ink-950/80 p-3">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('review.quickNote')}</span>
+              <textarea
+                className="mt-2 min-h-24 w-full rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                onChange={(event) => onNoteDraftChange(event.target.value)}
+                placeholder={t('review.notePlaceholder')}
+                value={noteDraft}
+              />
+            </label>
+            <button
+              className="mt-2 min-h-11 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+              disabled={!noteDraft.trim()}
+              onClick={onSubmitNote}
+              type="button"
+            >
+              Save note and continue
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className={`qs-review-zone qs-review-zone-positive ${isSwipeEngaged && swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
