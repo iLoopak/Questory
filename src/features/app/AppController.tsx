@@ -1,18 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Icon, type IconName } from '../../components/Icon';
+import { Icon } from '../../components/Icon';
 
 import type { FormEvent, ReactNode } from 'react';
-import { ArtworkAuditPanel } from '../../components/ArtworkAuditPanel';
 import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
-import { DataManagementPanel } from '../../components/DataManagementPanel';
-import { GameDetailView } from '../../components/GameDetailView';
 import { GameListEmptyState, GameListShell } from '../../components/GameListShell';
 import { CollectionToolbar } from '../../components/CollectionToolbar';
 import { ViewportModal } from '../../components/ViewportModal';
 import { UndoToastStack } from '../../components/UndoToastStack';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
-import { HltbSettingsPanel } from '../../components/HltbSettingsPanel';
 import { HomePanel } from '../../components/HomePanel';
 import { MetadataEnrichmentPanel } from '../../components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from '../../components/OnboardingChecklist';
@@ -20,20 +16,9 @@ import { ShelfAvatar } from '../../components/ShelfIdentity';
 import { ShelfProfilePopover } from '../shelf-profile/ShelfProfilePopover';
 import { PwaStatusBanner } from '../../components/PwaStatusBanner';
 import { QueuePanel } from '../../components/QueuePanel';
-import { IsThereAnyDealSettingsPanel } from '../../components/IsThereAnyDealSettingsPanel';
-import { RawgSettingsPanel } from '../../components/RawgSettingsPanel';
 import { RecommendationPanel } from '../../components/RecommendationPanel';
-import { RetroImportPanel } from '../../components/RetroImportPanel';
 import { ReviewModePanel } from '../../components/ReviewModePanel';
 import { StatsPanel } from '../../components/StatsPanel';
-import { SteamSettingsPanel } from '../../components/SteamSettingsPanel';
-import { AboutSettingsPanel } from '../../components/settings/AboutSettingsPanel';
-import { AppearanceSettingsPanel } from '../../components/settings/AppearanceSettingsPanel';
-import { NavigationVisibilitySettingsPanel } from '../../components/settings/NavigationVisibilitySettingsPanel';
-import { PersonalizationSettingsPanel } from '../../components/settings/PersonalizationSettingsPanel';
-import { SettingsSection } from '../../components/settings/SettingsSection';
-import { QueuePlatformsSettingsPanel } from '../../components/settings/PlatformsSettingsPanel';
-import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from '../../components/settings/WishlistSettingsPanel';
 import {
   getNavDescription,
   moreNavItems,
@@ -42,7 +27,7 @@ import {
   type NavItem,
   type TopNavItem,
 } from '../../config/navigation';
-import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } from '../../config/settings';
+import type { SettingsCategory } from '../../config/settings';
 import {
   achievementFilterOptions,
   allOption,
@@ -60,13 +45,11 @@ import {
   type QuickFilter,
   type SourceFilter,
 } from '../../config/collection';
-import { I18nProvider, createTranslator, useI18n, translateOption, translateSettingsCategory, type AppLanguage, type TFunction } from '../../i18n';
+import { I18nProvider, createTranslator, useI18n, translateOption } from '../../i18n';
 import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import { loadGames, saveGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import { loadLanguagePreference } from '../../lib/languagePreference';
-import type { ShelfIdentitySettings } from '../../lib/shelfIdentity';
-import type { ControllerLayoutPreference } from '../../lib/controllerLayoutPreferences';
 import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
 import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
 import { saveOnboardingState, onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
@@ -107,7 +90,6 @@ import {
 } from '../../lib/notifications';
 import { loadReviewModeState, type ReviewModeState, type ReviewSource } from '../../lib/reviewModeStorage';
 import { getAppTemplateClassName, type AccentColorPreference, type AppTemplatePreference, type ResolvedTheme, type ThemePreference } from '../../lib/themePreferences';
-import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibilityPreferences';
 import { type UndoActionHistoryEntry } from '../../lib/undoHistoryStorage';
 import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, saveIgnoredSteamGames, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
 import { getOwnedGames, getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamApiError, SteamWishlistError } from '../../services/steamApi';
@@ -127,7 +109,12 @@ import { useShelfProfileController } from '../shelf-profile/useShelfProfileContr
 import { usePlatformQueueController } from '../queue/usePlatformQueueController';
 import { useAppPreferencesController } from '../settings/useAppPreferencesController';
 import { useSyncController } from '../integrations/useSyncController';
+import { SteamWishlistHtmlImportModal } from '../../components/settings/WishlistSettingsPanel';
 import { useMetadataController } from '../metadata/useMetadataController';
+import { PlayingNowHub } from '../playing-now/PlayingNowHub';
+import { GameDetailsView } from '../game-details/GameDetailsView';
+import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
+import { SettingsView } from '../settings/SettingsView';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
@@ -1514,7 +1501,7 @@ export function AppController() {
               />
             </div>
           ) : (activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
-            <GameDetailView
+            <GameDetailsView
               activity={playActivity}
               game={selectedGame}
               onAddToQueue={openBacklogPicker}
@@ -1682,7 +1669,7 @@ export function AppController() {
               selectionRequestId={metadataSelectionRequest?.requestId}
             />
           ) : activeNavItem === 'Artwork' ? (
-            <ArtworkAuditPanel
+            <ArtworkBrowserView
               games={games}
               onApplyArtworkUpdate={updateGameArtwork}
               onEnrichGames={startMetadataWorkflow}
@@ -1722,7 +1709,7 @@ export function AppController() {
               }}
             />
           ) : activeNavItem === 'Settings' ? (
-            <SettingsPanel
+            <SettingsView
               activeCategory={activeSettingsCategory}
               autoBackupSignal={autoBackupSignal}
               completedOnboardingItemIds={completedOnboardingItemIds}
@@ -1878,242 +1865,6 @@ export function AppController() {
 }
 
 
-
-type PlayingNowHubProps = {
-  activity: PlayActivityRecord[];
-  games: Game[];
-  onBack: () => void;
-  onOpenDetails: (gameId: string) => void;
-  onPlayToday: (game: Game) => void;
-  onStatusChange: (gameId: string, status: GameStatus) => void;
-};
-
-type PlayingNowContext = {
-  lastPlayedDate: string | null;
-  playedDaysLast30: number;
-  playedDaysLast7: number;
-  playedToday: boolean;
-  steamActivityLabel: string | null;
-  steamActivityToday: boolean;
-};
-
-function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, onStatusChange, t }: PlayingNowHubProps & { t: TFunction }) {
-  const today = formatLocalDate(new Date());
-  const playingGames = useMemo(
-    () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
-    [games],
-  );
-  const groupedGames = useMemo(() => {
-    const groups = new Map<GamePlatform, Game[]>();
-
-    playingGames.forEach((game) => {
-      const group = groups.get(game.platform) ?? [];
-      group.push(game);
-      groups.set(game.platform, group);
-    });
-
-    return Array.from(groups.entries())
-      .sort(([platformA], [platformB]) => platformA.localeCompare(platformB))
-      .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
-  }, [playingGames]);
-  const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
-
-  return (
-    <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-8 text-slate-100" aria-labelledby="playing-now-title">
-        <header className="qs-glass flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-mint">
-              <Icon name="play-circle" size={14} strokeWidth={2.2} />
-              <span>{t('playingNow.title')}</span>
-            </div>
-            <h2 id="playing-now-title" className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{t('playingNow.title')}</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-300">{playingGames.length} {playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')}</p>
-            <p className="mt-1 max-w-2xl text-sm text-slate-400">{t('playingNow.helper')}</p>
-          </div>
-          <button
-            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
-            onClick={onBack}
-            type="button"
-          >
-            {t('action.back')}
-          </button>
-        </header>
-
-        <div>
-          {playingGames.length === 0 ? (
-            <div className="qs-glass grid min-h-[55vh] place-items-center rounded-xl border p-8 text-center"><div>
-              <Icon name="gamepad-2" size={32} className="mx-auto text-mint" strokeWidth={2} />
-              <h3 className="mt-3 text-base font-semibold text-white">{t('playingNow.emptyTitle')}</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">{t('playingNow.emptyText')}</p>
-            </div></div>
-          ) : (
-            <div className="space-y-4">
-              {groupedGames.map(([platform, platformGames]) => (
-                <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3 shadow-panel">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name={getPlayingNowPlatformIcon(platform)} size={16} /></span>
-                      <h3 className="truncate text-sm font-semibold uppercase tracking-[0.14em] text-slate-200" title={platform}>{platform}</h3>
-                    </div>
-                    <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs font-semibold text-slate-400">{platformGames.length}</span>
-                  </div>
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3 lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] 2xl:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
-                    {platformGames.map((game) => (
-                      <PlayingNowCard
-                        key={game.id}
-                        context={activityByGame.get(game.id) ?? getEmptyPlayingNowContext(game, today)}
-                        game={game}
-                        onOpenDetails={onOpenDetails}
-                        onPlayToday={onPlayToday}
-                        onStatusChange={onStatusChange}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-  );
-}
-
-function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
-  const normalizedPlatform = platform.toLowerCase();
-
-  if (normalizedPlatform.includes('steam') || normalizedPlatform.includes('pc')) {
-    return 'steam';
-  }
-
-  if (normalizedPlatform.includes('switch') || normalizedPlatform.includes('deck') || normalizedPlatform.includes('handheld') || normalizedPlatform.includes('portable')) {
-    return 'handheld';
-  }
-
-  if (normalizedPlatform.includes('arcade') || normalizedPlatform.includes('retro')) {
-    return 'joystick';
-  }
-
-  return 'gamepad-2';
-}
-
-function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void }) {
-  return (
-    <article className="flex h-full min-w-0 gap-3 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3 shadow-lg shadow-black/20">
-      <img className="h-28 w-20 shrink-0 rounded-lg border border-skyglass/15 object-cover bg-ink-900" src={game.coverImage} alt={`${game.title} cover`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
-            <p className="mt-1 text-xs font-medium text-slate-400">{game.platform}</p>
-          </div>
-          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${context.steamActivityToday || context.playedToday ? 'border-mint/30 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-400'}`}>{context.steamActivityToday ? 'Active Today' : context.playedToday ? 'Played today' : 'Not today'}</span>
-        </div>
-        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-          <Stat label="Last" value={context.lastPlayedDate ?? 'Never'} />
-          <Stat label="7 days" value={String(context.playedDaysLast7)} />
-          <Stat label="30 days" value={String(context.playedDaysLast30)} />
-        </dl>
-        {context.steamActivityLabel ? (
-          <div className="mt-3 rounded-lg border border-mint/20 bg-mint/10 px-2.5 py-2 text-xs font-semibold text-mint">
-            {context.steamActivityToday ? '✓ Steam activity detected today' : context.steamActivityLabel}
-          </div>
-        ) : null}
-        {game.notes.trim() ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-400">{game.notes.trim()}</p> : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="rounded-md bg-mint px-3 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">Play Today</button>
-          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-mint/10" onClick={() => onOpenDetails(game.id)} type="button">Open detail</button>
-          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-skyglass/10" onClick={() => onStatusChange(game.id, 'Paused')} type="button">Pause</button>
-          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-skyglass/10" onClick={() => onStatusChange(game.id, 'Finished')} type="button">Finished</button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-skyglass/10 bg-ink-900/70 px-2 py-1.5"><dt className="text-[0.6rem] uppercase tracking-[0.12em] text-slate-500">{label}</dt><dd className="mt-0.5 font-semibold text-slate-100">{value}</dd></div>;
-}
-
-function getPlayingNowContexts(games: Game[], activity: PlayActivityRecord[], today: string) {
-  const contexts = new Map<string, PlayingNowContext>();
-  games.forEach((game) => contexts.set(game.id, getEmptyPlayingNowContext(game, today)));
-
-  games.forEach((game) => {
-    const dates = new Set(activity.filter((record) => record.gameId === game.id && record.action === 'played_today').map((record) => record.date));
-    if (game.lastPlayedAt && /^\d{4}-\d{2}-\d{2}/.test(game.lastPlayedAt)) {
-      dates.add(game.lastPlayedAt.slice(0, 10));
-    }
-    const sortedDates = Array.from(dates).sort();
-    contexts.set(game.id, {
-      lastPlayedDate: sortedDates.at(-1) ?? null,
-      playedDaysLast30: countDatesSince(sortedDates, today, 30),
-      playedDaysLast7: countDatesSince(sortedDates, today, 7),
-      playedToday: dates.has(today),
-      ...getSteamActivityContext(activity, game.id, today),
-    });
-  });
-
-  return contexts;
-}
-
-function getEmptyPlayingNowContext(game: Game, today: string): PlayingNowContext {
-  const lastPlayedDate = game.lastPlayedAt?.slice(0, 10) ?? null;
-  const dates = lastPlayedDate ? [lastPlayedDate] : [];
-  return {
-    lastPlayedDate,
-    playedDaysLast30: countDatesSince(dates, today, 30),
-    playedDaysLast7: countDatesSince(dates, today, 7),
-    playedToday: lastPlayedDate === today,
-    steamActivityLabel: getSteamActivityLabel(game.lastSteamActivityAt, today),
-    steamActivityToday: game.lastSteamActivityAt?.slice(0, 10) === today,
-  };
-}
-
-
-function getSteamActivityContext(activity: PlayActivityRecord[], gameId: string, today: string) {
-  const latestSteamActivity = activity
-    .filter((record) => record.gameId === gameId && record.source === 'steam' && record.type === 'playtime_delta')
-    .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))[0];
-
-  return {
-    steamActivityLabel: getSteamActivityLabel(latestSteamActivity?.detectedAt, today),
-    steamActivityToday: latestSteamActivity?.date === today,
-  };
-}
-
-function getSteamActivityLabel(detectedAt: string | undefined, today: string) {
-  if (!detectedAt) {
-    return null;
-  }
-
-  const date = detectedAt.slice(0, 10);
-  const todayTime = new Date(`${today}T00:00:00`).getTime();
-  const activityTime = new Date(`${date}T00:00:00`).getTime();
-  if (!Number.isFinite(activityTime)) {
-    return null;
-  }
-
-  const diffDays = Math.round((todayTime - activityTime) / (24 * 60 * 60 * 1000));
-  if (diffDays === 0) {
-    return 'Active Today';
-  }
-  if (diffDays === 1) {
-    return 'Active Yesterday';
-  }
-  if (diffDays >= 0 && diffDays < 7) {
-    return 'Active This Week';
-  }
-  return null;
-}
-
-function countDatesSince(dates: string[], today: string, days: number) {
-  const todayTime = new Date(`${today}T00:00:00`).getTime();
-  const earliestTime = todayTime - (days - 1) * 24 * 60 * 60 * 1000;
-  return dates.filter((date) => {
-    const dateTime = new Date(`${date}T00:00:00`).getTime();
-    return Number.isFinite(dateTime) && dateTime >= earliestTime && dateTime <= todayTime;
-  }).length;
-}
 
 type AddGameDialogProps = {
   existingGameIds: Set<string>;
@@ -3362,512 +3113,6 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
         </form>
       </section>
     </div>
-  );
-}
-
-type SettingsPanelProps = {
-  activeCategory: SettingsCategory;
-  autoBackupSignal: string;
-  completedOnboardingItemIds: Set<OnboardingItemId>;
-  skippedOnboardingItemIds: Set<OnboardingItemId>;
-  games: Game[];
-  ignoredSteamGames: IgnoredSteamGame[];
-  libraryOwnerNickname: string;
-  personalizedQuestShelfTitle: string;
-  shelfIdentity: ShelfIdentitySettings;
-  questShelfAchievements: ReturnType<typeof getQuestShelfAchievements>;
-  activeAchievementTitle: string;
-  steamAvatarUrl: string;
-  steamPersonaName: string;
-  controllerLayoutPreference: ControllerLayoutPreference;
-  isControllerDebugEnabled: boolean;
-  isLandscapeLockEnabled: boolean;
-  isOnboardingComplete: boolean;
-  isOnboardingOpen: boolean;
-  lastRetroImportsHiddenByFilters: boolean;
-  resolvedTheme: ResolvedTheme;
-  runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
-  themePreference: ThemePreference;
-  appTemplatePreference: AppTemplatePreference;
-  accentColorPreference: AccentColorPreference;
-  secondaryAccentColorPreference: AccentColorPreference;
-  neonButtonGradientBalancePreference: number;
-  neonButtonGradientMidpointPreference: number;
-  language: AppLanguage;
-  navigationVisibility: NavigationVisibilityPreferences;
-  platformQueueState: PlatformQueueState;
-  steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
-  steamWishlistSyncState: SteamWishlistSyncState;
-  onAddRetroImportedToQueue: (gameIds: string[]) => void;
-  onBackupExported: () => void;
-  onCategoryChange: (category: SettingsCategory) => void;
-  onLibraryOwnerNicknameChange: (nickname: string) => void;
-  onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
-  onClearLibraryFilters: () => void;
-  onConnectionTested: () => void;
-  onEnrichRetroImportedGames: (gameIds: string[]) => void;
-  onImportGames: (games: Game[]) => void;
-  onImportRetroGames: (games: Game[]) => Game[];
-  onControllerDebugChange: (isEnabled: boolean) => void;
-  onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
-  onLandscapeLockChange: (isEnabled: boolean) => void;
-  onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
-  onOnboardingAction: (itemId: OnboardingItemId, action?: 'primary' | 'secondary') => void;
-  onOnboardingClose: () => void;
-  onOnboardingComplete: (itemId: OnboardingItemId) => void;
-  onOnboardingSkip: (itemId: OnboardingItemId) => void;
-  onOpenOnboarding: () => void;
-  onRestartOnboarding: () => void;
-  onPlatformQueueStateChange: (state: PlatformQueueState) => void;
-  onRawgApiKeyConfigured: () => void;
-  onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
-  onReviewRetroImportedGames: () => void;
-  onThemePreferenceChange: (preference: ThemePreference) => void;
-  onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
-  onAccentColorChange: (color: AccentColorPreference) => void;
-  onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
-  onNeonButtonGradientBalanceChange: (balance: number) => void;
-  onNeonButtonGradientMidpointChange: (midpoint: number) => void;
-  onLanguageChange: (language: AppLanguage) => void;
-  onSteamApiKeyConfigured: () => void;
-  onSteamIdConfigured: () => void;
-  onSteamLibraryImported: () => void;
-  onImportSteamWishlistHtml: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
-  onSyncSteamWishlist: () => void;
-  onSteamProfileNameChange: (profileName: string) => void;
-  onUnignoreSteamGame: (steamAppId: number) => void;
-  onViewRetroImportedGames: (gameIds: string[]) => void;
-};
-
-function SettingsPanel({
-  activeCategory,
-  autoBackupSignal,
-  completedOnboardingItemIds,
-  skippedOnboardingItemIds,
-  games,
-  ignoredSteamGames,
-  libraryOwnerNickname,
-  personalizedQuestShelfTitle,
-  shelfIdentity,
-  questShelfAchievements,
-  activeAchievementTitle,
-  steamAvatarUrl,
-  steamPersonaName,
-  controllerLayoutPreference,
-  isControllerDebugEnabled,
-  isLandscapeLockEnabled,
-  isOnboardingComplete,
-  isOnboardingOpen,
-  lastRetroImportsHiddenByFilters,
-  resolvedTheme,
-  runtimeEnvironment,
-  themePreference,
-  appTemplatePreference,
-  accentColorPreference,
-  secondaryAccentColorPreference,
-  neonButtonGradientBalancePreference,
-  neonButtonGradientMidpointPreference,
-  language,
-  navigationVisibility,
-  platformQueueState,
-  steamPlaytimeRefreshState,
-  steamWishlistSyncState,
-  onAddRetroImportedToQueue,
-  onBackupExported,
-  onCategoryChange,
-  onLibraryOwnerNicknameChange,
-  onShelfIdentityChange,
-  onClearLibraryFilters,
-  onConnectionTested,
-  onEnrichRetroImportedGames,
-  onImportGames,
-  onImportRetroGames,
-  onControllerDebugChange,
-  onControllerLayoutChange,
-  onLandscapeLockChange,
-  onNavigationVisibilityChange,
-  onOnboardingAction,
-  onOnboardingClose,
-  onOnboardingComplete,
-  onOnboardingSkip,
-  onOpenOnboarding,
-  onRestartOnboarding,
-  onPlatformQueueStateChange,
-  onRawgApiKeyConfigured,
-  onRefreshSteamPlaytime,
-  onReviewRetroImportedGames,
-  onThemePreferenceChange,
-  onAppTemplatePreferenceChange,
-  onAccentColorChange,
-  onSecondaryAccentColorChange,
-  onLanguageChange,
-  onNeonButtonGradientBalanceChange,
-  onNeonButtonGradientMidpointChange,
-  onSteamApiKeyConfigured,
-  onSteamIdConfigured,
-  onSteamLibraryImported,
-  onImportSteamWishlistHtml,
-  onSyncSteamWishlist,
-  onSteamProfileNameChange,
-  onUnignoreSteamGame,
-  onViewRetroImportedGames,
-}: SettingsPanelProps) {
-  const [isCategoryListOpen, setIsCategoryListOpen] = useState(false);
-  const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
-  const steamWishlistImportButtonRef = useRef<HTMLButtonElement | null>(null);
-  const activeCategoryMeta = getSettingsCategoryMeta(activeCategory);
-  const t = useMemo(() => createTranslator(language), [language]);
-  const onboardingFinishedCount = onboardingItemIds.filter(
-    (itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId),
-  ).length;
-
-  function selectCategory(category: SettingsCategory) {
-    onCategoryChange(category);
-    setIsCategoryListOpen(false);
-  }
-
-  return (
-    <section className="qs-settings-shell min-w-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900/45 lg:h-[calc(100vh-116px)]">
-      <div className="qs-settings-shell-header border-b border-skyglass/15 bg-ink-950/90 px-3 py-3 backdrop-blur sm:px-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('settings.title')}</div>
-            <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-slate-400">
-              <span>{t('settings.title')}</span>
-              <span className="text-slate-600">/</span>
-              <span className="truncate font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</span>
-            </div>
-          </div>
-          <button
-            className="qs-settings-back h-11 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white lg:hidden"
-            onClick={() => setIsCategoryListOpen((currentValue) => !currentValue)}
-            type="button"
-          >
-            {isCategoryListOpen ? t('settings.showDetail') : t('settings.backToCategories')}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid h-full min-h-0 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside
-          className={`qs-settings-list border-b border-skyglass/15 bg-ink-950/70 p-3 lg:block lg:border-b-0 lg:border-r ${
-            isCategoryListOpen ? 'block' : 'hidden'
-          }`}
-        >
-          <nav className="qs-settings-tabs grid gap-2">
-            {settingsCategories.map((category) => (
-              <SettingsCategoryButton
-                key={category}
-                category={category}
-                isActive={category === activeCategory}
-                onSelect={selectCategory}
-              />
-            ))}
-          </nav>
-        </aside>
-
-        <div className={`qs-settings-detail min-h-0 overflow-y-auto p-3 sm:p-4 ${isCategoryListOpen ? 'hidden lg:block' : 'block'}`}>
-          <header className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-            <div className="flex items-start gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-mint/25 bg-mint/10 text-mint">
-                <SettingsCategoryIcon category={activeCategory} />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</h2>
-              </div>
-            </div>
-          </header>
-
-          {activeCategory === 'Integrations' ? (
-            <div className="space-y-4">
-              <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
-              <IsThereAnyDealSettingsPanel />
-              <HltbSettingsPanel />
-              <SteamSettingsPanel
-                games={games}
-                ignoredSteamGames={ignoredSteamGames}
-                onConnectionTested={onConnectionTested}
-                onImportGames={onImportGames}
-                onSteamApiKeyConfigured={onSteamApiKeyConfigured}
-                onSteamIdConfigured={onSteamIdConfigured}
-                onSteamLibraryImported={onSteamLibraryImported}
-                onSteamProfileNameChange={onSteamProfileNameChange}
-                playtimeRefreshState={steamPlaytimeRefreshState}
-                onRefreshSteamPlaytime={onRefreshSteamPlaytime}
-                onUnignoreSteamGame={onUnignoreSteamGame}
-                onOpenManualWishlistImport={() => setIsSteamWishlistHtmlImportOpen(true)}
-                manualWishlistImportButtonRef={steamWishlistImportButtonRef}
-              />
-            </div>
-          ) : null}
-
-
-          {activeCategory === 'Wishlist' ? (
-            <WishlistSettingsPanel
-              existingSteamAppIds={games
-                .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId === 'number')
-                .map((game) => game.steamAppId as number)}
-              steamWishlistSyncState={steamWishlistSyncState}
-              onImportSteamWishlistHtml={onImportSteamWishlistHtml}
-              onSyncSteamWishlist={onSyncSteamWishlist}
-            />
-          ) : null}
-
-          {isSteamWishlistHtmlImportOpen ? (
-            <SteamWishlistHtmlImportModal
-              existingSteamAppIds={games
-                .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId === 'number')
-                .map((game) => game.steamAppId as number)}
-              isExperimentalSyncLoading={steamWishlistSyncState.status === 'loading'}
-              onClose={() => setIsSteamWishlistHtmlImportOpen(false)}
-              onExperimentalSync={onSyncSteamWishlist}
-              onImport={onImportSteamWishlistHtml}
-              restoreFocusRef={steamWishlistImportButtonRef}
-            />
-          ) : null}
-
-          {activeCategory === 'Platforms' ? (
-            <QueuePlatformsSettingsPanel games={games} queueState={platformQueueState} onQueueStateChange={onPlatformQueueStateChange} />
-          ) : null}
-
-          {activeCategory === 'Retro' ? (
-            <div className="space-y-4">
-              <RetroImportPanel
-                games={games}
-                importedGamesHiddenByFilters={lastRetroImportsHiddenByFilters}
-                onAddImportedToQueue={onAddRetroImportedToQueue}
-                onClearLibraryFilters={onClearLibraryFilters}
-                onEnrichImportedGames={onEnrichRetroImportedGames}
-                onImportGames={onImportRetroGames}
-                onReviewImportedGames={onReviewRetroImportedGames}
-                onViewImportedGames={onViewRetroImportedGames}
-              />
-            </div>
-          ) : null}
-
-          {activeCategory === 'Personalization' ? (
-            <div className="space-y-4">
-              <PersonalizationSettingsPanel
-                personalizedQuestShelfTitle={personalizedQuestShelfTitle}
-                shelfIdentity={shelfIdentity}
-                games={games}
-                achievements={questShelfAchievements}
-                activeAchievementTitle={activeAchievementTitle}
-                steamAvatarUrl={steamAvatarUrl}
-                steamPersonaName={steamPersonaName}
-                onShelfIdentityChange={onShelfIdentityChange}
-              />
-            </div>
-          ) : null}
-
-          {activeCategory === 'Data & Backup' ? (
-            <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
-          ) : null}
-
-          {activeCategory === 'Appearance' ? (
-            <div className="space-y-4">
-              <NavigationVisibilitySettingsPanel
-                navigationVisibility={navigationVisibility}
-                onNavigationVisibilityChange={onNavigationVisibilityChange}
-                t={t}
-              />
-              <AppearanceSettingsPanel
-                controllerLayoutPreference={controllerLayoutPreference}
-                isControllerDebugEnabled={isControllerDebugEnabled}
-                isLandscapeLockEnabled={isLandscapeLockEnabled}
-                resolvedTheme={resolvedTheme}
-                runtimeEnvironment={runtimeEnvironment}
-                themePreference={themePreference}
-                appTemplatePreference={appTemplatePreference}
-                accentColorPreference={accentColorPreference}
-                secondaryAccentColorPreference={secondaryAccentColorPreference}
-                neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
-                neonButtonGradientMidpointPreference={neonButtonGradientMidpointPreference}
-                language={language}
-                onControllerDebugChange={onControllerDebugChange}
-                onControllerLayoutChange={onControllerLayoutChange}
-                onLandscapeLockChange={onLandscapeLockChange}
-                onThemePreferenceChange={onThemePreferenceChange}
-                onAppTemplatePreferenceChange={onAppTemplatePreferenceChange}
-                onAccentColorChange={onAccentColorChange}
-                onSecondaryAccentColorChange={onSecondaryAccentColorChange}
-                onNeonButtonGradientBalanceChange={onNeonButtonGradientBalanceChange}
-                onNeonButtonGradientMidpointChange={onNeonButtonGradientMidpointChange}
-                onLanguageChange={onLanguageChange}
-              />
-            </div>
-          ) : null}
-
-          {activeCategory === 'About' ? (
-            <div className="space-y-4">
-              <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} />
-              <OnboardingSettingsPanel
-                completedCount={onboardingFinishedCount}
-                isComplete={isOnboardingComplete}
-                onOpenOnboarding={onOpenOnboarding}
-                onRestartOnboarding={onRestartOnboarding}
-              />
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SettingsCategoryButton({
-  category,
-  isActive,
-  onSelect,
-}: {
-  category: SettingsCategory;
-  isActive: boolean;
-  onSelect: (category: SettingsCategory) => void;
-}) {
-  const meta = getSettingsCategoryMeta(category);
-  const { t } = useI18n();
-
-  return (
-    <button
-      aria-current={isActive ? 'page' : undefined}
-      className={`grid min-h-12 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border px-3 py-2 text-left transition ${
-        isActive
-          ? 'border-mint/50 bg-mint/15 text-white shadow-glow'
-          : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/30 hover:bg-mint/10 hover:text-white'
-      }`}
-      onClick={() => onSelect(category)}
-      type="button"
-    >
-      <span
-        className={`grid h-10 w-10 place-items-center rounded-md border ${
-          isActive ? 'border-mint/40 bg-mint text-ink-950' : 'border-skyglass/15 bg-ink-950 text-mint'
-        }`}
-      >
-        <SettingsCategoryIcon category={category} />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold">{translateSettingsCategory(meta.label, t)}</span>
-      </span>
-    </button>
-  );
-}
-
-function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
-  const commonProps = {
-    className: 'h-5 w-5',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    strokeWidth: 2,
-    viewBox: '0 0 24 24',
-  };
-
-  if (category === 'Integrations') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <path d="M7 7h4v4H7z" />
-        <path d="M13 13h4v4h-4z" />
-        <path d="M11 9h4a2 2 0 0 1 2 2v2" />
-        <path d="M13 15H9a2 2 0 0 1-2-2v-2" />
-      </svg>
-    );
-  }
-
-
-  if (category === 'Wishlist') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
-      </svg>
-    );
-  }
-
-  if (category === 'Retro') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <path d="M7 9h10a4 4 0 0 1 4 4v2a3 3 0 0 1-5.4 1.8L14 15h-4l-1.6 1.8A3 3 0 0 1 3 15v-2a4 4 0 0 1 4-4z" />
-        <path d="M8 12v3" />
-        <path d="M6.5 13.5h3" />
-        <path d="M16.5 13h.01" />
-        <path d="M18.5 15h.01" />
-      </svg>
-    );
-  }
-
-  if (category === 'Appearance') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <path d="M12 3a9 9 0 1 0 9 9 4.5 4.5 0 0 1-9-9z" />
-      </svg>
-    );
-  }
-
-  if (category === 'Personalization') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <circle cx="12" cy="8" r="4" />
-        <path d="M5 21a7 7 0 0 1 14 0" />
-        <path d="M17.5 6.5h.01" />
-      </svg>
-    );
-  }
-
-  if (category === 'Data & Backup') {
-    return (
-      <svg {...commonProps} aria-hidden="true">
-        <path d="M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z" />
-        <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
-        <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg {...commonProps} aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 17v-5" />
-      <path d="M12 8h.01" />
-    </svg>
-  );
-}
-
-function OnboardingSettingsPanel({
-  completedCount,
-  isComplete,
-  onOpenOnboarding,
-  onRestartOnboarding,
-}: {
-  completedCount: number;
-  isComplete: boolean;
-  onOpenOnboarding: () => void;
-  onRestartOnboarding: () => void;
-}) {
-  const { t } = useI18n();
-
-  return (
-    <SettingsSection
-      title={isComplete ? t('settings.setupComplete') : t('settings.setupAssistant')}
-      description={`${completedCount} setup items finished or skipped. Reopen the assistant to continue guidance, or restart it from the beginning.`}
-      actions={(
-        <>
-          <button
-            className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
-            onClick={onOpenOnboarding}
-            type="button"
-          >
-            {t('settings.reopenSetup')}
-          </button>
-          <button
-            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
-            onClick={onRestartOnboarding}
-            type="button"
-          >
-            Restart setup
-          </button>
-        </>
-      )}
-    />
   );
 }
 
