@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
@@ -71,6 +80,7 @@ type SwipeVerticalDirection = 'up' | 'down';
 type SwipeQuadrant = `${SwipeHorizontalDirection}-${SwipeVerticalDirection}`;
 
 const decisionActions = [...negativeActions, ...positiveActions];
+const decisionActionTypes = new Set<ReviewModeAction>(decisionActions.map((action) => action.action));
 const firstPositiveActionIndex = negativeActions.length;
 const defaultSwipeLeftAction: ReviewModeAction = 'skip';
 const defaultSwipeRightAction: ReviewModeAction = 'queue';
@@ -133,6 +143,7 @@ export function ReviewModePanel({
   const [isReviewOptionsOpen, setIsReviewOptionsOpen] = useState(false);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
+  const [retainedUtilityGameIds, setRetainedUtilityGameIds] = useState<Set<string>>(() => new Set());
   const queueButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const platformOptions = useMemo(() => {
@@ -143,11 +154,20 @@ export function ReviewModePanel({
 
   const sourceGames = useMemo(() => {
     return games
-      .filter((game) => matchesReviewSource(game, source))
+      .filter((game) => matchesReviewSource(game, source) || retainedUtilityGameIds.has(game.id))
       .filter((game) => selectedPlatform === anyPlatform || game.platform === selectedPlatform)
       .filter((game) => !ignoredGameIds.has(game.id))
-      .sort(compareReviewGames);
-  }, [games, ignoredGameIds, selectedPlatform, source]);
+      .sort((firstGame, secondGame) => {
+        const firstRetained = retainedUtilityGameIds.has(firstGame.id);
+        const secondRetained = retainedUtilityGameIds.has(secondGame.id);
+
+        if (firstRetained !== secondRetained) {
+          return firstRetained ? -1 : 1;
+        }
+
+        return compareReviewGames(firstGame, secondGame);
+      });
+  }, [games, ignoredGameIds, retainedUtilityGameIds, selectedPlatform, source]);
 
   const reviewQueue = useMemo(() => {
     return sourceGames.filter((game) => !processedGameIds.has(game.id));
@@ -169,6 +189,7 @@ export function ReviewModePanel({
     setIsReviewOptionsOpen(false);
     setIsNoteOpen(false);
     setNoteDraft('');
+    setRetainedUtilityGameIds(new Set());
   }, [selectedPlatform, source]);
 
   useEffect(() => {
@@ -327,11 +348,19 @@ export function ReviewModePanel({
     }
 
     if (action === 'note') {
+      setRetainedUtilityGameIds((currentIds) => new Set(currentIds).add(game.id));
       setIsNoteOpen(true);
       return;
     }
 
     if (action === 'open-details') {
+      setRetainedUtilityGameIds((currentIds) => new Set(currentIds).add(game.id));
+      onAction(game, action);
+      return;
+    }
+
+    if (!decisionActionTypes.has(action)) {
+      setRetainedUtilityGameIds((currentIds) => new Set(currentIds).add(game.id));
       onAction(game, action);
       return;
     }
@@ -344,7 +373,9 @@ export function ReviewModePanel({
       return;
     }
 
-    advanceReview(activeGame, 'note', noteDraft.trim());
+    onAction(activeGame, 'note', noteDraft.trim());
+    setIsNoteOpen(false);
+    setNoteDraft('');
   }
 
   function addToQueue(platform: GamePlatform) {
@@ -636,6 +667,12 @@ function FocusedReviewCard({
     window.setTimeout(() => setSwipeState(emptySwipeState), swipeCommitDelayMs);
   }
 
+  function handleInlineUtilityClick(event: ReactMouseEvent<HTMLButtonElement>, action: ReviewModeAction) {
+    event.preventDefault();
+    event.stopPropagation();
+    onAction(action);
+  }
+
   return (
     <article
       className={`qs-review-stage min-h-full ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
@@ -747,7 +784,7 @@ function FocusedReviewCard({
         <div className="mt-3 grid w-full gap-2 px-2 sm:grid-cols-2">
           <button
             className="min-h-11 rounded-xl border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:text-white focus-visible:border-mint"
-            onClick={() => onAction('open-details')}
+            onClick={(event) => handleInlineUtilityClick(event, 'open-details')}
             type="button"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
@@ -757,7 +794,7 @@ function FocusedReviewCard({
           </button>
           <button
             className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint"
-            onClick={() => onAction('note')}
+            onClick={(event) => handleInlineUtilityClick(event, 'note')}
             type="button"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
@@ -768,7 +805,7 @@ function FocusedReviewCard({
           <button
             className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint disabled:cursor-wait disabled:opacity-70"
             disabled={isRefreshingMetadata}
-            onClick={() => onAction('enrich')}
+            onClick={(event) => handleInlineUtilityClick(event, 'enrich')}
             type="button"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
@@ -779,7 +816,7 @@ function FocusedReviewCard({
           <button
             className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint disabled:cursor-wait disabled:opacity-70"
             disabled={isRefreshingMetadata}
-            onClick={() => onAction('find-artwork')}
+            onClick={(event) => handleInlineUtilityClick(event, 'find-artwork')}
             type="button"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
