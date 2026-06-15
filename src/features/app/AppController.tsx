@@ -455,6 +455,21 @@ export function AppController() {
   }, [lastRetroImportedGames, libraryFilters]);
 
   useEffect(() => {
+    if (activeUtilityView !== 'playing-now' || !document.documentElement.classList.contains('qs-modal-open')) {
+      return;
+    }
+
+    document.documentElement.classList.remove('qs-modal-open');
+    document.documentElement.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+  }, [activeUtilityView]);
+
+  useEffect(() => {
     function handleControllerNavigation(event: KeyboardEvent) {
       const target = event.target;
       if (
@@ -1936,7 +1951,7 @@ function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, on
           </button>
         </header>
 
-        <div className="min-h-[55vh]">
+        <div>
           {playingGames.length === 0 ? (
             <div className="qs-glass grid min-h-[55vh] place-items-center rounded-xl border p-8 text-center"><div>
               <Icon name="gamepad-2" size={32} className="mx-auto text-mint" strokeWidth={2} />
@@ -1946,15 +1961,15 @@ function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, on
           ) : (
             <div className="space-y-4">
               {groupedGames.map(([platform, platformGames]) => (
-                <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="grid h-8 w-8 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name="handheld" size={16} /></span>
-                      <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-200">{platform}</h3>
+                <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3 shadow-panel">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name={getPlayingNowPlatformIcon(platform)} size={16} /></span>
+                      <h3 className="truncate text-sm font-semibold uppercase tracking-[0.14em] text-slate-200" title={platform}>{platform}</h3>
                     </div>
-                    <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs text-slate-400">{platformGames.length}</span>
+                    <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs font-semibold text-slate-400">{platformGames.length}</span>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3 lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] 2xl:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
                     {platformGames.map((game) => (
                       <PlayingNowCard
                         key={game.id}
@@ -1975,9 +1990,27 @@ function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, on
   );
 }
 
+function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
+  const normalizedPlatform = platform.toLowerCase();
+
+  if (normalizedPlatform.includes('steam') || normalizedPlatform.includes('pc')) {
+    return 'steam';
+  }
+
+  if (normalizedPlatform.includes('switch') || normalizedPlatform.includes('deck') || normalizedPlatform.includes('handheld') || normalizedPlatform.includes('portable')) {
+    return 'handheld';
+  }
+
+  if (normalizedPlatform.includes('arcade') || normalizedPlatform.includes('retro')) {
+    return 'joystick';
+  }
+
+  return 'gamepad-2';
+}
+
 function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void }) {
   return (
-    <article className="flex gap-3 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3 shadow-lg shadow-black/20">
+    <article className="flex h-full min-w-0 gap-3 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3 shadow-lg shadow-black/20">
       <img className="h-28 w-20 shrink-0 rounded-lg border border-skyglass/15 object-cover bg-ink-900" src={game.coverImage} alt={`${game.title} cover`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
