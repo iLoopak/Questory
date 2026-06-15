@@ -455,18 +455,11 @@ export function AppController() {
   }, [lastRetroImportedGames, libraryFilters]);
 
   useEffect(() => {
-    if (activeUtilityView !== 'playing-now' || !document.documentElement.classList.contains('qs-modal-open')) {
+    if (activeUtilityView !== 'playing-now') {
       return;
     }
 
-    document.documentElement.classList.remove('qs-modal-open');
-    document.documentElement.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    document.body.style.overflow = '';
+    unlockDocumentScrollForPageView();
   }, [activeUtilityView]);
 
   useEffect(() => {
@@ -1365,6 +1358,7 @@ export function AppController() {
   }
 
   function openPlayingNowHubFromShelfProfile() {
+    unlockDocumentScrollForPageView();
     setPlayingNowReturnContext({ activeNavItem, selectedGameId });
     setSelectedGameId(null);
     setIsShelfProfileOpen(false);
@@ -1890,6 +1884,27 @@ export function AppController() {
   );
 }
 
+
+
+function unlockDocumentScrollForPageView() {
+  const { body, documentElement } = document;
+  const lockedScrollY = body.style.position === 'fixed' && body.style.top.startsWith('-')
+    ? Math.max(0, Number.parseFloat(body.style.top.slice(1)) || 0)
+    : null;
+
+  documentElement.classList.remove('qs-modal-open');
+  documentElement.style.overflow = '';
+  body.style.position = '';
+  body.style.top = '';
+  body.style.left = '';
+  body.style.right = '';
+  body.style.width = '';
+  body.style.overflow = '';
+
+  if (lockedScrollY !== null) {
+    window.scrollTo(window.scrollX, lockedScrollY);
+  }
+}
 
 type PlayingNowHubProps = {
   activity: PlayActivityRecord[];
