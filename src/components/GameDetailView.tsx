@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
@@ -12,6 +13,7 @@ import { formatHltbBadge, hasHltbData } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
 
 type GameDetailViewProps = {
+  activity?: PlayActivityRecord[];
   game: Game;
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
@@ -37,6 +39,7 @@ type GameDetailAction = {
 };
 
 export function GameDetailView({
+  activity = [],
   game,
   onAddToQueue,
   onAddToWishlist,
@@ -90,6 +93,9 @@ export function GameDetailView({
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
   const canEditGame = isGameEditable(game);
+  const recentSteamActivity = useMemo(() => getRecentSteamActivityForGame(activity, game.id), [activity, game.id]);
+  const lastSteamActivityAt = recentSteamActivity?.detectedAt ?? game.lastSteamActivityAt;
+  const recentSteamDeltaMinutes = recentSteamActivity?.deltaMinutes ?? game.lastSteamActivityDeltaMinutes;
 
   function updateTracking(changes: Partial<Pick<Game, 'notes' | 'status' | 'tags'>>) {
     onTrackingChange(game.id, {
@@ -374,6 +380,17 @@ export function GameDetailView({
                 </label>
               </div>
             </DetailSection>
+
+
+            {isSteamLibraryGame ? (
+              <DetailSection kicker="Steam Activity" title="Steam Activity" description="Detected only when Steam reports higher total playtime than the previous sync.">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <PersonalStatField label="Playtime" value={`${game.playtimeHours}h`} />
+                  <PersonalStatField label="Last Steam Activity" value={formatRelativeActivityDate(lastSteamActivityAt)} />
+                  <PersonalStatField label="Recent Delta" value={formatDeltaMinutes(recentSteamDeltaMinutes)} />
+                </div>
+              </DetailSection>
+            ) : null}
 
             <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
               <div className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.importedMetadata')}</div>
@@ -852,4 +869,49 @@ function formatList(value: string[] | undefined, unavailableText: string) {
 
 function formatConfidence(value: number | undefined, unavailableText: string) {
   return typeof value === 'number' ? `${Math.round(value * 100)}%` : unavailableText;
+}
+
+
+function formatDeltaMinutes(deltaMinutes?: number) {
+  if (!deltaMinutes || deltaMinutes <= 0) {
+    return 'No recent delta';
+  }
+
+  const hours = Math.floor(deltaMinutes / 60);
+  const minutes = deltaMinutes % 60;
+  if (hours > 0 && minutes > 0) {
+    return `+${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `+${hours}h`;
+  }
+  return `+${minutes}m`;
+}
+
+function formatRelativeActivityDate(value?: string | null) {
+  if (!value) {
+    return 'Not detected';
+  }
+
+  const activityDate = new Date(value);
+  if (Number.isNaN(activityDate.getTime())) {
+    return 'Not detected';
+  }
+
+  const today = new Date();
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const activityDay = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
+  const diffDays = Math.round((todayDate.getTime() - activityDay.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 0) {
+    return 'Today';
+  }
+  if (diffDays === 1) {
+    return 'Yesterday';
+  }
+  if (diffDays >= 0 && diffDays < 7) {
+    return 'This week';
+  }
+
+  return activityDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }

@@ -72,7 +72,7 @@ import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
 import { saveOnboardingState, onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import { savePlatformQueueState, type PlatformQueueState } from '../../lib/platformQueueStorage';
-import { formatLocalDate, loadPlayActivity, savePlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
+import { appendSteamPlaytimeDeltaActivity, formatLocalDate, loadPlayActivity, savePlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadIsThereAnyDealSettings } from '../../lib/isThereAnyDealSettingsStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
@@ -876,6 +876,9 @@ export function AppController() {
       const completed = result.summary.updatedCount + result.summary.unchangedCount + result.summary.failedCount;
 
       setGames(result.games);
+      if (result.activityRecords.length > 0) {
+        setPlayActivity((currentActivity) => appendSteamPlaytimeDeltaActivity(currentActivity, result.activityRecords));
+      }
       setSteamPlaytimeRefreshState({
         status: 'success',
         message: formatMessageTemplate(t('app.steamPlaytimeRefreshComplete'), { updated: result.summary.updatedCount, unchanged: result.summary.unchangedCount, failed: result.summary.failedCount }),
@@ -1482,6 +1485,7 @@ export function AppController() {
         <section className="flex-1 py-2">
           {(activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
             <GameDetailView
+              activity={playActivity}
               game={selectedGame}
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
@@ -1872,6 +1876,8 @@ type PlayingNowContext = {
   playedDaysLast30: number;
   playedDaysLast7: number;
   playedToday: boolean;
+  steamActivityLabel: string | null;
+  steamActivityToday: boolean;
 };
 
 function PlayingNowHub({ activity, games, onClose, onOpenDetails, onPlayToday, onStatusChange }: PlayingNowHubProps) {
@@ -1966,13 +1972,18 @@ function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusCha
             <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
             <p className="mt-1 text-xs font-medium text-slate-400">{game.platform}</p>
           </div>
-          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${context.playedToday ? 'border-mint/30 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-400'}`}>{context.playedToday ? 'Played today' : 'Not today'}</span>
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${context.steamActivityToday || context.playedToday ? 'border-mint/30 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-400'}`}>{context.steamActivityToday ? 'Active Today' : context.playedToday ? 'Played today' : 'Not today'}</span>
         </div>
         <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
           <Stat label="Last" value={context.lastPlayedDate ?? 'Never'} />
           <Stat label="7 days" value={String(context.playedDaysLast7)} />
           <Stat label="30 days" value={String(context.playedDaysLast30)} />
         </dl>
+        {context.steamActivityLabel ? (
+          <div className="mt-3 rounded-lg border border-mint/20 bg-mint/10 px-2.5 py-2 text-xs font-semibold text-mint">
+            {context.steamActivityToday ? '✓ Steam activity detected today' : context.steamActivityLabel}
+          </div>
+        ) : null}
         {game.notes.trim() ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-400">{game.notes.trim()}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="rounded-md bg-mint px-3 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">Play Today</button>
@@ -2004,6 +2015,7 @@ function getPlayingNowContexts(games: Game[], activity: PlayActivityRecord[], to
       playedDaysLast30: countDatesSince(sortedDates, today, 30),
       playedDaysLast7: countDatesSince(sortedDates, today, 7),
       playedToday: dates.has(today),
+      ...getSteamActivityContext(activity, game.id, today),
     });
   });
 
@@ -2018,7 +2030,46 @@ function getEmptyPlayingNowContext(game: Game, today: string): PlayingNowContext
     playedDaysLast30: countDatesSince(dates, today, 30),
     playedDaysLast7: countDatesSince(dates, today, 7),
     playedToday: lastPlayedDate === today,
+    steamActivityLabel: getSteamActivityLabel(game.lastSteamActivityAt, today),
+    steamActivityToday: game.lastSteamActivityAt?.slice(0, 10) === today,
   };
+}
+
+
+function getSteamActivityContext(activity: PlayActivityRecord[], gameId: string, today: string) {
+  const latestSteamActivity = activity
+    .filter((record) => record.gameId === gameId && record.source === 'steam' && record.type === 'playtime_delta')
+    .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))[0];
+
+  return {
+    steamActivityLabel: getSteamActivityLabel(latestSteamActivity?.detectedAt, today),
+    steamActivityToday: latestSteamActivity?.date === today,
+  };
+}
+
+function getSteamActivityLabel(detectedAt: string | undefined, today: string) {
+  if (!detectedAt) {
+    return null;
+  }
+
+  const date = detectedAt.slice(0, 10);
+  const todayTime = new Date(`${today}T00:00:00`).getTime();
+  const activityTime = new Date(`${date}T00:00:00`).getTime();
+  if (!Number.isFinite(activityTime)) {
+    return null;
+  }
+
+  const diffDays = Math.round((todayTime - activityTime) / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) {
+    return 'Active Today';
+  }
+  if (diffDays === 1) {
+    return 'Active Yesterday';
+  }
+  if (diffDays >= 0 && diffDays < 7) {
+    return 'Active This Week';
+  }
+  return null;
 }
 
 function countDatesSince(dates: string[], today: string, days: number) {
