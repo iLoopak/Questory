@@ -264,6 +264,7 @@ export function QueuePanel({
           </>
         }
       />
+      <p className="-mt-1 mb-2 px-1 text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">

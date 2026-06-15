@@ -49,11 +49,11 @@ export function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Queue') {
-    return 'Platforms is the focused plan for active systems, currently playing games, and platform backlogs.';
+    return 'Platform Plans is the focused backlog for what waits on each system.';
   }
 
   if (activeNavItem === 'Review Mode') {
-    return 'Quest Queue helps quickly process imported games into Platforms plans, wishlist picks, status updates, or ignores.';
+    return 'Quest Queue helps quickly process imported games into Platform Plans, wishlist picks, status updates, or ignores.';
   }
 
   if (activeNavItem === 'Stats') {
