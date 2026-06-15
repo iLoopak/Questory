@@ -60,7 +60,7 @@ import {
   type QuickFilter,
   type SourceFilter,
 } from '../../config/collection';
-import { I18nProvider, createTranslator, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from '../../i18n';
+import { I18nProvider, createTranslator, useI18n, translateOption, translateSettingsCategory, type AppLanguage, type TFunction } from '../../i18n';
 import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import { loadGames, saveGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
@@ -156,7 +156,8 @@ export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [playActivity, setPlayActivity] = useState<PlayActivityRecord[]>(() => loadPlayActivity());
-  const [isPlayingNowHubOpen, setIsPlayingNowHubOpen] = useState(false);
+  const [activeUtilityView, setActiveUtilityView] = useState<'playing-now' | null>(null);
+  const [playingNowReturnContext, setPlayingNowReturnContext] = useState<{ activeNavItem: NavItem; selectedGameId: string | null } | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
@@ -1349,8 +1350,22 @@ export function AppController() {
   }
 
   function openPlayingNowHubFromShelfProfile() {
+    setPlayingNowReturnContext({ activeNavItem, selectedGameId });
+    setSelectedGameId(null);
     setIsShelfProfileOpen(false);
-    setIsPlayingNowHubOpen(true);
+    setActiveUtilityView('playing-now');
+  }
+
+  function closePlayingNowHub() {
+    setActiveUtilityView(null);
+    if (playingNowReturnContext) {
+      setActiveNavItem(playingNowReturnContext.activeNavItem);
+      setSelectedGameId(playingNowReturnContext.selectedGameId);
+      setPlayingNowReturnContext(null);
+      return;
+    }
+    setActiveNavItem('Library');
+    setSelectedGameId(null);
   }
 
   function logPlayedToday(game: Game) {
@@ -1369,7 +1384,8 @@ export function AppController() {
   }
 
   function openDetailsFromPlayingNow(gameId: string) {
-    setIsPlayingNowHubOpen(false);
+    setActiveUtilityView(null);
+    setPlayingNowReturnContext(null);
     setSelectedGameId(gameId);
     setActiveNavItem('Library');
   }
@@ -1382,6 +1398,8 @@ export function AppController() {
   }
 
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
+    setActiveUtilityView(null);
+    setPlayingNowReturnContext(null);
     setActiveNavItem(item);
     setIsMoreMenuOpen(false);
     if (item !== 'Library' && item !== 'Wishlist') {
@@ -1483,7 +1501,17 @@ export function AppController() {
         </header>
 
         <section className="flex-1 py-2">
-          {(activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
+          {activeUtilityView === 'playing-now' ? (
+            <PlayingNowHub
+              activity={playActivity}
+              games={games}
+              onBack={closePlayingNowHub}
+              onOpenDetails={openDetailsFromPlayingNow}
+              onPlayToday={logPlayedToday}
+              onStatusChange={updateGameStatus}
+              t={t}
+            />
+          ) : (activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
             <GameDetailView
               activity={playActivity}
               game={selectedGame}
@@ -1802,16 +1830,6 @@ export function AppController() {
         />
       ) : null}
 
-      {isPlayingNowHubOpen ? (
-        <PlayingNowHub
-          activity={playActivity}
-          games={games}
-          onClose={() => setIsPlayingNowHubOpen(false)}
-          onOpenDetails={openDetailsFromPlayingNow}
-          onPlayToday={logPlayedToday}
-          onStatusChange={updateGameStatus}
-        />
-      ) : null}
 
       {backlogPickerGame ? (
         <BacklogPlatformPicker
@@ -1865,7 +1883,7 @@ export function AppController() {
 type PlayingNowHubProps = {
   activity: PlayActivityRecord[];
   games: Game[];
-  onClose: () => void;
+  onBack: () => void;
   onOpenDetails: (gameId: string) => void;
   onPlayToday: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
@@ -1880,7 +1898,7 @@ type PlayingNowContext = {
   steamActivityToday: boolean;
 };
 
-function PlayingNowHub({ activity, games, onClose, onOpenDetails, onPlayToday, onStatusChange }: PlayingNowHubProps) {
+function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, onStatusChange, t }: PlayingNowHubProps & { t: TFunction }) {
   const today = formatLocalDate(new Date());
   const playingGames = useMemo(
     () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
@@ -1902,33 +1920,33 @@ function PlayingNowHub({ activity, games, onClose, onOpenDetails, onPlayToday, o
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
 
   return (
-    <ViewportModal ariaLabel="Playing Now Hub" onClose={onClose}>
-      <section className="flex max-h-[min(44rem,calc(100vh-2rem))] w-[min(68rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border border-mint/25 bg-ink-950 text-slate-100 shadow-2xl shadow-black/60">
-        <header className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/95 p-3">
+    <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-8 text-slate-100" aria-labelledby="playing-now-title">
+        <header className="qs-glass flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-mint">
               <Icon name="play-circle" size={14} strokeWidth={2.2} />
-              <span>Playing Now</span>
+              <span>{t('playingNow.title')}</span>
             </div>
-            <h2 className="mt-1 truncate text-lg font-semibold text-white">Active games hub</h2>
-            <p className="mt-1 text-sm text-slate-400">A focused place for games marked as Playing. Activity records daily intent, not exact playtime.</p>
+            <h2 id="playing-now-title" className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{t('playingNow.title')}</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-300">{playingGames.length} {playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')}</p>
+            <p className="mt-1 max-w-2xl text-sm text-slate-400">{t('playingNow.helper')}</p>
           </div>
           <button
             className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
-            onClick={onClose}
+            onClick={onBack}
             type="button"
           >
-            Back
+            {t('action.back')}
           </button>
         </header>
 
-        <div className="overflow-y-auto p-3 sm:p-4">
+        <div className="min-h-[55vh]">
           {playingGames.length === 0 ? (
-            <div className="qs-glass rounded-xl border p-8 text-center">
+            <div className="qs-glass grid min-h-[55vh] place-items-center rounded-xl border p-8 text-center"><div>
               <Icon name="gamepad-2" size={32} className="mx-auto text-mint" strokeWidth={2} />
-              <h3 className="mt-3 text-base font-semibold text-white">No games are Playing right now</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">Mark a Library game as Playing and it will appear here with a one-tap Play Today activity signal.</p>
-            </div>
+              <h3 className="mt-3 text-base font-semibold text-white">{t('playingNow.emptyTitle')}</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">{t('playingNow.emptyText')}</p>
+            </div></div>
           ) : (
             <div className="space-y-4">
               {groupedGames.map(([platform, platformGames]) => (
@@ -1940,7 +1958,7 @@ function PlayingNowHub({ activity, games, onClose, onOpenDetails, onPlayToday, o
                     </div>
                     <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs text-slate-400">{platformGames.length}</span>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {platformGames.map((game) => (
                       <PlayingNowCard
                         key={game.id}
@@ -1958,7 +1976,6 @@ function PlayingNowHub({ activity, games, onClose, onOpenDetails, onPlayToday, o
           )}
         </div>
       </section>
-    </ViewportModal>
   );
 }
 
