@@ -82,9 +82,9 @@ export function PersonalizationSettingsPanel({
     try {
       const customAvatarDataUrl = await resizeAvatarFile(file);
       onShelfIdentityChange({ ...shelfIdentity, avatarSelection: 'custom', shelfAvatar: 'custom', customAvatarDataUrl });
-      setAvatarUploadStatus('Custom avatar saved locally and selected.');
+      setAvatarUploadStatus(t('personalization.customAvatarSaved'));
     } catch (error) {
-      setAvatarUploadError(error instanceof Error ? error.message : 'Avatar upload failed.');
+      setAvatarUploadError(error instanceof Error ? error.message : t('personalization.avatarUploadFailed'));
     } finally {
       if (uploadInputRef.current) uploadInputRef.current.value = '';
     }
@@ -92,7 +92,7 @@ export function PersonalizationSettingsPanel({
 
   function clearCustomAvatar() {
     onShelfIdentityChange({ ...shelfIdentity, avatarSelection: 'app-icon', shelfAvatar: 'app-icon', customAvatarDataUrl: '' });
-    setAvatarUploadStatus('Custom avatar cleared. QuestShelf Q selected.');
+    setAvatarUploadStatus(t('personalization.customAvatarCleared'));
     setAvatarUploadError('');
   }
 
@@ -118,18 +118,18 @@ export function PersonalizationSettingsPanel({
   const activeAchievement = achievements.find((achievement) => achievement.title === activeAchievementTitle);
   const avatarOptions = [
     ...personalizationAvatarOptions,
-    ...(steamAvatarUrl ? [{ label: `Steam avatar${steamPersonaName ? ` · ${steamPersonaName}` : ''}`, value: 'steam' as const }] : []),
-    ...(shelfIdentity.customAvatarDataUrl ? [{ label: 'Custom upload', value: 'custom' as const }] : []),
+    ...(steamAvatarUrl ? [{ label: `${t('personalization.steamAvatar')}${steamPersonaName ? ` · ${steamPersonaName}` : ''}`, value: 'steam' as const }] : []),
+    ...(shelfIdentity.customAvatarDataUrl ? [{ label: t('personalization.customUpload'), value: 'custom' as const }] : []),
   ];
 
   return (
     <SettingsSection
-      title="Personalization"
-      description="Set the shelf identity shown in places like Library and Home without changing Appearance theme or accent settings."
+      title={t('personalization.title')}
+      description={t('personalization.help')}
     >
       <div className="space-y-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Name</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.shelfName')}</span>
           <input
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
             maxLength={maxShelfNameLength}
@@ -138,13 +138,13 @@ export function PersonalizationSettingsPanel({
             value={shelfIdentity.shelfName}
           />
           <span className="mt-2 block text-xs leading-5 text-slate-500">
-            Optional. Examples: Loopak's QuestShelf, My QuestShelf, Viktor's QuestShelf.
+            {t('personalization.shelfNameHelp')}
           </span>
         </label>
 
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Avatar</div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Shelf Avatar">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.shelfAvatar')}</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label={t('personalization.shelfAvatar')}>
             {avatarOptions.map((option) => {
               const isSelected = shelfIdentity.avatarSelection === option.value;
               return (
@@ -182,7 +182,7 @@ export function PersonalizationSettingsPanel({
               onClick={() => uploadInputRef.current?.click()}
               type="button"
             >
-              {shelfIdentity.customAvatarDataUrl ? 'Replace custom avatar' : 'Upload custom avatar'}
+              {shelfIdentity.customAvatarDataUrl ? t('personalization.replaceCustomAvatar') : t('personalization.uploadCustomAvatar')}
             </button>
             {shelfIdentity.customAvatarDataUrl ? (
               <button
@@ -190,10 +190,10 @@ export function PersonalizationSettingsPanel({
                 onClick={clearCustomAvatar}
                 type="button"
               >
-                Clear custom avatar
+                {t('personalization.clearCustomAvatar')}
               </button>
             ) : null}
-            <span className="text-xs leading-5 text-slate-500">Images are cropped to 256×256 and saved locally with Shelf Identity.</span>
+            <span className="text-xs leading-5 text-slate-500">{t('personalization.avatarCropHelp')}</span>
           </div>
           {avatarUploadStatus ? <div className="mt-2 text-sm text-mint">{avatarUploadStatus}</div> : null}
           {avatarUploadError ? <div className="mt-2 text-sm text-red-200">{avatarUploadError}</div> : null}
@@ -262,19 +262,19 @@ export function PersonalizationSettingsPanel({
         <div>
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Active Badge</div>
-              <p className="mt-1 text-sm text-slate-400">Choose an unlocked QuestShelf achievement as your shelf badge, or use automatic priority.</p>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.activeBadge')}</div>
+              <p className="mt-1 text-sm text-slate-400">{t('personalization.activeBadgeHelp')}</p>
             </div>
             <button
               className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${!shelfIdentity.selectedActiveBadgeId ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-300 hover:border-mint/35 hover:text-white'}`}
               onClick={() => updateActiveBadge('')}
               type="button"
             >
-              Auto badge
+              {t('personalization.autoBadge')}
             </button>
           </div>
           <div className="qs-achievement-preview mt-2">
-            Preview active badge: <span className="qs-achievement-inline-badge">{activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle || 'No badge unlocked yet'}</span>
+            {t('personalization.previewActiveBadge')}: <span className="qs-achievement-inline-badge">{activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle || t('personalization.noBadgeUnlocked')}</span>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {achievements.map((achievement) => {
@@ -298,7 +298,7 @@ export function PersonalizationSettingsPanel({
                     onClick={() => updateActiveBadge(achievement.id)}
                     type="button"
                   >
-                    {isSelected ? 'Active badge' : achievement.isUnlocked ? 'Set active' : 'Locked'}
+                    {isSelected ? t('personalization.activeBadge') : achievement.isUnlocked ? t('personalization.setActive') : t('personalization.locked')}
                   </button>
                 </div>
               );
@@ -307,7 +307,7 @@ export function PersonalizationSettingsPanel({
         </div>
 
         <div className="qs-achievement-preview">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em]">Preview</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em]">{t('personalization.preview')}</div>
           <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
             <ShelfAvatar {...shelfIdentity} isActive steamAvatarUrl={steamAvatarUrl} sizeClassName="h-10 w-10" />
             <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="qs-achievement-inline-badge ml-1"> · {activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle}</span> : null}</span>

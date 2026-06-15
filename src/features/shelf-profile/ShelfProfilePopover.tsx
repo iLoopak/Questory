@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
+import type { TFunction } from '../../i18n';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import type { Game } from '../../types/game';
 
@@ -12,6 +13,7 @@ type ShelfProfilePopoverProps = {
   playingNowGame?: Game | null;
   shelfName: string;
   shelfOverview: ShelfOverviewCounts;
+  t: TFunction;
 };
 
 type ShelfOverviewCounts = {
@@ -36,6 +38,7 @@ export function ShelfProfilePopover({
   playingNowGame,
   shelfName,
   shelfOverview,
+  t,
 }: ShelfProfilePopoverProps) {
   return (
     <div
@@ -46,20 +49,20 @@ export function ShelfProfilePopover({
         <div className="shrink-0">{avatar}</div>
         <div className="min-w-0">
           <div className="break-words text-sm font-semibold uppercase tracking-[0.14em] text-mint">{shelfName}</div>
-          <div className="mt-1 text-xs text-slate-500">Shelf Profile</div>
+          <div className="mt-1 text-xs text-slate-500">{t('shelfProfile.title')}</div>
         </div>
       </div>
 
       <div className="space-y-2 border-b border-skyglass/15 py-3">
         <ShelfProfileRow
           iconName={activeAchievement?.icon ?? 'trophy'}
-          label="Active Badge"
-          value={activeAchievement?.title ?? 'No active badge yet'}
+          label={t('shelfProfile.activeBadge')}
+          value={activeAchievement?.title ?? t('shelfProfile.noActiveBadge')}
         />
         <ShelfProfileRow
           iconName="check-circle"
-          label="Featured Game"
-          value={featuredGame?.title ?? 'No featured game yet'}
+          label={t('shelfProfile.featuredGame')}
+          value={featuredGame?.title ?? t('shelfProfile.noFeaturedGame')}
         />
         <button
           className="flex min-h-11 w-full min-w-0 items-center gap-3 rounded-lg border border-mint/20 bg-mint/10 px-2.5 py-2 text-left transition hover:bg-mint/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
@@ -71,14 +74,14 @@ export function ShelfProfilePopover({
             <Icon name="gamepad-2" size={16} strokeWidth={2.2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Playing Now</span>
-            <span className="block truncate text-sm font-semibold text-slate-100" title={playingNowGame?.title ?? 'Open Playing Now Hub'}>{playingNowGame?.title ?? 'Open Playing Now Hub'}</span>
+            <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{t('playingNow.title')}</span>
+            <span className="block truncate text-sm font-semibold text-slate-100" title={playingNowGame?.title ?? t('shelfProfile.openPlayingNowHub')}>{playingNowGame?.title ?? t('shelfProfile.openPlayingNowHub')}</span>
           </span>
           <span className="rounded-full border border-mint/25 bg-ink-950/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-mint">{shelfOverview.playing.toLocaleString()}</span>
         </button>
       </div>
 
-      <ShelfOverviewSection overview={shelfOverview} />
+      <ShelfOverviewSection overview={shelfOverview} t={t} />
 
       <div className="border-b border-skyglass/15 py-2">
         <button
@@ -90,7 +93,7 @@ export function ShelfProfilePopover({
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
             <Icon name="settings" size={16} strokeWidth={2.2} />
           </span>
-          <span>Settings</span>
+          <span>{t('nav.settings')}</span>
         </button>
       </div>
 
@@ -99,19 +102,19 @@ export function ShelfProfilePopover({
 }
 
 
-function ShelfOverviewSection({ overview }: { overview: ShelfOverviewCounts }) {
+function ShelfOverviewSection({ overview, t }: { overview: ShelfOverviewCounts; t: TFunction }) {
   const stats: ShelfOverviewStat[] = [
-    { iconName: 'library', label: 'Games', value: overview.games },
-    { iconName: 'handheld', label: 'Platforms', value: overview.platforms },
-    { iconName: 'play-circle', label: 'Playing', value: overview.playing },
-    { iconName: 'list-ordered', label: 'Queue', value: overview.queue },
+    { iconName: 'library', label: t('shelfProfile.games'), value: overview.games },
+    { iconName: 'handheld', label: t('shelfProfile.platforms'), value: overview.platforms },
+    { iconName: 'play-circle', label: t('shelfProfile.playing'), value: overview.playing },
+    { iconName: 'list-ordered', label: t('shelfProfile.queue'), value: overview.queue },
   ];
 
   return (
-    <section className="border-b border-skyglass/15 py-3" aria-label="Shelf Overview">
+    <section className="border-b border-skyglass/15 py-3" aria-label={t('shelfProfile.overview')}>
       <div className="mb-2 flex items-center gap-2 px-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
         <Icon name="layers" size={14} strokeWidth={2.2} />
-        <span>Shelf Overview</span>
+        <span>{t('shelfProfile.overview')}</span>
       </div>
       <div className="grid grid-cols-1 gap-2 min-[340px]:grid-cols-2">
         {stats.map((stat) => (
@@ -143,4 +146,3 @@ function ShelfProfileRow({ iconName, label, value }: { iconName: IconName; label
     </div>
   );
 }
-

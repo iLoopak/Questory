@@ -1425,6 +1425,7 @@ export function AppController() {
                 playingNowGame={playingNowGame}
                 shelfName={personalizedQuestShelfTitle}
                 shelfOverview={shelfOverview}
+                t={t}
               />
             ) : null}
           </div>
@@ -1458,7 +1459,7 @@ export function AppController() {
                 onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
                 type="button"
               >
-                <span>More</span>
+                <span>{t('action.more')}</span>
                 <Icon name="chevrons-right" size={13} className="rotate-90" strokeWidth={2.4} />
               </button>
               {isMoreMenuOpen ? (
