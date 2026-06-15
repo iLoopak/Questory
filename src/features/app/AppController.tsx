@@ -36,7 +36,9 @@ import { QueuePlatformsSettingsPanel } from '../../components/settings/Platforms
 import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from '../../components/settings/WishlistSettingsPanel';
 import {
   getNavDescription,
+  moreNavItems,
   navItemLabelKeys,
+  type MoreNavItem,
   type NavItem,
   type TopNavItem,
 } from '../../config/navigation';
@@ -217,7 +219,33 @@ export function AppController() {
     shelfOverview,
     shelfProfileRef,
   } = useShelfProfileController(games, platformQueueState, steamProfileName);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!moreMenuRef.current?.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsMoreMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoreMenuOpen]);
+
   const {
     completedOnboardingItemIds,
     finishedOnboardingItemIds,
@@ -1310,11 +1338,19 @@ export function AppController() {
     setActiveNavItem('Queue');
   }
 
-  function openPersonalizationSettings() {
+  function openSettingsFromShelfProfile() {
     setIsShelfProfileOpen(false);
     setSelectedGameId(null);
     setActiveNavItem('Settings');
     setActiveSettingsCategory('Personalization');
+  }
+
+  function selectNavigationItem(item: TopNavItem | MoreNavItem) {
+    setActiveNavItem(item);
+    setIsMoreMenuOpen(false);
+    if (item !== 'Library' && item !== 'Wishlist') {
+      setSelectedGameId(null);
+    }
   }
 
   if (!isAppReady) {
@@ -1343,8 +1379,7 @@ export function AppController() {
                 activeAchievement={activeShelfAchievement}
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
                 featuredGame={computedFeaturedGame}
-                onClose={() => setIsShelfProfileOpen(false)}
-                onOpenPersonalization={openPersonalizationSettings}
+                onOpenPersonalization={openSettingsFromShelfProfile}
                 playingNowGame={playingNowGame}
                 shelfName={personalizedQuestShelfTitle}
                 shelfOverview={shelfOverview}
@@ -1361,18 +1396,50 @@ export function AppController() {
                     ? 'bg-mint text-ink-950 shadow-glow'
                     : 'text-slate-300 hover:bg-mint/10 hover:text-white hover:shadow-glow'
                 }`}
-                onClick={() => {
-                  setActiveNavItem(item);
-                  if (item !== 'Library' && item !== 'Wishlist') {
-                    setSelectedGameId(null);
-                  }
-                }}
+                onClick={() => selectNavigationItem(item)}
                 type="button"
               >
                 {t(navItemLabelKeys[item])}
               </button>
             ))}
           </nav>
+
+          <div className="relative shrink-0" ref={moreMenuRef}>
+              <button
+                aria-expanded={isMoreMenuOpen}
+                aria-haspopup="menu"
+                className={`flex h-8 items-center gap-1 rounded px-2.5 text-xs font-semibold transition sm:h-9 sm:text-sm ${
+                  isMoreNavActive
+                    ? 'bg-mint text-ink-950 shadow-glow'
+                    : 'text-slate-300 hover:bg-mint/10 hover:text-white hover:shadow-glow'
+                }`}
+                onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
+                type="button"
+              >
+                <span>More</span>
+                <Icon name="chevrons-right" size={13} className="rotate-90" strokeWidth={2.4} />
+              </button>
+              {isMoreMenuOpen ? (
+                <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl" role="menu">
+                  {moreNavItems.map((item) => (
+                    <button
+                      key={item}
+                      className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70 ${
+                        item === activeNavItem ? 'bg-mint/15 text-white' : 'text-slate-200 hover:bg-mint/10 hover:text-white'
+                      }`}
+                      onClick={() => selectNavigationItem(item)}
+                      role="menuitem"
+                      type="button"
+                    >
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
+                        <Icon name={item === 'Stats' ? 'panel-top-open' : 'image-frame'} size={15} strokeWidth={2.2} />
+                      </span>
+                      <span>{t(navItemLabelKeys[item])}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+          </div>
 
           <PwaStatusBanner appTitle={personalizedQuestShelfTitle} />
           <BackToTopButton />

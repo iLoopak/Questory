@@ -1,12 +1,14 @@
 import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
-export const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Artwork', 'Recommendation', 'Stats', 'Settings'] as const;
-export const alwaysVisibleNavItems = ['Library', 'Settings'] as const;
+export const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Recommendation'] as const;
+export const moreNavItems = ['Stats', 'Artwork'] as const;
+export const alwaysVisibleNavItems = ['Library'] as const;
 
 export type TopNavItem = (typeof navItems)[number];
+export type MoreNavItem = (typeof moreNavItems)[number];
 
-export const navItemLabelKeys: Record<TopNavItem, Parameters<TFunction>[0]> = {
+export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Parameters<TFunction>[0]> = {
   Artwork: 'nav.artwork',
   Library: 'nav.library',
   Queue: 'nav.queue',
@@ -26,7 +28,7 @@ export const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, P
   Wishlist: 'nav.wishlist',
 };
 
-export const allNavItems = ['Home', ...navItems, 'Metadata'] as const;
+export const allNavItems = ['Home', ...navItems, ...moreNavItems, 'Settings', 'Metadata'] as const;
 export type NavItem = (typeof allNavItems)[number];
 
 export function getNavDescription(activeNavItem: NavItem) {
@@ -75,4 +77,8 @@ export function isNavigationItemVisible(item: TopNavItem, navigationVisibility: 
 
 export function isTopNavItem(item: NavItem): item is TopNavItem {
   return navItems.includes(item as TopNavItem);
+}
+
+export function isMoreNavItem(item: NavItem): item is MoreNavItem {
+  return moreNavItems.includes(item as MoreNavItem);
 }
