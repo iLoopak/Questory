@@ -3,7 +3,7 @@ import type { Game } from '../types/game';
 import { getLegacyComputedShelfTitle, isQuestShelfAchievementId, type QuestShelfAchievementId } from './questShelfAchievements';
 
 export const shelfIdentityStorageKey = 'questshelf.shelfIdentity.v1';
-export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon.png';
+export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon-180.png';
 export const maxShelfNameLength = 48;
 export const maxCustomAvatarDataUrlLength = 700_000;
 

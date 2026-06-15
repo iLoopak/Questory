@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Icon, type IconName } from './Icon';
-import { builtInAvatars, resizeAvatarFile, type ShelfAvatarSelection, type ShelfIdentitySettings } from '../lib/shelfIdentity';
+import { builtInAvatars, questShelfAppIconAvatarUrl, resizeAvatarFile, type ShelfAvatarSelection, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 
 export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarUrl, sizeClassName = 'h-10 w-10', isActive = false }: ShelfIdentitySettings & { steamAvatarUrl?: string; sizeClassName?: string; isActive?: boolean }) {
   const selectedBuiltInId = avatarSelection.startsWith('built-in:') ? avatarSelection.slice('built-in:'.length) : '';
@@ -8,16 +8,25 @@ export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarU
   const imageUrl = avatarSelection === 'custom' ? customAvatarDataUrl : avatarSelection === 'steam' ? steamAvatarUrl : '';
   const className = `qs-shelf-avatar${isActive ? ' qs-shelf-avatar--active' : ''} ${sizeClassName}`;
 
+  if (avatarSelection === 'app-icon') {
+    return (
+      <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="QuestShelf Q">
+        <img
+          alt=""
+          className="h-full w-full object-contain opacity-100"
+          src={questShelfAppIconAvatarUrl}
+          style={{ filter: 'none', mixBlendMode: 'normal' }}
+        />
+      </div>
+    );
+  }
+
   if (builtInAvatar) {
     return (
       <div className={className} title={builtInAvatar.label}>
         <Icon name={builtInAvatar.icon as IconName} size={20} strokeWidth={2.1} />
       </div>
     );
-  }
-
-  if (avatarSelection === 'app-icon') {
-    return <div className={`${className} qs-shelf-avatar--app-icon`} title="QuestShelf Q"><span>Q</span></div>;
   }
 
   return <div className={`${className} overflow-hidden`} title={avatarSelection === 'steam' ? 'Steam avatar' : 'Custom avatar'}>{imageUrl ? <img className="h-full w-full object-cover" src={imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <span>Q</span>}</div>;
