@@ -159,7 +159,7 @@ export function useMetadataArtworkActions({
       addToastNotification({
         category: error instanceof RawgApiError && error.code === 'missing-api-key' ? 'warning' : 'error',
         dedupeKey: toastKey,
-        message,
+        message: formatGameToastMessage(message, targetGame),
       });
       return 'error';
     } finally {

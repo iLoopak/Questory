@@ -27,7 +27,7 @@ type UseReviewModeActionsParams = {
   addToastNotification: (notification: NotificationDraft) => void;
   addToWishlist: (game: Game) => void;
   addUndoAction: (message: string, payload: ReviewUndoPayload) => void;
-  openArtworkAudit: () => void;
+  refreshGameMetadataFromActions: (game: Game, mode?: 'metadata' | 'artwork') => Promise<unknown>;
   reviewModeState: ReviewModeState;
   setActiveNavItem: (navItem: 'Library' | 'Wishlist' | 'Review Mode') => void;
   setActiveReviewSource: Dispatch<SetStateAction<ReviewSource>>;
@@ -55,7 +55,7 @@ export function useReviewModeActions({
   addToastNotification,
   addToWishlist,
   addUndoAction,
-  openArtworkAudit,
+  refreshGameMetadataFromActions,
   reviewModeState,
   setActiveNavItem,
   setActiveReviewSource,
@@ -117,12 +117,12 @@ export function useReviewModeActions({
 
     if (action === 'enrich') {
       recordReviewDecision('enriched');
-      startMetadataWorkflow([game.id]);
+      void refreshGameMetadataFromActions(game, 'metadata');
       return;
     }
 
     if (action === 'find-artwork') {
-      openArtworkAudit();
+      void refreshGameMetadataFromActions(game, 'artwork');
       return;
     }
 

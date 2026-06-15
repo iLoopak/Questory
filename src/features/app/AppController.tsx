@@ -1508,7 +1508,7 @@ export function AppController() {
     addToastNotification,
     addToWishlist,
     addUndoAction,
-    openArtworkAudit,
+    refreshGameMetadataFromActions,
     reviewModeState,
     setActiveNavItem,
     setActiveReviewSource,
@@ -1777,6 +1777,7 @@ export function AppController() {
               ignoredGameIds={reviewIgnoredGameIds}
               queuePlatforms={activeQueuePlatforms}
               queueState={platformQueueState}
+              refreshingMetadataGameIds={refreshingMetadataGameIds}
               controllerLayout={controllerLayoutPreference}
               source={activeReviewSource}
               onAction={handleReviewAction}
