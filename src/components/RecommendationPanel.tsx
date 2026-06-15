@@ -181,10 +181,9 @@ export function RecommendationPanel({
         onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
         onClearFilters={hasActiveMoreFilters ? clearMoreFilters : undefined}
         leadingAccessory={
-          activeAchievement || featuredGame ? (
+          activeAchievement ? (
           <AchievementToolbarChips
             activeAchievement={activeAchievement}
-            featuredGame={featuredGame}
             onOpenAchievementSettings={onOpenAchievementSettings}
             onOpenDetails={onOpenDetails}
           />

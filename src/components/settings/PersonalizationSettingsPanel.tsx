@@ -1,14 +1,26 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icon';
 import { ShelfAvatar } from '../ShelfIdentity';
 import {
   maxShelfNameLength,
   resizeAvatarFile,
+  type FeaturedGameMode,
   type ShelfAvatarSelection,
   type ShelfIdentitySettings,
 } from '../../lib/shelfIdentity';
+import { useI18n } from '../../i18n';
+import type { Game } from '../../types/game';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import { SettingsSection } from './SettingsSection';
+
+type FeaturedGameModeLabelKey = 'personalization.featuredMostPlayed' | 'personalization.featuredHighestAchievementCompletion' | 'personalization.featuredMostRecentlyPlayed' | 'personalization.featuredChooseManually';
+
+const featuredGameModeOptions: Array<{ labelKey: FeaturedGameModeLabelKey; value: FeaturedGameMode }> = [
+  { labelKey: 'personalization.featuredMostPlayed', value: 'automatic-most-played' },
+  { labelKey: 'personalization.featuredHighestAchievementCompletion', value: 'automatic-achievement-completion' },
+  { labelKey: 'personalization.featuredMostRecentlyPlayed', value: 'automatic-recently-played' },
+  { labelKey: 'personalization.featuredChooseManually', value: 'manual' },
+];
 
 const personalizationAvatarOptions: Array<{
   label: string;
@@ -32,6 +44,7 @@ const personalizationAvatarOptions: Array<{
 export function PersonalizationSettingsPanel({
   personalizedQuestShelfTitle,
   shelfIdentity,
+  games,
   achievements,
   activeAchievementTitle,
   steamAvatarUrl = '',
@@ -40,15 +53,18 @@ export function PersonalizationSettingsPanel({
 }: {
   personalizedQuestShelfTitle: string;
   shelfIdentity: ShelfIdentitySettings;
+  games: Game[];
   achievements: QuestShelfAchievementProgress[];
   activeAchievementTitle: string;
   steamAvatarUrl?: string;
   steamPersonaName?: string;
   onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
 }) {
+  const { t } = useI18n();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarUploadStatus, setAvatarUploadStatus] = useState('');
   const [avatarUploadError, setAvatarUploadError] = useState('');
+  const [manualGameSearch, setManualGameSearch] = useState('');
 
   function updateShelfName(shelfName: string) {
     onShelfIdentityChange({ ...shelfIdentity, shelfName });
@@ -80,10 +96,25 @@ export function PersonalizationSettingsPanel({
     setAvatarUploadError('');
   }
 
+
+  function updateFeaturedGameMode(featuredGameMode: FeaturedGameMode) {
+    onShelfIdentityChange({ ...shelfIdentity, featuredGameMode });
+  }
+
+  function updateManualFeaturedGame(manualFeaturedGameId: string) {
+    onShelfIdentityChange({ ...shelfIdentity, manualFeaturedGameId });
+  }
+
   function updateActiveBadge(selectedActiveBadgeId: ShelfIdentitySettings['selectedActiveBadgeId']) {
     onShelfIdentityChange({ ...shelfIdentity, selectedActiveBadgeId });
   }
 
+  const libraryGames = useMemo(() => games.filter((game) => game.collectionType === 'library').sort((a, b) => a.title.localeCompare(b.title)), [games]);
+  const selectedManualGame = libraryGames.find((game) => game.id === shelfIdentity.manualFeaturedGameId) ?? null;
+  const manualGameSearchResults = useMemo(() => {
+    const query = manualGameSearch.trim().toLocaleLowerCase();
+    return (query ? libraryGames.filter((game) => game.title.toLocaleLowerCase().includes(query)) : libraryGames).slice(0, 8);
+  }, [libraryGames, manualGameSearch]);
   const activeAchievement = achievements.find((achievement) => achievement.title === activeAchievementTitle);
   const avatarOptions = [
     ...personalizationAvatarOptions,
@@ -166,6 +197,66 @@ export function PersonalizationSettingsPanel({
           </div>
           {avatarUploadStatus ? <div className="mt-2 text-sm text-mint">{avatarUploadStatus}</div> : null}
           {avatarUploadError ? <div className="mt-2 text-sm text-red-200">{avatarUploadError}</div> : null}
+        </div>
+
+
+        <div className="rounded-lg border border-skyglass/15 bg-ink-900/60 p-3">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
+              <Icon name="check-circle" size={18} strokeWidth={2.2} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.featuredGame')}</div>
+              <p className="mt-1 text-sm text-slate-400">{t('personalization.featuredGameHelp')}</p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {featuredGameModeOptions.map((option) => {
+              const isSelected = shelfIdentity.featuredGameMode === option.value;
+              return (
+                <button
+                  aria-checked={isSelected}
+                  className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${
+                    isSelected
+                      ? 'border-mint/60 bg-mint/10 text-white shadow-glow'
+                      : 'border-skyglass/15 bg-ink-950/70 text-slate-300 hover:border-mint/35 hover:text-white'
+                  }`}
+                  key={option.value}
+                  onClick={() => updateFeaturedGameMode(option.value)}
+                  role="radio"
+                  type="button"
+                >
+                  {t(option.labelKey)}
+                </button>
+              );
+            })}
+          </div>
+          {shelfIdentity.featuredGameMode === 'manual' ? (
+            <label className="mt-3 block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.manualFeaturedGame')}</span>
+              <input
+                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+                onChange={(event) => setManualGameSearch(event.target.value)}
+                placeholder={t('personalization.searchLibraryGames')}
+                type="search"
+                value={manualGameSearch}
+              />
+              {selectedManualGame ? <div className="mt-2 text-xs text-slate-400">{t('personalization.manualFeaturedGame')}: <span className="font-semibold text-mint">{selectedManualGame.title}</span></div> : null}
+              <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-skyglass/10 bg-ink-950/70 p-1">
+                {manualGameSearchResults.length > 0 ? manualGameSearchResults.map((game) => (
+                  <button
+                    className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-sm transition ${game.id === shelfIdentity.manualFeaturedGameId ? 'bg-mint/15 text-mint' : 'text-slate-200 hover:bg-mint/10 hover:text-white'}`}
+                    key={game.id}
+                    onClick={() => { updateManualFeaturedGame(game.id); setManualGameSearch(game.title); }}
+                    type="button"
+                  >
+                    <span className="truncate font-semibold">{game.title}</span>
+                    <span className="shrink-0 text-xs text-slate-500">{game.platform}</span>
+                  </button>
+                )) : <div className="px-2 py-3 text-sm text-slate-500">{t('collection.emptyLibraryTitle')}</div>}
+              </div>
+            </label>
+          ) : null}
         </div>
 
         <div>
