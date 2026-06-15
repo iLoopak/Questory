@@ -72,6 +72,7 @@ import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
 import { saveOnboardingState, onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import { savePlatformQueueState, type PlatformQueueState } from '../../lib/platformQueueStorage';
+import { formatLocalDate, loadPlayActivity, savePlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadIsThereAnyDealSettings } from '../../lib/isThereAnyDealSettingsStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
@@ -154,6 +155,8 @@ function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { clas
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
+  const [playActivity, setPlayActivity] = useState<PlayActivityRecord[]>(() => loadPlayActivity());
+  const [isPlayingNowHubOpen, setIsPlayingNowHubOpen] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
@@ -362,6 +365,10 @@ export function AppController() {
   useEffect(() => {
     saveIgnoredSteamGames(ignoredSteamGames);
   }, [ignoredSteamGames]);
+
+  useEffect(() => {
+    savePlayActivity(playActivity);
+  }, [playActivity]);
 
   useEffect(() => {
     saveOnboardingState(onboardingState);
@@ -1338,6 +1345,32 @@ export function AppController() {
     setActiveNavItem('Queue');
   }
 
+  function openPlayingNowHubFromShelfProfile() {
+    setIsShelfProfileOpen(false);
+    setIsPlayingNowHubOpen(true);
+  }
+
+  function logPlayedToday(game: Game) {
+    const now = new Date();
+    setPlayActivity((currentActivity) => upsertPlayedTodayActivity(currentActivity, game.id, now));
+    setGames((currentGames) =>
+      currentGames.map((currentGame) =>
+        currentGame.id === game.id
+          ? touchGameRecord({
+              ...currentGame,
+              lastPlayedAt: formatLocalDate(now),
+            })
+          : currentGame,
+      ),
+    );
+  }
+
+  function openDetailsFromPlayingNow(gameId: string) {
+    setIsPlayingNowHubOpen(false);
+    setSelectedGameId(gameId);
+    setActiveNavItem('Library');
+  }
+
   function openSettingsFromShelfProfile() {
     setIsShelfProfileOpen(false);
     setSelectedGameId(null);
@@ -1380,6 +1413,7 @@ export function AppController() {
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
                 featuredGame={computedFeaturedGame}
                 onOpenPersonalization={openSettingsFromShelfProfile}
+                onOpenPlayingNow={openPlayingNowHubFromShelfProfile}
                 playingNowGame={playingNowGame}
                 shelfName={personalizedQuestShelfTitle}
                 shelfOverview={shelfOverview}
@@ -1764,6 +1798,17 @@ export function AppController() {
         />
       ) : null}
 
+      {isPlayingNowHubOpen ? (
+        <PlayingNowHub
+          activity={playActivity}
+          games={games}
+          onClose={() => setIsPlayingNowHubOpen(false)}
+          onOpenDetails={openDetailsFromPlayingNow}
+          onPlayToday={logPlayedToday}
+          onStatusChange={updateGameStatus}
+        />
+      ) : null}
+
       {backlogPickerGame ? (
         <BacklogPlatformPicker
           game={backlogPickerGame}
@@ -1810,6 +1855,179 @@ export function AppController() {
     </main>
     </I18nProvider>
   );
+}
+
+
+type PlayingNowHubProps = {
+  activity: PlayActivityRecord[];
+  games: Game[];
+  onClose: () => void;
+  onOpenDetails: (gameId: string) => void;
+  onPlayToday: (game: Game) => void;
+  onStatusChange: (gameId: string, status: GameStatus) => void;
+};
+
+type PlayingNowContext = {
+  lastPlayedDate: string | null;
+  playedDaysLast30: number;
+  playedDaysLast7: number;
+  playedToday: boolean;
+};
+
+function PlayingNowHub({ activity, games, onClose, onOpenDetails, onPlayToday, onStatusChange }: PlayingNowHubProps) {
+  const today = formatLocalDate(new Date());
+  const playingGames = useMemo(
+    () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
+    [games],
+  );
+  const groupedGames = useMemo(() => {
+    const groups = new Map<GamePlatform, Game[]>();
+
+    playingGames.forEach((game) => {
+      const group = groups.get(game.platform) ?? [];
+      group.push(game);
+      groups.set(game.platform, group);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([platformA], [platformB]) => platformA.localeCompare(platformB))
+      .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
+  }, [playingGames]);
+  const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
+
+  return (
+    <ViewportModal ariaLabel="Playing Now Hub" onClose={onClose}>
+      <section className="flex max-h-[min(44rem,calc(100vh-2rem))] w-[min(68rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border border-mint/25 bg-ink-950 text-slate-100 shadow-2xl shadow-black/60">
+        <header className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/95 p-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-mint">
+              <Icon name="play-circle" size={14} strokeWidth={2.2} />
+              <span>Playing Now</span>
+            </div>
+            <h2 className="mt-1 truncate text-lg font-semibold text-white">Active games hub</h2>
+            <p className="mt-1 text-sm text-slate-400">A focused place for games marked as Playing. Activity records daily intent, not exact playtime.</p>
+          </div>
+          <button
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+            onClick={onClose}
+            type="button"
+          >
+            Back
+          </button>
+        </header>
+
+        <div className="overflow-y-auto p-3 sm:p-4">
+          {playingGames.length === 0 ? (
+            <div className="qs-glass rounded-xl border p-8 text-center">
+              <Icon name="gamepad-2" size={32} className="mx-auto text-mint" strokeWidth={2} />
+              <h3 className="mt-3 text-base font-semibold text-white">No games are Playing right now</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">Mark a Library game as Playing and it will appear here with a one-tap Play Today activity signal.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupedGames.map(([platform, platformGames]) => (
+                <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name="handheld" size={16} /></span>
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-200">{platform}</h3>
+                    </div>
+                    <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs text-slate-400">{platformGames.length}</span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {platformGames.map((game) => (
+                      <PlayingNowCard
+                        key={game.id}
+                        context={activityByGame.get(game.id) ?? getEmptyPlayingNowContext(game, today)}
+                        game={game}
+                        onOpenDetails={onOpenDetails}
+                        onPlayToday={onPlayToday}
+                        onStatusChange={onStatusChange}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </ViewportModal>
+  );
+}
+
+function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void }) {
+  return (
+    <article className="flex gap-3 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3 shadow-lg shadow-black/20">
+      <img className="h-28 w-20 shrink-0 rounded-lg border border-skyglass/15 object-cover bg-ink-900" src={game.coverImage} alt={`${game.title} cover`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
+            <p className="mt-1 text-xs font-medium text-slate-400">{game.platform}</p>
+          </div>
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${context.playedToday ? 'border-mint/30 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-400'}`}>{context.playedToday ? 'Played today' : 'Not today'}</span>
+        </div>
+        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+          <Stat label="Last" value={context.lastPlayedDate ?? 'Never'} />
+          <Stat label="7 days" value={String(context.playedDaysLast7)} />
+          <Stat label="30 days" value={String(context.playedDaysLast30)} />
+        </dl>
+        {game.notes.trim() ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-400">{game.notes.trim()}</p> : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="rounded-md bg-mint px-3 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">Play Today</button>
+          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-mint/10" onClick={() => onOpenDetails(game.id)} type="button">Open detail</button>
+          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-skyglass/10" onClick={() => onStatusChange(game.id, 'Paused')} type="button">Pause</button>
+          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-skyglass/10" onClick={() => onStatusChange(game.id, 'Finished')} type="button">Finished</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-skyglass/10 bg-ink-900/70 px-2 py-1.5"><dt className="text-[0.6rem] uppercase tracking-[0.12em] text-slate-500">{label}</dt><dd className="mt-0.5 font-semibold text-slate-100">{value}</dd></div>;
+}
+
+function getPlayingNowContexts(games: Game[], activity: PlayActivityRecord[], today: string) {
+  const contexts = new Map<string, PlayingNowContext>();
+  games.forEach((game) => contexts.set(game.id, getEmptyPlayingNowContext(game, today)));
+
+  games.forEach((game) => {
+    const dates = new Set(activity.filter((record) => record.gameId === game.id && record.action === 'played_today').map((record) => record.date));
+    if (game.lastPlayedAt && /^\d{4}-\d{2}-\d{2}/.test(game.lastPlayedAt)) {
+      dates.add(game.lastPlayedAt.slice(0, 10));
+    }
+    const sortedDates = Array.from(dates).sort();
+    contexts.set(game.id, {
+      lastPlayedDate: sortedDates.at(-1) ?? null,
+      playedDaysLast30: countDatesSince(sortedDates, today, 30),
+      playedDaysLast7: countDatesSince(sortedDates, today, 7),
+      playedToday: dates.has(today),
+    });
+  });
+
+  return contexts;
+}
+
+function getEmptyPlayingNowContext(game: Game, today: string): PlayingNowContext {
+  const lastPlayedDate = game.lastPlayedAt?.slice(0, 10) ?? null;
+  const dates = lastPlayedDate ? [lastPlayedDate] : [];
+  return {
+    lastPlayedDate,
+    playedDaysLast30: countDatesSince(dates, today, 30),
+    playedDaysLast7: countDatesSince(dates, today, 7),
+    playedToday: lastPlayedDate === today,
+  };
+}
+
+function countDatesSince(dates: string[], today: string, days: number) {
+  const todayTime = new Date(`${today}T00:00:00`).getTime();
+  const earliestTime = todayTime - (days - 1) * 24 * 60 * 60 * 1000;
+  return dates.filter((date) => {
+    const dateTime = new Date(`${date}T00:00:00`).getTime();
+    return Number.isFinite(dateTime) && dateTime >= earliestTime && dateTime <= todayTime;
+  }).length;
 }
 
 type AddGameDialogProps = {
