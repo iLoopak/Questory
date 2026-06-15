@@ -8,7 +8,14 @@ export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarU
   if (avatarSelection === 'app-icon') {
     return (
       <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="QuestShelf Q">
-        <img className="qs-shelf-avatar__app-icon h-full w-full object-contain" src={questShelfAppIconAvatarUrl} alt="" aria-hidden="true" />
+        <img
+          className="qs-shelf-avatar__app-icon h-full w-full object-contain"
+          src={questShelfAppIconAvatarUrl}
+          alt="QuestShelf Q"
+          onError={() => {
+            console.error(`QuestShelf app icon avatar failed to load: ${questShelfAppIconAvatarUrl}`);
+          }}
+        />
       </div>
     );
   }

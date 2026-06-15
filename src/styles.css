@@ -2903,7 +2903,14 @@ body.qs-controller-active .qs-compact-card:focus-within {
   padding: 10%;
 }
 
+.qs-shelf-avatar--app-icon img,
 .qs-shelf-avatar__app-icon {
   display: block;
-  filter: drop-shadow(0 0 10px rgb(var(--overlay-rgb) / 0.28));
+  color: initial;
+  filter: none;
+  opacity: 1;
+  mix-blend-mode: normal;
+  background-clip: border-box;
+  mask: none;
+  -webkit-mask: none;
 }
