@@ -1112,7 +1112,14 @@ function getGameTime(value: string | null | undefined) {
 }
 
 function getReviewActionLabel(action: { action: ReviewModeAction; label: string }, t: TFunction) {
-  return action.action === 'queue' ? t('action.addToQueue') : action.label;
+  if (action.action === 'queue') return t('action.addToQueue');
+  if (action.action === 'playing') return t('action.playingNow');
+  if (action.action === 'wishlist') return t('wishlist.title');
+  if (action.action === 'finished') return t('action.finished');
+  if (action.action === 'ignore') return t('action.ignore');
+  if (action.action === 'dropped') return t('action.drop');
+  if (action.action === 'skip') return t('action.skip');
+  return action.label;
 }
 
 function getReviewActionLabelByType(actionType: ReviewModeAction, t: TFunction) {
