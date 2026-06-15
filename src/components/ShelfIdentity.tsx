@@ -3,23 +3,24 @@ import { Icon, type IconName } from './Icon';
 import { builtInAvatars, questShelfAppIconAvatarUrl, resizeAvatarFile, type ShelfAvatarSelection, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 
 export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarUrl, sizeClassName = 'h-10 w-10', isActive = false }: ShelfIdentitySettings & { steamAvatarUrl?: string; sizeClassName?: string; isActive?: boolean }) {
-  const selectedBuiltInId = avatarSelection.startsWith('built-in:') ? avatarSelection.slice('built-in:'.length) : '';
-  const builtInAvatar = builtInAvatars.find((avatar) => avatar.id === selectedBuiltInId);
-  const imageUrl = avatarSelection === 'custom' ? customAvatarDataUrl : avatarSelection === 'steam' ? steamAvatarUrl : '';
   const className = `qs-shelf-avatar${isActive ? ' qs-shelf-avatar--active' : ''} ${sizeClassName}`;
-
-  if (builtInAvatar) {
-    return (
-      <div className={className} title={builtInAvatar.label}>
-        <Icon name={builtInAvatar.icon as IconName} size={20} strokeWidth={2.1} />
-      </div>
-    );
-  }
 
   if (avatarSelection === 'app-icon') {
     return (
       <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="QuestShelf Q">
         <img className="qs-shelf-avatar__app-icon h-full w-full object-contain" src={questShelfAppIconAvatarUrl} alt="" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  const selectedBuiltInId = avatarSelection.startsWith('built-in:') ? avatarSelection.slice('built-in:'.length) : '';
+  const builtInAvatar = builtInAvatars.find((avatar) => avatar.id === selectedBuiltInId);
+  const imageUrl = avatarSelection === 'custom' ? customAvatarDataUrl : avatarSelection === 'steam' ? steamAvatarUrl : '';
+
+  if (builtInAvatar) {
+    return (
+      <div className={className} title={builtInAvatar.label}>
+        <Icon name={builtInAvatar.icon as IconName} size={20} strokeWidth={2.1} />
       </div>
     );
   }
@@ -50,7 +51,7 @@ export function ShelfIdentityEditor({ identity, onIdentityChange, shelfNamePlace
     }
   }
   const options: Array<{ label: string; value: ShelfAvatarSelection; recommended?: boolean }> = [
-    { label: 'QuestShelf icon', value: 'app-icon' },
+    { label: 'QuestShelf Q', value: 'app-icon' },
     ...(steamAvatarUrl ? [{ label: `Steam avatar${steamPersonaName ? ` · ${steamPersonaName}` : ''}`, value: 'steam' as const, recommended: true }] : []),
     ...builtInAvatars.map((avatar) => ({ label: avatar.label, value: `built-in:${avatar.id}` as ShelfAvatarSelection })),
     ...(identity.customAvatarDataUrl ? [{ label: 'Custom upload', value: 'custom' as const }] : []),
