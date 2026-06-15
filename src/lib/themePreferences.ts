@@ -3,15 +3,18 @@ export type ResolvedTheme = 'light' | 'dark';
 export type AccentColorPreference = string | null;
 export type AppTemplatePreference = 'classic' | 'neon-deck';
 export type NeonButtonGradientBalancePreference = number;
+export type NeonButtonGradientMidpointPreference = number;
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
 export const accentColorStorageKey = 'questshelf.accentColor.v1';
 export const secondaryAccentColorStorageKey = 'questshelf.secondaryAccentColor.v1';
 export const neonButtonGradientBalanceStorageKey = 'questshelf.neonButtonGradientBalance.v1';
+export const neonButtonGradientMidpointStorageKey = 'questshelf.neonButtonGradientMidpoint.v1';
 export const appTemplateStorageKey = 'questshelf.appTemplate.v1';
 export const defaultAccentColor = '#ff5a2c';
 export const defaultSecondaryAccentColor = '#38bdf8';
 export const defaultNeonButtonGradientBalance = 50;
+export const defaultNeonButtonGradientMidpoint = 50;
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
 export const darkOnlyAppTemplatePreferences: AppTemplatePreference[] = ['neon-deck'];
@@ -57,25 +60,40 @@ export function normalizeAccentColor(value: string): string | null {
   return isAccentColor(trimmedValue) ? trimmedValue.toLowerCase() : null;
 }
 
-export function normalizeNeonButtonGradientBalance(value: unknown): NeonButtonGradientBalancePreference {
+function normalizeGradientSliderValue(value: unknown, defaultValue: number) {
   const numericValue = typeof value === 'number' ? value : Number(value);
 
   if (!Number.isFinite(numericValue)) {
-    return defaultNeonButtonGradientBalance;
+    return defaultValue;
   }
 
   return Math.min(100, Math.max(0, Math.round(numericValue)));
 }
 
-export function getNeonButtonGradientStops(balance: NeonButtonGradientBalancePreference) {
+export function normalizeNeonButtonGradientBalance(value: unknown): NeonButtonGradientBalancePreference {
+  return normalizeGradientSliderValue(value, defaultNeonButtonGradientBalance);
+}
+
+export function normalizeNeonButtonGradientMidpoint(value: unknown): NeonButtonGradientMidpointPreference {
+  return normalizeGradientSliderValue(value, defaultNeonButtonGradientMidpoint);
+}
+
+export function getNeonButtonGradientStops(
+  balance: NeonButtonGradientBalancePreference,
+  midpoint: NeonButtonGradientMidpointPreference = defaultNeonButtonGradientMidpoint,
+) {
   const normalizedBalance = normalizeNeonButtonGradientBalance(balance);
-  const gradientCenter = 85 - normalizedBalance * 0.7;
-  const primaryStop = Math.min(100, Math.max(0, Math.round(gradientCenter - 14)));
-  const secondaryStop = Math.min(100, Math.max(0, Math.round(gradientCenter + 14)));
+  const normalizedMidpoint = normalizeNeonButtonGradientMidpoint(midpoint);
+  const transitionCenter = 85 - normalizedBalance * 0.7 + (normalizedMidpoint - 50) * 0.16;
+  const transitionSpread = 2 + normalizedMidpoint * 0.36;
+  const startStop = Math.min(100, Math.max(0, Math.round(transitionCenter - transitionSpread / 2)));
+  const midStop = Math.min(100, Math.max(0, Math.round(transitionCenter)));
+  const endStop = Math.min(100, Math.max(0, Math.round(transitionCenter + transitionSpread / 2)));
 
   return {
-    primaryStop: `${primaryStop}%`,
-    secondaryStop: `${secondaryStop}%`,
+    startStop: `${startStop}%`,
+    midStop: `${midStop}%`,
+    endStop: `${endStop}%`,
   };
 }
 
@@ -222,6 +240,38 @@ export function saveNeonButtonGradientBalancePreference(balance: NeonButtonGradi
   void saveAccentColorPreferenceToNativeStorage(neonButtonGradientBalanceStorageKey, String(normalizedBalance));
 }
 
+export function loadNeonButtonGradientMidpointPreference(): NeonButtonGradientMidpointPreference {
+  if (typeof window === 'undefined') {
+    return defaultNeonButtonGradientMidpoint;
+  }
+
+  try {
+    return normalizeNeonButtonGradientMidpoint(window.localStorage.getItem(neonButtonGradientMidpointStorageKey));
+  } catch {
+    return defaultNeonButtonGradientMidpoint;
+  }
+}
+
+export function saveNeonButtonGradientMidpointPreference(midpoint: NeonButtonGradientMidpointPreference) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalizedMidpoint = normalizeNeonButtonGradientMidpoint(midpoint);
+
+  try {
+    if (normalizedMidpoint === defaultNeonButtonGradientMidpoint) {
+      window.localStorage.removeItem(neonButtonGradientMidpointStorageKey);
+    } else {
+      window.localStorage.setItem(neonButtonGradientMidpointStorageKey, String(normalizedMidpoint));
+    }
+  } catch {
+    // Gradient tuning should stay responsive even when storage is unavailable.
+  }
+
+  void saveAccentColorPreferenceToNativeStorage(neonButtonGradientMidpointStorageKey, String(normalizedMidpoint));
+}
+
 export function saveSecondaryAccentColorPreference(color: AccentColorPreference) {
   if (typeof window === 'undefined') {
     return;
@@ -261,6 +311,7 @@ export function getAccentColorThemeVariables(
   color: AccentColorPreference,
   secondaryColor: AccentColorPreference = null,
   neonButtonGradientBalance: NeonButtonGradientBalancePreference = defaultNeonButtonGradientBalance,
+  neonButtonGradientMidpoint: NeonButtonGradientMidpointPreference = defaultNeonButtonGradientMidpoint,
 ) {
   const primaryColor = color ?? defaultAccentColor;
   const primaryRgb = hexToRgb(primaryColor);
@@ -269,7 +320,8 @@ export function getAccentColorThemeVariables(
   const secondaryRgb = hexToRgb(secondaryResolvedColor);
   const secondaryRgbValue = `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`;
   const normalizedGradientBalance = normalizeNeonButtonGradientBalance(neonButtonGradientBalance);
-  const gradientStops = getNeonButtonGradientStops(normalizedGradientBalance);
+  const normalizedGradientMidpoint = normalizeNeonButtonGradientMidpoint(neonButtonGradientMidpoint);
+  const gradientStops = getNeonButtonGradientStops(normalizedGradientBalance, normalizedGradientMidpoint);
   const dominantButtonRgb = normalizedGradientBalance > 50 ? secondaryRgb : primaryRgb;
 
   return {
@@ -279,8 +331,10 @@ export function getAccentColorThemeVariables(
     '--qs-accent-primary-rgb': primaryRgbValue,
     '--qs-accent-secondary-rgb': secondaryRgbValue,
     '--qs-neon-button-gradient-balance': String(normalizedGradientBalance),
-    '--qs-neon-button-gradient-primary-stop': gradientStops.primaryStop,
-    '--qs-neon-button-gradient-secondary-stop': gradientStops.secondaryStop,
+    '--qs-neon-button-gradient-midpoint': String(normalizedGradientMidpoint),
+    '--qs-neon-button-gradient-start': gradientStops.startStop,
+    '--qs-neon-button-gradient-mid': gradientStops.midStop,
+    '--qs-neon-button-gradient-end': gradientStops.endStop,
     '--qs-neon-button-text': getReadableTextColor(dominantButtonRgb),
     '--accent-contrast': getReadableTextColor(primaryRgb),
     '--qs-glow-primary': `0 0 28px rgb(${primaryRgbValue} / 0.26)`,
@@ -292,12 +346,13 @@ export function applyAccentColorPreference(
   color: AccentColorPreference,
   secondaryColor: AccentColorPreference = null,
   neonButtonGradientBalance: NeonButtonGradientBalancePreference = defaultNeonButtonGradientBalance,
+  neonButtonGradientMidpoint: NeonButtonGradientMidpointPreference = defaultNeonButtonGradientMidpoint,
 ) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  const accentVariables = getAccentColorThemeVariables(color, secondaryColor, neonButtonGradientBalance);
+  const accentVariables = getAccentColorThemeVariables(color, secondaryColor, neonButtonGradientBalance, neonButtonGradientMidpoint);
   const themedRoots = [document.documentElement, ...Array.from(document.querySelectorAll<HTMLElement>('.qs-app-root'))];
 
   themedRoots.forEach((root) => {
@@ -309,6 +364,7 @@ export function applyAccentColorPreference(
   document.documentElement.dataset.accentColor = color ?? 'default';
   document.documentElement.dataset.secondaryAccentColor = secondaryColor ?? 'default';
   document.documentElement.dataset.neonButtonGradientBalance = String(normalizeNeonButtonGradientBalance(neonButtonGradientBalance));
+  document.documentElement.dataset.neonButtonGradientMidpoint = String(normalizeNeonButtonGradientMidpoint(neonButtonGradientMidpoint));
 }
 
 export function applyThemePreference(

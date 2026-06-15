@@ -48,8 +48,10 @@
   --qs-accent-primary-rgb: var(--accent-rgb);
   --qs-accent-secondary-rgb: 56 189 248;
   --qs-neon-button-gradient-balance: 50;
-  --qs-neon-button-gradient-primary-stop: 36%;
-  --qs-neon-button-gradient-secondary-stop: 64%;
+  --qs-neon-button-gradient-midpoint: 50;
+  --qs-neon-button-gradient-start: 36%;
+  --qs-neon-button-gradient-mid: 50%;
+  --qs-neon-button-gradient-end: 64%;
   --qs-neon-button-text: var(--accent-contrast);
   --qs-accent-primary: rgb(var(--qs-accent-primary-rgb));
   --qs-accent-secondary: rgb(var(--qs-accent-secondary-rgb));
@@ -2016,8 +2018,10 @@ textarea,
   --qs-accent-primary-rgb: 255 90 44;
   --qs-accent-secondary-rgb: 56 189 248;
   --qs-neon-button-gradient-balance: 50;
-  --qs-neon-button-gradient-primary-stop: 36%;
-  --qs-neon-button-gradient-secondary-stop: 64%;
+  --qs-neon-button-gradient-midpoint: 50;
+  --qs-neon-button-gradient-start: 36%;
+  --qs-neon-button-gradient-mid: 50%;
+  --qs-neon-button-gradient-end: 64%;
   --qs-neon-button-text: rgb(3 6 18);
   --accent-rgb: var(--qs-accent-primary-rgb);
   --skyglass-rgb: var(--qs-accent-secondary-rgb);
@@ -2062,7 +2066,7 @@ textarea,
   --qs-app-background: var(--body-background);
   --qs-panel-background: var(--surface-primary);
   --qs-card-background: linear-gradient(180deg, rgb(18 28 58 / 0.82), rgb(7 11 27 / 0.9));
-  --qs-neon-button-gradient: linear-gradient(135deg, rgb(var(--qs-accent-primary-rgb)) 0%, rgb(var(--qs-accent-primary-rgb)) var(--qs-neon-button-gradient-primary-stop), rgb(var(--qs-accent-secondary-rgb)) var(--qs-neon-button-gradient-secondary-stop), rgb(var(--qs-accent-secondary-rgb)) 100%);
+  --qs-neon-button-gradient: linear-gradient(135deg, rgb(var(--qs-accent-primary-rgb)) 0%, rgb(var(--qs-accent-primary-rgb)) var(--qs-neon-button-gradient-start), color-mix(in srgb, rgb(var(--qs-accent-primary-rgb)) 50%, rgb(var(--qs-accent-secondary-rgb))) var(--qs-neon-button-gradient-mid), rgb(var(--qs-accent-secondary-rgb)) var(--qs-neon-button-gradient-end), rgb(var(--qs-accent-secondary-rgb)) 100%);
   --qs-surface: var(--surface-primary);
   --qs-surface-muted: var(--surface-secondary);
   --qs-text: var(--text-primary);
@@ -2320,7 +2324,7 @@ textarea,
 }
 
 .qs-neon-preview-button {
-  background: linear-gradient(135deg, var(--preview-primary) 0%, var(--preview-primary) var(--preview-button-gradient-primary-stop, 36%), var(--preview-secondary) var(--preview-button-gradient-secondary-stop, 64%), var(--preview-secondary) 100%);
+  background: linear-gradient(135deg, var(--preview-primary) 0%, var(--preview-primary) var(--preview-button-gradient-start, 36%), color-mix(in srgb, var(--preview-primary) 50%, var(--preview-secondary)) var(--preview-button-gradient-mid, 50%), var(--preview-secondary) var(--preview-button-gradient-end, 64%), var(--preview-secondary) 100%);
   color: var(--qs-neon-button-text, rgb(15 23 42));
   box-shadow: 0 0 22px color-mix(in srgb, var(--preview-primary) 28%, transparent), 0 10px 24px rgb(0 0 0 / 0.22);
 }

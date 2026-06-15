@@ -18,6 +18,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.accentColor.v1'
   | 'questshelf.secondaryAccentColor.v1'
   | 'questshelf.neonButtonGradientBalance.v1'
+  | 'questshelf.neonButtonGradientMidpoint.v1'
   | 'questshelf.appTemplate.v1'
   | 'questshelf.appPersonalization.v1'
   | 'questshelf.shelfIdentity.v1'
@@ -166,6 +167,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     backup: 'never',
     key: 'questshelf.neonButtonGradientBalance.v1',
     purpose: 'Custom Neon CTA/button gradient primary-secondary balance.',
+    scope: 'ui',
+    schema: 'Integer 0-100, default 50 when absent.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.neonButtonGradientMidpoint.v1',
+    purpose: 'Custom Neon CTA/button gradient transition midpoint/spread.',
     scope: 'ui',
     schema: 'Integer 0-100, default 50 when absent.',
   },
