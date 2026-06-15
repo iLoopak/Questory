@@ -29,6 +29,7 @@ type ReviewModePanelProps = {
   ignoredGameIds: Set<string>;
   queuePlatforms: GamePlatform[];
   queueState?: PlatformQueueState;
+  refreshingMetadataGameIds: Set<string>;
   source: ReviewSource;
   onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) => void;
   onAddPlatform: (platform: GamePlatform) => void;
@@ -111,6 +112,7 @@ export function ReviewModePanel({
   ignoredGameIds,
   queuePlatforms,
   queueState,
+  refreshingMetadataGameIds,
   source,
   onAction,
   onAddPlatform,
@@ -152,6 +154,7 @@ export function ReviewModePanel({
   }, [processedGameIds, sourceGames]);
 
   const activeGame = reviewQueue[0] ?? null;
+  const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = sourceGames.length - reviewQueue.length;
   const totalCount = sourceGames.length;
@@ -456,6 +459,7 @@ export function ReviewModePanel({
               queueButtonRef={queueButtonRef}
               queuePlatforms={queuePlatforms}
               queueState={queueState}
+              isRefreshingMetadata={isRefreshingCurrentGame}
             />
           ) : (
             <ReviewComplete
@@ -500,6 +504,7 @@ function FocusedReviewCard({
   queueButtonRef,
   queuePlatforms,
   queueState,
+  isRefreshingMetadata,
 }: {
   game: Game;
   hasGamepad: boolean;
@@ -514,6 +519,7 @@ function FocusedReviewCard({
   queueButtonRef: RefObject<HTMLButtonElement | null>;
   queuePlatforms: GamePlatform[];
   queueState?: PlatformQueueState;
+  isRefreshingMetadata: boolean;
 }) {
   const { t } = useI18n();
   const coverSources = getGameCoverSources(game);
@@ -760,23 +766,25 @@ function FocusedReviewCard({
             </span>
           </button>
           <button
-            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint"
+            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint disabled:cursor-wait disabled:opacity-70"
+            disabled={isRefreshingMetadata}
             onClick={() => onAction('enrich')}
             type="button"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               <Icon name="refresh-cw" />
-              <span>Enrich metadata</span>
+              <span>{isRefreshingMetadata ? 'Enriching…' : 'Enrich metadata'}</span>
             </span>
           </button>
           <button
-            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint"
+            className="min-h-11 rounded-xl border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus-visible:border-mint disabled:cursor-wait disabled:opacity-70"
+            disabled={isRefreshingMetadata}
             onClick={() => onAction('find-artwork')}
             type="button"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               <Icon name="image" />
-              <span>Find Artwork</span>
+              <span>{isRefreshingMetadata ? 'Searching artwork…' : 'Find Artwork'}</span>
             </span>
           </button>
         </div>
