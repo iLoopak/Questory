@@ -158,7 +158,6 @@ export function useReviewModeActions({
       updateGameReviewFields(game.id, {
         notes: appendReviewNote(game.notes, note),
       });
-      recordReviewDecision('reviewed');
       return;
     }
 
