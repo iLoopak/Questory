@@ -210,7 +210,7 @@ export function AppController() {
     targetQueuePlatform,
   } = usePlatformQueueController(games);
   const {
-    computedFeaturedGame,
+    resolvedFeaturedGame,
     isShelfProfileOpen,
     libraryOwnerNickname,
     personalizedQuestShelfTitle,
@@ -1414,7 +1414,7 @@ export function AppController() {
               <ShelfProfilePopover
                 activeAchievement={activeShelfAchievement}
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
-                featuredGame={computedFeaturedGame}
+                featuredGame={resolvedFeaturedGame}
                 onOpenPersonalization={openSettingsFromShelfProfile}
                 onOpenPlayingNow={openPlayingNowHubFromShelfProfile}
                 playingNowGame={playingNowGame}
@@ -1505,7 +1505,7 @@ export function AppController() {
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
               shelfTitle={computedShelfTitle}
-              featuredGame={computedFeaturedGame}
+              featuredGame={resolvedFeaturedGame}
               avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" />}
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
@@ -1667,7 +1667,7 @@ export function AppController() {
             <RecommendationPanel
               games={games}
               queueState={platformQueueState}
-              featuredGame={computedFeaturedGame}
+              featuredGame={resolvedFeaturedGame}
               activeAchievement={activeShelfAchievement}
               onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
               shelfTitle={computedShelfTitle}
@@ -3616,6 +3616,7 @@ function SettingsPanel({
               <PersonalizationSettingsPanel
                 personalizedQuestShelfTitle={personalizedQuestShelfTitle}
                 shelfIdentity={shelfIdentity}
+                games={games}
                 achievements={questShelfAchievements}
                 activeAchievementTitle={activeAchievementTitle}
                 steamAvatarUrl={steamAvatarUrl}

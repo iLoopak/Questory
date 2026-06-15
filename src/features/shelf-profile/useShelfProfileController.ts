@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatPersonalizedQuestShelfTitle, getPersonalizedQuestShelfTitle, loadAppPersonalizationSettings, sanitizeLibraryOwnerNickname, saveAppPersonalizationSettings } from '../../lib/appPersonalization';
-import { getComputedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
+import { getResolvedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
 import type { Game } from '../../types/game';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 
@@ -13,7 +13,7 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
   const legacyQuestShelfTitle = useMemo(() => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName), [libraryOwnerNickname, steamProfileName]);
   const personalizedQuestShelfTitle = useMemo(() => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle), [legacyQuestShelfTitle, shelfIdentity.shelfName]);
   const formattedPersonalizedQuestShelfTitle = useMemo(() => formatPersonalizedQuestShelfTitle(personalizedQuestShelfTitle), [personalizedQuestShelfTitle]);
-  const computedFeaturedGame = useMemo(() => getComputedFeaturedGame(games), [games]);
+  const resolvedFeaturedGame = useMemo(() => getResolvedFeaturedGame(games, shelfIdentity), [games, shelfIdentity]);
   const playingNowGame = useMemo(() => games.find((game) => game.collectionType === 'library' && game.status === 'Playing') ?? null, [games]);
   const shelfOverview = useMemo(() => ({
     games: games.filter((game) => game.collectionType === 'library').length,
@@ -39,5 +39,5 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
     return () => { document.removeEventListener('pointerdown', handlePointerDown); document.removeEventListener('keydown', handleKeyDown); };
   }, [isShelfProfileOpen]);
 
-  return { computedFeaturedGame, formattedPersonalizedQuestShelfTitle, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, playingNowGame, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
+  return { resolvedFeaturedGame, formattedPersonalizedQuestShelfTitle, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, playingNowGame, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
 }
