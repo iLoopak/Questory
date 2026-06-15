@@ -212,10 +212,12 @@ function App() {
     accentColorPreference,
     accentThemeStyle,
     appTemplatePreference,
+    neonButtonGradientBalancePreference,
     resolvedTheme,
     secondaryAccentColorPreference,
     setAccentColorPreference,
     setAppTemplatePreference,
+    setNeonButtonGradientBalancePreference,
     setSecondaryAccentColorPreference,
     setThemePreference,
     themePreference,
@@ -1825,6 +1827,7 @@ function App() {
               appTemplatePreference={appTemplatePreference}
               accentColorPreference={accentColorPreference}
               secondaryAccentColorPreference={secondaryAccentColorPreference}
+              neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
               language={language}
               navigationVisibility={navigationVisibility}
               platformQueueState={platformQueueState}
@@ -1864,6 +1867,7 @@ function App() {
               onAppTemplatePreferenceChange={setAppTemplatePreference}
               onAccentColorChange={setAccentColorPreference}
               onSecondaryAccentColorChange={setSecondaryAccentColorPreference}
+              onNeonButtonGradientBalanceChange={setNeonButtonGradientBalancePreference}
               onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
@@ -3243,6 +3247,7 @@ type SettingsPanelProps = {
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   secondaryAccentColorPreference: AccentColorPreference;
+  neonButtonGradientBalancePreference: number;
   language: AppLanguage;
   navigationVisibility: NavigationVisibilityPreferences;
   platformQueueState: PlatformQueueState;
@@ -3276,6 +3281,7 @@ type SettingsPanelProps = {
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
   onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
+  onNeonButtonGradientBalanceChange: (balance: number) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
@@ -3313,6 +3319,7 @@ function SettingsPanel({
   appTemplatePreference,
   accentColorPreference,
   secondaryAccentColorPreference,
+  neonButtonGradientBalancePreference,
   language,
   navigationVisibility,
   platformQueueState,
@@ -3347,6 +3354,7 @@ function SettingsPanel({
   onAccentColorChange,
   onSecondaryAccentColorChange,
   onLanguageChange,
+  onNeonButtonGradientBalanceChange,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
@@ -3522,6 +3530,7 @@ function SettingsPanel({
                 appTemplatePreference={appTemplatePreference}
                 accentColorPreference={accentColorPreference}
                 secondaryAccentColorPreference={secondaryAccentColorPreference}
+                neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
                 language={language}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
@@ -3530,6 +3539,7 @@ function SettingsPanel({
                 onAppTemplatePreferenceChange={onAppTemplatePreferenceChange}
                 onAccentColorChange={onAccentColorChange}
                 onSecondaryAccentColorChange={onSecondaryAccentColorChange}
+                onNeonButtonGradientBalanceChange={onNeonButtonGradientBalanceChange}
                 onLanguageChange={onLanguageChange}
               />
             </div>

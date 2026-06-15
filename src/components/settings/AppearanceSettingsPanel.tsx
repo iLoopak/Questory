@@ -8,7 +8,9 @@ import { getRuntimeEnvironment } from "../../lib/capacitorEnvironment";
 import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPreferences";
 import {
   defaultAccentColor,
+  defaultNeonButtonGradientBalance,
   defaultSecondaryAccentColor,
+  getNeonButtonGradientStops,
   normalizeAccentColor,
   type AccentColorPreference,
   type AppTemplatePreference,
@@ -27,6 +29,7 @@ export function AppearanceSettingsPanel({
   appTemplatePreference,
   accentColorPreference,
   secondaryAccentColorPreference,
+  neonButtonGradientBalancePreference,
   language,
   onControllerDebugChange,
   onControllerLayoutChange,
@@ -35,6 +38,7 @@ export function AppearanceSettingsPanel({
   onAppTemplatePreferenceChange,
   onAccentColorChange,
   onSecondaryAccentColorChange,
+  onNeonButtonGradientBalanceChange,
   onLanguageChange,
 }: {
   controllerLayoutPreference: ControllerLayoutPreference;
@@ -46,6 +50,7 @@ export function AppearanceSettingsPanel({
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   secondaryAccentColorPreference: AccentColorPreference;
+  neonButtonGradientBalancePreference: number;
   language: AppLanguage;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
@@ -54,6 +59,7 @@ export function AppearanceSettingsPanel({
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
   onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
+  onNeonButtonGradientBalanceChange: (balance: number) => void;
   onLanguageChange: (language: AppLanguage) => void;
 }) {
   const t = useMemo(() => createTranslator(language), [language]);
@@ -103,6 +109,7 @@ export function AppearanceSettingsPanel({
     secondaryAccentColorPreference ?? defaultSecondaryAccentColor;
   const isDefaultAccentColor = accentColorPreference === null;
   const isDefaultSecondaryAccentColor = secondaryAccentColorPreference === null;
+  const neonButtonGradientStops = getNeonButtonGradientStops(neonButtonGradientBalancePreference);
   const accentColorPresets = [
     { color: defaultAccentColor, label: t("settings.defaultAccentColor") },
     { color: "#1b75d0", label: "Steam blue" },
@@ -153,6 +160,7 @@ export function AppearanceSettingsPanel({
           ? null
           : normalizedSecondary
       );
+      onNeonButtonGradientBalanceChange(defaultNeonButtonGradientBalance);
     }
   };
 
@@ -367,6 +375,8 @@ export function AppearanceSettingsPanel({
                   {
                     "--preview-primary": selectedAccentColor,
                     "--preview-secondary": selectedSecondaryAccentColor,
+                    "--preview-button-gradient-primary-stop": neonButtonGradientStops.primaryStop,
+                    "--preview-button-gradient-secondary-stop": neonButtonGradientStops.secondaryStop,
                   } as CSSProperties
                 }
               >
@@ -436,6 +446,37 @@ export function AppearanceSettingsPanel({
               </label>
             </div>
 
+
+            <label className="mt-4 block rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
+              <span className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="font-semibold text-white">Button gradient balance</span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Shift Neon CTA buttons toward the primary or secondary accent without changing card glows.
+                  </span>
+                </span>
+                <span className="font-mono text-xs text-slate-400">
+                  {neonButtonGradientBalancePreference}
+                </span>
+              </span>
+              <input
+                aria-label="Button gradient balance"
+                className="accent-mint mt-4 w-full"
+                max={100}
+                min={0}
+                onChange={(event) =>
+                  onNeonButtonGradientBalanceChange(Number(event.target.value))
+                }
+                type="range"
+                value={neonButtonGradientBalancePreference}
+              />
+              <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <span>Primary</span>
+                <span>Balanced</span>
+                <span>Secondary</span>
+              </span>
+            </label>
+
             <div className="mt-4">
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Neon preset pairs
@@ -486,6 +527,7 @@ export function AppearanceSettingsPanel({
                 onClick={() => {
                   onAccentColorChange(null);
                   onSecondaryAccentColorChange(null);
+                  onNeonButtonGradientBalanceChange(defaultNeonButtonGradientBalance);
                 }}
                 type="button"
               >
