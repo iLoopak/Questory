@@ -69,7 +69,7 @@ const positiveActions: Array<{
   label: string;
   tone: 'accent' | 'neutral';
 }> = [
-  { action: 'queue', hint: 'primary', icon: 'list-plus', label: 'Add to Platforms', tone: 'accent' },
+  { action: 'queue', hint: 'primary', icon: 'list-plus', label: 'Add to Platform Plans', tone: 'accent' },
   { action: 'playing', hint: 'topFace', icon: 'gamepad-2', label: 'Playing Now', tone: 'accent' },
   { action: 'wishlist', hint: 'leftFace', icon: 'heart', label: 'Wishlist', tone: 'neutral' },
   { action: 'finished', hint: '', icon: 'trophy', label: 'Finished', tone: 'neutral' },
@@ -711,7 +711,7 @@ function FocusedReviewCard({
 
       <section
         className={`qs-review-hero qs-review-swipe-card flex flex-col items-center ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
-        aria-label={`${game.title} Quest Queue card. Drag left and up to Skip, left and down to Drop, right and up to Finished, or right and down to Add to Platforms.`}
+        aria-label={`${game.title} Quest Queue card. Drag left and up to Skip, left and down to Drop, right and up to Finished, or right and down to Add to Platform Plans.`}
         onPointerCancel={cancelSwipe}
         onPointerDown={beginSwipe}
         onPointerMove={updateSwipe}
@@ -1001,7 +1001,7 @@ function ReviewComplete({
             onClick={onOpenQueue}
             type="button"
           >
-            Open Platforms
+            Open Platform Plans
           </button>
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"

@@ -7,7 +7,7 @@ export type ToastActionKind = 'dismiss' | 'open-queue' | 'open-steam-settings' |
 export type ToastAction = {
   gameId?: string;
   kind: ToastActionKind;
-  label: 'Dismiss' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game';
+  label: 'Dismiss' | 'Open Platform Plans' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game';
 };
 
 export type NotificationDraft = {
@@ -84,7 +84,7 @@ export function getBulkWishlistToastMessage(count: number, game?: Pick<Game, 'ti
 }
 
 export function getQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `${formatToastGameTitle(game.title)} added to Platforms`;
+  return `${formatToastGameTitle(game.title)} added to Platform Plans`;
 }
 
 export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
@@ -92,7 +92,7 @@ export function getMoveQueueToastMessage(game: Pick<Game, 'title'>, platform: Ga
 }
 
 export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: GamePlatform) {
-  return `${formatToastGameTitle(game.title)} removed from Platforms`;
+  return `${formatToastGameTitle(game.title)} removed from Platform Plans`;
 }
 
 export function getViewGameAction(gameId: string): ToastAction {
@@ -100,7 +100,7 @@ export function getViewGameAction(gameId: string): ToastAction {
 }
 
 export function getOpenQueueAction(): ToastAction {
-  return { kind: 'open-queue', label: 'Open Platforms' };
+  return { kind: 'open-queue', label: 'Open Platform Plans' };
 }
 
 export function getOpenSteamSettingsAction(): ToastAction {

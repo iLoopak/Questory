@@ -75,7 +75,7 @@ export function QueuePlatformsSettingsPanel({
           </h2>
           <p className="mt-1 text-sm text-slate-400">
             Supported platforms remain available for imports and metadata.
-            Active platforms are the only ones shown in Platforms.
+            Active platforms are the only ones shown in Platform Plans.
           </p>
         </div>
         <div className="rounded-md border border-mint/20 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint">
@@ -374,8 +374,8 @@ function QueuePlatformManagementRow({
         </div>
         <div className="text-xs text-slate-500">
           {isActive
-            ? "Shown in Platforms"
-            : "Hidden from Platforms but available for imports/metadata"}
+            ? "Shown in Platform Plans"
+            : "Hidden from Platform Plans but available for imports/metadata"}
         </div>
         {artworkUrl ? (
           <div className="mt-2 h-12 overflow-hidden rounded border border-white/10">

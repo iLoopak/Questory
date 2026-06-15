@@ -183,7 +183,7 @@ function getLocalizedToastActionLabel(label: ToastAction['label'], t: ReturnType
     return t('app.dismiss');
   }
 
-  if (label === 'Open Platforms') {
+  if (label === 'Open Platform Plans' || label === 'Open Platforms') {
     return t('app.openPlatforms');
   }
 
