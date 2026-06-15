@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
-import { useEffect, useMemo, useRef, useState } from 'react';
+
 import type { FormEvent, ReactNode } from 'react';
 import { ArtworkAuditPanel } from '../../components/ArtworkAuditPanel';
 import { BackToTopButton } from '../../components/BackToTopButton';
@@ -16,6 +17,7 @@ import { HomePanel } from '../../components/HomePanel';
 import { MetadataEnrichmentPanel } from '../../components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from '../../components/OnboardingChecklist';
 import { ShelfAvatar } from '../../components/ShelfIdentity';
+import { ShelfProfilePopover } from '../shelf-profile/ShelfProfilePopover';
 import { PwaStatusBanner } from '../../components/PwaStatusBanner';
 import { QueuePanel } from '../../components/QueuePanel';
 import { IsThereAnyDealSettingsPanel } from '../../components/IsThereAnyDealSettingsPanel';
@@ -56,13 +58,26 @@ import {
   type QuickFilter,
   type SourceFilter,
 } from '../../config/collection';
-import {
-  initialItadDealSyncState,
-  initialSteamAchievementSyncState,
-  initialSteamPlaytimeRefreshState,
-  initialSteamWishlistSyncState,
-  type ItadDealSyncState,
-} from '../../config/syncStates';
+import { I18nProvider, createTranslator, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from '../../i18n';
+import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
+import { loadGames, saveGames } from '../../lib/gameStorage';
+import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
+import { loadLanguagePreference } from '../../lib/languagePreference';
+import type { ShelfIdentitySettings } from '../../lib/shelfIdentity';
+import type { ControllerLayoutPreference } from '../../lib/controllerLayoutPreferences';
+import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
+import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
+import { saveOnboardingState, onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
+import type { ItadDealSyncState } from '../../config/syncStates';
+import { savePlatformQueueState, type PlatformQueueState } from '../../lib/platformQueueStorage';
+import { loadIsThereAnyDealSettings } from '../../lib/isThereAnyDealSettingsStorage';
+import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
+import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
+import { IsThereAnyDealError, syncItadDealsForWishlistGames } from '../../lib/isThereAnyDeal';
+import { syncHltbForGames, type HltbSyncSummary } from '../../lib/hltb';
+import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from '../../lib/steamAchievementsSync';
+import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from '../../lib/steamPlaytimeRefresh';
+import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
 import {
   didSteamAchievementSyncSucceed,
   didSteamPlaytimeSyncSucceed,
@@ -75,54 +90,8 @@ import {
   type BulkActionSummary,
   type SteamWishlistHtmlImportSummary,
 } from '../../utils/summaryFormatters';
-import {
-  getActiveAdvancedFilterCount,
-  getActiveFilterCount,
-  isCollectionFiltered,
-  parseTagInput,
-} from '../../utils/gameFilters';
+import { getActiveAdvancedFilterCount, getActiveFilterCount, isCollectionFiltered, parseTagInput } from '../../utils/gameFilters';
 import { filterGames, getVisibleCollectionGames } from '../../utils/collectionFilters';
-import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
-import { I18nProvider, createTranslator, useI18n, translateOption, translateSettingsCategory, type AppLanguage } from '../../i18n';
-import { loadLanguagePreference, saveLanguagePreference } from '../../lib/languagePreference';
-import {
-  formatPersonalizedQuestShelfTitle,
-  getPersonalizedQuestShelfTitle,
-  loadAppPersonalizationSettings,
-  sanitizeLibraryOwnerNickname,
-  saveAppPersonalizationSettings,
-} from '../../lib/appPersonalization';
-import { getComputedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
-import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
-import { loadControllerDebugEnabled, saveControllerDebugEnabled } from '../../lib/androidGamepadShortcuts';
-import { isMockGame, loadGames, saveGames } from '../../lib/gameStorage';
-import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
-import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
-import { loadControllerLayoutPreference, saveControllerLayoutPreference, type ControllerLayoutPreference } from '../../lib/controllerLayoutPreferences';
-import { loadLandscapeLockPreference, saveLandscapeLockPreference } from '../../lib/landscapePreference';
-import {
-  loadOnboardingState,
-  onboardingItemIds,
-  saveOnboardingState,
-  type OnboardingItemId,
-  type OnboardingState,
-} from '../../lib/onboardingStorage';
-import {
-  getActiveQueuePlatforms,
-  getQueuePlatforms,
-  getQueueSummary,
-  loadPlatformQueueState,
-  savePlatformQueueState,
-  type PlatformQueueState,
-} from '../../lib/platformQueueStorage';
-import { loadIsThereAnyDealSettings } from '../../lib/isThereAnyDealSettingsStorage';
-import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
-import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
-import { IsThereAnyDealError, syncItadDealsForWishlistGames } from '../../lib/isThereAnyDeal';
-import { syncHltbForGames, type HltbSyncSummary } from '../../lib/hltb';
-import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from '../../lib/steamAchievementsSync';
-import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from '../../lib/steamPlaytimeRefresh';
-import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
 import {
   formatGameToastMessage,
   getDismissAction,
@@ -133,34 +102,15 @@ import {
   getUndoAction,
   getViewGameAction,
 } from '../../lib/notifications';
-import {
-  loadReviewModeState,
-  type ReviewModeState,
-  type ReviewSource,
-} from '../../lib/reviewModeStorage';
-import {
-  getAppTemplateClassName,
-  type AccentColorPreference,
-  type AppTemplatePreference,
-  type ResolvedTheme,
-  type ThemePreference,
-} from '../../lib/themePreferences';
+import { loadReviewModeState, type ReviewModeState, type ReviewSource } from '../../lib/reviewModeStorage';
+import { getAppTemplateClassName, type AccentColorPreference, type AppTemplatePreference, type ResolvedTheme, type ThemePreference } from '../../lib/themePreferences';
 import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibilityPreferences';
-import {
-  type UndoActionHistoryEntry,
-} from '../../lib/undoHistoryStorage';
-import {
-  addIgnoredSteamGame,
-  loadIgnoredSteamGames,
-  removeIgnoredSteamGame,
-  saveIgnoredSteamGames,
-  type IgnoredSteamGame,
-} from '../../lib/steamIgnoredGamesStorage';
+import { type UndoActionHistoryEntry } from '../../lib/undoHistoryStorage';
+import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, saveIgnoredSteamGames, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
 import { getOwnedGames, getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamApiError, SteamWishlistError } from '../../services/steamApi';
 import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from '../../types/game';
 import { gamePlatforms, gameStatuses, wishlistPriorities } from '../../types/game';
 import type { SteamAchievementSyncState, SteamAchievementSyncSummary, SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from '../../types/steam';
-import { useAppAppearance } from '../../hooks/useAppAppearance';
 import { useNavigationState } from '../navigation/useNavigationState';
 import { useCollectionViewMode } from '../../hooks/useCollectionUiState';
 import { useCollectionFilters } from '../collection/useCollectionFilters';
@@ -168,8 +118,13 @@ import { useGameSelection } from '../../hooks/useGameSelection';
 import { useToastState } from '../toasts/useToastState';
 import { useQueueActions } from '../../hooks/useQueueActions';
 import { useGameLibraryActions } from '../../hooks/useGameLibraryActions';
-import { useMetadataArtworkActions, type MetadataSelectionRequest } from '../../hooks/useMetadataArtworkActions';
 import { useReviewModeActions } from '../../hooks/useReviewModeActions';
+import { useOnboardingController } from '../onboarding/useOnboardingController';
+import { useShelfProfileController } from '../shelf-profile/useShelfProfileController';
+import { usePlatformQueueController } from '../queue/usePlatformQueueController';
+import { useAppPreferencesController } from '../settings/useAppPreferencesController';
+import { useSyncController } from '../integrations/useSyncController';
+import { useMetadataController } from '../metadata/useMetadataController';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
@@ -200,132 +155,33 @@ export function AppController() {
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
-  const [isLandscapeLockEnabled, setIsLandscapeLockEnabled] = useState(() => loadLandscapeLockPreference());
-  const [language, setLanguage] = useState<AppLanguage>(() => loadLanguagePreference());
-  const [libraryOwnerNickname, setLibraryOwnerNicknameState] = useState(() => loadAppPersonalizationSettings().libraryOwnerNickname);
-  const [shelfIdentity, setShelfIdentityState] = useState<ShelfIdentitySettings>(() => loadShelfIdentitySettings());
   const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
   const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(steamSettingsSnapshot));
-  const [isControllerDebugEnabled, setIsControllerDebugEnabled] = useState(() => loadControllerDebugEnabled());
-  const [controllerLayoutPreference, setControllerLayoutPreference] = useState<ControllerLayoutPreference>(() => loadControllerLayoutPreference());
   const {
     accentColorPreference,
     accentThemeStyle,
     appTemplatePreference,
+    controllerLayoutPreference,
+    isControllerDebugEnabled,
+    isLandscapeLockEnabled,
+    language,
     neonButtonGradientBalancePreference,
     neonButtonGradientMidpointPreference,
     resolvedTheme,
     secondaryAccentColorPreference,
     setAccentColorPreference,
     setAppTemplatePreference,
+    setControllerLayoutPreference,
+    setIsControllerDebugEnabled,
+    setIsLandscapeLockEnabled,
+    setLanguage,
     setNeonButtonGradientBalancePreference,
     setNeonButtonGradientMidpointPreference,
     setSecondaryAccentColorPreference,
     setThemePreference,
+    t,
     themePreference,
-  } = useAppAppearance();
-  const legacyQuestShelfTitle = useMemo(
-    () => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName),
-    [libraryOwnerNickname, steamProfileName],
-  );
-  const personalizedQuestShelfTitle = useMemo(
-    () => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle),
-    [legacyQuestShelfTitle, shelfIdentity.shelfName],
-  );
-  const computedFeaturedGame = useMemo(() => getComputedFeaturedGame(games), [games]);
-  const playingNowGame = useMemo(() => games.find((game) => game.collectionType === 'library' && game.status === 'Playing') ?? null, [games]);
-  const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
-  const [isShelfProfileOpen, setIsShelfProfileOpen] = useState(false);
-  const shelfProfileRef = useRef<HTMLDivElement | null>(null);
-
-  function setShelfIdentity(value: ShelfIdentitySettings) {
-    setShelfIdentityState(value);
-    saveShelfIdentitySettings(value);
-  }
-
-  useEffect(() => {
-    document.title = personalizedQuestShelfTitle;
-  }, [personalizedQuestShelfTitle]);
-
-  useEffect(() => {
-    if (!isShelfProfileOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!shelfProfileRef.current?.contains(event.target as Node)) {
-        setIsShelfProfileOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsShelfProfileOpen(false);
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isShelfProfileOpen]);
-
-  function handleSteamProfileNameChange(profileName: string) {
-    setSteamProfileName(profileName);
-    setSteamSettingsSnapshot(loadSteamSettings());
-  }
-
-  function setLibraryOwnerNickname(value: string) {
-    const libraryOwnerNickname = sanitizeLibraryOwnerNickname(value);
-    setLibraryOwnerNicknameState(libraryOwnerNickname);
-    saveAppPersonalizationSettings({ libraryOwnerNickname });
-  }
-
-  const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
-  const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
-  const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
-  const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
-  const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
-  const shelfOverview = useMemo(
-    () => ({
-      games: games.filter((game) => game.collectionType === 'library').length,
-      platforms: platformQueueState.activePlatforms.length,
-      playing: games.filter((game) => game.collectionType === 'library' && game.status === 'Playing').length,
-      queue: platformQueueState.entries.length,
-    }),
-    [games, platformQueueState.activePlatforms.length, platformQueueState.entries.length],
-  );
-  const questShelfAchievements = useMemo(() => getQuestShelfAchievements(games, platformQueueState), [games, platformQueueState]);
-  const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
-  const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
-  const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
-  const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
-    const initialState = loadOnboardingState();
-    const hasExistingLibrary = loadGames().some((game) => !isMockGame(game));
-    const steamSettings = loadSteamSettings();
-    const hasExistingSettings = Boolean(steamSettings.apiKey.trim() || steamSettings.steamId64.trim());
-    return !initialState.hasSeenChecklist && !initialState.skipped && !hasExistingLibrary && !hasExistingSettings;
-  });
-  const [metadataSelectionRequest, setMetadataSelectionRequest] = useState<MetadataSelectionRequest | null>(null);
-  const [steamWishlistSyncState, setSteamWishlistSyncState] = useState<SteamWishlistSyncState>(
-    initialSteamWishlistSyncState,
-  );
-  const [steamAchievementSyncState, setSteamAchievementSyncState] = useState<SteamAchievementSyncState>(
-    initialSteamAchievementSyncState,
-  );
-  const [steamPlaytimeRefreshState, setSteamPlaytimeRefreshState] = useState<SteamPlaytimeRefreshState>(
-    initialSteamPlaytimeRefreshState,
-  );
-  const [itadDealSyncState, setItadDealSyncState] = useState<ItadDealSyncState>(initialItadDealSyncState);
-  const [isHltbSyncing, setIsHltbSyncing] = useState(false);
-  const [refreshingMetadataGameIds, setRefreshingMetadataGameIds] = useState<Set<string>>(new Set());
-  const isAppMountedRef = useRef(true);
-  const t = useMemo(() => createTranslator(language), [language]);
+  } = useAppPreferencesController();
   const {
     activeNavItem,
     activeSettingsCategory,
@@ -335,6 +191,73 @@ export function AppController() {
     setNavigationVisibility,
     visibleNavItems,
   } = useNavigationState({ onSectionChange: () => setSelectedGameId(null) });
+  const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
+  const {
+    activeQueuePlatforms,
+    backlogPickerGame,
+    openBacklogPicker,
+    platformQueueState,
+    queuePlatforms,
+    queueSummary,
+    setBacklogPickerGame,
+    setPlatformQueueState,
+    setTargetQueuePlatform,
+    targetQueuePlatform,
+  } = usePlatformQueueController(games);
+  const {
+    computedFeaturedGame,
+    isShelfProfileOpen,
+    libraryOwnerNickname,
+    personalizedQuestShelfTitle,
+    playingNowGame,
+    setIsShelfProfileOpen,
+    setLibraryOwnerNickname,
+    setShelfIdentity,
+    shelfIdentity,
+    shelfOverview,
+    shelfProfileRef,
+  } = useShelfProfileController(games, platformQueueState, steamProfileName);
+  const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
+  const {
+    completedOnboardingItemIds,
+    finishedOnboardingItemIds,
+    handleOnboardingAction,
+    hideOnboarding,
+    isOnboardingComplete,
+    isOnboardingOpen,
+    markOnboardingItemComplete,
+    markOnboardingItemsComplete,
+    onboardingState,
+    openOnboarding,
+    restartOnboarding,
+    skipOnboardingItem,
+    skippedOnboardingItemIds,
+  } = useOnboardingController({ setActiveNavItem, setActiveSettingsCategory, setIsAddGameOpen, setSelectedGameId });
+  const {
+    isHltbSyncing,
+    itadDealSyncState,
+    setIsHltbSyncing,
+    setItadDealSyncState,
+    setSteamAchievementSyncState,
+    setSteamPlaytimeRefreshState,
+    setSteamWishlistSyncState,
+    steamAchievementSyncState,
+    steamPlaytimeRefreshState,
+    steamWishlistSyncState,
+  } = useSyncController();
+
+  function handleSteamProfileNameChange(profileName: string) {
+    setSteamProfileName(profileName);
+    setSteamSettingsSnapshot(loadSteamSettings());
+  }
+
+  const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
+  const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
+  const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
+  const questShelfAchievements = useMemo(() => getQuestShelfAchievements(games, platformQueueState), [games, platformQueueState]);
+  const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
+  const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
+  const isAppMountedRef = useRef(true);
   const { addToastNotification, addUndoAction, createUndoSnapshot, dismissUndoAction, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,
@@ -372,20 +295,19 @@ export function AppController() {
   });
 
   const {
+    metadataSelectionRequest,
+    refreshingMetadataGameIds,
     refreshGameMetadataFromActions,
     startMetadataWorkflow,
     updateGameArtwork,
     updateGameMetadata,
     updateGameMetadataManagement,
-  } = useMetadataArtworkActions({
+  } = useMetadataController({
     addToastNotification,
     games,
     markOnboardingItemComplete,
-    refreshingMetadataGameIds,
     setActiveNavItem,
     setGames,
-    setMetadataSelectionRequest,
-    setRefreshingMetadataGameIds,
     setSelectedGameId,
     t,
   });
@@ -412,10 +334,6 @@ export function AppController() {
   useEffect(() => {
     saveIgnoredSteamGames(ignoredSteamGames);
   }, [ignoredSteamGames]);
-
-  useEffect(() => {
-    saveLanguagePreference(language);
-  }, [language]);
 
   useEffect(() => {
     saveOnboardingState(onboardingState);
@@ -482,20 +400,7 @@ export function AppController() {
       }),
     [games, ignoredSteamGames],
   );
-  const completedOnboardingItemIds = useMemo(() => {
-    return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId])));
-  }, [onboardingState.completedAt]);
-  const skippedOnboardingItemIds = useMemo(() => {
-    return new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.skippedAt[itemId])));
-  }, [onboardingState.skippedAt]);
-  const finishedOnboardingItemIds = useMemo(() => {
-    return new Set(onboardingItemIds.filter((itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId)));
-  }, [completedOnboardingItemIds, skippedOnboardingItemIds]);
-  const isOnboardingComplete = finishedOnboardingItemIds.size === onboardingItemIds.length;
   const reviewIgnoredGameIds = useMemo(() => new Set(reviewModeState.ignoredGameIds), [reviewModeState.ignoredGameIds]);
-  const queueSummary = useMemo(() => getQueueSummary(platformQueueState, games), [games, platformQueueState]);
-  const queuePlatforms = useMemo(() => getQueuePlatforms(games, platformQueueState), [games, platformQueueState]);
-  const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(platformQueueState), [platformQueueState]);
   const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
   const lastRetroImportedGames = useMemo(
     () =>
@@ -512,19 +417,6 @@ export function AppController() {
     const visibleImportedGameIds = new Set(filterGames(lastRetroImportedGames, libraryFilters).map((game) => game.id));
     return lastRetroImportedGames.some((game) => !visibleImportedGameIds.has(game.id));
   }, [lastRetroImportedGames, libraryFilters]);
-
-  useEffect(() => {
-    saveControllerDebugEnabled(isControllerDebugEnabled);
-  }, [isControllerDebugEnabled]);
-
-  useEffect(() => {
-    saveControllerLayoutPreference(controllerLayoutPreference);
-  }, [controllerLayoutPreference]);
-
-  useEffect(() => {
-    saveLandscapeLockPreference(isLandscapeLockEnabled);
-    window.dispatchEvent(new CustomEvent('questshelf:landscape-lock-change', { detail: isLandscapeLockEnabled }));
-  }, [isLandscapeLockEnabled]);
 
   useEffect(() => {
     function handleControllerNavigation(event: KeyboardEvent) {
@@ -568,144 +460,6 @@ export function AppController() {
 
     return () => window.removeEventListener('keydown', handleControllerNavigation);
   }, [visibleNavItems]);
-
-  function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
-    setOnboardingState((currentState) => updater(currentState));
-  }
-
-  function markOnboardingItemComplete(itemId: OnboardingItemId) {
-    markOnboardingItemsComplete([itemId]);
-  }
-
-  function markOnboardingItemsComplete(itemIds: Array<OnboardingItemId | null>) {
-    const nextItemIds = itemIds.filter((itemId): itemId is OnboardingItemId => Boolean(itemId));
-
-    if (nextItemIds.length === 0) {
-      return;
-    }
-
-    updateOnboardingState((currentState) => {
-      const nextCompletedAt = { ...currentState.completedAt };
-      let changed = false;
-
-      nextItemIds.forEach((itemId) => {
-        if (!nextCompletedAt[itemId]) {
-          nextCompletedAt[itemId] = new Date().toISOString();
-          changed = true;
-        }
-      });
-
-      if (!changed) {
-        return currentState;
-      }
-
-      const nextSkippedAt = { ...currentState.skippedAt };
-      nextItemIds.forEach((itemId) => {
-        delete nextSkippedAt[itemId];
-      });
-
-      return { ...currentState, completedAt: nextCompletedAt, skippedAt: nextSkippedAt };
-    });
-  }
-
-  function openOnboarding() {
-    updateOnboardingState((currentState) => ({
-      ...currentState,
-      hasSeenChecklist: true,
-      skipped: false,
-    }));
-    setIsOnboardingOpen(true);
-  }
-
-
-  function restartOnboarding() {
-    updateOnboardingState((currentState) => {
-      const nextCompletedAt = { ...currentState.completedAt };
-      const nextSkippedAt = { ...currentState.skippedAt };
-
-      onboardingItemIds.forEach((itemId) => {
-        delete nextCompletedAt[itemId];
-        delete nextSkippedAt[itemId];
-      });
-
-      return {
-        ...currentState,
-        completedAt: nextCompletedAt,
-        hasSeenChecklist: true,
-        skipped: false,
-        skippedAt: nextSkippedAt,
-      };
-    });
-    setIsOnboardingOpen(true);
-  }
-
-  function hideOnboarding() {
-    updateOnboardingState((currentState) => ({
-      ...currentState,
-      hasSeenChecklist: true,
-    }));
-    setIsOnboardingOpen(false);
-  }
-
-  function skipOnboardingItem(itemId: OnboardingItemId) {
-    updateOnboardingState((currentState) => {
-      if (currentState.completedAt[itemId] || currentState.skippedAt[itemId]) {
-        return currentState;
-      }
-
-      return {
-        ...currentState,
-        hasSeenChecklist: true,
-        skippedAt: {
-          ...currentState.skippedAt,
-          [itemId]: new Date().toISOString(),
-        },
-      };
-    });
-  }
-
-  function handleOnboardingAction(itemId: OnboardingItemId, action: 'primary' | 'secondary' = 'primary') {
-    if (itemId === 'queue-game' || itemId === 'manual-game' || itemId === 'wishlist-item') {
-      setActiveNavItem(itemId === 'wishlist-item' ? 'Wishlist' : 'Library');
-      setSelectedGameId(null);
-      setIsAddGameOpen(true);
-      return;
-    }
-
-    if (itemId === 'ready') {
-      setActiveNavItem(action === 'secondary' ? 'Queue' : 'Library');
-      setSelectedGameId(null);
-      setIsOnboardingOpen(false);
-      return;
-    }
-
-    if (itemId === 'metadata-enriched') {
-      setActiveNavItem('Metadata');
-      setSelectedGameId(null);
-      return;
-    }
-
-    setActiveNavItem('Settings');
-    setSelectedGameId(null);
-
-    if (itemId === 'platforms') {
-      setActiveSettingsCategory('Platforms');
-      return;
-    }
-
-    if (itemId === 'retro-import') {
-      setActiveSettingsCategory('Retro');
-      return;
-    }
-
-    if (itemId === 'backup-exported') {
-      setActiveSettingsCategory('Data & Backup');
-      return;
-    }
-
-    setActiveSettingsCategory('Integrations');
-  }
-
 
   function importGames(importedGames: Game[]) {
     let createdGames: Game[] = [];
@@ -1475,10 +1229,6 @@ export function AppController() {
     return summary;
   }
 
-  function openBacklogPicker(game: Game) {
-    setBacklogPickerGame(game);
-  }
-
   const {
     addGameToQueue,
     addQueuePlatform,
@@ -2000,145 +1750,6 @@ type AddGameDialogProps = {
   onClose: () => void;
   onSave: (game: Game) => void;
 };
-
-type ShelfProfilePopoverProps = {
-  activeAchievement?: QuestShelfAchievementProgress | null;
-  avatar: ReactNode;
-  featuredGame?: Game | null;
-  onClose: () => void;
-  onOpenPersonalization: () => void;
-  playingNowGame?: Game | null;
-  shelfName: string;
-  shelfOverview: ShelfOverviewCounts;
-};
-
-type ShelfOverviewCounts = {
-  games: number;
-  platforms: number;
-  playing: number;
-  queue: number;
-};
-
-type ShelfOverviewStat = {
-  iconName: IconName;
-  label: string;
-  value: number;
-};
-
-function ShelfProfilePopover({
-  activeAchievement,
-  avatar,
-  featuredGame,
-  onClose,
-  onOpenPersonalization,
-  playingNowGame,
-  shelfName,
-  shelfOverview,
-}: ShelfProfilePopoverProps) {
-  return (
-    <div
-      className="absolute left-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-mint/25 bg-ink-950/95 p-3 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl"
-      role="menu"
-    >
-      <div className="flex min-w-0 items-center gap-3 border-b border-skyglass/15 pb-3">
-        <div className="shrink-0">{avatar}</div>
-        <div className="min-w-0">
-          <div className="break-words text-sm font-semibold uppercase tracking-[0.14em] text-mint">{shelfName}</div>
-          <div className="mt-1 text-xs text-slate-500">Shelf Profile</div>
-        </div>
-      </div>
-
-      <div className="space-y-2 border-b border-skyglass/15 py-3">
-        <ShelfProfileRow
-          iconName={activeAchievement?.icon ?? 'trophy'}
-          label="Active Badge"
-          value={activeAchievement?.title ?? 'No active badge yet'}
-        />
-        <ShelfProfileRow
-          iconName="check-circle"
-          label="Featured Game"
-          value={featuredGame?.title ?? 'No featured game yet'}
-        />
-        <ShelfProfileRow
-          iconName="gamepad-2"
-          label="Playing Now"
-          value={playingNowGame?.title ?? 'Nothing marked as playing'}
-        />
-      </div>
-
-      <ShelfOverviewSection overview={shelfOverview} />
-
-      <div className="border-b border-skyglass/15 py-2">
-        <button
-          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
-          onClick={onOpenPersonalization}
-          role="menuitem"
-          type="button"
-        >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
-            <Icon name="settings" size={16} strokeWidth={2.2} />
-          </span>
-          <span>Personalization</span>
-        </button>
-      </div>
-
-      <button
-        className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg border border-skyglass/15 px-3 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
-        onClick={onClose}
-        role="menuitem"
-        type="button"
-      >
-        Close
-      </button>
-    </div>
-  );
-}
-
-
-function ShelfOverviewSection({ overview }: { overview: ShelfOverviewCounts }) {
-  const stats: ShelfOverviewStat[] = [
-    { iconName: 'library', label: 'Games', value: overview.games },
-    { iconName: 'handheld', label: 'Platforms', value: overview.platforms },
-    { iconName: 'play-circle', label: 'Playing', value: overview.playing },
-    { iconName: 'list-ordered', label: 'Queue', value: overview.queue },
-  ];
-
-  return (
-    <section className="border-b border-skyglass/15 py-3" aria-label="Shelf Overview">
-      <div className="mb-2 flex items-center gap-2 px-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        <Icon name="layers" size={14} strokeWidth={2.2} />
-        <span>Shelf Overview</span>
-      </div>
-      <div className="grid grid-cols-1 gap-2 min-[340px]:grid-cols-2">
-        {stats.map((stat) => (
-          <div key={stat.label} className="flex min-w-0 items-center gap-2 rounded-lg border border-skyglass/10 bg-ink-900/55 px-2.5 py-2">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-mint/20 bg-mint/10 text-mint">
-              <Icon name={stat.iconName} size={15} strokeWidth={2.2} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-slate-500">{stat.label}</span>
-              <span className="block text-sm font-semibold tabular-nums text-slate-100">{stat.value.toLocaleString()}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ShelfProfileRow({ iconName, label, value }: { iconName: IconName; label: string; value: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-skyglass/10 bg-ink-900/70 px-2.5 py-2">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint">
-        <Icon name={iconName} size={16} strokeWidth={2.2} />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
-        <span className="block truncate text-sm font-semibold text-slate-100" title={value}>{value}</span>
-      </span>
-    </div>
-  );
-}
 
 type CollectionPanelProps = {
   collectionType: GameCollectionType;

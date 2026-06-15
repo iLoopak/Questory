@@ -1,0 +1,144 @@
+import type { ReactNode } from 'react';
+import { Icon, type IconName } from '../../components/Icon';
+import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
+import type { Game } from '../../types/game';
+
+type ShelfProfilePopoverProps = {
+  activeAchievement?: QuestShelfAchievementProgress | null;
+  avatar: ReactNode;
+  featuredGame?: Game | null;
+  onClose: () => void;
+  onOpenPersonalization: () => void;
+  playingNowGame?: Game | null;
+  shelfName: string;
+  shelfOverview: ShelfOverviewCounts;
+};
+
+type ShelfOverviewCounts = {
+  games: number;
+  platforms: number;
+  playing: number;
+  queue: number;
+};
+
+type ShelfOverviewStat = {
+  iconName: IconName;
+  label: string;
+  value: number;
+};
+
+export function ShelfProfilePopover({
+  activeAchievement,
+  avatar,
+  featuredGame,
+  onClose,
+  onOpenPersonalization,
+  playingNowGame,
+  shelfName,
+  shelfOverview,
+}: ShelfProfilePopoverProps) {
+  return (
+    <div
+      className="absolute left-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-mint/25 bg-ink-950/95 p-3 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      role="menu"
+    >
+      <div className="flex min-w-0 items-center gap-3 border-b border-skyglass/15 pb-3">
+        <div className="shrink-0">{avatar}</div>
+        <div className="min-w-0">
+          <div className="break-words text-sm font-semibold uppercase tracking-[0.14em] text-mint">{shelfName}</div>
+          <div className="mt-1 text-xs text-slate-500">Shelf Profile</div>
+        </div>
+      </div>
+
+      <div className="space-y-2 border-b border-skyglass/15 py-3">
+        <ShelfProfileRow
+          iconName={activeAchievement?.icon ?? 'trophy'}
+          label="Active Badge"
+          value={activeAchievement?.title ?? 'No active badge yet'}
+        />
+        <ShelfProfileRow
+          iconName="check-circle"
+          label="Featured Game"
+          value={featuredGame?.title ?? 'No featured game yet'}
+        />
+        <ShelfProfileRow
+          iconName="gamepad-2"
+          label="Playing Now"
+          value={playingNowGame?.title ?? 'Nothing marked as playing'}
+        />
+      </div>
+
+      <ShelfOverviewSection overview={shelfOverview} />
+
+      <div className="border-b border-skyglass/15 py-2">
+        <button
+          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+          onClick={onOpenPersonalization}
+          role="menuitem"
+          type="button"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
+            <Icon name="settings" size={16} strokeWidth={2.2} />
+          </span>
+          <span>Personalization</span>
+        </button>
+      </div>
+
+      <button
+        className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg border border-skyglass/15 px-3 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+        onClick={onClose}
+        role="menuitem"
+        type="button"
+      >
+        Close
+      </button>
+    </div>
+  );
+}
+
+
+function ShelfOverviewSection({ overview }: { overview: ShelfOverviewCounts }) {
+  const stats: ShelfOverviewStat[] = [
+    { iconName: 'library', label: 'Games', value: overview.games },
+    { iconName: 'handheld', label: 'Platforms', value: overview.platforms },
+    { iconName: 'play-circle', label: 'Playing', value: overview.playing },
+    { iconName: 'list-ordered', label: 'Queue', value: overview.queue },
+  ];
+
+  return (
+    <section className="border-b border-skyglass/15 py-3" aria-label="Shelf Overview">
+      <div className="mb-2 flex items-center gap-2 px-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <Icon name="layers" size={14} strokeWidth={2.2} />
+        <span>Shelf Overview</span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 min-[340px]:grid-cols-2">
+        {stats.map((stat) => (
+          <div key={stat.label} className="flex min-w-0 items-center gap-2 rounded-lg border border-skyglass/10 bg-ink-900/55 px-2.5 py-2">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-mint/20 bg-mint/10 text-mint">
+              <Icon name={stat.iconName} size={15} strokeWidth={2.2} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-slate-500">{stat.label}</span>
+              <span className="block text-sm font-semibold tabular-nums text-slate-100">{stat.value.toLocaleString()}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ShelfProfileRow({ iconName, label, value }: { iconName: IconName; label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-skyglass/10 bg-ink-900/70 px-2.5 py-2">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint">
+        <Icon name={iconName} size={16} strokeWidth={2.2} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+        <span className="block truncate text-sm font-semibold text-slate-100" title={value}>{value}</span>
+      </span>
+    </div>
+  );
+}
+
