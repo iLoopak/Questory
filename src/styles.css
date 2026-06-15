@@ -2866,3 +2866,44 @@ body.qs-controller-active .qs-compact-card:focus-within {
   --qs-chip-hover-border: rgb(var(--qs-accent-secondary-rgb) / 0.68);
   --qs-chip-hover-shadow: 0 0 0 1px rgb(var(--qs-accent-secondary-rgb) / 0.18), 0 0 22px rgb(var(--qs-accent-secondary-rgb) / 0.2), 0 8px 18px rgb(var(--overlay-rgb) / 0.2);
 }
+
+.qs-shelf-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.26);
+  background:
+    radial-gradient(circle at 50% 18%, rgb(var(--accent-rgb) / 0.1), transparent 46%),
+    color-mix(in srgb, var(--surface-secondary, rgb(8 13 31)) 82%, rgb(var(--ink-950-rgb)));
+  color: var(--qs-accent-primary, var(--accent));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 18px rgb(var(--accent-rgb) / 0.1);
+  line-height: 1;
+}
+
+.qs-shelf-avatar .qs-icon {
+  width: 52%;
+  height: 52%;
+  color: currentColor;
+  filter: drop-shadow(0 0 8px rgb(var(--accent-rgb) / 0.22));
+}
+
+.qs-shelf-avatar--active {
+  border-color: rgb(var(--accent-rgb) / 0.72);
+  background:
+    radial-gradient(circle at 50% 18%, rgb(var(--accent-rgb) / 0.16), transparent 46%),
+    color-mix(in srgb, var(--surface-secondary, rgb(8 13 31)) 76%, rgb(var(--accent-rgb) / 0.1));
+  box-shadow:
+    0 0 0 1px rgb(var(--accent-rgb) / 0.16),
+    0 0 24px rgb(var(--accent-rgb) / 0.24),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.qs-shelf-avatar--app-icon span {
+  color: var(--qs-accent-primary, var(--accent));
+  font-size: 0.9em;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  transform: translateX(-0.02em);
+  text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.36);
+}

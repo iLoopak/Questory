@@ -97,7 +97,7 @@ export function PersonalizationSettingsPanel({
                   role="radio"
                   type="button"
                 >
-                  <ShelfAvatar {...shelfIdentity} avatarSelection={option.value} sizeClassName="h-11 w-11" />
+                  <ShelfAvatar {...shelfIdentity} avatarSelection={option.value} isActive={isSelected} sizeClassName="h-11 w-11" />
                   <span className="font-semibold">{option.label}</span>
                 </button>
               );
@@ -157,7 +157,7 @@ export function PersonalizationSettingsPanel({
         <div className="qs-achievement-preview">
           <div className="text-xs font-semibold uppercase tracking-[0.14em]">Preview</div>
           <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
-            <ShelfAvatar {...previewIdentity} sizeClassName="h-10 w-10" />
+            <ShelfAvatar {...previewIdentity} isActive sizeClassName="h-10 w-10" />
             <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="qs-achievement-inline-badge ml-1"> · {activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle}</span> : null}</span>
           </div>
         </div>
