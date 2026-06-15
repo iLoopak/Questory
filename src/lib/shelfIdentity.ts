@@ -6,6 +6,7 @@ export const shelfIdentityStorageKey = 'questshelf.shelfIdentity.v1';
 export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon-180.png';
 export const maxShelfNameLength = 48;
 export const maxCustomAvatarDataUrlLength = 700_000;
+export const maxCustomAvatarFileSize = 10 * 1024 * 1024;
 
 export type BuiltInAvatarId = 'controller' | 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer' | 'curator' | 'platform-hopper' | 'handheld-hero' | 'playing-right-now' | 'metadata-master' | 'art-conservator' | 'queue-commander' | 'century-club';
 export type ShelfAvatarSelection = 'app-icon' | 'steam' | `built-in:${BuiltInAvatarId}` | 'custom';
@@ -119,14 +120,55 @@ export function getResolvedShelfName(shelfName: string, legacyTitle: string) {
 
 export async function resizeAvatarFile(file: File, size = 256): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
-  const bitmap = await createImageBitmap(file);
+  if (file.size > maxCustomAvatarFileSize) throw new Error('Choose an image smaller than 10 MB.');
+
+  const source = await loadAvatarImageSource(file);
   const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
+  canvas.width = size;
+  canvas.height = size;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Avatar resizing is unavailable.');
-  const scale = Math.max(size / bitmap.width, size / bitmap.height);
-  const width = bitmap.width * scale; const height = bitmap.height * scale;
-  context.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
-  bitmap.close?.();
-  return canvas.toDataURL('image/webp', 0.82);
+
+  const scale = Math.max(size / source.width, size / source.height);
+  const width = source.width * scale;
+  const height = source.height * scale;
+  context.drawImage(source.image, (size - width) / 2, (size - height) / 2, width, height);
+  source.close?.();
+
+  const webpDataUrl = canvas.toDataURL('image/webp', 0.82);
+  const dataUrl = webpDataUrl.startsWith('data:image/webp') ? webpDataUrl : canvas.toDataURL('image/png');
+  if (dataUrl.length > maxCustomAvatarDataUrlLength) throw new Error('Avatar is still too large after resizing. Try a smaller image.');
+  return dataUrl;
+}
+
+type AvatarImageSource = {
+  image: CanvasImageSource;
+  width: number;
+  height: number;
+  close?: () => void;
+};
+
+async function loadAvatarImageSource(file: File): Promise<AvatarImageSource> {
+  if ('createImageBitmap' in window) {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return { image: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close?.() };
+    } catch {
+      // Fall back to HTMLImageElement decoding below for WebViews with partial createImageBitmap support.
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('Could not read that image file.'));
+      image.src = objectUrl;
+    });
+    return { image, width: image.naturalWidth, height: image.naturalHeight };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
