@@ -18,19 +18,19 @@ export type ShelfIdentitySettings = {
   selectedActiveBadgeId: QuestShelfAchievementId | '';
 };
 
-export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; glyph: string; gradient: string }> = [
-  { id: 'controller', label: 'Controller', glyph: '🎮', gradient: 'from-mint to-sky-300' },
-  { id: 'achievement-hunter', label: 'Achievement Hunter', glyph: '🏆', gradient: 'from-amber-300 to-mint' },
-  { id: 'retro-explorer', label: 'Retro Explorer', glyph: '👾', gradient: 'from-fuchsia-400 to-cyan-300' },
-  { id: 'rpg-adventurer', label: 'RPG Adventurer', glyph: '⚔️', gradient: 'from-red-400 to-amber-300' },
-  { id: 'sci-fi-pilot', label: 'Sci-Fi Pilot', glyph: '🚀', gradient: 'from-sky-300 to-violet-400' },
-  { id: 'fantasy-hero', label: 'Fantasy Hero', glyph: '🐉', gradient: 'from-emerald-300 to-purple-400' },
-  { id: 'collector', label: 'Collector', glyph: '💎', gradient: 'from-blue-300 to-mint' },
-  { id: 'backlog-slayer', label: 'Backlog Slayer', glyph: '☠️', gradient: 'from-mint to-lime-300' },
-  { id: 'curator', label: 'Curator', glyph: '📝', gradient: 'from-rose-300 to-amber-300' },
-  { id: 'platform-hopper', label: 'Platform Hopper', glyph: '🕹️', gradient: 'from-cyan-300 to-violet-400' },
-  { id: 'handheld-hero', label: 'Handheld Hero', glyph: '📟', gradient: 'from-lime-300 to-cyan-300' },
-  { id: 'playing-right-now', label: 'Playing Right Now', glyph: '🔥', gradient: 'from-orange-300 to-red-400' },
+export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; icon: string }> = [
+  { id: 'controller', label: 'Controller', icon: 'gamepad-2' },
+  { id: 'achievement-hunter', label: 'Achievement Hunter', icon: 'trophy' },
+  { id: 'retro-explorer', label: 'Retro Explorer', icon: 'joystick' },
+  { id: 'rpg-adventurer', label: 'RPG Adventurer', icon: 'sword' },
+  { id: 'sci-fi-pilot', label: 'Sci-Fi Pilot', icon: 'rocket' },
+  { id: 'fantasy-hero', label: 'Fantasy Hero', icon: 'sparkles' },
+  { id: 'collector', label: 'Collector', icon: 'gem' },
+  { id: 'backlog-slayer', label: 'Backlog Slayer', icon: 'skull-check' },
+  { id: 'curator', label: 'Curator', icon: 'bookmark-pen' },
+  { id: 'platform-hopper', label: 'Platform Hopper', icon: 'panel-top-open' },
+  { id: 'handheld-hero', label: 'Handheld Hero', icon: 'handheld' },
+  { id: 'playing-right-now', label: 'Playing Right Now', icon: 'flame' },
 ];
 
 const emptyIdentity: ShelfIdentitySettings = {
