@@ -2357,6 +2357,11 @@ body {
   min-height: 0;
 }
 
+.qs-playing-now-scroll {
+  max-height: calc(100dvh - 4.75rem);
+  -webkit-overflow-scrolling: touch;
+}
+
 .qs-content-panel,
 .qs-queue-shell,
 .qs-review-shell,
