@@ -11,6 +11,7 @@ import {
   applyThemePreference,
   loadAccentColorPreference,
   loadAppTemplatePreference,
+  loadNeonButtonGradientBalancePreference,
   loadSecondaryAccentColorPreference,
   loadThemePreference,
 } from './lib/themePreferences';
@@ -30,7 +31,11 @@ async function startApp() {
 
   applyAppTemplatePreference(appTemplatePreference);
   applyThemePreference(loadThemePreference(), appTemplatePreference);
-  applyAccentColorPreference(loadAccentColorPreference(), loadSecondaryAccentColorPreference());
+  applyAccentColorPreference(
+    loadAccentColorPreference(),
+    loadSecondaryAccentColorPreference(),
+    loadNeonButtonGradientBalancePreference(),
+  );
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

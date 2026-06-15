@@ -7,16 +7,19 @@ import {
   getAccentColorThemeVariables,
   loadAccentColorPreference,
   loadAppTemplatePreference,
+  loadNeonButtonGradientBalancePreference,
   loadSecondaryAccentColorPreference,
   loadThemePreference,
   normalizeThemePreferenceForTemplate,
   saveAccentColorPreference,
   saveAppTemplatePreference,
+  saveNeonButtonGradientBalancePreference,
   saveSecondaryAccentColorPreference,
   saveThemePreference,
   watchSystemTheme,
   type AccentColorPreference,
   type AppTemplatePreference,
+  type NeonButtonGradientBalancePreference,
   type ResolvedTheme,
   type ThemePreference,
 } from '../lib/themePreferences';
@@ -28,13 +31,16 @@ export function useAppAppearance() {
   );
   const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
   const [secondaryAccentColorPreference, setSecondaryAccentColorPreference] = useState<AccentColorPreference>(() => loadSecondaryAccentColorPreference());
+  const [neonButtonGradientBalancePreference, setNeonButtonGradientBalancePreference] = useState<NeonButtonGradientBalancePreference>(() =>
+    loadNeonButtonGradientBalancePreference(),
+  );
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     applyThemePreference(themePreference, appTemplatePreference),
   );
 
   const accentThemeStyle = useMemo(
-    () => getAccentColorThemeVariables(accentColorPreference, secondaryAccentColorPreference) as CSSProperties,
-    [accentColorPreference, secondaryAccentColorPreference],
+    () => getAccentColorThemeVariables(accentColorPreference, secondaryAccentColorPreference, neonButtonGradientBalancePreference) as CSSProperties,
+    [accentColorPreference, neonButtonGradientBalancePreference, secondaryAccentColorPreference],
   );
 
   function setThemePreference(preference: ThemePreference) {
@@ -71,19 +77,22 @@ export function useAppAppearance() {
   }, [appTemplatePreference]);
 
   useEffect(() => {
-    applyAccentColorPreference(accentColorPreference, secondaryAccentColorPreference);
+    applyAccentColorPreference(accentColorPreference, secondaryAccentColorPreference, neonButtonGradientBalancePreference);
     saveAccentColorPreference(accentColorPreference);
     saveSecondaryAccentColorPreference(secondaryAccentColorPreference);
-  }, [accentColorPreference, secondaryAccentColorPreference]);
+    saveNeonButtonGradientBalancePreference(neonButtonGradientBalancePreference);
+  }, [accentColorPreference, neonButtonGradientBalancePreference, secondaryAccentColorPreference]);
 
   return {
     accentColorPreference,
     accentThemeStyle,
     appTemplatePreference,
+    neonButtonGradientBalancePreference,
     resolvedTheme,
     secondaryAccentColorPreference,
     setAccentColorPreference,
     setAppTemplatePreference,
+    setNeonButtonGradientBalancePreference,
     setSecondaryAccentColorPreference,
     setThemePreference,
     themePreference,

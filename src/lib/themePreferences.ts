@@ -2,13 +2,16 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
 export type AccentColorPreference = string | null;
 export type AppTemplatePreference = 'classic' | 'neon-deck';
+export type NeonButtonGradientBalancePreference = number;
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
 export const accentColorStorageKey = 'questshelf.accentColor.v1';
 export const secondaryAccentColorStorageKey = 'questshelf.secondaryAccentColor.v1';
+export const neonButtonGradientBalanceStorageKey = 'questshelf.neonButtonGradientBalance.v1';
 export const appTemplateStorageKey = 'questshelf.appTemplate.v1';
 export const defaultAccentColor = '#ff5a2c';
 export const defaultSecondaryAccentColor = '#38bdf8';
+export const defaultNeonButtonGradientBalance = 50;
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
 export const darkOnlyAppTemplatePreferences: AppTemplatePreference[] = ['neon-deck'];
@@ -52,6 +55,28 @@ export function normalizeThemePreferenceForTemplate(
 export function normalizeAccentColor(value: string): string | null {
   const trimmedValue = value.trim();
   return isAccentColor(trimmedValue) ? trimmedValue.toLowerCase() : null;
+}
+
+export function normalizeNeonButtonGradientBalance(value: unknown): NeonButtonGradientBalancePreference {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return defaultNeonButtonGradientBalance;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(numericValue)));
+}
+
+export function getNeonButtonGradientStops(balance: NeonButtonGradientBalancePreference) {
+  const normalizedBalance = normalizeNeonButtonGradientBalance(balance);
+  const gradientCenter = 85 - normalizedBalance * 0.7;
+  const primaryStop = Math.min(100, Math.max(0, Math.round(gradientCenter - 14)));
+  const secondaryStop = Math.min(100, Math.max(0, Math.round(gradientCenter + 14)));
+
+  return {
+    primaryStop: `${primaryStop}%`,
+    secondaryStop: `${secondaryStop}%`,
+  };
 }
 
 export function loadThemePreference(): ThemePreference {
@@ -165,6 +190,38 @@ export function saveAccentColorPreference(color: AccentColorPreference) {
   void saveAccentColorPreferenceToNativeStorage(accentColorStorageKey, color);
 }
 
+export function loadNeonButtonGradientBalancePreference(): NeonButtonGradientBalancePreference {
+  if (typeof window === 'undefined') {
+    return defaultNeonButtonGradientBalance;
+  }
+
+  try {
+    return normalizeNeonButtonGradientBalance(window.localStorage.getItem(neonButtonGradientBalanceStorageKey));
+  } catch {
+    return defaultNeonButtonGradientBalance;
+  }
+}
+
+export function saveNeonButtonGradientBalancePreference(balance: NeonButtonGradientBalancePreference) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalizedBalance = normalizeNeonButtonGradientBalance(balance);
+
+  try {
+    if (normalizedBalance === defaultNeonButtonGradientBalance) {
+      window.localStorage.removeItem(neonButtonGradientBalanceStorageKey);
+    } else {
+      window.localStorage.setItem(neonButtonGradientBalanceStorageKey, String(normalizedBalance));
+    }
+  } catch {
+    // Gradient tuning should stay responsive even when storage is unavailable.
+  }
+
+  void saveAccentColorPreferenceToNativeStorage(neonButtonGradientBalanceStorageKey, String(normalizedBalance));
+}
+
 export function saveSecondaryAccentColorPreference(color: AccentColorPreference) {
   if (typeof window === 'undefined') {
     return;
@@ -200,13 +257,20 @@ export function resolveThemePreference(
   return window.matchMedia(darkThemeQuery).matches ? 'dark' : 'light';
 }
 
-export function getAccentColorThemeVariables(color: AccentColorPreference, secondaryColor: AccentColorPreference = null) {
+export function getAccentColorThemeVariables(
+  color: AccentColorPreference,
+  secondaryColor: AccentColorPreference = null,
+  neonButtonGradientBalance: NeonButtonGradientBalancePreference = defaultNeonButtonGradientBalance,
+) {
   const primaryColor = color ?? defaultAccentColor;
   const primaryRgb = hexToRgb(primaryColor);
   const primaryRgbValue = `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`;
   const secondaryResolvedColor = secondaryColor ?? defaultSecondaryAccentColor;
   const secondaryRgb = hexToRgb(secondaryResolvedColor);
   const secondaryRgbValue = `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`;
+  const normalizedGradientBalance = normalizeNeonButtonGradientBalance(neonButtonGradientBalance);
+  const gradientStops = getNeonButtonGradientStops(normalizedGradientBalance);
+  const dominantButtonRgb = normalizedGradientBalance > 50 ? secondaryRgb : primaryRgb;
 
   return {
     '--accent-rgb': primaryRgbValue,
@@ -214,18 +278,26 @@ export function getAccentColorThemeVariables(color: AccentColorPreference, secon
     '--qs-accent-secondary': secondaryResolvedColor,
     '--qs-accent-primary-rgb': primaryRgbValue,
     '--qs-accent-secondary-rgb': secondaryRgbValue,
+    '--qs-neon-button-gradient-balance': String(normalizedGradientBalance),
+    '--qs-neon-button-gradient-primary-stop': gradientStops.primaryStop,
+    '--qs-neon-button-gradient-secondary-stop': gradientStops.secondaryStop,
+    '--qs-neon-button-text': getReadableTextColor(dominantButtonRgb),
     '--accent-contrast': getReadableTextColor(primaryRgb),
     '--qs-glow-primary': `0 0 28px rgb(${primaryRgbValue} / 0.26)`,
     '--qs-glow-secondary': `0 0 32px rgb(${secondaryRgbValue} / 0.2)`,
   };
 }
 
-export function applyAccentColorPreference(color: AccentColorPreference, secondaryColor: AccentColorPreference = null) {
+export function applyAccentColorPreference(
+  color: AccentColorPreference,
+  secondaryColor: AccentColorPreference = null,
+  neonButtonGradientBalance: NeonButtonGradientBalancePreference = defaultNeonButtonGradientBalance,
+) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  const accentVariables = getAccentColorThemeVariables(color, secondaryColor);
+  const accentVariables = getAccentColorThemeVariables(color, secondaryColor, neonButtonGradientBalance);
   const themedRoots = [document.documentElement, ...Array.from(document.querySelectorAll<HTMLElement>('.qs-app-root'))];
 
   themedRoots.forEach((root) => {
@@ -236,6 +308,7 @@ export function applyAccentColorPreference(color: AccentColorPreference, seconda
 
   document.documentElement.dataset.accentColor = color ?? 'default';
   document.documentElement.dataset.secondaryAccentColor = secondaryColor ?? 'default';
+  document.documentElement.dataset.neonButtonGradientBalance = String(normalizeNeonButtonGradientBalance(neonButtonGradientBalance));
 }
 
 export function applyThemePreference(
@@ -347,7 +420,7 @@ function getRelativeLuminance({ r, g, b }: { r: number; g: number; b: number }) 
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
-async function saveAccentColorPreferenceToNativeStorage(key: string, color: AccentColorPreference) {
+async function saveAccentColorPreferenceToNativeStorage(key: string, color: string | null) {
   try {
     const preferences = (await import(/* @vite-ignore */ preferenceModuleName)) as PreferencesPlugin;
     await preferences.Preferences.set({ key, value: color ?? '' });
