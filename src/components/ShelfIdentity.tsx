@@ -3,19 +3,25 @@ import { Icon, type IconName } from './Icon';
 import { builtInAvatars, questShelfAppIconAvatarUrl, resizeAvatarFile, type ShelfAvatarSelection, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 
 export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarUrl, sizeClassName = 'h-10 w-10', isActive = false }: ShelfIdentitySettings & { steamAvatarUrl?: string; sizeClassName?: string; isActive?: boolean }) {
+  const [appIconFailed, setAppIconFailed] = useState(false);
   const className = `qs-shelf-avatar${isActive ? ' qs-shelf-avatar--active' : ''} ${sizeClassName}`;
 
   if (avatarSelection === 'app-icon') {
     return (
-      <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="QuestShelf Q">
-        <img
-          className="qs-shelf-avatar__app-icon h-full w-full object-contain"
-          src={questShelfAppIconAvatarUrl}
-          alt="QuestShelf Q"
-          onError={() => {
-            console.error(`QuestShelf app icon avatar failed to load: ${questShelfAppIconAvatarUrl}`);
-          }}
-        />
+      <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title={appIconFailed ? `QuestShelf Q failed to load: ${questShelfAppIconAvatarUrl}` : 'QuestShelf Q'}>
+        {appIconFailed ? (
+          <span className="qs-shelf-avatar__app-icon-error" aria-label={`QuestShelf icon failed to load from ${questShelfAppIconAvatarUrl}`} role="img">!</span>
+        ) : (
+          <img
+            className="qs-shelf-avatar__app-icon h-full w-full object-contain"
+            src={questShelfAppIconAvatarUrl}
+            alt="QuestShelf Q"
+            onError={() => {
+              console.error(`QuestShelf app icon avatar failed to load: ${questShelfAppIconAvatarUrl}`);
+              setAppIconFailed(true);
+            }}
+          />
+        )}
       </div>
     );
   }

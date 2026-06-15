@@ -2914,3 +2914,15 @@ body.qs-controller-active .qs-compact-card:focus-within {
   mask: none;
   -webkit-mask: none;
 }
+
+.qs-shelf-avatar__app-icon-error {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  color: #fecaca;
+  background: rgb(127 29 29 / 0.72);
+  font-size: 0.72em;
+  font-weight: 800;
+}
