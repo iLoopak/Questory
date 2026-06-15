@@ -8,7 +8,6 @@ import { DataManagementPanel } from './components/DataManagementPanel';
 import { GameDetailView } from './components/GameDetailView';
 import { GameListEmptyState, GameListShell } from './components/GameListShell';
 import { CollectionToolbar } from './components/CollectionToolbar';
-import { AchievementToolbarChips } from './components/AchievementToolbarChips';
 import { ViewportModal } from './components/ViewportModal';
 import { UndoToastStack } from './components/UndoToastStack';
 import { CollectionGrid, CollectionList, CollectionShelf } from './components/CollectionViews';
@@ -233,7 +232,10 @@ function App() {
     [legacyQuestShelfTitle, shelfIdentity.shelfName],
   );
   const computedFeaturedGame = useMemo(() => getComputedFeaturedGame(games), [games]);
+  const playingNowGame = useMemo(() => games.find((game) => game.collectionType === 'library' && game.status === 'Playing') ?? null, [games]);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
+  const [isShelfProfileOpen, setIsShelfProfileOpen] = useState(false);
+  const shelfProfileRef = useRef<HTMLDivElement | null>(null);
 
   function setShelfIdentity(value: ShelfIdentitySettings) {
     setShelfIdentityState(value);
@@ -244,6 +246,31 @@ function App() {
     document.title = personalizedQuestShelfTitle;
   }, [personalizedQuestShelfTitle]);
 
+  useEffect(() => {
+    if (!isShelfProfileOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!shelfProfileRef.current?.contains(event.target as Node)) {
+        setIsShelfProfileOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsShelfProfileOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isShelfProfileOpen]);
 
   function handleSteamProfileNameChange(profileName: string) {
     setSteamProfileName(profileName);
@@ -1543,6 +1570,13 @@ function App() {
     setActiveNavItem('Queue');
   }
 
+  function openPersonalizationSettings() {
+    setIsShelfProfileOpen(false);
+    setSelectedGameId(null);
+    setActiveNavItem('Settings');
+    setActiveSettingsCategory('Personalization');
+  }
+
   if (!isAppReady) {
     return <AppStartupScreen />;
   }
@@ -1552,9 +1586,29 @@ function App() {
     <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
       <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
-          <div className="flex min-w-0 shrink-0 items-center gap-2" aria-label={personalizedQuestShelfTitle}>
-            <ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />
-            <div className="hidden min-w-0 truncate text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">{personalizedQuestShelfTitle}</div>
+          <div className="relative min-w-0 shrink-0" ref={shelfProfileRef}>
+            <button
+              aria-expanded={isShelfProfileOpen}
+              aria-haspopup="menu"
+              aria-label={`${personalizedQuestShelfTitle} shelf profile`}
+              className="flex min-h-10 min-w-0 items-center gap-2 rounded-md px-1.5 text-left transition hover:bg-mint/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+              onClick={() => setIsShelfProfileOpen((isOpen) => !isOpen)}
+              type="button"
+            >
+              <ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />
+              <span className="hidden min-w-0 max-w-[12rem] truncate text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">{personalizedQuestShelfTitle}</span>
+            </button>
+            {isShelfProfileOpen ? (
+              <ShelfProfilePopover
+                activeAchievement={activeShelfAchievement}
+                avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
+                featuredGame={computedFeaturedGame}
+                onClose={() => setIsShelfProfileOpen(false)}
+                onOpenPersonalization={openPersonalizationSettings}
+                playingNowGame={playingNowGame}
+                shelfName={personalizedQuestShelfTitle}
+              />
+            ) : null}
           </div>
 
           <nav className="qs-top-nav flex flex-1 gap-1 overflow-x-auto rounded-md border border-skyglass/15 bg-ink-950/70 p-0.5 shadow-inner">
@@ -1626,10 +1680,6 @@ function App() {
             <CollectionPanel
               collectionType="library"
               filters={libraryFilters}
-              featuredGame={computedFeaturedGame}
-              activeAchievement={activeShelfAchievement}
-              onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
-              shelfTitle={computedShelfTitle}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               games={filteredLibraryGames}
@@ -1678,10 +1728,6 @@ function App() {
             <CollectionPanel
               collectionType="wishlist"
               filters={wishlistFilters}
-              featuredGame={computedFeaturedGame}
-              activeAchievement={activeShelfAchievement}
-              onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
-              shelfTitle={computedShelfTitle}
               games={filteredWishlistGames}
               platformOptions={platformOptions}
               steamWishlistSyncState={steamWishlistSyncState}
@@ -1963,13 +2009,99 @@ type AddGameDialogProps = {
   onSave: (game: Game) => void;
 };
 
+type ShelfProfilePopoverProps = {
+  activeAchievement?: QuestShelfAchievementProgress | null;
+  avatar: ReactNode;
+  featuredGame?: Game | null;
+  onClose: () => void;
+  onOpenPersonalization: () => void;
+  playingNowGame?: Game | null;
+  shelfName: string;
+};
+
+function ShelfProfilePopover({
+  activeAchievement,
+  avatar,
+  featuredGame,
+  onClose,
+  onOpenPersonalization,
+  playingNowGame,
+  shelfName,
+}: ShelfProfilePopoverProps) {
+  return (
+    <div
+      className="absolute left-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-mint/25 bg-ink-950/95 p-3 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      role="menu"
+    >
+      <div className="flex min-w-0 items-center gap-3 border-b border-skyglass/15 pb-3">
+        <div className="shrink-0">{avatar}</div>
+        <div className="min-w-0">
+          <div className="break-words text-sm font-semibold uppercase tracking-[0.14em] text-mint">{shelfName}</div>
+          <div className="mt-1 text-xs text-slate-500">Shelf Profile</div>
+        </div>
+      </div>
+
+      <div className="space-y-2 border-b border-skyglass/15 py-3">
+        <ShelfProfileRow
+          iconName={activeAchievement?.icon ?? 'trophy'}
+          label="Active Badge"
+          value={activeAchievement?.title ?? 'No active badge yet'}
+        />
+        <ShelfProfileRow
+          iconName="check-circle"
+          label="Featured Game"
+          value={featuredGame?.title ?? 'No featured game yet'}
+        />
+        <ShelfProfileRow
+          iconName="gamepad-2"
+          label="Playing Now"
+          value={playingNowGame?.title ?? 'Nothing marked as playing'}
+        />
+      </div>
+
+      <div className="border-b border-skyglass/15 py-2">
+        <button
+          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+          onClick={onOpenPersonalization}
+          role="menuitem"
+          type="button"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
+            <Icon name="settings" size={16} strokeWidth={2.2} />
+          </span>
+          <span>Personalization</span>
+        </button>
+      </div>
+
+      <button
+        className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg border border-skyglass/15 px-3 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+        onClick={onClose}
+        role="menuitem"
+        type="button"
+      >
+        Close
+      </button>
+    </div>
+  );
+}
+
+function ShelfProfileRow({ iconName, label, value }: { iconName: QuestShelfAchievementProgress['icon'] | 'check-circle' | 'gamepad-2' | 'trophy'; label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-skyglass/10 bg-ink-900/70 px-2.5 py-2">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint">
+        <Icon name={iconName} size={16} strokeWidth={2.2} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+        <span className="block truncate text-sm font-semibold text-slate-100" title={value}>{value}</span>
+      </span>
+    </div>
+  );
+}
+
 type CollectionPanelProps = {
   collectionType: GameCollectionType;
   filters: CollectionFilters;
-  activeAchievement?: QuestShelfAchievementProgress | null;
-  featuredGame?: Game | null;
-  onOpenAchievementSettings?: () => void;
-  shelfTitle?: string;
   games: Game[];
   platformOptions: GamePlatform[];
   platformQueueState?: PlatformQueueState;
@@ -2010,10 +2142,6 @@ type CollectionPanelProps = {
 function CollectionPanel({
   collectionType,
   filters,
-  activeAchievement = null,
-  featuredGame = null,
-  onOpenAchievementSettings,
-  shelfTitle = '',
   games,
   platformOptions,
   platformQueueState,
@@ -2382,16 +2510,6 @@ function CollectionPanel({
         moreFiltersButtonRef={advancedFiltersButtonRef}
         onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
-        leadingAccessory={
-          (collectionType === 'library' || collectionType === 'wishlist') && (activeAchievement || featuredGame) ? (
-            <AchievementToolbarChips
-              activeAchievement={activeAchievement}
-              featuredGame={featuredGame}
-              onOpenAchievementSettings={onOpenAchievementSettings}
-              onOpenDetails={onOpenDetails}
-            />
-          ) : null
-        }
         primaryAction={
           <button
             aria-label={collectionType === 'wishlist' ? t('toolbar.addWishlistGame') : t('toolbar.addGame')}
