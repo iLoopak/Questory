@@ -460,6 +460,19 @@ export function AppController() {
     }
 
     unlockDocumentScrollForPageView();
+
+    const frame = window.requestAnimationFrame(() => {
+      unlockDocumentScrollForPageView();
+    });
+
+    const timeout = window.setTimeout(() => {
+      unlockDocumentScrollForPageView();
+    }, 50);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
   }, [activeUtilityView]);
 
   useEffect(() => {
