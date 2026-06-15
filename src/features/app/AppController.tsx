@@ -1695,10 +1695,6 @@ export function AppController() {
             <RecommendationPanel
               games={games}
               queueState={platformQueueState}
-              featuredGame={resolvedFeaturedGame}
-              activeAchievement={activeShelfAchievement}
-              onOpenAchievementSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Personalization'); setSelectedGameId(null); }}
-              shelfTitle={computedShelfTitle}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setSelectedGameId(gameId);
@@ -4123,4 +4119,3 @@ function PlaceholderPanel({ title }: PlaceholderPanelProps) {
     </section>
   );
 }
-

@@ -2,12 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
-import { AchievementToolbarChips } from './AchievementToolbarChips';
 import { Icon } from './Icon';
 import { GameListEmptyState, GameListShell } from './GameListShell';
 import { ViewportModal } from './ViewportModal';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import type { QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
 import {
   availableTimeOptions,
   getRecommendations,
@@ -23,10 +21,6 @@ import { gamePlatforms } from '../types/game';
 type RecommendationPanelProps = {
   games: Game[];
   queueState: PlatformQueueState;
-  activeAchievement?: QuestShelfAchievementProgress | null;
-  featuredGame?: Game | null;
-  onOpenAchievementSettings?: () => void;
-  shelfTitle?: string;
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
@@ -46,10 +40,6 @@ const recommendationViewModes: readonly RecommendationViewMode[] = ['Grid View',
 export function RecommendationPanel({
   games,
   queueState,
-  activeAchievement = null,
-  featuredGame = null,
-  onOpenAchievementSettings,
-  shelfTitle = '',
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
@@ -180,15 +170,6 @@ export function RecommendationPanel({
         moreFiltersButtonRef={moreFiltersButtonRef}
         onMoreFiltersClick={() => setIsMoreFiltersOpen(true)}
         onClearFilters={hasActiveMoreFilters ? clearMoreFilters : undefined}
-        leadingAccessory={
-          activeAchievement ? (
-          <AchievementToolbarChips
-            activeAchievement={activeAchievement}
-            onOpenAchievementSettings={onOpenAchievementSettings}
-            onOpenDetails={onOpenDetails}
-          />
-          ) : null
-        }
         actionMenu={
           <>
             <button
