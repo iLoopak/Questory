@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Icon, type IconName } from './Icon';
-import { builtInAvatars, resizeAvatarFile, type ShelfAvatarSelection, type ShelfIdentitySettings } from '../lib/shelfIdentity';
+import { builtInAvatars, questShelfAppIconAvatarUrl, resizeAvatarFile, type ShelfAvatarSelection, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 
 export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarUrl, sizeClassName = 'h-10 w-10', isActive = false }: ShelfIdentitySettings & { steamAvatarUrl?: string; sizeClassName?: string; isActive?: boolean }) {
   const selectedBuiltInId = avatarSelection.startsWith('built-in:') ? avatarSelection.slice('built-in:'.length) : '';
@@ -17,7 +17,11 @@ export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarU
   }
 
   if (avatarSelection === 'app-icon') {
-    return <div className={`${className} qs-shelf-avatar--app-icon`} title="QuestShelf Q"><span>Q</span></div>;
+    return (
+      <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="QuestShelf Q">
+        <img className="qs-shelf-avatar__app-icon h-full w-full object-contain" src={questShelfAppIconAvatarUrl} alt="" aria-hidden="true" />
+      </div>
+    );
   }
 
   return <div className={`${className} overflow-hidden`} title={avatarSelection === 'steam' ? 'Steam avatar' : 'Custom avatar'}>{imageUrl ? <img className="h-full w-full object-cover" src={imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <span>Q</span>}</div>;
