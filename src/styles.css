@@ -2899,20 +2899,11 @@ body.qs-controller-active .qs-compact-card:focus-within {
     inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
 
-.qs-shelf-avatar--app-icon {
-  padding: 10%;
-  background: transparent;
-  color: initial;
-}
-
-.qs-shelf-avatar--app-icon img,
-.qs-shelf-avatar__app-icon {
-  display: block;
-  color: initial;
-  filter: none;
-  opacity: 1;
-  mix-blend-mode: normal;
-  background-clip: border-box;
-  mask: none;
-  -webkit-mask: none;
+.qs-shelf-avatar--app-icon span {
+  color: var(--qs-accent-primary, var(--accent));
+  font-size: 0.9em;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  transform: translateX(-0.02em);
+  text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.36);
 }
