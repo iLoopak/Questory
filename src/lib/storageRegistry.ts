@@ -9,6 +9,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.wishlistFilters.v1'
   | 'questshelf.onboarding.v1'
   | 'questshelf.platformQueues.v1'
+  | 'questshelf.playActivity.v1'
   | 'questshelf.reviewMode.v1'
   | 'questshelf.syncFolderSettings.v1'
   | 'questshelf.installHintDismissed.v1'
@@ -85,6 +86,14 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Active platforms, platform plan entries, and per-platform limits.',
     scope: 'core',
     schema: 'PlatformQueueState.',
+  },
+
+  {
+    backup: 'default',
+    key: 'questshelf.playActivity.v1',
+    purpose: 'Daily play intent activity records for games marked as played today.',
+    scope: 'core',
+    schema: 'PlayActivityRecord[] normalized by playActivityStorage.',
   },
   {
     backup: 'default',

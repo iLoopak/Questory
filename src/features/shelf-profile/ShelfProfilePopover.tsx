@@ -8,6 +8,7 @@ type ShelfProfilePopoverProps = {
   avatar: ReactNode;
   featuredGame?: Game | null;
   onOpenPersonalization: () => void;
+  onOpenPlayingNow: () => void;
   playingNowGame?: Game | null;
   shelfName: string;
   shelfOverview: ShelfOverviewCounts;
@@ -31,6 +32,7 @@ export function ShelfProfilePopover({
   avatar,
   featuredGame,
   onOpenPersonalization,
+  onOpenPlayingNow,
   playingNowGame,
   shelfName,
   shelfOverview,
@@ -59,11 +61,21 @@ export function ShelfProfilePopover({
           label="Featured Game"
           value={featuredGame?.title ?? 'No featured game yet'}
         />
-        <ShelfProfileRow
-          iconName="gamepad-2"
-          label="Playing Now"
-          value={playingNowGame?.title ?? 'Nothing marked as playing'}
-        />
+        <button
+          className="flex min-h-11 w-full min-w-0 items-center gap-3 rounded-lg border border-mint/20 bg-mint/10 px-2.5 py-2 text-left transition hover:bg-mint/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+          onClick={onOpenPlayingNow}
+          role="menuitem"
+          type="button"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
+            <Icon name="gamepad-2" size={16} strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Playing Now</span>
+            <span className="block truncate text-sm font-semibold text-slate-100" title={playingNowGame?.title ?? 'Open Playing Now Hub'}>{playingNowGame?.title ?? 'Open Playing Now Hub'}</span>
+          </span>
+          <span className="rounded-full border border-mint/25 bg-ink-950/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-mint">{shelfOverview.playing.toLocaleString()}</span>
+        </button>
       </div>
 
       <ShelfOverviewSection overview={shelfOverview} />
