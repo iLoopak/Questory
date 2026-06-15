@@ -455,27 +455,6 @@ export function AppController() {
   }, [lastRetroImportedGames, libraryFilters]);
 
   useEffect(() => {
-    if (activeUtilityView !== 'playing-now') {
-      return;
-    }
-
-    unlockDocumentScrollForPageView();
-
-    const frame = window.requestAnimationFrame(() => {
-      unlockDocumentScrollForPageView();
-    });
-
-    const timeout = window.setTimeout(() => {
-      unlockDocumentScrollForPageView();
-    }, 50);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timeout);
-    };
-  }, [activeUtilityView]);
-
-  useEffect(() => {
     function handleControllerNavigation(event: KeyboardEvent) {
       const target = event.target;
       if (
@@ -1371,7 +1350,6 @@ export function AppController() {
   }
 
   function openPlayingNowHubFromShelfProfile() {
-    unlockDocumentScrollForPageView();
     setPlayingNowReturnContext({ activeNavItem, selectedGameId });
     setSelectedGameId(null);
     setIsShelfProfileOpen(false);
@@ -1435,8 +1413,8 @@ export function AppController() {
 
   return (
     <I18nProvider language={language}>
-    <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
-      <div className="qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
+    <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${activeUtilityView === 'playing-now' ? 'h-dvh overflow-hidden' : ''} ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
+      <div className={`qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5 ${activeUtilityView === 'playing-now' ? 'h-full min-h-0 overflow-hidden' : ''}`}>
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="relative min-w-0 shrink-0" ref={shelfProfileRef}>
             <button
@@ -1522,17 +1500,19 @@ export function AppController() {
           <BackToTopButton />
         </header>
 
-        <section className="flex-1 py-2">
+        <section className={`min-h-0 flex-1 py-2 ${activeUtilityView === 'playing-now' ? 'flex flex-col overflow-hidden' : ''}`}>
           {activeUtilityView === 'playing-now' ? (
-            <PlayingNowHub
-              activity={playActivity}
-              games={games}
-              onBack={closePlayingNowHub}
-              onOpenDetails={openDetailsFromPlayingNow}
-              onPlayToday={logPlayedToday}
-              onStatusChange={updateGameStatus}
-              t={t}
-            />
+            <div className="qs-playing-now-scroll h-full min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-1">
+              <PlayingNowHub
+                activity={playActivity}
+                games={games}
+                onBack={closePlayingNowHub}
+                onOpenDetails={openDetailsFromPlayingNow}
+                onPlayToday={logPlayedToday}
+                onStatusChange={updateGameStatus}
+                t={t}
+              />
+            </div>
           ) : (activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
             <GameDetailView
               activity={playActivity}
@@ -1898,26 +1878,6 @@ export function AppController() {
 }
 
 
-
-function unlockDocumentScrollForPageView() {
-  const { body, documentElement } = document;
-  const lockedScrollY = body.style.position === 'fixed' && body.style.top.startsWith('-')
-    ? Math.max(0, Number.parseFloat(body.style.top.slice(1)) || 0)
-    : null;
-
-  documentElement.classList.remove('qs-modal-open');
-  documentElement.style.overflow = '';
-  body.style.position = '';
-  body.style.top = '';
-  body.style.left = '';
-  body.style.right = '';
-  body.style.width = '';
-  body.style.overflow = '';
-
-  if (lockedScrollY !== null) {
-    window.scrollTo(window.scrollX, lockedScrollY);
-  }
-}
 
 type PlayingNowHubProps = {
   activity: PlayActivityRecord[];
