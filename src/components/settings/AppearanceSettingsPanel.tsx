@@ -9,6 +9,7 @@ import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPrefe
 import {
   defaultAccentColor,
   defaultNeonButtonGradientBalance,
+  defaultNeonButtonGradientMidpoint,
   defaultSecondaryAccentColor,
   getNeonButtonGradientStops,
   normalizeAccentColor,
@@ -30,6 +31,7 @@ export function AppearanceSettingsPanel({
   accentColorPreference,
   secondaryAccentColorPreference,
   neonButtonGradientBalancePreference,
+  neonButtonGradientMidpointPreference,
   language,
   onControllerDebugChange,
   onControllerLayoutChange,
@@ -39,6 +41,7 @@ export function AppearanceSettingsPanel({
   onAccentColorChange,
   onSecondaryAccentColorChange,
   onNeonButtonGradientBalanceChange,
+  onNeonButtonGradientMidpointChange,
   onLanguageChange,
 }: {
   controllerLayoutPreference: ControllerLayoutPreference;
@@ -51,6 +54,7 @@ export function AppearanceSettingsPanel({
   accentColorPreference: AccentColorPreference;
   secondaryAccentColorPreference: AccentColorPreference;
   neonButtonGradientBalancePreference: number;
+  neonButtonGradientMidpointPreference: number;
   language: AppLanguage;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
@@ -60,6 +64,7 @@ export function AppearanceSettingsPanel({
   onAccentColorChange: (color: AccentColorPreference) => void;
   onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
   onNeonButtonGradientBalanceChange: (balance: number) => void;
+  onNeonButtonGradientMidpointChange: (midpoint: number) => void;
   onLanguageChange: (language: AppLanguage) => void;
 }) {
   const t = useMemo(() => createTranslator(language), [language]);
@@ -109,7 +114,7 @@ export function AppearanceSettingsPanel({
     secondaryAccentColorPreference ?? defaultSecondaryAccentColor;
   const isDefaultAccentColor = accentColorPreference === null;
   const isDefaultSecondaryAccentColor = secondaryAccentColorPreference === null;
-  const neonButtonGradientStops = getNeonButtonGradientStops(neonButtonGradientBalancePreference);
+  const neonButtonGradientStops = getNeonButtonGradientStops(neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference);
   const accentColorPresets = [
     { color: defaultAccentColor, label: t("settings.defaultAccentColor") },
     { color: "#1b75d0", label: "Steam blue" },
@@ -161,6 +166,7 @@ export function AppearanceSettingsPanel({
           : normalizedSecondary
       );
       onNeonButtonGradientBalanceChange(defaultNeonButtonGradientBalance);
+      onNeonButtonGradientMidpointChange(defaultNeonButtonGradientMidpoint);
     }
   };
 
@@ -375,8 +381,9 @@ export function AppearanceSettingsPanel({
                   {
                     "--preview-primary": selectedAccentColor,
                     "--preview-secondary": selectedSecondaryAccentColor,
-                    "--preview-button-gradient-primary-stop": neonButtonGradientStops.primaryStop,
-                    "--preview-button-gradient-secondary-stop": neonButtonGradientStops.secondaryStop,
+                    "--preview-button-gradient-start": neonButtonGradientStops.startStop,
+                    "--preview-button-gradient-mid": neonButtonGradientStops.midStop,
+                    "--preview-button-gradient-end": neonButtonGradientStops.endStop,
                   } as CSSProperties
                 }
               >
@@ -447,35 +454,67 @@ export function AppearanceSettingsPanel({
             </div>
 
 
-            <label className="mt-4 block rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
-              <span className="flex items-center justify-between gap-3">
-                <span>
-                  <span className="font-semibold text-white">Button gradient balance</span>
-                  <span className="mt-1 block text-xs text-slate-500">
-                    Shift Neon CTA buttons toward the primary or secondary accent without changing card glows.
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="block rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
+                <span className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="font-semibold text-white">Button gradient balance</span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Shift Neon CTA buttons toward the primary or secondary accent without changing card glows.
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-slate-400">
+                    {neonButtonGradientBalancePreference}
                   </span>
                 </span>
-                <span className="font-mono text-xs text-slate-400">
-                  {neonButtonGradientBalancePreference}
+                <input
+                  aria-label="Button gradient balance"
+                  className="accent-mint mt-4 w-full"
+                  max={100}
+                  min={0}
+                  onChange={(event) =>
+                    onNeonButtonGradientBalanceChange(Number(event.target.value))
+                  }
+                  type="range"
+                  value={neonButtonGradientBalancePreference}
+                />
+                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <span>Primary</span>
+                  <span>Balanced</span>
+                  <span>Secondary</span>
                 </span>
-              </span>
-              <input
-                aria-label="Button gradient balance"
-                className="accent-mint mt-4 w-full"
-                max={100}
-                min={0}
-                onChange={(event) =>
-                  onNeonButtonGradientBalanceChange(Number(event.target.value))
-                }
-                type="range"
-                value={neonButtonGradientBalancePreference}
-              />
-              <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                <span>Primary</span>
-                <span>Balanced</span>
-                <span>Secondary</span>
-              </span>
-            </label>
+              </label>
+
+              <label className="block rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
+                <span className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="font-semibold text-white">Button gradient midpoint</span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Move the Neon button color transition from tighter and earlier to wider and later.
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-slate-400">
+                    {neonButtonGradientMidpointPreference}
+                  </span>
+                </span>
+                <input
+                  aria-label="Button gradient midpoint"
+                  className="accent-mint mt-4 w-full"
+                  max={100}
+                  min={0}
+                  onChange={(event) =>
+                    onNeonButtonGradientMidpointChange(Number(event.target.value))
+                  }
+                  type="range"
+                  value={neonButtonGradientMidpointPreference}
+                />
+                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <span>Sharper</span>
+                  <span>50</span>
+                  <span>Wider</span>
+                </span>
+              </label>
+            </div>
 
             <div className="mt-4">
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -528,6 +567,7 @@ export function AppearanceSettingsPanel({
                   onAccentColorChange(null);
                   onSecondaryAccentColorChange(null);
                   onNeonButtonGradientBalanceChange(defaultNeonButtonGradientBalance);
+                  onNeonButtonGradientMidpointChange(defaultNeonButtonGradientMidpoint);
                 }}
                 type="button"
               >
