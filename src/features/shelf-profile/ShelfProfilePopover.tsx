@@ -7,7 +7,6 @@ type ShelfProfilePopoverProps = {
   activeAchievement?: QuestShelfAchievementProgress | null;
   avatar: ReactNode;
   featuredGame?: Game | null;
-  onClose: () => void;
   onOpenPersonalization: () => void;
   playingNowGame?: Game | null;
   shelfName: string;
@@ -31,7 +30,6 @@ export function ShelfProfilePopover({
   activeAchievement,
   avatar,
   featuredGame,
-  onClose,
   onOpenPersonalization,
   playingNowGame,
   shelfName,
@@ -80,18 +78,10 @@ export function ShelfProfilePopover({
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
             <Icon name="settings" size={16} strokeWidth={2.2} />
           </span>
-          <span>Personalization</span>
+          <span>Settings</span>
         </button>
       </div>
 
-      <button
-        className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg border border-skyglass/15 px-3 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
-        onClick={onClose}
-        role="menuitem"
-        type="button"
-      >
-        Close
-      </button>
     </div>
   );
 }
