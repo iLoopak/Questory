@@ -272,7 +272,7 @@ export function GameDetailView({
                 <div className="min-w-0 space-y-4">
                   <button className="inline-flex items-center gap-1.5 text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
                     <Icon name="arrow-left" />
-                    <span>{t('detail.backToLibrary')}</span>
+                    <span>{t('detail.back')}</span>
                   </button>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
