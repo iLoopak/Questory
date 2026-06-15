@@ -3512,6 +3512,8 @@ function SettingsPanel({
                 shelfIdentity={shelfIdentity}
                 achievements={questShelfAchievements}
                 activeAchievementTitle={activeAchievementTitle}
+                steamAvatarUrl={steamAvatarUrl}
+                steamPersonaName={steamPersonaName}
                 onShelfIdentityChange={onShelfIdentityChange}
               />
             </div>

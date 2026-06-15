@@ -1,7 +1,9 @@
+import { useRef, useState } from 'react';
 import { Icon } from '../Icon';
 import { ShelfAvatar } from '../ShelfIdentity';
 import {
   maxShelfNameLength,
+  resizeAvatarFile,
   type ShelfAvatarSelection,
   type ShelfIdentitySettings,
 } from '../../lib/shelfIdentity';
@@ -32,18 +34,21 @@ export function PersonalizationSettingsPanel({
   shelfIdentity,
   achievements,
   activeAchievementTitle,
+  steamAvatarUrl = '',
+  steamPersonaName = '',
   onShelfIdentityChange,
 }: {
   personalizedQuestShelfTitle: string;
   shelfIdentity: ShelfIdentitySettings;
   achievements: QuestShelfAchievementProgress[];
   activeAchievementTitle: string;
+  steamAvatarUrl?: string;
+  steamPersonaName?: string;
   onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
 }) {
-  const previewIdentity = {
-    ...shelfIdentity,
-    avatarSelection: shelfIdentity.avatarSelection === 'steam' || shelfIdentity.avatarSelection === 'custom' ? 'app-icon' : shelfIdentity.avatarSelection,
-  };
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarUploadStatus, setAvatarUploadStatus] = useState('');
+  const [avatarUploadError, setAvatarUploadError] = useState('');
 
   function updateShelfName(shelfName: string) {
     onShelfIdentityChange({ ...shelfIdentity, shelfName });
@@ -51,6 +56,28 @@ export function PersonalizationSettingsPanel({
 
   function updateShelfAvatar(avatarSelection: ShelfAvatarSelection) {
     onShelfIdentityChange({ ...shelfIdentity, avatarSelection, shelfAvatar: avatarSelection });
+    setAvatarUploadError('');
+  }
+
+  async function uploadCustomAvatar(file?: File) {
+    if (!file) return;
+    setAvatarUploadStatus('');
+    setAvatarUploadError('');
+    try {
+      const customAvatarDataUrl = await resizeAvatarFile(file);
+      onShelfIdentityChange({ ...shelfIdentity, avatarSelection: 'custom', shelfAvatar: 'custom', customAvatarDataUrl });
+      setAvatarUploadStatus('Custom avatar saved locally and selected.');
+    } catch (error) {
+      setAvatarUploadError(error instanceof Error ? error.message : 'Avatar upload failed.');
+    } finally {
+      if (uploadInputRef.current) uploadInputRef.current.value = '';
+    }
+  }
+
+  function clearCustomAvatar() {
+    onShelfIdentityChange({ ...shelfIdentity, avatarSelection: 'app-icon', shelfAvatar: 'app-icon', customAvatarDataUrl: '' });
+    setAvatarUploadStatus('Custom avatar cleared. QuestShelf Q selected.');
+    setAvatarUploadError('');
   }
 
   function updateActiveBadge(selectedActiveBadgeId: ShelfIdentitySettings['selectedActiveBadgeId']) {
@@ -58,6 +85,11 @@ export function PersonalizationSettingsPanel({
   }
 
   const activeAchievement = achievements.find((achievement) => achievement.title === activeAchievementTitle);
+  const avatarOptions = [
+    ...personalizationAvatarOptions,
+    ...(steamAvatarUrl ? [{ label: `Steam avatar${steamPersonaName ? ` · ${steamPersonaName}` : ''}`, value: 'steam' as const }] : []),
+    ...(shelfIdentity.customAvatarDataUrl ? [{ label: 'Custom upload', value: 'custom' as const }] : []),
+  ];
 
   return (
     <SettingsSection
@@ -82,7 +114,7 @@ export function PersonalizationSettingsPanel({
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Shelf Avatar</div>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Shelf Avatar">
-            {personalizationAvatarOptions.map((option) => {
+            {avatarOptions.map((option) => {
               const isSelected = shelfIdentity.avatarSelection === option.value;
               return (
                 <button
@@ -97,7 +129,7 @@ export function PersonalizationSettingsPanel({
                   role="radio"
                   type="button"
                 >
-                  <ShelfAvatar {...shelfIdentity} avatarSelection={option.value} isActive={isSelected} sizeClassName="h-11 w-11" />
+                  <ShelfAvatar {...shelfIdentity} avatarSelection={option.value} isActive={isSelected} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-11 w-11" />
                   <span className="font-semibold">{option.label}</span>
                 </button>
               );
@@ -105,7 +137,36 @@ export function PersonalizationSettingsPanel({
           </div>
         </div>
 
-
+        <div className="rounded-lg border border-skyglass/15 bg-ink-900/60 p-3">
+          <input
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => void uploadCustomAvatar(event.target.files?.[0])}
+            ref={uploadInputRef}
+            type="file"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+              onClick={() => uploadInputRef.current?.click()}
+              type="button"
+            >
+              {shelfIdentity.customAvatarDataUrl ? 'Replace custom avatar' : 'Upload custom avatar'}
+            </button>
+            {shelfIdentity.customAvatarDataUrl ? (
+              <button
+                className="h-10 rounded-md border border-red-400/30 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10"
+                onClick={clearCustomAvatar}
+                type="button"
+              >
+                Clear custom avatar
+              </button>
+            ) : null}
+            <span className="text-xs leading-5 text-slate-500">Images are cropped to 256×256 and saved locally with Shelf Identity.</span>
+          </div>
+          {avatarUploadStatus ? <div className="mt-2 text-sm text-mint">{avatarUploadStatus}</div> : null}
+          {avatarUploadError ? <div className="mt-2 text-sm text-red-200">{avatarUploadError}</div> : null}
+        </div>
 
         <div>
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -157,7 +218,7 @@ export function PersonalizationSettingsPanel({
         <div className="qs-achievement-preview">
           <div className="text-xs font-semibold uppercase tracking-[0.14em]">Preview</div>
           <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
-            <ShelfAvatar {...previewIdentity} isActive sizeClassName="h-10 w-10" />
+            <ShelfAvatar {...shelfIdentity} isActive steamAvatarUrl={steamAvatarUrl} sizeClassName="h-10 w-10" />
             <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="qs-achievement-inline-badge ml-1"> · {activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle}</span> : null}</span>
           </div>
         </div>
