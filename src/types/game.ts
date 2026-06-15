@@ -60,6 +60,7 @@ export type Game = {
   artworkUpdatedAt?: string;
   playtimeHours: number;
   playtimeCacheHours?: number;
+  steamPlaytimeMinutes?: number;
   rating?: number | null;
   favorite?: boolean;
   completionState?: string;
@@ -74,6 +75,8 @@ export type Game = {
   steamLastAchievementUnlockTime?: number;
   steamAchievementsUnsupported?: boolean;
   steamAchievementsLastCheckedAt?: number;
+  lastSteamActivityAt?: string;
+  lastSteamActivityDeltaMinutes?: number;
   externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
   externalUrl?: string;
   importedAt?: string;
