@@ -1,7 +1,9 @@
 import type { AppLanguage } from '../../i18n';
 import type { PlayActivityRecord } from '../../lib/playActivityStorage';
+import { sanitizeShelfNickname } from '../../lib/shelfIdentity';
 import type { PlatformQueueState, PlatformQueueSummary } from '../../lib/platformQueueStorage';
 import type { Game } from '../../types/game';
+import { getPlayingNowTimeBucket } from './playingNowGreeting';
 
 export type ContextualGreeting = {
   headline: string;
@@ -16,12 +18,16 @@ export type ContextualGreetingInput = {
   games: Game[];
   language: AppLanguage;
   queue?: PlatformQueueState | null;
+  seed?: string;
+  shelfIdentity?: string | null;
   shelfStats?: Pick<PlatformQueueSummary, 'platformSizes' | 'queuedCount'> | null;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const classicTitles = ['Portal', 'Portal 2', 'Half-Life 2', 'BioShock', 'Mass Effect', 'Skyrim', 'Fallout: New Vegas', 'The Witcher 3', 'Hollow Knight', 'Celeste', 'Hades'];
+const looseClassicSuffixes = ['anniversary', 'definitive edition', 'enhanced edition', 'game of the year edition', 'goty edition', 'remaster', 'remastered', 'special edition', 'ultimate edition'];
 
-export function getContextualGreeting({ activity, date = new Date(), featuredGame, games, language, queue, shelfStats }: ContextualGreetingInput): ContextualGreeting | null {
+export function getContextualGreeting({ activity, date = new Date(), featuredGame, games, language, queue, seed, shelfIdentity, shelfStats }: ContextualGreetingInput): ContextualGreeting | null {
   const libraryGames = games.filter((game) => game.collectionType === 'library');
   const playingGames = libraryGames.filter((game) => game.status === 'Playing');
   const eligibleLibraryGames = libraryGames.filter((game) => !isFinishedOrDropped(game));
@@ -41,6 +47,34 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
+  const unfinishedClassic = eligibleLibraryGames.find(isKnownUnfinishedClassic);
+  if (unfinishedClassic) {
+    candidates.push({
+      headline: language === 'cs' ? `${libraryGames.length.toLocaleString('cs-CZ')} her.` : `${libraryGames.length.toLocaleString('en-US')} games.`,
+      priority: 85,
+      subtext: language === 'cs' ? `${unfinishedClassic.title} je pořád tady.` : `${unfinishedClassic.title} is still right there.`,
+    });
+  }
+
+  const idlePlayingGame = getLongIdlePlayingGame(playingGames, date);
+  if (idlePlayingGame) {
+    const days = getDaysSince(idlePlayingGame.lastPlayedAt, date);
+    candidates.push({
+      headline: language === 'cs' ? `${idlePlayingGame.title} máš rozehraný už ${days.toLocaleString('cs-CZ')} dní.` : `You marked ${idlePlayingGame.title} as Playing ${days.toLocaleString('en-US')} days ago.`,
+      priority: 82,
+      subtext: language === 'cs' ? 'Odvážný tah.' : 'Bold move.',
+    });
+  }
+
+  const currentPlayingGame = getDeterministicGame(playingGames, `${buildSeed({ date, language, seed, shelfIdentity })}-playing-reminder`);
+  if (currentPlayingGame) {
+    candidates.push({
+      headline: language === 'cs' ? `${currentPlayingGame.title} už čeká.` : `${currentPlayingGame.title} is already waiting.`,
+      priority: 78,
+      subtext: '',
+    });
+  }
+
   if (playingGames.length > 5) {
     candidates.push({
       headline: language === 'cs' ? `${playingGames.length.toLocaleString('cs-CZ')} rozehraných her.` : `${playingGames.length.toLocaleString('en-US')} active adventures.`,
@@ -50,7 +84,13 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
   }
 
   const queuedCount = shelfStats?.queuedCount ?? queue?.entries.length ?? 0;
-  if (queuedCount > 100) {
+  if (queuedCount > 250) {
+    candidates.push({
+      headline: language === 'cs' ? `${queuedCount.toLocaleString('cs-CZ')} kandidátů v Quest Queue.` : `${queuedCount.toLocaleString('en-US')} candidates in Quest Queue.`,
+      priority: 76,
+      subtext: language === 'cs' ? 'To už není fronta. To je životní styl.' : 'That is not a queue. That is a lifestyle.',
+    });
+  } else if (queuedCount > 100) {
     candidates.push({
       headline: language === 'cs' ? `Quest Queue obsahuje ${queuedCount.toLocaleString('cs-CZ')} kandidátů.` : `Quest Queue contains ${queuedCount.toLocaleString('en-US')} candidates.`,
       priority: 70,
@@ -69,7 +109,7 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
   const recentSteamGame = getRecentSteamActivityGame(eligibleLibraryGames, activity, date);
   if (recentSteamGame) {
     candidates.push({
-      headline: language === 'cs' ? `${recentSteamGame.title} zaznamenal tvůj návrat.` : `${recentSteamGame.title} noticed your return.`,
+      headline: language === 'cs' ? `Steam zaznamenal pohyb u ${recentSteamGame.title}.` : `Steam noticed movement in ${recentSteamGame.title}.`,
       priority: 60,
       subtext: '',
     });
@@ -94,31 +134,80 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
-  const abandonedGame = playingGames
-    .filter((game) => getDaysSince(game.lastPlayedAt, date) > 30)
-    .sort((first, second) => (Date.parse(first.lastPlayedAt ?? '') || 0) - (Date.parse(second.lastPlayedAt ?? '') || 0) || first.title.localeCompare(second.title))[0];
-  if (abandonedGame) {
-    candidates.push({
-      headline: language === 'cs' ? `${abandonedGame.title} trpělivě čeká.` : `${abandonedGame.title} has been waiting patiently.`,
-      priority: 45,
-      subtext: '',
-    });
-  }
-
   const platformBacklog = getDominantPlannedPlatform(queue, shelfStats);
   if (platformBacklog) {
     candidates.push({
-      headline: language === 'cs' ? `Backlog platformy ${platformBacklog} roste.` : `Your ${platformBacklog} backlog is growing.`,
+      headline: language === 'cs' ? `${platformBacklog} táhne tenhle backlog.` : `${platformBacklog} is carrying this backlog.`,
       priority: 40,
       subtext: '',
     });
   }
 
-  return candidates.sort((first, second) => second.priority - first.priority || first.headline.localeCompare(second.headline))[0] ?? null;
+  return selectWeightedCandidate(candidates, buildSeed({ date, language, seed, shelfIdentity }));
+}
+
+function selectWeightedCandidate(candidates: ContextualGreeting[], seed: string) {
+  if (candidates.length === 0) return null;
+  const totalWeight = candidates.reduce((total, candidate) => total + getPriorityWeight(candidate.priority), 0);
+  let cursor = hashString(seed) % totalWeight;
+  const stableCandidates = [...candidates].sort((first, second) => second.priority - first.priority || first.headline.localeCompare(second.headline) || first.subtext.localeCompare(second.subtext));
+  for (const candidate of stableCandidates) {
+    cursor -= getPriorityWeight(candidate.priority);
+    if (cursor < 0) return candidate;
+  }
+  return stableCandidates[stableCandidates.length - 1] ?? null;
+}
+
+function getPriorityWeight(priority: number) {
+  if (priority >= 90) return 4;
+  if (priority >= 70) return 3;
+  if (priority >= 50) return 2;
+  return 1;
+}
+
+function buildSeed({ date, language, seed, shelfIdentity }: { date: Date; language: AppLanguage; seed?: string; shelfIdentity?: string | null }) {
+  return seed ?? `${formatSeedDate(date)}-${getPlayingNowTimeBucket(date)}-${language}-${sanitizeShelfNickname(shelfIdentity)}`;
+}
+
+function formatSeedDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  return hash;
+}
+
+function getDeterministicGame(games: Game[], seed: string) {
+  if (games.length === 0) return null;
+  const stableGames = [...games].sort((first, second) => first.title.localeCompare(second.title) || first.id.localeCompare(second.id));
+  return stableGames[hashString(seed) % stableGames.length] ?? null;
 }
 
 function isFinishedOrDropped(game: Game) {
   return game.status === 'Finished' || game.status === 'Dropped';
+}
+
+function isKnownUnfinishedClassic(game: Game) {
+  return !isFinishedOrDropped(game) && classicTitles.some((title) => looselyMatchesClassic(game.title, title));
+}
+
+function looselyMatchesClassic(gameTitle: string, classicTitle: string) {
+  const normalizedGameTitle = normalizeTitle(gameTitle);
+  const normalizedClassicTitle = normalizeTitle(classicTitle);
+  if (normalizedGameTitle === normalizedClassicTitle) return true;
+  return looseClassicSuffixes.some((suffix) => normalizedGameTitle === `${normalizedClassicTitle} ${normalizeTitle(suffix)}`);
+}
+
+function normalizeTitle(value: string) {
+  return value.toLocaleLowerCase('en-US').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+function getLongIdlePlayingGame(games: Game[], date: Date) {
+  return games
+    .filter((game) => getDaysSince(game.lastPlayedAt, date) > 14 && Number.isFinite(getDaysSince(game.lastPlayedAt, date)))
+    .sort((first, second) => (Date.parse(first.lastPlayedAt ?? '') || 0) - (Date.parse(second.lastPlayedAt ?? '') || 0) || first.title.localeCompare(second.title))[0] ?? null;
 }
 
 function getRecentSteamActivityGame(games: Game[], activity: PlayActivityRecord[], date: Date) {
@@ -131,7 +220,7 @@ function getRecentSteamActivityGame(games: Game[], activity: PlayActivityRecord[
     });
 
   return games
-    .map((game) => ({ game, detectedAt: activityByGameId.get(game.id) ?? game.lastSteamActivityAt }))
+    .map((game) => ({ game, detectedAt: activityByGameId.get(game.id) ?? (game.lastSteamActivityDeltaMinutes && game.lastSteamActivityDeltaMinutes > 0 ? game.lastSteamActivityAt : undefined) }))
     .filter(({ detectedAt }) => {
       const daysSince = getDaysSince(detectedAt, date);
       return typeof detectedAt === 'string' && daysSince >= 0 && daysSince <= 7;
