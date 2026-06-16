@@ -6,8 +6,6 @@ import type { Game } from '../../types/game';
 import { getPlayingNowTimeBucket } from './playingNowGreeting';
 
 export type ContextualGreeting = {
-  headline: string;
-  priority: number;
   subtext: string;
 };
 
@@ -35,23 +33,19 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
 
   if (libraryGames.length > 1000) {
     candidates.push({
-      headline: language === 'cs' ? `${libraryGames.length.toLocaleString('cs-CZ')} her.` : `${libraryGames.length.toLocaleString('en-US')} games.`,
-      priority: 100,
-      subtext: language === 'cs' ? 'Skutečný achievement je vybrat jednu.' : 'The real achievement is choosing one.',
+      subtext: language === 'cs'
+        ? `Quest Queue obsahuje ${libraryGames.length.toLocaleString('cs-CZ')} kandidátů. Žádný tlak.`
+        : `Quest Queue contains ${libraryGames.length.toLocaleString('en-US')} candidates. No pressure.`,
     });
   } else if (libraryGames.length > 500) {
     candidates.push({
-      headline: language === 'cs' ? '500+ her.' : '500+ games.',
-      priority: 90,
-      subtext: language === 'cs' ? 'A pořád vybíráš?' : 'Still looking for something to play?',
+      subtext: language === 'cs' ? '500+ her. A pořád vybíráš?' : '500+ games. Still looking for something to play?',
     });
   }
 
   const unfinishedClassic = eligibleLibraryGames.find(isKnownUnfinishedClassic);
   if (unfinishedClassic) {
     candidates.push({
-      headline: language === 'cs' ? `${libraryGames.length.toLocaleString('cs-CZ')} her.` : `${libraryGames.length.toLocaleString('en-US')} games.`,
-      priority: 85,
       subtext: language === 'cs' ? `${unfinishedClassic.title} je pořád tady.` : `${unfinishedClassic.title} is still right there.`,
     });
   }
@@ -60,66 +54,52 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
   if (idlePlayingGame) {
     const days = getDaysSince(idlePlayingGame.lastPlayedAt, date);
     candidates.push({
-      headline: language === 'cs' ? `${idlePlayingGame.title} máš rozehraný už ${days.toLocaleString('cs-CZ')} dní.` : `You marked ${idlePlayingGame.title} as Playing ${days.toLocaleString('en-US')} days ago.`,
-      priority: 82,
-      subtext: language === 'cs' ? 'Odvážný tah.' : 'Bold move.',
+      subtext: language === 'cs'
+        ? `${idlePlayingGame.title} máš rozehraný už ${days.toLocaleString('cs-CZ')} dní. Odvážný tah.`
+        : `You marked ${idlePlayingGame.title} as Playing ${days.toLocaleString('en-US')} days ago. Bold move.`,
     });
   }
 
   const currentPlayingGame = getDeterministicGame(playingGames, `${buildSeed({ date, language, seed, shelfIdentity })}-playing-reminder`);
   if (currentPlayingGame) {
     candidates.push({
-      headline: language === 'cs' ? `${currentPlayingGame.title} už čeká.` : `${currentPlayingGame.title} is already waiting.`,
-      priority: 78,
-      subtext: '',
+      subtext: language === 'cs' ? `${currentPlayingGame.title} už čeká.` : `${currentPlayingGame.title} is already waiting.`,
     });
   }
 
   if (playingGames.length > 5) {
     candidates.push({
-      headline: language === 'cs' ? `${playingGames.length.toLocaleString('cs-CZ')} rozehraných her.` : `${playingGames.length.toLocaleString('en-US')} active adventures.`,
-      priority: 80,
-      subtext: language === 'cs' ? 'Odvážná strategie.' : 'Bold strategy.',
+      subtext: language === 'cs' ? `${playingGames.length.toLocaleString('cs-CZ')} rozehraných her. Odvážná strategie.` : `${playingGames.length.toLocaleString('en-US')} active adventures. Bold strategy.`,
     });
   }
 
   const queuedCount = shelfStats?.queuedCount ?? queue?.entries.length ?? 0;
   if (queuedCount > 250) {
     candidates.push({
-      headline: language === 'cs' ? `${queuedCount.toLocaleString('cs-CZ')} kandidátů v Quest Queue.` : `${queuedCount.toLocaleString('en-US')} candidates in Quest Queue.`,
-      priority: 76,
-      subtext: language === 'cs' ? 'To už není fronta. To je životní styl.' : 'That is not a queue. That is a lifestyle.',
+      subtext: language === 'cs' ? `${queuedCount.toLocaleString('cs-CZ')} kandidátů v Quest Queue. To už není fronta. To je životní styl.` : `${queuedCount.toLocaleString('en-US')} candidates in Quest Queue. That is not a queue. That is a lifestyle.`,
     });
   } else if (queuedCount > 100) {
     candidates.push({
-      headline: language === 'cs' ? `Quest Queue obsahuje ${queuedCount.toLocaleString('cs-CZ')} kandidátů.` : `Quest Queue contains ${queuedCount.toLocaleString('en-US')} candidates.`,
-      priority: 70,
-      subtext: language === 'cs' ? 'Žádný tlak.' : 'No pressure.',
+      subtext: language === 'cs' ? `Quest Queue obsahuje ${queuedCount.toLocaleString('cs-CZ')} kandidátů. Žádný tlak.` : `Quest Queue contains ${queuedCount.toLocaleString('en-US')} candidates. No pressure.`,
     });
   }
 
   if (featuredGame && featuredGame.collectionType === 'library' && featuredGame.status !== 'Playing' && !isFinishedOrDropped(featuredGame)) {
     candidates.push({
-      headline: language === 'cs' ? `${featuredGame.title} stále čeká.` : `${featuredGame.title} is still waiting.`,
-      priority: 65,
-      subtext: '',
+      subtext: language === 'cs' ? `${featuredGame.title} stále čeká.` : `${featuredGame.title} is still waiting.`,
     });
   }
 
   const recentSteamGame = getRecentSteamActivityGame(eligibleLibraryGames, activity, date);
   if (recentSteamGame) {
     candidates.push({
-      headline: language === 'cs' ? `Steam zaznamenal pohyb u ${recentSteamGame.title}.` : `Steam noticed movement in ${recentSteamGame.title}.`,
-      priority: 60,
-      subtext: '',
+      subtext: language === 'cs' ? `Steam zaznamenal pohyb u ${recentSteamGame.title}.` : `Steam noticed movement in ${recentSteamGame.title}.`,
     });
   }
 
   if (playingGames.length === 1) {
     candidates.push({
-      headline: language === 'cs' ? 'Dnešní mise vypadá jasně.' : "Today's mission seems obvious.",
-      priority: 55,
-      subtext: '',
+      subtext: language === 'cs' ? 'Dnešní mise vypadá jasně.' : "Today's mission seems obvious.",
     });
   }
 
@@ -128,41 +108,24 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     .sort((first, second) => (second.steamAchievementsPercent ?? 0) - (first.steamAchievementsPercent ?? 0) || first.title.localeCompare(second.title))[0];
   if (almostCompleteGame) {
     candidates.push({
-      headline: language === 'cs' ? `${almostCompleteGame.title} je téměř hotový.` : `${almostCompleteGame.title} is almost complete.`,
-      priority: 50,
-      subtext: '',
+      subtext: language === 'cs' ? `${almostCompleteGame.title} je téměř hotový.` : `${almostCompleteGame.title} is almost complete.`,
     });
   }
 
   const platformBacklog = getDominantPlannedPlatform(queue, shelfStats);
   if (platformBacklog) {
     candidates.push({
-      headline: language === 'cs' ? `${platformBacklog} táhne tenhle backlog.` : `${platformBacklog} is carrying this backlog.`,
-      priority: 40,
-      subtext: '',
+      subtext: language === 'cs' ? `${platformBacklog} táhne tenhle backlog.` : `${platformBacklog} is carrying this backlog.`,
     });
   }
 
-  return selectWeightedCandidate(candidates, buildSeed({ date, language, seed, shelfIdentity }));
+  return selectDeterministicCandidate(candidates, buildSeed({ date, language, seed, shelfIdentity }));
 }
 
-function selectWeightedCandidate(candidates: ContextualGreeting[], seed: string) {
+function selectDeterministicCandidate(candidates: ContextualGreeting[], seed: string) {
   if (candidates.length === 0) return null;
-  const totalWeight = candidates.reduce((total, candidate) => total + getPriorityWeight(candidate.priority), 0);
-  let cursor = hashString(seed) % totalWeight;
-  const stableCandidates = [...candidates].sort((first, second) => second.priority - first.priority || first.headline.localeCompare(second.headline) || first.subtext.localeCompare(second.subtext));
-  for (const candidate of stableCandidates) {
-    cursor -= getPriorityWeight(candidate.priority);
-    if (cursor < 0) return candidate;
-  }
-  return stableCandidates[stableCandidates.length - 1] ?? null;
-}
-
-function getPriorityWeight(priority: number) {
-  if (priority >= 90) return 4;
-  if (priority >= 70) return 3;
-  if (priority >= 50) return 2;
-  return 1;
+  const stableCandidates = [...candidates].sort((first, second) => first.subtext.localeCompare(second.subtext));
+  return stableCandidates[hashString(seed) % stableCandidates.length] ?? null;
 }
 
 function buildSeed({ date, language, seed, shelfIdentity }: { date: Date; language: AppLanguage; seed?: string; shelfIdentity?: string | null }) {

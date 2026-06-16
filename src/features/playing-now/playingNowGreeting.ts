@@ -19,71 +19,71 @@ const greetingPools: Record<AppLanguage, Record<PlayingNowTimeBucket, GreetingTe
       { headline: 'Good morning, {name}.', subtext: 'What are we playing today?' },
       { headline: 'Morning, {name}.', subtext: 'Your backlog survived the night.' },
       { headline: 'Good morning.', subtext: 'One game before real life?' },
-      { headline: 'New day, same backlog.', subtext: 'What is first?' },
+      { headline: 'Morning check-in.', subtext: 'What is first?' },
     ],
     day: [
       { headline: 'Welcome back, {name}.', subtext: 'What are you in the mood for?' },
       { headline: 'Good to see you, {name}.', subtext: 'Pick your next run.' },
-      { headline: 'A quick session sounds reasonable.', subtext: '' },
-      { headline: 'What deserves your attention today?', subtext: '' },
+      { headline: 'Welcome back.', subtext: 'A quick session sounds reasonable.' },
+      { headline: 'Good to see you.', subtext: 'What deserves your attention today?' },
     ],
     evening: [
       { headline: 'Welcome back, {name}.', subtext: 'What are we playing tonight?' },
       { headline: 'Evening mode engaged.', subtext: 'Choose your quest.' },
-      { headline: 'One more game?', subtext: 'Classic.' },
-      { headline: 'The day is done.', subtext: 'The backlog is not.' },
+      { headline: 'Good evening.', subtext: 'Classic.' },
+      { headline: 'Evening check-in.', subtext: 'The backlog is not done.' },
     ],
     lateNight: [
       { headline: 'Still awake, {name}?', subtext: 'Dangerous territory.' },
-      { headline: 'One more game before sleep.', subtext: 'Surely.' },
-      { headline: '3:15.', subtext: 'Something is going to happen.' },
-      { headline: 'Your future self may question this decision.', subtext: '' },
+      { headline: 'Still awake?', subtext: 'Surely just one more game.' },
+      { headline: 'Late-night check-in.', subtext: 'Something is going to happen.' },
+      { headline: 'Still here?', subtext: 'Your future self may question this decision.' },
     ],
   },
   cs: {
     morning: [
       { headline: 'Dobré ráno, {name}.', subtext: 'Co dnes rozehraješ?' },
       { headline: 'Dobré ráno, {name}.', subtext: 'Backlog přežil další noc.' },
-      { headline: 'Nový den, stejná polička.', subtext: 'Čím začneš?' },
-      { headline: 'Než začne realita…', subtext: 'Jedna hra?' },
+      { headline: 'Dobré ráno.', subtext: 'Čím začneš?' },
+      { headline: 'Ranní kontrola.', subtext: 'Jedna hra?' },
     ],
     day: [
       { headline: 'Vítej zpátky, {name}.', subtext: 'Na co máš dnes náladu?' },
       { headline: 'Rád tě vidím, {name}.', subtext: 'Co si dáš dál?' },
-      { headline: 'Rychlá session zní rozumně.', subtext: '' },
-      { headline: 'Co si dnes zaslouží pozornost?', subtext: '' },
+      { headline: 'Vítej zpátky.', subtext: 'Rychlá session zní rozumně.' },
+      { headline: 'Rád tě vidím.', subtext: 'Co si dnes zaslouží pozornost?' },
     ],
     evening: [
       { headline: 'Vítej zpátky, {name}.', subtext: 'Co si dnes večer zahraješ?' },
       { headline: 'Večerní režim zapnut.', subtext: 'Vyber quest.' },
-      { headline: 'Ještě jedna hra?', subtext: 'Klasika.' },
-      { headline: 'Den končí.', subtext: 'Backlog ne.' },
+      { headline: 'Dobrý večer.', subtext: 'Klasika.' },
+      { headline: 'Večerní kontrola.', subtext: 'Backlog nekončí.' },
     ],
     lateNight: [
       { headline: 'Ještě vzhůru, {name}?', subtext: 'Nebezpečná zóna.' },
-      { headline: 'Ještě jedna hra před spaním.', subtext: 'Určitě.' },
-      { headline: '3:15.', subtext: 'Něco se stane.' },
-      { headline: 'Tvoje ranní já to možná zpochybní.', subtext: '' },
+      { headline: 'Ještě vzhůru?', subtext: 'Určitě jen jedna hra.' },
+      { headline: 'Noční kontrola.', subtext: 'Něco se stane.' },
+      { headline: 'Pořád tady?', subtext: 'Tvoje ranní já to možná zpochybní.' },
     ],
   },
 };
 
-const easterEggPools: Record<AppLanguage, GreetingTemplate[]> = {
+const easterEggSubtextPools: Record<AppLanguage, string[]> = {
   en: [
-    { headline: 'Achievement unlocked:', subtext: 'opened QuestShelf.' },
-    { headline: 'The backlog is not judging you.', subtext: 'Yet.' },
-    { headline: 'Quest Queue is watching.', subtext: '' },
-    { headline: 'Today is a perfect day', subtext: 'to ignore the wishlist.' },
-    { headline: 'Just browsing.', subtext: 'Famous last words.' },
-    { headline: 'Saving the world can wait.', subtext: 'Unless it is in your backlog.' },
+    'Achievement unlocked: opened QuestShelf.',
+    'The backlog is not judging you. Yet.',
+    'Quest Queue is watching.',
+    'Today is a perfect day to ignore the wishlist.',
+    'Just browsing. Famous last words.',
+    'Saving the world can wait. Unless it is in your backlog.',
   ],
   cs: [
-    { headline: 'Achievement odemčen:', subtext: 'otevřen QuestShelf.' },
-    { headline: 'Backlog tě nehodnotí.', subtext: 'Zatím.' },
-    { headline: 'Quest Queue tě sleduje.', subtext: '' },
-    { headline: 'Ideální den', subtext: 'ignorovat wishlist.' },
-    { headline: 'Jen se podívám.', subtext: 'Slavná poslední slova.' },
-    { headline: 'Záchrana světa počká.', subtext: 'Pokud není v backlogu.' },
+    'Achievement odemčen: otevřen QuestShelf.',
+    'Backlog tě nehodnotí. Zatím.',
+    'Quest Queue tě sleduje.',
+    'Ideální den ignorovat wishlist.',
+    'Jen se podívám. Slavná poslední slova.',
+    'Záchrana světa počká. Pokud není v backlogu.',
   ],
 };
 
@@ -96,22 +96,28 @@ export function getPlayingNowTimeBucket(date: Date): PlayingNowTimeBucket {
 }
 
 export function createPlayingNowGreeting({ contextualGreeting, date = new Date(), language, nickname }: { contextualGreeting?: ContextualGreeting | null; date?: Date; language: AppLanguage; nickname?: string | null }): PlayingNowGreeting {
-  if (contextualGreeting) {
-    return { headline: contextualGreeting.headline, subtext: contextualGreeting.subtext };
-  }
-
-  const seed = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}-${getPlayingNowTimeBucket(date)}-${language}-${sanitizeShelfNickname(nickname)}`;
+  const name = sanitizeShelfNickname(nickname);
+  const timeBucket = getPlayingNowTimeBucket(date);
+  const seed = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}-${timeBucket}-${language}-${name}`;
   const hash = hashString(seed);
-  const pool = hash % 100 < 4 ? easterEggPools[language] : greetingPools[language][getPlayingNowTimeBucket(date)];
-  const template = pool[hash % pool.length];
-  return formatGreetingTemplate(template, sanitizeShelfNickname(nickname));
+  const greetingPool = greetingPools[language][timeBucket];
+  const headlineTemplate = greetingPool[hash % greetingPool.length];
+  const genericSubtext = selectGenericSubtext({ date, hash, language, name, timeBucket });
+
+  return {
+    headline: formatTemplateText(headlineTemplate.headline, name),
+    subtext: contextualGreeting?.subtext ?? genericSubtext,
+  };
 }
 
-function formatGreetingTemplate(template: GreetingTemplate, name: string) {
-  return {
-    headline: formatTemplateText(template.headline, name),
-    subtext: formatTemplateText(template.subtext, name),
-  };
+function selectGenericSubtext({ date, hash, language, name, timeBucket }: { date: Date; hash: number; language: AppLanguage; name: string; timeBucket: PlayingNowTimeBucket }) {
+  const subtexts = greetingPools[language][timeBucket]
+    .map((template) => template.subtext)
+    .filter((subtext) => subtext.trim().length > 0);
+  const pool = hash % 100 < 4 ? [...subtexts, ...easterEggSubtextPools[language]] : subtexts;
+  if (pool.length === 0) return '';
+  const subtextHash = hashString(`${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}-${timeBucket}-${language}-${name}-subtext`);
+  return formatTemplateText(pool[subtextHash % pool.length], name);
 }
 
 function formatTemplateText(value: string, name: string) {
