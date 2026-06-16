@@ -86,12 +86,7 @@ export function getContextualGreeting({ activity, date = new Date(), games, lang
     });
   }
 
-  const recentSteamGame = getRecentSteamActivityGame(playingGames, activity, date);
-  if (recentSteamGame) {
-    candidates.push({
-      subtext: language === 'cs' ? `Steam zaznamenal pohyb u ${recentSteamGame.title}.` : `Steam noticed movement in ${recentSteamGame.title}.`,
-    });
-  }
+  candidates.push(...getSteamActivityGreetingCandidates(playingGames, activity, date, language));
 
   if (playingGames.length === 1) {
     candidates.push({
@@ -165,22 +160,129 @@ function getLongIdlePlayingGame(games: Game[], date: Date) {
     .sort((first, second) => (Date.parse(first.lastPlayedAt ?? '') || 0) - (Date.parse(second.lastPlayedAt ?? '') || 0) || first.title.localeCompare(second.title))[0] ?? null;
 }
 
-function getRecentSteamActivityGame(games: Game[], activity: PlayActivityRecord[], date: Date) {
-  const activityByGameId = new Map<string, string>();
-  activity
-    .filter((record) => record.source === 'steam' && record.type === 'playtime_delta')
-    .forEach((record) => {
-      const previous = activityByGameId.get(record.gameId);
-      if (!previous || record.detectedAt > previous) activityByGameId.set(record.gameId, record.detectedAt);
-    });
+function getSteamActivityGreetingCandidates(games: Game[], activity: PlayActivityRecord[], date: Date, language: AppLanguage): ContextualGreeting[] {
+  const contexts = getSteamActivityGreetingContexts(games, activity, date);
+  const candidates: ContextualGreeting[] = [];
 
-  return games
-    .map((game) => ({ game, detectedAt: activityByGameId.get(game.id) ?? (game.lastSteamActivityDeltaMinutes && game.lastSteamActivityDeltaMinutes > 0 ? game.lastSteamActivityAt : undefined) }))
-    .filter(({ detectedAt }) => {
-      const daysSince = getDaysSince(detectedAt, date);
-      return typeof detectedAt === 'string' && daysSince >= 0 && daysSince <= 7;
-    })
-    .sort((first, second) => (second.detectedAt ?? '').localeCompare(first.detectedAt ?? '') || first.game.title.localeCompare(second.game.title))[0]?.game ?? null;
+  contexts.forEach((context) => {
+    if (isSameLocalDay(context.lastActivityAt, date)) {
+      candidates.push(...pickTemplates(language, [
+        `You already played ${context.game.title} today.`,
+        `${context.game.title} is today's front-runner.`,
+        `Steam noticed activity in ${context.game.title}.`,
+      ], [
+        `Dnes už jsi hrál ${context.game.title}.`,
+        `${context.game.title} zatím vede dnešní statistiky.`,
+        `Steam zaznamenal aktivitu u ${context.game.title}.`,
+      ]));
+    }
+
+    if (context.deltaMinutes > 0 && getDaysSince(context.lastActivityAt, date) >= 0 && getDaysSince(context.lastActivityAt, date) <= 7) {
+      const delta = formatPlaytimeDelta(context.deltaMinutes, language);
+      candidates.push(...pickTemplates(language, [
+        `${context.game.title} gained ${delta} since your last sync.`,
+        `${context.game.title} has seen some action recently.`,
+        `${delta} added to ${context.game.title}. Progress is progress.`,
+      ], [
+        `${context.game.title} získal od poslední synchronizace ${delta}.`,
+        `${context.game.title} v poslední době nezahálel.`,
+        `${delta} přidáno do ${context.game.title}. I to se počítá.`,
+      ]));
+
+      if (context.deltaMinutes >= 120) {
+        candidates.push({ subtext: language === 'cs' ? `${delta} v ${context.game.title}. To nebyla úplně rychlá session.` : `${delta} in ${context.game.title}. Not exactly a quick session.` });
+      }
+    }
+
+    if (context.returnedAfterLongInactivity && getDaysSince(context.lastActivityAt, date) <= 7) {
+      candidates.push(...pickTemplates(language, [
+        `You returned to ${context.game.title}.`,
+        `${context.game.title} noticed your comeback.`,
+      ], [
+        `Vrátil ses do ${context.game.title}.`,
+        `${context.game.title} zaznamenal tvůj návrat.`,
+      ]));
+    }
+  });
+
+  const mostActive = getUniqueMostActiveContext(contexts, date);
+  if (mostActive) {
+    candidates.push(...pickTemplates(language, [
+      `${mostActive.game.title} currently has your attention.`,
+      `${mostActive.game.title} is winning the battle for your time.`,
+    ], [
+      `${mostActive.game.title} si aktuálně drží tvoji pozornost.`,
+      `${mostActive.game.title} zatím vyhrává boj o tvůj čas.`,
+    ]));
+  }
+
+  return candidates;
+}
+
+function pickTemplates(language: AppLanguage, en: string[], cs: string[]): ContextualGreeting[] {
+  return (language === 'cs' ? cs : en).map((subtext) => ({ subtext }));
+}
+
+type SteamActivityGreetingContext = {
+  deltaMinutes: number;
+  game: Game;
+  lastActivityAt: string;
+  returnedAfterLongInactivity: boolean;
+};
+
+function getSteamActivityGreetingContexts(games: Game[], activity: PlayActivityRecord[], date: Date): SteamActivityGreetingContext[] {
+  const recordsByGameId = new Map<string, PlayActivityRecord[]>();
+  activity
+    .filter((record) => record.source === 'steam' && record.type === 'playtime_delta' && typeof record.deltaMinutes === 'number' && record.deltaMinutes > 0)
+    .forEach((record) => recordsByGameId.set(record.gameId, [...(recordsByGameId.get(record.gameId) ?? []), record]));
+
+  recordsByGameId.forEach((records, gameId) => {
+    recordsByGameId.set(gameId, records.sort((first, second) => second.detectedAt.localeCompare(first.detectedAt)));
+  });
+
+  return games.flatMap((game) => {
+    const records = recordsByGameId.get(game.id) ?? [];
+    const latestRecord = records[0];
+    const deltaMinutes = latestRecord?.deltaMinutes ?? game.lastSteamActivityDeltaMinutes;
+    const lastActivityAt = latestRecord?.detectedAt ?? game.lastSteamActivityAt;
+
+    if (!lastActivityAt || !deltaMinutes || deltaMinutes <= 0 || getDaysSince(lastActivityAt, date) < 0) {
+      return [];
+    }
+
+    const previousRecord = records[1];
+    const returnedAfterLongInactivity = Boolean(previousRecord && getDaysBetween(previousRecord.detectedAt, lastActivityAt) >= 30);
+    return [{ deltaMinutes, game, lastActivityAt, returnedAfterLongInactivity }];
+  });
+}
+
+function getUniqueMostActiveContext(contexts: SteamActivityGreetingContext[], date: Date) {
+  const sorted = contexts.filter((context) => context.deltaMinutes > 0 && getDaysSince(context.lastActivityAt, date) <= 7).sort((first, second) => second.deltaMinutes - first.deltaMinutes || first.game.title.localeCompare(second.game.title));
+  if (sorted.length === 0) return null;
+  if (sorted.length > 1 && sorted[0].deltaMinutes === sorted[1].deltaMinutes) return null;
+  return sorted[0];
+}
+
+function formatPlaytimeDelta(minutes: number, language: AppLanguage) {
+  const roundedMinutes = Math.max(1, Math.round(minutes));
+  const hours = Math.floor(roundedMinutes / 60);
+  const remainingMinutes = roundedMinutes % 60;
+  if (hours <= 0) return language === 'cs' ? `${roundedMinutes} min` : `${roundedMinutes} minutes`;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+function isSameLocalDay(value: string, date: Date) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return startOfDay(parsed).getTime() === startOfDay(date).getTime();
+}
+
+function getDaysBetween(from: string, to: string) {
+  const fromDate = Date.parse(from);
+  const toDate = Date.parse(to);
+  if (!Number.isFinite(fromDate) || !Number.isFinite(toDate)) return 0;
+  return Math.floor((startOfDay(new Date(toDate)).getTime() - startOfDay(new Date(fromDate)).getTime()) / DAY_MS);
 }
 
 function getDaysSince(value: string | null | undefined, date: Date) {
