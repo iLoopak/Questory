@@ -4,7 +4,7 @@ import { getLegacyComputedShelfTitle, isQuestShelfAchievementId, type QuestShelf
 
 export const shelfIdentityStorageKey = 'questshelf.shelfIdentity.v1';
 export const questShelfAppIconAvatarUrl = '/icons/questshelf-icon-180.png';
-export const maxShelfNameLength = 48;
+export const maxShelfNameLength = 32;
 export const maxCustomAvatarDataUrlLength = 700_000;
 export const maxCustomAvatarFileSize = 10 * 1024 * 1024;
 
@@ -65,7 +65,7 @@ export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySet
     avatarSelection,
     shelfAvatar: avatarSelection,
     customAvatarDataUrl,
-    shelfName: sanitizeShelfName(parsed.shelfName),
+    shelfName: sanitizeShelfNickname(parsed.shelfName),
     selectedActiveBadgeId: normalizeActiveBadgeId(parsed.selectedActiveBadgeId),
     featuredGameMode: normalizeFeaturedGameMode(parsed.featuredGameMode),
     manualFeaturedGameId: typeof parsed.manualFeaturedGameId === 'string' ? parsed.manualFeaturedGameId : '',
@@ -90,7 +90,24 @@ function normalizeActiveBadgeId(value: unknown): ShelfIdentitySettings['selected
 }
 
 export function sanitizeShelfName(value: unknown) {
-  return typeof value === 'string' ? value.trim().slice(0, maxShelfNameLength) : '';
+  return sanitizeShelfNickname(value);
+}
+
+export function sanitizeShelfNickname(value: unknown) {
+  if (typeof value !== 'string') return '';
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  const withoutQuestShelfSuffix = normalized.replace(/[’']s\s+QuestShelf$/i, '').trim();
+  const withoutQuestShelfPrefix = withoutQuestShelfSuffix.replace(/^QuestShelf\s*:\s*/i, '').trim();
+  if (/^(My QuestShelf|Můj QuestShelf)$/i.test(withoutQuestShelfPrefix)) return '';
+  if (/^QuestShelf$/i.test(withoutQuestShelfPrefix)) return '';
+  return withoutQuestShelfPrefix.slice(0, maxShelfNameLength);
+}
+
+export function formatShelfDisplayName(nickname: string | null | undefined, language: 'en' | 'cs' = 'en') {
+  const normalizedNickname = sanitizeShelfNickname(nickname);
+  if (language === 'cs') return normalizedNickname ? `QuestShelf: ${normalizedNickname}` : 'Můj QuestShelf';
+  return normalizedNickname ? `${normalizedNickname}'s QuestShelf` : 'My QuestShelf';
 }
 
 export function sanitizeAvatarDataUrl(value: unknown) {
@@ -167,8 +184,8 @@ function getFeaturedGameScore(game: Game) {
 }
 
 
-export function getResolvedShelfName(shelfName: string, legacyTitle: string) {
-  return sanitizeShelfName(shelfName) || legacyTitle;
+export function getResolvedShelfName(shelfName: string, legacyTitle: string, language: 'en' | 'cs' = 'en') {
+  return formatShelfDisplayName(sanitizeShelfNickname(shelfName) || sanitizeShelfNickname(legacyTitle), language);
 }
 
 export async function resizeAvatarFile(file: File, size = 256): Promise<string> {

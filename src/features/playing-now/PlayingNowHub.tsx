@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
-import type { TFunction } from '../../i18n';
+import { useI18n, type TFunction } from '../../i18n';
 import type { Game, GamePlatform, GameStatus } from '../../types/game';
+import { createPlayingNowGreeting } from './playingNowGreeting';
 
 export type PlayingNowHubProps = {
   activity: PlayActivityRecord[];
@@ -11,6 +12,7 @@ export type PlayingNowHubProps = {
   onOpenDetails: (gameId: string) => void;
   onPlayToday: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
+  shelfNickname?: string;
 };
 
 type PlayingNowContext = {
@@ -22,7 +24,12 @@ type PlayingNowContext = {
   steamActivityToday: boolean;
 };
 
-export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, onStatusChange, t }: PlayingNowHubProps & { t: TFunction }) {
+export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, onStatusChange, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
+  const { language } = useI18n();
+  const greetingRef = useRef<{ language: typeof language; nickname?: string; message: string } | null>(null);
+  if (!greetingRef.current || greetingRef.current.language !== language || greetingRef.current.nickname !== shelfNickname) {
+    greetingRef.current = { language, nickname: shelfNickname, message: createPlayingNowGreeting({ language, nickname: shelfNickname }) };
+  }
   const today = formatLocalDate(new Date());
   const playingGames = useMemo(
     () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
@@ -42,6 +49,8 @@ export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayTo
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
   }, [playingGames]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
+  const platformCount = groupedGames.length;
+  const metaLine = `${playingGames.length} ${playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')} • ${platformCount} ${platformCount === 1 ? t('playingNow.platformSingular') : t('playingNow.platformPlural')}`;
 
   return (
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-8 text-slate-100" aria-labelledby="playing-now-title">
@@ -52,8 +61,8 @@ export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayTo
               <span>{t('playingNow.title')}</span>
             </div>
             <h2 id="playing-now-title" className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{t('playingNow.title')}</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-300">{playingGames.length} {playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')}</p>
-            <p className="mt-1 max-w-2xl text-sm text-slate-400">{t('playingNow.helper')}</p>
+            <p className="mt-1 max-w-2xl text-sm text-slate-300">{greetingRef.current.message}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{metaLine}</p>
           </div>
           <button
             className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
