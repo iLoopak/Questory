@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { formatPersonalizedQuestShelfTitle, getPersonalizedQuestShelfTitle, loadAppPersonalizationSettings, sanitizeLibraryOwnerNickname, saveAppPersonalizationSettings } from '../../lib/appPersonalization';
-import { getResolvedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
+import { useI18n } from '../../i18n';
+import { getPersonalizedQuestShelfTitle, loadAppPersonalizationSettings, sanitizeLibraryOwnerNickname, saveAppPersonalizationSettings } from '../../lib/appPersonalization';
+import { getResolvedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, normalizeShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
 import type { Game } from '../../types/game';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 
 export function useShelfProfileController(games: Game[], platformQueueState: PlatformQueueState, steamProfileName: string) {
+  const { language } = useI18n();
   const [libraryOwnerNickname, setLibraryOwnerNicknameState] = useState(() => loadAppPersonalizationSettings().libraryOwnerNickname);
   const [shelfIdentity, setShelfIdentityState] = useState<ShelfIdentitySettings>(() => loadShelfIdentitySettings());
   const [isShelfProfileOpen, setIsShelfProfileOpen] = useState(false);
   const shelfProfileRef = useRef<HTMLDivElement | null>(null);
 
   const legacyQuestShelfTitle = useMemo(() => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName), [libraryOwnerNickname, steamProfileName]);
-  const personalizedQuestShelfTitle = useMemo(() => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle), [legacyQuestShelfTitle, shelfIdentity.shelfName]);
-  const formattedPersonalizedQuestShelfTitle = useMemo(() => formatPersonalizedQuestShelfTitle(personalizedQuestShelfTitle), [personalizedQuestShelfTitle]);
+  const personalizedQuestShelfTitle = useMemo(() => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle, language), [language, legacyQuestShelfTitle, shelfIdentity.shelfName]);
   const resolvedFeaturedGame = useMemo(() => getResolvedFeaturedGame(games, shelfIdentity), [games, shelfIdentity]);
   const playingNowGame = useMemo(() => games.find((game) => game.collectionType === 'library' && game.status === 'Playing') ?? null, [games]);
   const shelfOverview = useMemo(() => ({
@@ -22,7 +23,7 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
     queue: platformQueueState.entries.length,
   }), [games, platformQueueState.activePlatforms.length, platformQueueState.entries.length]);
 
-  function setShelfIdentity(value: ShelfIdentitySettings) { setShelfIdentityState(value); saveShelfIdentitySettings(value); }
+  function setShelfIdentity(value: ShelfIdentitySettings) { const normalizedValue = normalizeShelfIdentitySettings(value); setShelfIdentityState(normalizedValue); saveShelfIdentitySettings(normalizedValue); }
   function setLibraryOwnerNickname(value: string) {
     const libraryOwnerNickname = sanitizeLibraryOwnerNickname(value);
     setLibraryOwnerNicknameState(libraryOwnerNickname);
@@ -39,5 +40,5 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
     return () => { document.removeEventListener('pointerdown', handlePointerDown); document.removeEventListener('keydown', handleKeyDown); };
   }, [isShelfProfileOpen]);
 
-  return { resolvedFeaturedGame, formattedPersonalizedQuestShelfTitle, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, playingNowGame, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
+  return { resolvedFeaturedGame, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, playingNowGame, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
 }

@@ -1498,6 +1498,7 @@ export function AppController() {
                 onOpenDetails={openDetailsFromPlayingNow}
                 onPlayToday={logPlayedToday}
                 onStatusChange={updateGameStatus}
+                shelfNickname={shelfIdentity.shelfName}
                 t={t}
               />
             </div>

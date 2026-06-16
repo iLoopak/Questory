@@ -134,7 +134,7 @@ export function PersonalizationSettingsPanel({
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
             maxLength={maxShelfNameLength}
             onChange={(event) => updateShelfName(event.target.value)}
-            placeholder="Loopak's QuestShelf"
+            placeholder="Loopak"
             value={shelfIdentity.shelfName}
           />
           <span className="mt-2 block text-xs leading-5 text-slate-500">
