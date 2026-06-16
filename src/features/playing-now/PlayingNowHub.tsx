@@ -1,17 +1,22 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { useI18n, type TFunction } from '../../i18n';
+import type { PlatformQueueState, PlatformQueueSummary } from '../../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../../types/game';
+import { getContextualGreeting } from './contextualGreetings';
 import { createPlayingNowGreeting } from './playingNowGreeting';
 
 export type PlayingNowHubProps = {
   activity: PlayActivityRecord[];
+  featuredGame?: Game | null;
   games: Game[];
   onBack: () => void;
   onOpenDetails: (gameId: string) => void;
   onPlayToday: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
+  queue?: PlatformQueueState | null;
+  queueSummary?: PlatformQueueSummary | null;
   shelfNickname?: string;
 };
 
@@ -24,12 +29,8 @@ type PlayingNowContext = {
   steamActivityToday: boolean;
 };
 
-export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayToday, onStatusChange, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
+export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDetails, onPlayToday, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
   const { language } = useI18n();
-  const greetingRef = useRef<{ language: typeof language; nickname?: string; message: string } | null>(null);
-  if (!greetingRef.current || greetingRef.current.language !== language || greetingRef.current.nickname !== shelfNickname) {
-    greetingRef.current = { language, nickname: shelfNickname, message: createPlayingNowGreeting({ language, nickname: shelfNickname }) };
-  }
   const today = formatLocalDate(new Date());
   const playingGames = useMemo(
     () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
@@ -49,6 +50,8 @@ export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayTo
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
   }, [playingGames]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
+  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, featuredGame, games, language, queue, shelfStats: queueSummary }), [activity, featuredGame, games, language, queue, queueSummary]);
+  const greeting = useMemo(() => createPlayingNowGreeting({ contextualGreeting, language, nickname: shelfNickname }), [contextualGreeting, language, shelfNickname]);
   const platformCount = groupedGames.length;
   const metaLine = `${playingGames.length} ${playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')} • ${platformCount} ${platformCount === 1 ? t('playingNow.platformSingular') : t('playingNow.platformPlural')}`;
 
@@ -60,8 +63,8 @@ export function PlayingNowHub({ activity, games, onBack, onOpenDetails, onPlayTo
               <Icon name="play-circle" size={14} strokeWidth={2.2} />
               <span>{t('playingNow.title')}</span>
             </div>
-            <h2 id="playing-now-title" className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{t('playingNow.title')}</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-300">{greetingRef.current.message}</p>
+            <h2 id="playing-now-title" className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{greeting.headline}</h2>
+            {greeting.subtext ? <p className="mt-1 max-w-2xl text-sm text-slate-300">{greeting.subtext}</p> : null}
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{metaLine}</p>
           </div>
           <button
