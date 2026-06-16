@@ -1493,11 +1493,14 @@ export function AppController() {
             <div className="qs-playing-now-scroll h-full min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-1">
               <PlayingNowHub
                 activity={playActivity}
+                featuredGame={resolvedFeaturedGame}
                 games={games}
                 onBack={closePlayingNowHub}
                 onOpenDetails={openDetailsFromPlayingNow}
                 onPlayToday={logPlayedToday}
                 onStatusChange={updateGameStatus}
+                queue={platformQueueState}
+                queueSummary={queueSummary}
                 shelfNickname={shelfIdentity.shelfName}
                 t={t}
               />
