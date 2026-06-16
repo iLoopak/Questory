@@ -50,7 +50,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
   }, [playingGames]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
-  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, featuredGame, games, language, queue, shelfStats: queueSummary }), [activity, featuredGame, games, language, queue, queueSummary]);
+  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, featuredGame, games, language, queue, shelfIdentity: shelfNickname, shelfStats: queueSummary }), [activity, featuredGame, games, language, queue, queueSummary, shelfNickname]);
   const greeting = useMemo(() => createPlayingNowGreeting({ contextualGreeting, language, nickname: shelfNickname }), [contextualGreeting, language, shelfNickname]);
   const platformCount = groupedGames.length;
   const metaLine = `${playingGames.length} ${playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')} • ${platformCount} ${platformCount === 1 ? t('playingNow.platformSingular') : t('playingNow.platformPlural')}`;
