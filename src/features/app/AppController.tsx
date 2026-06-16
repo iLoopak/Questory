@@ -1498,6 +1498,7 @@ export function AppController() {
                 onBack={closePlayingNowHub}
                 onOpenDetails={openDetailsFromPlayingNow}
                 onPlayToday={logPlayedToday}
+                onRefreshSteamActivity={(gameIds) => { void refreshSteamPlaytime(gameIds, { showToast: false }); }}
                 onStatusChange={updateGameStatus}
                 queue={platformQueueState}
                 queueSummary={queueSummary}
