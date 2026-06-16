@@ -14,6 +14,7 @@ export type ContextualGreetingInput = {
   date?: Date;
   featuredGame?: Game | null;
   games: Game[];
+  playingNowGames?: Game[];
   language: AppLanguage;
   queue?: PlatformQueueState | null;
   seed?: string;
@@ -26,10 +27,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const classicTitles = ['Portal', 'Portal 2', 'Half-Life 2', 'BioShock', 'Mass Effect', 'Skyrim', 'Fallout: New Vegas', 'The Witcher 3', 'Hollow Knight', 'Celeste', 'Hades'];
 const looseClassicSuffixes = ['anniversary', 'definitive edition', 'enhanced edition', 'game of the year edition', 'goty edition', 'remaster', 'remastered', 'special edition', 'ultimate edition'];
 
-export function getContextualGreeting({ activity, date = new Date(), featuredGame, games, language, previousSubtext, queue, seed, shelfIdentity, shelfStats }: ContextualGreetingInput): ContextualGreeting | null {
+export function getContextualGreeting({ activity, date = new Date(), games, language, playingNowGames, previousSubtext, queue, seed, shelfIdentity, shelfStats }: ContextualGreetingInput): ContextualGreeting | null {
   const libraryGames = games.filter((game) => game.collectionType === 'library');
-  const playingGames = libraryGames.filter((game) => game.status === 'Playing');
-  const eligibleLibraryGames = libraryGames.filter((game) => !isFinishedOrDropped(game));
+  const playingGames = (playingNowGames ?? libraryGames.filter((game) => game.status === 'Playing'))
+    .filter((game) => game.collectionType === 'library' && game.status === 'Playing');
   const candidates: ContextualGreeting[] = [];
 
   if (libraryGames.length > 1000) {
@@ -44,7 +45,7 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
-  const unfinishedClassic = eligibleLibraryGames.find(isKnownUnplayedClassic);
+  const unfinishedClassic = playingGames.find(isKnownClassic);
   if (unfinishedClassic) {
     candidates.push({
       subtext: language === 'cs' ? `${unfinishedClassic.title} je pořád tady.` : `${unfinishedClassic.title} is still right there.`,
@@ -85,13 +86,7 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
-  if (featuredGame && featuredGame.collectionType === 'library' && featuredGame.status !== 'Playing' && !isFinishedOrDropped(featuredGame)) {
-    candidates.push({
-      subtext: language === 'cs' ? `${featuredGame.title} stále čeká.` : `${featuredGame.title} is still waiting.`,
-    });
-  }
-
-  const recentSteamGame = getRecentSteamActivityGame(eligibleLibraryGames, activity, date);
+  const recentSteamGame = getRecentSteamActivityGame(playingGames, activity, date);
   if (recentSteamGame) {
     candidates.push({
       subtext: language === 'cs' ? `Steam zaznamenal pohyb u ${recentSteamGame.title}.` : `Steam noticed movement in ${recentSteamGame.title}.`,
@@ -104,8 +99,8 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
-  const almostCompleteGame = eligibleLibraryGames
-    .filter((game) => game.status !== 'Finished' && typeof game.steamAchievementsPercent === 'number' && game.steamAchievementsPercent > 90)
+  const almostCompleteGame = playingGames
+    .filter((game) => typeof game.steamAchievementsPercent === 'number' && game.steamAchievementsPercent > 90)
     .sort((first, second) => (second.steamAchievementsPercent ?? 0) - (first.steamAchievementsPercent ?? 0) || first.title.localeCompare(second.title))[0];
   if (almostCompleteGame) {
     candidates.push({
@@ -149,16 +144,8 @@ function getDeterministicGame(games: Game[], seed: string) {
   return stableGames[hashString(seed) % stableGames.length] ?? null;
 }
 
-function isFinishedOrDropped(game: Game) {
-  return game.status === 'Finished' || game.status === 'Dropped';
-}
-
-function isKnownUnplayedClassic(game: Game) {
-  return isBacklogLikeStatus(game) && classicTitles.some((title) => looselyMatchesClassic(game.title, title));
-}
-
-function isBacklogLikeStatus(game: Game) {
-  return game.status === 'Want to play' || game.status === 'Paused';
+function isKnownClassic(game: Game) {
+  return classicTitles.some((title) => looselyMatchesClassic(game.title, title));
 }
 
 function looselyMatchesClassic(gameTitle: string, classicTitle: string) {

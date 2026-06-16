@@ -52,7 +52,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
   }, [playingGames]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
-  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, featuredGame, games, language, previousSubtext: previousGreetingSubtextRef.current, queue, seed: greetingSeedRef.current, shelfIdentity: shelfNickname, shelfStats: queueSummary }), [activity, featuredGame, games, language, queue, queueSummary, shelfNickname]);
+  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, games, language, playingNowGames: playingGames, previousSubtext: previousGreetingSubtextRef.current, queue, seed: greetingSeedRef.current, shelfIdentity: shelfNickname, shelfStats: queueSummary }), [activity, games, language, playingGames, queue, queueSummary, shelfNickname]);
   const greeting = useMemo(() => createPlayingNowGreeting({ contextualGreeting, language, nickname: shelfNickname }), [contextualGreeting, language, shelfNickname]);
 
   useEffect(() => {
