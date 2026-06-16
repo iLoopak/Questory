@@ -14,6 +14,7 @@ export type PlayingNowHubProps = {
   onBack: () => void;
   onOpenDetails: (gameId: string) => void;
   onPlayToday: (game: Game) => void;
+  onRefreshSteamActivity?: (gameIds: string[]) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   queue?: PlatformQueueState | null;
   queueSummary?: PlatformQueueSummary | null;
@@ -29,7 +30,7 @@ type PlayingNowContext = {
   steamActivityToday: boolean;
 };
 
-export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDetails, onPlayToday, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
+export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDetails, onPlayToday, onRefreshSteamActivity, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
   const { language } = useI18n();
   const today = formatLocalDate(new Date());
   const greetingSeedRef = useRef(`${Date.now()}-${Math.random()}`);
@@ -38,6 +39,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
     () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
     [games],
   );
+  const refreshKeyRef = useRef<string | null>(null);
   const groupedGames = useMemo(() => {
     const groups = new Map<GamePlatform, Game[]>();
 
@@ -52,6 +54,15 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
   }, [playingGames]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
+
+  useEffect(() => {
+    if (!onRefreshSteamActivity) return;
+    const refreshableGameIds = playingGames.filter(isVisiblePlayingSteamGame).map((game) => game.id).sort();
+    const refreshKey = refreshableGameIds.join('|');
+    if (!refreshKey || refreshKeyRef.current === refreshKey) return;
+    refreshKeyRef.current = refreshKey;
+    window.setTimeout(() => onRefreshSteamActivity(refreshableGameIds), 0);
+  }, [onRefreshSteamActivity, playingGames]);
   const contextualGreeting = useMemo(() => getContextualGreeting({ activity, games, language, playingNowGames: playingGames, previousSubtext: previousGreetingSubtextRef.current, queue, seed: greetingSeedRef.current, shelfIdentity: shelfNickname, shelfStats: queueSummary }), [activity, games, language, playingGames, queue, queueSummary, shelfNickname]);
   const greeting = useMemo(() => createPlayingNowGreeting({ contextualGreeting, language, nickname: shelfNickname }), [contextualGreeting, language, shelfNickname]);
 
@@ -100,7 +111,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
                     </div>
                     <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs font-semibold text-slate-400">{platformGames.length}</span>
                   </div>
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3 lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] 2xl:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-2.5 lg:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] 2xl:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
                     {platformGames.map((game) => (
                       <PlayingNowCard
                         key={game.id}
@@ -141,48 +152,64 @@ function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
 }
 
 function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange, t }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; t: TFunction }) {
+  const statusBadge = getPlayingNowStatusBadge(context, t);
+
   return (
-    <article className="flex h-full min-w-0 gap-3 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3 shadow-lg shadow-black/20">
-      <img className="h-28 w-20 shrink-0 rounded-lg border border-skyglass/15 object-cover bg-ink-900" src={game.coverImage} alt={`${game.title} cover`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
-            <p className="mt-1 text-xs font-medium text-slate-400">{game.platform}</p>
-          </div>
-          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${context.steamActivityToday || context.playedToday ? 'border-mint/30 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-400'}`}>{context.steamActivityToday ? t('playingNow.activeToday') : context.playedToday ? t('playingNow.playedToday') : t('playingNow.notToday')}</span>
+    <article className="flex h-full min-w-0 gap-2.5 rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20">
+      <img className="h-24 w-16 shrink-0 rounded-lg border border-skyglass/15 bg-ink-900 object-cover" src={game.coverImage} alt={`${game.title} cover`} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
+          <p className="mt-0.5 truncate text-[0.7rem] font-medium text-slate-400" title={game.platform}>{game.platform}</p>
         </div>
-        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-          <Stat label={t('playingNow.last')} value={context.lastPlayedDate ?? t('playingNow.never')} />
-          <Stat label={t('playingNow.days7')} value={String(context.playedDaysLast7)} />
-          <Stat label={t('playingNow.days30')} value={String(context.playedDaysLast30)} />
-        </dl>
-        {context.steamActivityLabel ? (
-          <div className="mt-3 rounded-lg border border-mint/20 bg-mint/10 px-2.5 py-2 text-xs font-semibold text-mint">
-            {context.steamActivityToday ? t('playingNow.steamActivityDetectedToday') : translateSteamActivityLabel(context.steamActivityLabel, t)}
-          </div>
-        ) : null}
-        {game.notes.trim() ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-400">{game.notes.trim()}</p> : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="rounded-md bg-mint px-3 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
-          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-mint/10" onClick={() => onOpenDetails(game.id)} type="button">{t('playingNow.openDetail')}</button>
-          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-skyglass/10" onClick={() => onStatusChange(game.id, 'Paused')} type="button">{t('status.paused')}</button>
-          <button className="rounded-md border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-skyglass/10" onClick={() => onStatusChange(game.id, 'Finished')} type="button">{t('action.finished')}</button>
+        <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
+        <div className="mt-auto flex items-center gap-2 pt-3">
+          <button className="min-h-8 flex-1 rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
+          <details className="group relative shrink-0">
+            <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-skyglass/15 text-slate-200 transition hover:bg-mint/10 hover:text-white" aria-label={t('action.moreActions')}>
+              <Icon name="more-horizontal" size={16} strokeWidth={2.2} />
+            </summary>
+            <div className="absolute right-0 top-full z-40 mt-2 w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl">
+              <div className="mb-2 grid grid-cols-3 gap-1 border-b border-skyglass/10 pb-2 text-center text-[0.65rem]">
+                <Metric label={t('playingNow.last')} value={context.lastPlayedDate ?? t('playingNow.never')} />
+                <Metric label={t('playingNow.days7')} value={String(context.playedDaysLast7)} />
+                <Metric label={t('playingNow.days30')} value={String(context.playedDaysLast30)} />
+              </div>
+              <OverflowAction icon="panel-top-open" label={t('playingNow.openDetail')} onClick={() => onOpenDetails(game.id)} />
+              <OverflowAction icon="x" label={t('status.paused')} onClick={() => onStatusChange(game.id, 'Paused')} />
+              <OverflowAction icon="check-circle" label={t('action.finished')} onClick={() => onStatusChange(game.id, 'Finished')} />
+              <OverflowAction icon="archive" label={t('queue.removeFromPlaying')} onClick={() => onStatusChange(game.id, 'Want to play')} />
+            </div>
+          </details>
         </div>
       </div>
     </article>
   );
 }
 
-function translateSteamActivityLabel(label: string, t: TFunction) {
-  if (label === 'Active Today') return t('playingNow.activeToday');
-  if (label === 'Active Yesterday') return t('playingNow.activeYesterday');
-  if (label === 'Active This Week') return t('playingNow.activeThisWeek');
-  return label;
+function getPlayingNowStatusBadge(context: PlayingNowContext, t: TFunction) {
+  const activeTone = 'border-mint/30 bg-mint/10 text-mint';
+  if (context.playedToday) return { label: t('playingNow.playedToday'), tone: activeTone };
+  if (context.steamActivityToday) return { label: t('playingNow.activeToday'), tone: activeTone };
+  if (context.steamActivityLabel === 'Active This Week' || context.steamActivityLabel === 'Active Yesterday') return { label: t('playingNow.activeThisWeek'), tone: 'border-sky-300/25 bg-sky-300/10 text-sky-200' };
+  return { label: t('playingNow.idle'), tone: 'border-skyglass/15 text-slate-400' };
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-skyglass/10 bg-ink-900/70 px-2 py-1.5"><dt className="text-[0.6rem] uppercase tracking-[0.12em] text-slate-500">{label}</dt><dd className="mt-0.5 font-semibold text-slate-100">{value}</dd></div>;
+function OverflowAction({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+  return (
+    <button className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-xs font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={onClick} type="button">
+      <Icon name={icon} size={14} strokeWidth={2.2} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><div className="uppercase tracking-[0.12em] text-slate-500">{label}</div><div className="truncate font-semibold text-slate-200" title={value}>{value}</div></div>;
+}
+
+function isVisiblePlayingSteamGame(game: Game) {
+  return game.collectionType === 'library' && game.status === 'Playing' && (game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.platform.toLowerCase().includes('steam'));
 }
 
 function getPlayingNowContexts(games: Game[], activity: PlayActivityRecord[], today: string) {
