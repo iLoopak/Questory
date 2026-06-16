@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { useI18n, type TFunction } from '../../i18n';
@@ -32,6 +32,8 @@ type PlayingNowContext = {
 export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDetails, onPlayToday, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
   const { language } = useI18n();
   const today = formatLocalDate(new Date());
+  const greetingSeedRef = useRef(`${Date.now()}-${Math.random()}`);
+  const previousGreetingSubtextRef = useRef(readLastPlayingNowGreetingSubtext());
   const playingGames = useMemo(
     () => games.filter((game) => game.collectionType === 'library' && game.status === 'Playing'),
     [games],
@@ -50,8 +52,12 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
   }, [playingGames]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
-  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, featuredGame, games, language, queue, shelfIdentity: shelfNickname, shelfStats: queueSummary }), [activity, featuredGame, games, language, queue, queueSummary, shelfNickname]);
+  const contextualGreeting = useMemo(() => getContextualGreeting({ activity, featuredGame, games, language, previousSubtext: previousGreetingSubtextRef.current, queue, seed: greetingSeedRef.current, shelfIdentity: shelfNickname, shelfStats: queueSummary }), [activity, featuredGame, games, language, queue, queueSummary, shelfNickname]);
   const greeting = useMemo(() => createPlayingNowGreeting({ contextualGreeting, language, nickname: shelfNickname }), [contextualGreeting, language, shelfNickname]);
+
+  useEffect(() => {
+    if (contextualGreeting?.subtext) writeLastPlayingNowGreetingSubtext(contextualGreeting.subtext);
+  }, [contextualGreeting]);
   const platformCount = groupedGames.length;
   const metaLine = `${playingGames.length} ${playingGames.length === 1 ? t('playingNow.countSingular') : t('playingNow.countPlural')} • ${platformCount} ${platformCount === 1 ? t('playingNow.platformSingular') : t('playingNow.platformPlural')}`;
 
@@ -258,4 +264,24 @@ function countDatesSince(dates: string[], today: string, days: number) {
     const dateTime = new Date(`${date}T00:00:00`).getTime();
     return Number.isFinite(dateTime) && dateTime >= earliestTime && dateTime <= todayTime;
   }).length;
+}
+
+const lastPlayingNowGreetingSubtextKey = 'questshelf.playingNow.lastContextualSubtext';
+
+function readLastPlayingNowGreetingSubtext() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(lastPlayingNowGreetingSubtextKey);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastPlayingNowGreetingSubtext(subtext: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(lastPlayingNowGreetingSubtextKey, subtext);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts; greeting selection still works without repeat memory.
+  }
 }

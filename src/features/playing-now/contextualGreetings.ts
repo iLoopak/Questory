@@ -17,6 +17,7 @@ export type ContextualGreetingInput = {
   language: AppLanguage;
   queue?: PlatformQueueState | null;
   seed?: string;
+  previousSubtext?: string | null;
   shelfIdentity?: string | null;
   shelfStats?: Pick<PlatformQueueSummary, 'platformSizes' | 'queuedCount'> | null;
 };
@@ -25,7 +26,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const classicTitles = ['Portal', 'Portal 2', 'Half-Life 2', 'BioShock', 'Mass Effect', 'Skyrim', 'Fallout: New Vegas', 'The Witcher 3', 'Hollow Knight', 'Celeste', 'Hades'];
 const looseClassicSuffixes = ['anniversary', 'definitive edition', 'enhanced edition', 'game of the year edition', 'goty edition', 'remaster', 'remastered', 'special edition', 'ultimate edition'];
 
-export function getContextualGreeting({ activity, date = new Date(), featuredGame, games, language, queue, seed, shelfIdentity, shelfStats }: ContextualGreetingInput): ContextualGreeting | null {
+export function getContextualGreeting({ activity, date = new Date(), featuredGame, games, language, previousSubtext, queue, seed, shelfIdentity, shelfStats }: ContextualGreetingInput): ContextualGreeting | null {
   const libraryGames = games.filter((game) => game.collectionType === 'library');
   const playingGames = libraryGames.filter((game) => game.status === 'Playing');
   const eligibleLibraryGames = libraryGames.filter((game) => !isFinishedOrDropped(game));
@@ -43,7 +44,7 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
-  const unfinishedClassic = eligibleLibraryGames.find(isKnownUnfinishedClassic);
+  const unfinishedClassic = eligibleLibraryGames.find(isKnownUnplayedClassic);
   if (unfinishedClassic) {
     candidates.push({
       subtext: language === 'cs' ? `${unfinishedClassic.title} je pořád tady.` : `${unfinishedClassic.title} is still right there.`,
@@ -119,13 +120,13 @@ export function getContextualGreeting({ activity, date = new Date(), featuredGam
     });
   }
 
-  return selectDeterministicCandidate(candidates, buildSeed({ date, language, seed, shelfIdentity }));
+  return selectDeterministicCandidate(candidates, buildSeed({ date, language, seed, shelfIdentity }), previousSubtext);
 }
 
-function selectDeterministicCandidate(candidates: ContextualGreeting[], seed: string) {
+function selectDeterministicCandidate(candidates: ContextualGreeting[], seed: string, previousSubtext?: string | null) {
   if (candidates.length === 0) return null;
-  const stableCandidates = [...candidates].sort((first, second) => first.subtext.localeCompare(second.subtext));
-  return stableCandidates[hashString(seed) % stableCandidates.length] ?? null;
+  const eligibleCandidates = previousSubtext && candidates.length > 1 ? candidates.filter((candidate) => candidate.subtext !== previousSubtext) : candidates;
+  return eligibleCandidates[hashString(seed) % eligibleCandidates.length] ?? null;
 }
 
 function buildSeed({ date, language, seed, shelfIdentity }: { date: Date; language: AppLanguage; seed?: string; shelfIdentity?: string | null }) {
@@ -152,8 +153,12 @@ function isFinishedOrDropped(game: Game) {
   return game.status === 'Finished' || game.status === 'Dropped';
 }
 
-function isKnownUnfinishedClassic(game: Game) {
-  return !isFinishedOrDropped(game) && classicTitles.some((title) => looselyMatchesClassic(game.title, title));
+function isKnownUnplayedClassic(game: Game) {
+  return isBacklogLikeStatus(game) && classicTitles.some((title) => looselyMatchesClassic(game.title, title));
+}
+
+function isBacklogLikeStatus(game: Game) {
+  return game.status === 'Want to play' || game.status === 'Paused';
 }
 
 function looselyMatchesClassic(gameTitle: string, classicTitle: string) {
