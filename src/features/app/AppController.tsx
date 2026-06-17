@@ -1656,6 +1656,7 @@ export function AppController() {
               queuePlatforms={activeQueuePlatforms}
               queueState={platformQueueState}
               refreshingMetadataGameIds={refreshingMetadataGameIds}
+              reviewModeState={reviewModeState}
               controllerLayout={controllerLayoutPreference}
               source={activeReviewSource}
               onAction={handleReviewAction}

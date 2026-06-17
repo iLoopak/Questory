@@ -15,7 +15,7 @@ import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { PlatformBadge } from './PlatformBadge';
-import { getReviewSourceLabel, reviewSourceOptions, type ReviewSource } from '../lib/reviewModeStorage';
+import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
 
@@ -39,6 +39,7 @@ type ReviewModePanelProps = {
   queuePlatforms: GamePlatform[];
   queueState?: PlatformQueueState;
   refreshingMetadataGameIds: Set<string>;
+  reviewModeState: ReviewModeState;
   source: ReviewSource;
   onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) => void;
   onAddPlatform: (platform: GamePlatform) => void;
@@ -123,6 +124,7 @@ export function ReviewModePanel({
   queuePlatforms,
   queueState,
   refreshingMetadataGameIds,
+  reviewModeState,
   source,
   onAction,
   onAddPlatform,
@@ -146,17 +148,28 @@ export function ReviewModePanel({
   const [retainedUtilityGameIds, setRetainedUtilityGameIds] = useState<Set<string>>(() => new Set());
   const queueButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  const reviewedGameIds = useMemo(() => new Set(Object.keys(reviewModeState.reviewedGames)), [reviewModeState.reviewedGames]);
+  const queueOrderPositions = useMemo(() => new Map(reviewModeState.queueOrder.map((gameId, index) => [gameId, index])), [reviewModeState.queueOrder]);
+
   const platformOptions = useMemo(() => {
     return Array.from(new Set(games.map((game) => game.platform))).sort((first, second) =>
       first.localeCompare(second),
     );
   }, [games]);
 
+  const reviewableGames = useMemo(() => {
+    return games
+      .filter((game) => matchesReviewSource(game, source))
+      .filter((game) => selectedPlatform === anyPlatform || game.platform === selectedPlatform)
+      .filter((game) => !ignoredGameIds.has(game.id));
+  }, [games, ignoredGameIds, selectedPlatform, source]);
+
   const sourceGames = useMemo(() => {
     return games
       .filter((game) => matchesReviewSource(game, source) || retainedUtilityGameIds.has(game.id))
       .filter((game) => selectedPlatform === anyPlatform || game.platform === selectedPlatform)
       .filter((game) => !ignoredGameIds.has(game.id))
+      .filter((game) => !reviewedGameIds.has(game.id) || retainedUtilityGameIds.has(game.id))
       .sort((firstGame, secondGame) => {
         const firstRetained = retainedUtilityGameIds.has(firstGame.id);
         const secondRetained = retainedUtilityGameIds.has(secondGame.id);
@@ -165,9 +178,16 @@ export function ReviewModePanel({
           return firstRetained ? -1 : 1;
         }
 
+        const firstQueuePosition = queueOrderPositions.get(firstGame.id);
+        const secondQueuePosition = queueOrderPositions.get(secondGame.id);
+
+        if (firstQueuePosition !== undefined || secondQueuePosition !== undefined) {
+          return (firstQueuePosition ?? Number.MAX_SAFE_INTEGER) - (secondQueuePosition ?? Number.MAX_SAFE_INTEGER);
+        }
+
         return compareReviewGames(firstGame, secondGame);
       });
-  }, [games, ignoredGameIds, retainedUtilityGameIds, selectedPlatform, source]);
+  }, [games, ignoredGameIds, queueOrderPositions, retainedUtilityGameIds, reviewedGameIds, selectedPlatform, source]);
 
   const reviewQueue = useMemo(() => {
     return sourceGames.filter((game) => !processedGameIds.has(game.id));
@@ -176,9 +196,10 @@ export function ReviewModePanel({
   const activeGame = reviewQueue[0] ?? null;
   const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
-  const completedCount = sourceGames.length - reviewQueue.length;
-  const totalCount = sourceGames.length;
-  const progressLabel = totalCount === 0 ? '0 / 0' : `${Math.min(completedCount + 1, totalCount)} / ${totalCount}`;
+  const completedCount = reviewableGames.filter((game) => reviewedGameIds.has(game.id)).length;
+  const remainingCount = reviewQueue.length;
+  const totalCount = completedCount + remainingCount;
+  const progressLabel = totalCount === 0 ? '0 / 0' : `${completedCount} / ${totalCount}`;
 
   useEffect(() => {
     setProcessedGameIds(new Set());
@@ -312,7 +333,9 @@ export function ReviewModePanel({
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     onAction(game, action, note, targetPlatform);
-    setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
+    if (action !== 'skip') {
+      setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
+    }
     setReviewHistory((currentHistory) => [...currentHistory, { action, gameId: game.id }]);
     setActionStats((currentStats) => getNextActionStats(currentStats, action));
     setHighlightedActionIndex(firstPositiveActionIndex);

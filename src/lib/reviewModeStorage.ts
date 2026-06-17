@@ -1,7 +1,7 @@
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.reviewMode.v1';
-const reviewModeSchemaVersion = 1;
+const reviewModeSchemaVersion = 2;
 
 export const reviewSourceOptions = [
   'backlog',
@@ -29,6 +29,8 @@ export type ReviewStats = {
 
 export type ReviewModeState = {
   ignoredGameIds: string[];
+  queueOrder: string[];
+  reviewedGames: Record<string, { reviewedAt: string }>;
   lastSource: ReviewSource;
   schemaVersion: typeof reviewModeSchemaVersion;
   stats: ReviewStats;
@@ -49,6 +51,8 @@ const emptyStats: ReviewStats = {
 
 const emptyReviewModeState: ReviewModeState = {
   ignoredGameIds: [],
+  queueOrder: [],
+  reviewedGames: {},
   lastSource: 'backlog',
   schemaVersion: reviewModeSchemaVersion,
   stats: emptyStats,
@@ -93,6 +97,8 @@ export function normalizeReviewModeState(value: unknown): ReviewModeState {
       ? parsedState.ignoredGameIds.filter((gameId): gameId is string => typeof gameId === 'string')
       : [],
     lastSource: isReviewSource(parsedState.lastSource) ? parsedState.lastSource : 'backlog',
+    queueOrder: normalizeStringArray(parsedState.queueOrder),
+    reviewedGames: normalizeReviewedGames(parsedState.reviewedGames),
     schemaVersion: reviewModeSchemaVersion,
     stats: {
       dropped: getNumber(stats.dropped),
@@ -113,4 +119,26 @@ function isReviewSource(value: unknown): value is ReviewSource {
 
 function getNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function normalizeReviewedGames(value: unknown): ReviewModeState['reviewedGames'] {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).flatMap(([gameId, reviewedValue]) => {
+      if (!gameId || !reviewedValue || typeof reviewedValue !== 'object') {
+        return [];
+      }
+
+      const reviewedAt = (reviewedValue as { reviewedAt?: unknown }).reviewedAt;
+      return typeof reviewedAt === 'string' ? [[gameId, { reviewedAt }]] : [];
+    }),
+  );
 }
