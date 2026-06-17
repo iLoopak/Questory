@@ -185,7 +185,7 @@ function GameCardComponent({
         />
         {game.collectionType === 'wishlist' ? (
           <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-mint">
-            Wishlist
+            {t('collection.wishlist')}
           </span>
         ) : null}
 
@@ -214,7 +214,7 @@ function GameCardComponent({
               }}
               type="button"
             >
-              Details
+              {t('action.details')}
             </button>
             <div onClick={stopCardAction}>
               <GameActionMenu
