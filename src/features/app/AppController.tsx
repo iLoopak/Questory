@@ -1288,6 +1288,7 @@ export function AppController() {
     setActiveNavItem,
     setActiveReviewSource,
     setIgnoredSteamGames,
+    setPlatformQueueState,
     setReviewModeState,
     setSelectedGameId,
     startMetadataWorkflow,

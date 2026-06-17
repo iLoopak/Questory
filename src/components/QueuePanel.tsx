@@ -42,12 +42,12 @@ type QueuePanelProps = {
   onAddGameToQueue: (game: Game, platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onQueueStateChange: (state: PlatformQueueState) => void;
-  onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
-  onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
+  onMoveEntry: (gameId: string, platform: GamePlatform, direction: 'top' | 'up' | 'down') => void;
+  onMoveEntryToPlatform: (gameId: string, sourcePlatform: GamePlatform, platform: GamePlatform) => void;
   onPlayNow: (gameId: string, platform: GamePlatform) => void;
   onPlayingAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onOpenDetails: (gameId: string) => void;
-  onRemoveEntry: (gameId: string) => void;
+  onRemoveEntry: (gameId: string, platform: GamePlatform) => void;
   onStartReview: () => void;
 };
 
@@ -79,7 +79,7 @@ export function QueuePanel({
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const movePlatformOptions = activeQueuePlatforms;
-  const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => entry.gameId)), [queueState.entries]);
+  const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => `${entry.gameId}::${entry.targetPlatform}`)), [queueState.entries]);
   const displayedQueuePlatforms = useMemo(() => {
     const visiblePlatforms = platformFilter === 'All' ? activeQueuePlatforms : activeQueuePlatforms.filter((platform) => platform === platformFilter);
 
@@ -92,7 +92,7 @@ export function QueuePanel({
 
   const normalizedQueueSearch = queueSearchTerm.trim().toLowerCase();
   const addableGames = games
-    .filter((game) => game.collectionType === 'library' && !queueGameIds.has(game.id))
+    .filter((game) => game.collectionType === 'library' && (!selectedPlatform || !queueGameIds.has(`${game.id}::${selectedPlatform}`)))
     .filter((game) =>
       normalizedQueueSearch
         ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch)
@@ -687,12 +687,12 @@ function PlatformQueueColumn({
   onMovePlatform: (platform: GamePlatform, direction: 'up' | 'down') => void;
   onRemovePlatform: (platform: GamePlatform) => void;
   onRenamePlatform: (platform: GamePlatform, nextPlatform: GamePlatform) => void;
-  onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
-  onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
+  onMoveEntry: (gameId: string, platform: GamePlatform, direction: 'top' | 'up' | 'down') => void;
+  onMoveEntryToPlatform: (gameId: string, sourcePlatform: GamePlatform, platform: GamePlatform) => void;
   onPlayNow: (gameId: string, platform: GamePlatform) => void;
   onPlayingAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onOpenDetails: (gameId: string) => void;
-  onRemoveEntry: (gameId: string) => void;
+  onRemoveEntry: (gameId: string, platform: GamePlatform) => void;
 }) {
   const { t } = useI18n();
   const playingNowLabel = t('nav.playingNow');
@@ -809,7 +809,7 @@ function PlatformQueueColumn({
 
               return (
                 <QueueEntryRow
-                  key={entry.gameId}
+                  key={`${entry.gameId}-${entry.targetPlatform}`}
                   entry={entry}
                   game={game}
                   platformAccentColor={accentColor}
@@ -872,11 +872,11 @@ function QueueEntryRow({
   game: Game;
   platformAccentColor: string;
   platformOptions: GamePlatform[];
-  onMoveEntry: (gameId: string, direction: 'top' | 'up' | 'down') => void;
-  onMoveEntryToPlatform: (gameId: string, platform: GamePlatform) => void;
+  onMoveEntry: (gameId: string, platform: GamePlatform, direction: 'top' | 'up' | 'down') => void;
+  onMoveEntryToPlatform: (gameId: string, sourcePlatform: GamePlatform, platform: GamePlatform) => void;
   onOpenDetails: (gameId: string) => void;
   onPlayNow: () => void;
-  onRemoveEntry: (gameId: string) => void;
+  onRemoveEntry: (gameId: string, platform: GamePlatform) => void;
 }) {
   const { t } = useI18n();
 
@@ -894,13 +894,13 @@ function QueueEntryRow({
 
     if (event.key === 'x' || event.key === 'X') {
       event.preventDefault();
-      onMoveEntry(game.id, 'up');
+      onMoveEntry(game.id, entry.targetPlatform, 'up');
       return;
     }
 
     if (event.key === 'y' || event.key === 'Y') {
       event.preventDefault();
-      onMoveEntry(game.id, 'down');
+      onMoveEntry(game.id, entry.targetPlatform, 'down');
     }
   }
 
@@ -930,16 +930,16 @@ function QueueEntryRow({
             <Icon name="gamepad-2" />
             <span>{t('queue.playNow')}</span>
           </button>
-          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'top')} type="button">
+          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'top')} type="button">
             {t('queue.top')}
           </button>
-          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'up')} type="button">
+          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'up')} type="button">
             {t('settings.up')}
           </button>
-          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, 'down')} type="button">
+          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'down')} type="button">
             {t('settings.down')}
           </button>
-          <button className="h-9 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemoveEntry(game.id)} type="button">
+          <button className="h-9 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemoveEntry(game.id, entry.targetPlatform)} type="button">
             {t('action.remove')}
           </button>
         </div>
@@ -950,7 +950,7 @@ function QueueEntryRow({
           <select
             className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
             value={platformOptions.includes(entry.targetPlatform) ? entry.targetPlatform : ''}
-            onChange={(event) => onMoveEntryToPlatform(game.id, event.target.value as GamePlatform)}
+            onChange={(event) => onMoveEntryToPlatform(game.id, entry.targetPlatform, event.target.value as GamePlatform)}
           >
             {!platformOptions.includes(entry.targetPlatform) ? (
               <option disabled value="">
