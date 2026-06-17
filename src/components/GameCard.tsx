@@ -5,6 +5,7 @@ import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameActionMenu } from './GameActionMenu';
 import { PlatformBadge } from './PlatformBadge';
+import { DealCoverBadges } from './DealCoverBadges';
 import { translateOption, useI18n } from '../i18n';
 
 type GameCardProps = {
@@ -188,7 +189,7 @@ function GameCardComponent({
             {t('collection.wishlist')}
           </span>
         ) : null}
-
+        <DealCoverBadges game={game} variant="grid" />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
