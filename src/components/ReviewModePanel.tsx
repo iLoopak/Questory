@@ -87,21 +87,21 @@ type SwipeQuadrant = `${SwipeHorizontalDirection}-${SwipeVerticalDirection}`;
 const decisionActions = [...negativeActions, ...positiveActions];
 const decisionActionTypes = new Set<ReviewModeAction>(decisionActions.map((action) => action.action));
 const firstPositiveActionIndex = negativeActions.length;
-const defaultSwipeLeftAction: ReviewModeAction = 'skip';
-const defaultSwipeRightAction: ReviewModeAction = 'queue';
 const swipeReleaseThreshold = 110;
 const swipeVerticalDeadZone = 34;
 const swipeCommitDelayMs = 180;
 const dragStartScale = 0.85;
 const minDragScale = 0.74;
-const futureSwipeZones: Record<SwipeHorizontalDirection, Array<{ action: ReviewModeAction; hint: string; quadrant: SwipeQuadrant }>> = {
+// Derived from button arrays: top button = up gesture, bottom button = down gesture.
+// Middle buttons (Drop, Playing Now, Wishlist) are click-only — no swipe gesture.
+const futureSwipeZones: Record<SwipeHorizontalDirection, Array<{ action: ReviewModeAction; quadrant: SwipeQuadrant }>> = {
   left: [
-    { action: defaultSwipeLeftAction, hint: 'Left + up', quadrant: 'left-up' },
-    { action: 'dropped', hint: 'Left + down', quadrant: 'left-down' },
+    { action: negativeActions[0].action, quadrant: 'left-up' },
+    { action: negativeActions[negativeActions.length - 1].action, quadrant: 'left-down' },
   ],
   right: [
-    { action: 'finished', hint: 'Right + up', quadrant: 'right-up' },
-    { action: defaultSwipeRightAction, hint: 'Right + down', quadrant: 'right-down' },
+    { action: positiveActions[0].action, quadrant: 'right-up' },
+    { action: positiveActions[positiveActions.length - 1].action, quadrant: 'right-down' },
   ],
 };
 
@@ -710,34 +710,34 @@ function FocusedReviewCard({
       <section className={`qs-review-zone qs-review-zone-negative ${isSwipeEngaged && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
         <div className="grid gap-2">
-          {negativeActions.map((action, index) => (
-            <button
-              key={action.action}
-              className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(
-                action.tone,
-                highlightedActionIndex === index,
-              )}`}
-              onClick={() => onAction(action.action)}
-              onFocus={() => onHighlight(index)}
-              type="button"
-            >
-              <div className="flex items-center gap-1.5 justify-center">
-                <Icon className="select-none" name={action.icon} />
-                <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
-              </div>
-              {hasGamepad && action.hint && (
-                <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
-                  {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
-                </span>
-              )}
-            </button>
-          ))}
+          {negativeActions.map((action, index) => {
+            const isTarget = highlightedActionIndex === index;
+            return (
+              <button
+                key={action.action}
+                className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(action.tone, isTarget)} ${swipeTarget !== null && !isTarget ? 'opacity-30 pointer-events-none' : ''}`}
+                onClick={() => onAction(action.action)}
+                onFocus={() => onHighlight(index)}
+                type="button"
+              >
+                <div className="flex items-center gap-1.5 justify-center">
+                  <Icon className="select-none" name={action.icon} />
+                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
+                </div>
+                {hasGamepad && action.hint && (
+                  <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                    {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </section>
 
       <section
         className={`qs-review-hero qs-review-swipe-card flex flex-col items-center ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
-        aria-label={`${game.title} Quest Queue card. Drag left and up to Skip, left and down to Drop, right and up to Finished, or right and down to Add to Platform Plans.`}
+        aria-label={`${game.title} Quest Queue card. Drag left to Skip, left and up to Ignore, drag right to add to Platform Plans, or right and down to Finished.`}
         onPointerCancel={cancelSwipe}
         onPointerDown={beginSwipe}
         onPointerMove={updateSwipe}
@@ -880,14 +880,12 @@ function FocusedReviewCard({
         <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
+            const isTarget = highlightedActionIndex === index;
 
             return (
               <button
                 key={action.action}
-                className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(
-                  action.tone,
-                  highlightedActionIndex === index,
-                )}`}
+                className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(action.tone, isTarget)} ${swipeTarget !== null && !isTarget ? 'opacity-30 pointer-events-none' : ''}`}
                 onClick={() => onAction(action.action)}
                 onFocus={() => onHighlight(index)}
                 ref={action.action === 'queue' ? queueButtonRef : undefined}
@@ -953,7 +951,8 @@ function getSwipeVerticalDirection(offsetY: number, horizontal: SwipeHorizontalD
     return 'down';
   }
 
-  return horizontal === 'left' ? 'up' : 'down';
+  // Left default = 'down' → bottom button (Skip, gentle). Right default = 'up' → top button (Queue, primary).
+  return horizontal === 'left' ? 'down' : 'up';
 }
 
 function getSwipeTarget(offsetX: number, offsetY: number) {
