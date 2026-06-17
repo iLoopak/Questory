@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Icon } from '../../components/Icon';
 
 import type { FormEvent, ReactNode } from 'react';
@@ -149,6 +149,7 @@ export function AppController() {
   const [isScrolled, setIsScrolled] = useState(false);
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
   const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
+  const [isRawgApiKeySet, setIsRawgApiKeySet] = useState(() => Boolean(loadRawgSettings().apiKey.trim()));
   const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(steamSettingsSnapshot));
   const {
     accentColorPreference,
@@ -277,6 +278,9 @@ export function AppController() {
   const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
   const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
   const isAppMountedRef = useRef(true);
+  const gamesRef = useRef(games);
+  gamesRef.current = games;
+  const saveGamesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { addToastNotification, addUndoAction, createUndoSnapshot, dismissUndoAction, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,
@@ -336,12 +340,36 @@ export function AppController() {
 
     return () => {
       isAppMountedRef.current = false;
+      if (saveGamesTimerRef.current !== null) {
+        clearTimeout(saveGamesTimerRef.current);
+        saveGamesTimerRef.current = null;
+      }
+      saveGames(gamesRef.current);
     };
   }, []);
 
   useEffect(() => {
-    saveGames(games);
+    if (saveGamesTimerRef.current !== null) {
+      clearTimeout(saveGamesTimerRef.current);
+    }
+    saveGamesTimerRef.current = setTimeout(() => {
+      saveGamesTimerRef.current = null;
+      saveGames(gamesRef.current);
+    }, 400);
   }, [games]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden' && saveGamesTimerRef.current !== null) {
+        clearTimeout(saveGamesTimerRef.current);
+        saveGamesTimerRef.current = null;
+        saveGames(gamesRef.current);
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   useEffect(() => {
     debugAchievementSyncDiagnostic('render updated', {
@@ -382,16 +410,13 @@ export function AppController() {
   }, []);
 
   useEffect(() => {
-    const steamSettings = loadSteamSettings();
-    const rawgSettings = loadRawgSettings();
-
     markOnboardingItemsComplete([
       games.some((game) => game.collectionType === 'library' && game.externalSource === 'manual')
         ? 'manual-game'
         : null,
-      steamSettings.apiKey.trim() ? 'steam-api-key' : null,
-      steamSettings.steamId64.trim() ? 'steam-id64' : null,
-      steamSettings.apiKey.trim() && steamSettings.steamId64.trim() ? 'steam-connect' : null,
+      steamSettingsSnapshot.apiKey.trim() ? 'steam-api-key' : null,
+      steamSettingsSnapshot.steamId64.trim() ? 'steam-id64' : null,
+      steamSettingsSnapshot.apiKey.trim() && steamSettingsSnapshot.steamId64.trim() ? 'steam-connect' : null,
       platformQueueState.activePlatforms.length > 0 ? 'platforms' : null,
       platformQueueState.entries.length > 0 || games.some((game) => game.tags.includes('queue')) ? 'queue-game' : null,
       themePreference ? 'visual-preferences' : null,
@@ -401,11 +426,11 @@ export function AppController() {
       games.some((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom')
         ? 'retro-import'
         : null,
-      rawgSettings.apiKey.trim() ? 'rawg-api-key' : null,
+      isRawgApiKeySet ? 'rawg-api-key' : null,
       games.some((game) => game.metadataSource === 'rawg') ? 'metadata-enriched' : null,
       games.some((game) => game.collectionType === 'wishlist') ? 'wishlist-item' : null,
     ]);
-  }, [games, platformQueueState, themePreference]);
+  }, [games, isRawgApiKeySet, platformQueueState, steamSettingsSnapshot, themePreference]);
 
   const autoBackupSignal = useMemo(
     () =>
@@ -694,9 +719,7 @@ export function AppController() {
             }
 
             setGames((currentGames) => {
-              const mergedGames = mergeSteamAchievementUpdates(currentGames, batchResult.games, targetGameIds);
-              saveGames(mergedGames);
-              return mergedGames;
+              return mergeSteamAchievementUpdates(currentGames, batchResult.games, targetGameIds);
             });
             setSteamAchievementSyncState((currentState) =>
               currentState.status === 'loading'
@@ -747,7 +770,7 @@ export function AppController() {
           details: options.completionToastMessage?.(result.summary) ?? formatSteamAchievementSyncSummary(result.summary),
           message: syncableGames.length === 1
             ? formatGameToastMessage(hasPartialFailures ? t('toast.steamAchievementsPartiallySynced') : t('toast.steamAchievementsSynced'), syncableGames[0])
-            : hasPartialFailures ? 'Steam achievements partially synced' : 'Steam achievements synced',
+            : hasPartialFailures ? t('app.steamAchievementsBulkPartiallySynced') : t('app.steamAchievementsBulkSynced'),
         });
       }
 
@@ -906,7 +929,7 @@ export function AppController() {
         category: isCredentialError ? 'warning' : 'error',
         dedupeKey: isCredentialError ? 'steam-playtime-refresh:credentials' : 'steam-playtime-refresh:error',
         details: isCredentialError
-          ? 'Add your Steam API key and SteamID64 so QuestShelf can refresh playtime. Your Steam profile may also need public game details.'
+          ? t('app.steamPlaytimeCredentialsHelp')
           : message,
         message: isCredentialError ? t('app.steamCredentialsNeeded') : t('app.steamPlaytimeRefreshFailed'),
       });
@@ -1156,7 +1179,6 @@ export function AppController() {
     });
 
     setGames(nextGames);
-    saveGames(nextGames);
     return summary;
   }
 
@@ -1243,7 +1265,6 @@ export function AppController() {
     });
 
     setGames(nextGames);
-    saveGames(nextGames);
 
     const message = formatSteamWishlistHtmlImportSummary(summary, t);
     addToastNotification({
@@ -1393,6 +1414,26 @@ export function AppController() {
       setSelectedGameId(null);
     }
   }
+
+  const handleOpenDetailsFromCollection = useCallback((gameId: string) => {
+    setSelectedGameId(gameId);
+  }, []);
+
+  const handleClearLibraryFilters = useCallback(() => {
+    setLibraryFilters(initialCollectionFilters);
+  }, []);
+
+  const handleClearWishlistFilters = useCallback(() => {
+    setWishlistFilters(initialCollectionFilters);
+  }, []);
+
+  const handleLibraryFiltersChange = useCallback((changes: Partial<CollectionFilters>) => {
+    setLibraryFilters((currentFilters) => ({ ...currentFilters, ...changes }));
+  }, []);
+
+  const handleWishlistFiltersChange = useCallback((changes: Partial<CollectionFilters>) => {
+    setWishlistFilters((currentFilters) => ({ ...currentFilters, ...changes }));
+  }, []);
 
   if (!isAppReady) {
     return <AppStartupScreen />;
@@ -1583,11 +1624,11 @@ export function AppController() {
               }
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
-              onClearFilters={() => setLibraryFilters(initialCollectionFilters)}
-              onFiltersChange={(changes) => setLibraryFilters((currentFilters) => ({ ...currentFilters, ...changes }))}
+              onClearFilters={handleClearLibraryFilters}
+              onFiltersChange={handleLibraryFiltersChange}
               onFindMetadata={refreshGameMetadataFromActions}
               onMoveToLibrary={moveToLibrary}
-              onOpenDetails={(gameId) => setSelectedGameId(gameId)}
+              onOpenDetails={handleOpenDetailsFromCollection}
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}
               onStartReview={startReviewMode}
@@ -1616,11 +1657,11 @@ export function AppController() {
               onBulkRemove={removeManyGames}
               onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
               onBulkStatusChange={updateManyGameStatuses}
-              onClearFilters={() => setWishlistFilters(initialCollectionFilters)}
-              onFiltersChange={(changes) => setWishlistFilters((currentFilters) => ({ ...currentFilters, ...changes }))}
+              onClearFilters={handleClearWishlistFilters}
+              onFiltersChange={handleWishlistFiltersChange}
               onFindMetadata={refreshGameMetadataFromActions}
               onMoveToLibrary={moveToLibrary}
-              onOpenDetails={(gameId) => setSelectedGameId(gameId)}
+              onOpenDetails={handleOpenDetailsFromCollection}
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}
               onStartReview={startReviewMode}
@@ -1770,7 +1811,10 @@ export function AppController() {
               onOpenOnboarding={openOnboarding}
               onRestartOnboarding={restartOnboarding}
               onPlatformQueueStateChange={setPlatformQueueState}
-              onRawgApiKeyConfigured={() => markOnboardingItemComplete('rawg-api-key')}
+              onRawgApiKeyConfigured={() => {
+                markOnboardingItemComplete('rawg-api-key');
+                setIsRawgApiKeySet(true);
+              }}
               onRefreshSteamPlaytime={() => refreshSteamPlaytime()}
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
