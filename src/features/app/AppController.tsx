@@ -481,6 +481,8 @@ export function AppController() {
 
       if (event.key === 'm') {
         event.preventDefault();
+        setActiveUtilityView(null);
+        setPlayingNowReturnContext(null);
         setActiveNavItem('Settings');
         setSelectedGameId(null);
         return;
@@ -1402,6 +1404,8 @@ export function AppController() {
   }
 
   function openSettingsFromShelfProfile() {
+    setActiveUtilityView(null);
+    setPlayingNowReturnContext(null);
     setIsShelfProfileOpen(false);
     setSelectedGameId(null);
     setActiveNavItem('Settings');
@@ -1910,6 +1914,8 @@ export function AppController() {
         onDismiss={dismissUndoAction}
         onOpenQueue={openQueueFromToast}
         onOpenSteamSettings={() => {
+          setActiveUtilityView(null);
+          setPlayingNowReturnContext(null);
           setActiveNavItem('Settings');
           setActiveSettingsCategory('Integrations');
           setSelectedGameId(null);
