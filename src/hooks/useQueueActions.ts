@@ -8,6 +8,7 @@ import {
   getPlatformTag,
   moveQueueEntry,
   moveQueueEntryToPlatform,
+  removeCurrentlyPlayingFromPlatformQueue,
   removeGameFromPlatformQueue,
   updatePlatformQueueSetting,
   type PlatformQueueState,
@@ -78,7 +79,9 @@ export function useQueueActions({
       );
     }
 
-    setPlatformQueueState((currentState) => addGameToPlatformQueue(currentState, game, platform));
+    setPlatformQueueState((currentState) => game.status === 'Playing' && game.platform === platform
+      ? removeGameFromPlatformQueue(currentState, game.id, platform)
+      : addGameToPlatformQueue(currentState, game, platform));
     markOnboardingItemComplete('queue-game');
   }
 
@@ -97,7 +100,10 @@ export function useQueueActions({
     setGames((currentGames) => currentGames.map((currentGame) => currentGame.id === gameId
       ? touchGameRecord({ ...currentGame, platform, status: 'Playing', tags: platformTag ? Array.from(new Set([...currentGame.tags, platformTag])) : currentGame.tags, lastPlayedAt: today })
       : currentGame));
-    setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId, platform));
+    setPlatformQueueState((currentState) => removeCurrentlyPlayingFromPlatformQueue(removeGameFromPlatformQueue(currentState, gameId, platform), [
+      ...games.filter((currentGame) => currentGame.id !== gameId),
+      { ...game, platform, status: 'Playing' },
+    ]));
   }
 
   function updateCurrentlyPlayingGame(gameId: string, platform: GamePlatform, action: PlayingGameAction) {

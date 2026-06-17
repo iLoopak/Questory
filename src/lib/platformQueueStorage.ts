@@ -334,6 +334,29 @@ export function removeGameFromPlatformQueue(state: PlatformQueueState, gameId: s
   });
 }
 
+export function removeCurrentlyPlayingFromPlatformQueue(state: PlatformQueueState, games: Game[]): PlatformQueueState {
+  const playingGamePlatforms = getCurrentlyPlayingPlatformKeys(games);
+
+  if (playingGamePlatforms.size === 0) {
+    return normalizePlatformQueueState(state);
+  }
+
+  return normalizeQueuePositions({
+    ...state,
+    entries: state.entries.filter((entry) => !playingGamePlatforms.has(getPlatformPlanEntryKey(entry.gameId, entry.targetPlatform))),
+  });
+}
+
+export function getVisiblePlatformQueueEntries(state: PlatformQueueState, games: Game[]): PlatformQueueEntry[] {
+  const playingGamePlatforms = getCurrentlyPlayingPlatformKeys(games);
+
+  if (playingGamePlatforms.size === 0) {
+    return state.entries;
+  }
+
+  return state.entries.filter((entry) => !playingGamePlatforms.has(getPlatformPlanEntryKey(entry.gameId, entry.targetPlatform)));
+}
+
 export function moveQueueEntry(state: PlatformQueueState, gameId: string, direction: 'top' | 'up' | 'down', targetPlatform?: GamePlatform): PlatformQueueState {
   const entry = state.entries.find((queueEntry) => isSamePlatformPlanEntry(queueEntry, gameId, targetPlatform));
   if (!entry) {
@@ -435,24 +458,25 @@ export function createPlatformArtworkPreset(_platform: GamePlatform, accentColor
 
 export function getQueueSummary(state: PlatformQueueState, games: Game[]): PlatformQueueSummary {
   const gamesById = new Map(games.map((game) => [game.id, game]));
+  const visibleEntries = getVisiblePlatformQueueEntries(state, games);
   const now = Date.now();
-  const ageDays = state.entries.map((entry) => Math.max(0, Math.round((now - new Date(entry.queuedAt).getTime()) / 86400000)));
+  const ageDays = visibleEntries.map((entry) => Math.max(0, Math.round((now - new Date(entry.queuedAt).getTime()) / 86400000)));
   const platformCounts = new Map<GamePlatform, number>();
 
-  state.entries.forEach((entry) => {
+  visibleEntries.forEach((entry) => {
     platformCounts.set(entry.targetPlatform, (platformCounts.get(entry.targetPlatform) ?? 0) + 1);
   });
 
   return {
     averageQueueAgeDays: ageDays.length > 0 ? Math.round(ageDays.reduce((sum, age) => sum + age, 0) / ageDays.length) : 0,
-    estimatedBacklogHours: state.entries.reduce((sum, entry) => {
+    estimatedBacklogHours: visibleEntries.reduce((sum, entry) => {
       const game = gamesById.get(entry.gameId);
       return sum + (entry.estimatedPlaytime ?? game?.averagePlaytime ?? game?.expectedPlaytime ?? 0);
     }, 0),
     platformSizes: Array.from(platformCounts.entries())
       .map(([platform, count]) => ({ count, platform }))
       .sort((first, second) => second.count - first.count || first.platform.localeCompare(second.platform)),
-    queuedCount: state.entries.length,
+    queuedCount: visibleEntries.length,
   };
 }
 
@@ -567,6 +591,14 @@ function isSamePlatformPlanEntry(entry: PlatformQueueEntry, gameId: string, targ
 
 function getPlatformPlanEntryKey(gameId: string, targetPlatform: GamePlatform) {
   return `${gameId}::${normalizePlatformName(targetPlatform).toLowerCase()}`;
+}
+
+function getCurrentlyPlayingPlatformKeys(games: Game[]) {
+  return new Set(
+    games
+      .filter((game) => game.status === 'Playing')
+      .map((game) => getPlatformPlanEntryKey(game.id.trim(), game.platform)),
+  );
 }
 
 function normalizePlatformList(platforms: GamePlatform[]): GamePlatform[] {
