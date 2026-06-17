@@ -32,6 +32,10 @@ export type ReviewModeAction =
   | 'skip'
   | 'note';
 
+export type ReviewModeActionContext = {
+  queueGameIds?: string[];
+};
+
 type ReviewModePanelProps = {
   controllerLayout: ControllerLayoutPreference;
   games: Game[];
@@ -41,7 +45,7 @@ type ReviewModePanelProps = {
   refreshingMetadataGameIds: Set<string>;
   reviewModeState: ReviewModeState;
   source: ReviewSource;
-  onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) => void;
+  onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform, context?: ReviewModeActionContext) => void;
   onAddPlatform: (platform: GamePlatform) => void;
   onOpenQueue: () => void;
   onReturnToLibrary: () => void;
@@ -332,7 +336,7 @@ export function ReviewModePanel({
   }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
-    onAction(game, action, note, targetPlatform);
+    onAction(game, action, note, targetPlatform, { queueGameIds: reviewQueue.map((queuedGame) => queuedGame.id) });
     if (action !== 'skip') {
       setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
     }
