@@ -709,8 +709,7 @@ function FocusedReviewCard({
     >
       <section className={`qs-review-zone qs-review-zone-negative ${isSwipeEngaged && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.negativeActions')}>
         <div className="qs-review-zone-label">{t('review.discard')}</div>
-        {isSwipeEngaged ? <SwipeZonePreview direction="left" activeQuadrant={swipeTarget?.quadrant ?? null} /> : null}
-        {!isSwipeEngaged ? <div className="grid gap-2">
+        <div className="grid gap-2">
           {negativeActions.map((action, index) => (
             <button
               key={action.action}
@@ -733,7 +732,7 @@ function FocusedReviewCard({
               )}
             </button>
           ))}
-        </div> : null}
+        </div>
       </section>
 
       <section
@@ -878,8 +877,7 @@ function FocusedReviewCard({
 
       <section className={`qs-review-zone qs-review-zone-positive ${isSwipeEngaged && swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`} aria-label={t('review.positiveActions')}>
         <div className="qs-review-zone-label">{t('review.keep')}</div>
-        {isSwipeEngaged ? <SwipeZonePreview direction="right" activeQuadrant={swipeTarget?.quadrant ?? null} /> : null}
-        {!isSwipeEngaged ? <div className="grid gap-2">
+        <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
 
@@ -907,27 +905,12 @@ function FocusedReviewCard({
               </button>
             );
           })}
-        </div> : null}
+        </div>
       </section>
     </article>
   );
 }
 
-function SwipeZonePreview({ direction, activeQuadrant }: { direction: SwipeHorizontalDirection; activeQuadrant: SwipeQuadrant | null }) {
-  const { t } = useI18n();
-  const zones = futureSwipeZones[direction];
-
-  return (
-    <div className={`qs-review-future-zones qs-review-future-zones-${direction}`} aria-hidden="true">
-      {zones.map((zone) => (
-        <div key={zone.quadrant} className={`qs-review-future-zone ${activeQuadrant === zone.quadrant ? 'qs-review-future-zone-active' : ''}`}>
-          <span className="qs-review-future-zone-kicker">{zone.hint}</span>
-          <span className="qs-review-future-zone-label">{getReviewActionLabelByType(zone.action, t)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'exiting';
 
@@ -1149,10 +1132,6 @@ function getReviewActionLabel(action: { action: ReviewModeAction; label: string 
   return action.label;
 }
 
-function getReviewActionLabelByType(actionType: ReviewModeAction, t: TFunction) {
-  const action = decisionActions.find((candidate) => candidate.action === actionType);
-  return action ? getReviewActionLabel(action, t) : actionType;
-}
 
 function getActionClassName(tone: 'accent' | 'neutral' | 'danger' | 'quiet', isHighlighted: boolean) {
   if (isHighlighted) {
