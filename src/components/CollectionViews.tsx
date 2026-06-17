@@ -627,7 +627,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
         {game.status === 'Playing' || game.status === 'Paused' ? (
           <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
         ) : null}
-
+        <DealCoverBadges game={game} variant="shelf" />
       </span>
 
       <span className="mt-3 block min-h-[3rem]">
@@ -757,7 +757,7 @@ const CompactGameRow = memo(function CompactGameRow({
           ) : (
             <MissingCover title={game.title} />
           )}
-
+          <DealCoverBadges game={game} isInteractive={false} variant="compact" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
