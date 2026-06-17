@@ -1,12 +1,7 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
-import type { ReviewModeAction } from '../components/ReviewModePanel';
+import type { ReviewModeAction, ReviewModeActionContext } from '../components/ReviewModePanel';
 import { createTranslator } from '../i18n';
-import {
-  formatGameToastMessage,
-  getDismissAction,
-  getViewGameAction,
-  type NotificationDraft,
-} from '../lib/notifications';
+import { formatGameToastMessage } from '../lib/notifications';
 import {
   saveReviewModeState,
   type ReviewDecision,
@@ -24,7 +19,6 @@ type ReviewUndoPayload = {
 
 type UseReviewModeActionsParams = {
   addGameToQueue: (game: Game, platform: GamePlatform) => void;
-  addToastNotification: (notification: NotificationDraft) => void;
   addToWishlist: (game: Game) => void;
   addUndoAction: (message: string, payload: ReviewUndoPayload) => void;
   refreshGameMetadataFromActions: (game: Game, mode?: 'metadata' | 'artwork') => Promise<unknown>;
@@ -52,7 +46,6 @@ function appendReviewNote(existingNotes: string, note: string) {
 
 export function useReviewModeActions({
   addGameToQueue,
-  addToastNotification,
   addToWishlist,
   addUndoAction,
   refreshGameMetadataFromActions,
@@ -82,11 +75,18 @@ export function useReviewModeActions({
     }));
   }
 
-  function moveQuestQueueGameToEnd(gameId: string) {
-    setReviewModeState((currentState) => ({
-      ...currentState,
-      queueOrder: [...currentState.queueOrder.filter((queuedGameId) => queuedGameId !== gameId), gameId],
-    }));
+  function moveQuestQueueGameToEnd(gameId: string, context?: ReviewModeActionContext) {
+    setReviewModeState((currentState) => {
+      const currentQueueOrder = context?.queueGameIds?.length ? context.queueGameIds : currentState.queueOrder;
+      const reorderedCurrentQueue = [...currentQueueOrder.filter((queuedGameId) => queuedGameId !== gameId), gameId];
+      const reorderedGameIds = new Set(reorderedCurrentQueue);
+      const outsideCurrentQueue = currentState.queueOrder.filter((queuedGameId) => !reorderedGameIds.has(queuedGameId));
+
+      return {
+        ...currentState,
+        queueOrder: [...reorderedCurrentQueue, ...outsideCurrentQueue],
+      };
+    });
   }
 
   function recordReviewDecision(decision: ReviewDecision) {
@@ -117,16 +117,16 @@ export function useReviewModeActions({
     }));
   }
 
-  function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
+  function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform, context?: ReviewModeActionContext) {
     if (action === 'skip') {
-      addToastNotification({
-        actions: [getDismissAction(), getViewGameAction(game.id)],
-        category: 'info',
-        dedupeKey: `review-skip:${game.id}`,
-        message: formatGameToastMessage(t('toast.skipped'), game),
+      const message = formatGameToastMessage(t('toast.skipped'), game);
+      addUndoAction(message, {
+        actionType: 'skip-game',
+        affectedGameIds: [game.id],
+        description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
       });
       recordReviewDecision('skipped');
-      moveQuestQueueGameToEnd(game.id);
+      moveQuestQueueGameToEnd(game.id, context);
       return;
     }
 

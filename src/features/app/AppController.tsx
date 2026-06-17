@@ -1281,7 +1281,6 @@ export function AppController() {
 
   const { handleReviewAction, restoreReviewIgnoredGames, setReviewSource, startReviewMode } = useReviewModeActions({
     addGameToQueue,
-    addToastNotification,
     addToWishlist,
     addUndoAction,
     refreshGameMetadataFromActions,
