@@ -76,12 +76,12 @@ export function normalizeTitle(title: string) {
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[\u2122\u00ae\u00a9]/g, '')
-    .replace(/\((pc|steam|steam deck|switch|nintendo switch|playstation|ps4|ps5|xbox|xbox one|series x|series s|windows|mac|linux)\)$/g, '')
-    .replace(/\[(pc|steam|steam deck|switch|nintendo switch|playstation|ps4|ps5|xbox|xbox one|series x|series s|windows|mac|linux)\]$/g, '')
+    .replace(/\((pc|steam deck|steam|nintendo switch|switch|playstation 5|ps5|playstation 4|ps4|playstation 3|ps3|playstation 2|ps2|playstation portable|psp|ps vita|ps1|playstation|xbox series x|xbox series s|xbox one|xbox 360|xbox|series x|series s|nintendo 3ds|3ds|nintendo ds|nintendo 64|n64|game boy advance|gba|game boy color|gbc|game boy|gamecube|wii u|wii|nes|snes|dreamcast|sega saturn|saturn|sega genesis|mega drive|genesis|windows|mac|linux)\)$/g, '')
+    .replace(/\[(pc|steam deck|steam|nintendo switch|switch|playstation 5|ps5|playstation 4|ps4|playstation 3|ps3|playstation 2|ps2|playstation portable|psp|ps vita|ps1|playstation|xbox series x|xbox series s|xbox one|xbox 360|xbox|series x|series s|nintendo 3ds|3ds|nintendo ds|nintendo 64|n64|game boy advance|gba|game boy color|gbc|game boy|gamecube|wii u|wii|nes|snes|dreamcast|sega saturn|saturn|sega genesis|mega drive|genesis|windows|mac|linux)\]$/g, '')
     .replace(/\b(game of the year|goty)\b/g, '')
     .replace(/\b(definitive|deluxe|ultimate|complete|collector'?s?|enhanced|anniversary)\s+edition\b/g, '')
     .replace(/\b(remastered|remaster|remake|director'?s cut|hd|vr)\b/g, '')
-    .replace(/\b(pc|steam|steam deck|switch|nintendo switch|playstation|ps4|ps5|xbox|xbox one|series x|series s|windows|mac|linux)\b$/g, '')
+    .replace(/\b(pc|steam deck|steam|nintendo switch|switch|playstation 5|ps5|playstation 4|ps4|playstation 3|ps3|playstation 2|ps2|playstation portable|psp|ps vita|ps1|playstation|xbox series x|xbox series s|xbox one|xbox 360|xbox|series x|series s|nintendo 3ds|3ds|nintendo ds|nintendo 64|n64|game boy advance|gba|game boy color|gbc|game boy|gamecube|wii u|wii|nes|snes|dreamcast|sega saturn|saturn|sega genesis|mega drive|genesis|windows|mac|linux)\b$/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\b(edition|version)\b/g, '')
     .replace(/\s+/g, ' ')
@@ -102,22 +102,53 @@ function titleSimilarity(firstTitle: string, secondTitle: string) {
   return tokenScore * 0.75 + lengthScore * 0.25;
 }
 
+function toPlatformKey(platform: string): string {
+  switch (platform.toLowerCase().replace(/\s+/g, ' ').trim()) {
+    case 'pc': case 'windows': case 'steam': case 'steam deck': return 'pc';
+    case 'playstation': case 'playstation 1': case 'ps1': case 'psx': return 'ps';
+    case 'playstation 2': case 'ps2': return 'ps2';
+    case 'playstation 3': case 'ps3': return 'ps3';
+    case 'playstation 4': case 'ps4': return 'ps4';
+    case 'playstation 5': case 'ps5': return 'ps5';
+    case 'psp': case 'playstation portable': return 'psp';
+    case 'ps vita': case 'playstation vita': case 'vita': case 'psvita': return 'vita';
+    case 'xbox': return 'xbox';
+    case 'xbox 360': case 'x360': return 'xbox360';
+    case 'xbox one': return 'xboxone';
+    case 'xbox series x': case 'xbox series s': case 'xbox series x/s': case 'xbox series s/x': case 'series x': case 'series s': return 'xboxseries';
+    case 'nintendo switch': case 'switch': return 'switch';
+    case 'wii u': case 'wiiu': return 'wiiu';
+    case 'wii': return 'wii';
+    case 'gamecube': case 'nintendo gamecube': case 'gc': case 'ngc': return 'gamecube';
+    case 'nintendo 64': case 'n64': return 'n64';
+    case 'snes': case 'super nintendo': case 'super nes': case 'super famicom': return 'snes';
+    case 'nes': case 'famicom': case 'nintendo entertainment system': return 'nes';
+    case 'game boy advance': case 'gba': return 'gba';
+    case 'game boy color': case 'gbc': return 'gbc';
+    case 'game boy': case 'gameboy': case 'gb': return 'gb';
+    case 'nintendo ds': case 'nds': case 'ds': return 'ds';
+    case 'nintendo 3ds': case '3ds': return '3ds';
+    case 'dreamcast': case 'sega dreamcast': return 'dreamcast';
+    case 'genesis': case 'sega genesis': case 'mega drive': case 'sega mega drive': return 'genesis';
+    case 'saturn': case 'sega saturn': return 'saturn';
+    case 'mac': case 'macos': case 'apple mac': return 'mac';
+    case 'linux': return 'linux';
+    case 'ios': return 'ios';
+    case 'android': return 'android';
+    default: return platform.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+}
+
 function scorePlatform(game: Game, result: RawgSearchResult) {
-  const rawgPlatforms = result.platforms?.map((entry) => entry.platform.name.toLowerCase()) ?? [];
+  const rawgPlatforms = result.platforms?.map((entry) => toPlatformKey(entry.platform.name)) ?? [];
 
   if (rawgPlatforms.length === 0) {
     return { points: 0, reason: '' };
   }
 
-  const platform = game.platform.toLowerCase();
-  const expectsPc = platform === 'pc' || platform === 'steam' || platform === 'steam deck';
-  const hasPc = rawgPlatforms.some((rawgPlatform) => rawgPlatform.includes('pc'));
+  const gamePlatform = toPlatformKey(game.platform);
 
-  if (expectsPc && hasPc) {
-    return { points: 14, reason: 'platform similarity: match' };
-  }
-
-  if (rawgPlatforms.some((rawgPlatform) => rawgPlatform.includes(platform))) {
+  if (rawgPlatforms.includes(gamePlatform)) {
     return { points: 14, reason: 'platform similarity: match' };
   }
 

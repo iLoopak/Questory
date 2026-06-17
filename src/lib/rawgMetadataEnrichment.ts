@@ -45,7 +45,7 @@ export async function refreshRawgMetadataForGame(game: Game): Promise<SingleGame
   return { metadata, status: 'updated' };
 }
 
-function getMetadataSearchTitle(game: Game) {
+export function getMetadataSearchTitle(game: Game) {
   return (game.metadataSearchTitle || game.displayTitleOverride || game.title).trim() || game.title;
 }
 
