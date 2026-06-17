@@ -187,6 +187,7 @@ export function AppController() {
     visibleNavItems,
   } = useNavigationState({ onSectionChange: () => setSelectedGameId(null) });
   const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
+  const [detailReturnSection, setDetailReturnSection] = useState<NavItem | null>(null);
   const {
     activeQueuePlatforms,
     backlogPickerGame,
@@ -1348,6 +1349,7 @@ export function AppController() {
   }
 
   function openGameFromHome(game: Game) {
+    setDetailReturnSection('Home');
     setSelectedGameId(game.id);
     setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
@@ -1409,6 +1411,7 @@ export function AppController() {
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
     setActiveUtilityView(null);
     setPlayingNowReturnContext(null);
+    setDetailReturnSection(null);
     setActiveNavItem(item);
     setIsMoreMenuOpen(false);
     if (item !== 'Library' && item !== 'Wishlist') {
@@ -1419,6 +1422,14 @@ export function AppController() {
   const handleOpenDetailsFromCollection = useCallback((gameId: string) => {
     setSelectedGameId(gameId);
   }, []);
+
+  function handleBackFromDetail() {
+    setSelectedGameId(null);
+    if (detailReturnSection) {
+      setActiveNavItem(detailReturnSection);
+      setDetailReturnSection(null);
+    }
+  }
 
   const handleClearLibraryFilters = useCallback(() => {
     setLibraryFilters(initialCollectionFilters);
@@ -1548,13 +1559,13 @@ export function AppController() {
                 t={t}
               />
             </div>
-          ) : (activeNavItem === 'Library' || activeNavItem === 'Wishlist' || activeNavItem === 'Review Mode') && selectedGame ? (
+          ) : activeNavItem === 'Review Mode' && selectedGame ? (
             <GameDetailsView
               activity={playActivity}
               game={selectedGame}
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
-              onBack={() => setSelectedGameId(null)}
+              onBack={handleBackFromDetail}
               onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
               isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
               onIgnore={removeAndIgnoreSteamGame}
@@ -1588,89 +1599,139 @@ export function AppController() {
               }}
             />
           ) : activeNavItem === 'Library' ? (
-            <CollectionPanel
-              collectionType="library"
-              filters={libraryFilters}
-              steamAchievementSyncState={steamAchievementSyncState}
-              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-              games={filteredLibraryGames}
-              platformOptions={platformOptions}
-              tags={tags}
-              platformQueueState={platformQueueState}
-              onAddGame={() => setIsAddGameOpen(true)}
-              onAddToWishlist={addToWishlist}
-              onAddManyToWishlist={addManyToWishlist}
-              onAddToQueue={openBacklogPicker}
-              onPlayNow={playGameFromCompactRow}
-              onFinish={finishGameFromCompactRow}
-              onDrop={dropGameFromCompactRow}
-              onBulkEnrich={startMetadataWorkflow}
-              isHltbSyncing={isHltbSyncing}
-              onBulkSyncHltb={syncHltb}
-              onBulkRemove={removeManyGames}
-              onBulkSyncSteamAchievements={(gameIds, options) =>
-                syncSteamAchievements(gameIds, {
-                  completionToastMessage: formatSteamAchievementSyncSummary,
-                  emptyToastMessage: options?.emptyToastMessage,
-                  force: options?.force,
-                  showToast: true,
-                })
-              }
-              onBulkRefreshSteamPlaytime={(gameIds, options) =>
-                refreshSteamPlaytime(gameIds, {
-                  completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
-                  emptyToastMessage: options?.emptyToastMessage,
-                  showToast: true,
-                })
-              }
-              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-              onBulkStatusChange={updateManyGameStatuses}
-              onClearFilters={handleClearLibraryFilters}
-              onFiltersChange={handleLibraryFiltersChange}
-              onFindMetadata={refreshGameMetadataFromActions}
-              onMoveToLibrary={moveToLibrary}
-              onOpenDetails={handleOpenDetailsFromCollection}
-              onRemove={removeGame}
-              onRemoveAndIgnore={removeAndIgnoreSteamGame}
-              onStartReview={startReviewMode}
-              onStatusChange={updateGameStatus}
-            />
+            <div className="relative">
+              {selectedGame && (
+                <div className="absolute inset-0 z-10">
+                  <GameDetailsView
+                    activity={playActivity}
+                    game={selectedGame}
+                    onAddToQueue={openBacklogPicker}
+                    onAddToWishlist={addToWishlist}
+                    onBack={handleBackFromDetail}
+                    onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+                    isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
+                    onIgnore={removeAndIgnoreSteamGame}
+                    onSyncSteamData={syncSteamDataForGame}
+                    isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
+                    onStatusChange={updateGameStatus}
+                    onTrackingChange={updateGameTracking}
+                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
+                    onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
+                    platformQueueState={platformQueueState}
+                  />
+                </div>
+              )}
+              <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
+                <CollectionPanel
+                  collectionType="library"
+                  filters={libraryFilters}
+                  steamAchievementSyncState={steamAchievementSyncState}
+                  steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+                  games={filteredLibraryGames}
+                  platformOptions={platformOptions}
+                  tags={tags}
+                  platformQueueState={platformQueueState}
+                  onAddGame={() => setIsAddGameOpen(true)}
+                  onAddToWishlist={addToWishlist}
+                  onAddManyToWishlist={addManyToWishlist}
+                  onAddToQueue={openBacklogPicker}
+                  onPlayNow={playGameFromCompactRow}
+                  onFinish={finishGameFromCompactRow}
+                  onDrop={dropGameFromCompactRow}
+                  onBulkEnrich={startMetadataWorkflow}
+                  isHltbSyncing={isHltbSyncing}
+                  onBulkSyncHltb={syncHltb}
+                  onBulkRemove={removeManyGames}
+                  onBulkSyncSteamAchievements={(gameIds, options) =>
+                    syncSteamAchievements(gameIds, {
+                      completionToastMessage: formatSteamAchievementSyncSummary,
+                      emptyToastMessage: options?.emptyToastMessage,
+                      force: options?.force,
+                      showToast: true,
+                    })
+                  }
+                  onBulkRefreshSteamPlaytime={(gameIds, options) =>
+                    refreshSteamPlaytime(gameIds, {
+                      completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
+                      emptyToastMessage: options?.emptyToastMessage,
+                      showToast: true,
+                    })
+                  }
+                  onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
+                  onBulkStatusChange={updateManyGameStatuses}
+                  onClearFilters={handleClearLibraryFilters}
+                  onFiltersChange={handleLibraryFiltersChange}
+                  onFindMetadata={refreshGameMetadataFromActions}
+                  onMoveToLibrary={moveToLibrary}
+                  onOpenDetails={handleOpenDetailsFromCollection}
+                  onRemove={removeGame}
+                  onRemoveAndIgnore={removeAndIgnoreSteamGame}
+                  onStartReview={startReviewMode}
+                  onStatusChange={updateGameStatus}
+                />
+              </div>
+            </div>
           ) : activeNavItem === 'Wishlist' ? (
-            <CollectionPanel
-              collectionType="wishlist"
-              filters={wishlistFilters}
-              games={filteredWishlistGames}
-              platformOptions={platformOptions}
-              steamWishlistSyncState={steamWishlistSyncState}
-              itadDealSyncState={itadDealSyncState}
-              tags={tags}
-              platformQueueState={platformQueueState}
-              onAddGame={() => setIsAddGameOpen(true)}
-              onAddToWishlist={addToWishlist}
-              onAddManyToWishlist={addManyToWishlist}
-              onAddToQueue={openBacklogPicker}
-              onPlayNow={playGameFromCompactRow}
-              onFinish={finishGameFromCompactRow}
-              onDrop={dropGameFromCompactRow}
-              onBulkEnrich={startMetadataWorkflow}
-              isHltbSyncing={isHltbSyncing}
-              onBulkSyncHltb={syncHltb}
-              onBulkRemove={removeManyGames}
-              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-              onBulkStatusChange={updateManyGameStatuses}
-              onClearFilters={handleClearWishlistFilters}
-              onFiltersChange={handleWishlistFiltersChange}
-              onFindMetadata={refreshGameMetadataFromActions}
-              onMoveToLibrary={moveToLibrary}
-              onOpenDetails={handleOpenDetailsFromCollection}
-              onRemove={removeGame}
-              onRemoveAndIgnore={removeAndIgnoreSteamGame}
-              onStartReview={startReviewMode}
-              onStatusChange={updateGameStatus}
-              onSyncSteamWishlist={syncSteamWishlist}
-              onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
-              onSyncItadDeals={syncWishlistDeals}
-            />
+            <div className="relative">
+              {selectedGame && (
+                <div className="absolute inset-0 z-10">
+                  <GameDetailsView
+                    activity={playActivity}
+                    game={selectedGame}
+                    onAddToQueue={openBacklogPicker}
+                    onAddToWishlist={addToWishlist}
+                    onBack={handleBackFromDetail}
+                    onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+                    isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
+                    onIgnore={removeAndIgnoreSteamGame}
+                    onSyncSteamData={syncSteamDataForGame}
+                    isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
+                    onStatusChange={updateGameStatus}
+                    onTrackingChange={updateGameTracking}
+                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
+                    onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
+                    platformQueueState={platformQueueState}
+                  />
+                </div>
+              )}
+              <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
+                <CollectionPanel
+                  collectionType="wishlist"
+                  filters={wishlistFilters}
+                  games={filteredWishlistGames}
+                  platformOptions={platformOptions}
+                  steamWishlistSyncState={steamWishlistSyncState}
+                  itadDealSyncState={itadDealSyncState}
+                  tags={tags}
+                  platformQueueState={platformQueueState}
+                  onAddGame={() => setIsAddGameOpen(true)}
+                  onAddToWishlist={addToWishlist}
+                  onAddManyToWishlist={addManyToWishlist}
+                  onAddToQueue={openBacklogPicker}
+                  onPlayNow={playGameFromCompactRow}
+                  onFinish={finishGameFromCompactRow}
+                  onDrop={dropGameFromCompactRow}
+                  onBulkEnrich={startMetadataWorkflow}
+                  isHltbSyncing={isHltbSyncing}
+                  onBulkSyncHltb={syncHltb}
+                  onBulkRemove={removeManyGames}
+                  onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
+                  onBulkStatusChange={updateManyGameStatuses}
+                  onClearFilters={handleClearWishlistFilters}
+                  onFiltersChange={handleWishlistFiltersChange}
+                  onFindMetadata={refreshGameMetadataFromActions}
+                  onMoveToLibrary={moveToLibrary}
+                  onOpenDetails={handleOpenDetailsFromCollection}
+                  onRemove={removeGame}
+                  onRemoveAndIgnore={removeAndIgnoreSteamGame}
+                  onStartReview={startReviewMode}
+                  onStatusChange={updateGameStatus}
+                  onSyncSteamWishlist={syncSteamWishlist}
+                  onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
+                  onSyncItadDeals={syncWishlistDeals}
+                />
+              </div>
+            </div>
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
               games={games}
@@ -1685,6 +1746,7 @@ export function AppController() {
               onPlayingAction={updateCurrentlyPlayingGame}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
+                setDetailReturnSection('Queue');
                 setSelectedGameId(gameId);
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
@@ -1725,6 +1787,7 @@ export function AppController() {
               onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
+                setDetailReturnSection('Artwork');
                 setSelectedGameId(gameId);
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
@@ -1735,6 +1798,7 @@ export function AppController() {
               queueState={platformQueueState}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
+                setDetailReturnSection('Recommendation');
                 setSelectedGameId(gameId);
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
@@ -1753,6 +1817,7 @@ export function AppController() {
               queueSummary={queueSummary}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
+                setDetailReturnSection('Stats');
                 setSelectedGameId(gameId);
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
