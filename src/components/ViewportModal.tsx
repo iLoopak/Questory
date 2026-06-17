@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 type ViewportModalPlacement = 'bottom-sheet' | 'center';
 
@@ -51,29 +52,11 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, p
   const dialogRef = useRef<HTMLElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
+  useScrollLock();
+
   useEffect(() => {
     previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    const { body, documentElement } = document;
-    const previousBodyStyle = {
-      left: body.style.left,
-      overflow: body.style.overflow,
-      position: body.style.position,
-      right: body.style.right,
-      top: body.style.top,
-      width: body.style.width,
-    };
-    const previousDocumentOverflow = documentElement.style.overflow;
-
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.left = `-${scrollX}px`;
-    body.style.right = '0';
-    body.style.width = '100%';
-    body.style.overflow = 'hidden';
-    documentElement.style.overflow = 'hidden';
+    const { documentElement } = document;
     documentElement.classList.add('qs-modal-open');
 
     window.setTimeout(() => {
@@ -82,15 +65,7 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, p
     }, 0);
 
     return () => {
-      body.style.position = previousBodyStyle.position;
-      body.style.top = previousBodyStyle.top;
-      body.style.left = previousBodyStyle.left;
-      body.style.right = previousBodyStyle.right;
-      body.style.width = previousBodyStyle.width;
-      body.style.overflow = previousBodyStyle.overflow;
-      documentElement.style.overflow = previousDocumentOverflow;
       documentElement.classList.remove('qs-modal-open');
-      window.scrollTo(scrollX, scrollY);
 
       window.setTimeout(() => {
         const focusTarget = restoreFocusRef?.current ?? previouslyFocusedElementRef.current;

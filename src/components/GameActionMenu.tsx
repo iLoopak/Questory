@@ -5,6 +5,7 @@ import { useI18n, type TFunction } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
 import { Icon, type IconName } from './Icon';
 import type { Game, GameStatus } from '../types/game';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 type GameActionMenuProps = {
   game: Game;
@@ -164,6 +165,7 @@ function GameActionMenuOverlay({
   t,
 }: GameActionMenuOverlayProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  useScrollLock();
   const sections = useMemo(
     () =>
       buildGameActionMenuSections({

@@ -1781,6 +1781,8 @@ textarea,
 
 .qs-game-action-backdrop {
   background: rgb(var(--overlay-rgb) / 0.68);
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .qs-game-action-sheet {

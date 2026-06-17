@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { getCachedRawgMetadata, saveRawgMetadataCacheEntry } from '../lib/rawgMetadataCache';
 import { searchRawgWithFallback } from '../lib/rawgMetadataEnrichment';
 import { getRawgMetadataWithCoverFallback } from '../lib/gameCoverImages';
@@ -596,9 +597,10 @@ type ManualMatchDialogProps = {
 
 function ManualMatchDialog({ matches, onClose, onPick }: ManualMatchDialogProps) {
   const { t } = useI18n();
+  useScrollLock();
 
   return (
-    <div className="fixed inset-0 z-20 grid place-items-center bg-black/70 p-4">
+    <div className="fixed inset-0 z-20 grid touch-none place-items-center overscroll-none bg-black/70 p-4">
       <section className="qs-glass max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel">
         <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>

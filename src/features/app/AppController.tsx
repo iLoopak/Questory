@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import { Icon } from '../../components/Icon';
 
 import type { FormEvent, ReactNode } from 'react';
@@ -2882,6 +2883,8 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
   const [storeUrl, setStoreUrl] = useState('');
   const [error, setError] = useState('');
 
+  useScrollLock();
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -2950,7 +2953,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
   }
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/80 p-3 backdrop-blur-sm">
+    <div className="fixed inset-0 z-30 grid touch-none place-items-center overscroll-none bg-black/80 p-3 backdrop-blur-sm">
       <section aria-modal="true" className="qs-modal-panel qs-glass max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel" role="dialog">
         <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
           <div>
