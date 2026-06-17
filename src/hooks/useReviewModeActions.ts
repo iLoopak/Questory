@@ -70,6 +70,25 @@ export function useReviewModeActions({
     saveReviewModeState(reviewModeState);
   }, [reviewModeState]);
 
+
+  function markQuestQueueReviewed(gameId: string) {
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      queueOrder: currentState.queueOrder.filter((queuedGameId) => queuedGameId !== gameId),
+      reviewedGames: {
+        ...currentState.reviewedGames,
+        [gameId]: { reviewedAt: new Date().toISOString() },
+      },
+    }));
+  }
+
+  function moveQuestQueueGameToEnd(gameId: string) {
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      queueOrder: [...currentState.queueOrder.filter((queuedGameId) => queuedGameId !== gameId), gameId],
+    }));
+  }
+
   function recordReviewDecision(decision: ReviewDecision) {
     setReviewModeState((currentState) => ({
       ...currentState,
@@ -107,6 +126,7 @@ export function useReviewModeActions({
         message: formatGameToastMessage(t('toast.skipped'), game),
       });
       recordReviewDecision('skipped');
+      moveQuestQueueGameToEnd(game.id);
       return;
     }
 
@@ -130,6 +150,7 @@ export function useReviewModeActions({
       addToWishlist(game);
       recordReviewDecision('wishlisted');
       recordReviewDecision('reviewed');
+      markQuestQueueReviewed(game.id);
       return;
     }
 
@@ -151,6 +172,7 @@ export function useReviewModeActions({
 
       recordReviewDecision('ignored');
       recordReviewDecision('reviewed');
+      markQuestQueueReviewed(game.id);
       return;
     }
 
@@ -167,6 +189,7 @@ export function useReviewModeActions({
       }
       recordReviewDecision('queueCandidates');
       recordReviewDecision('reviewed');
+      markQuestQueueReviewed(game.id);
       return;
     }
 
@@ -176,6 +199,7 @@ export function useReviewModeActions({
       });
       recordReviewDecision('playing');
       recordReviewDecision('reviewed');
+      markQuestQueueReviewed(game.id);
       return;
     }
 
@@ -185,6 +209,7 @@ export function useReviewModeActions({
         status: 'Finished',
       });
       recordReviewDecision('reviewed');
+      markQuestQueueReviewed(game.id);
       return;
     }
 
@@ -195,6 +220,7 @@ export function useReviewModeActions({
       });
       recordReviewDecision('dropped');
       recordReviewDecision('reviewed');
+      markQuestQueueReviewed(game.id);
     }
   }
 
