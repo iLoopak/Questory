@@ -13,6 +13,7 @@ import {
   getPlatformMaxActiveGames,
   getPlatformTag,
   getQueuePlatforms,
+  getVisiblePlatformQueueEntries,
   hideQueuePlatform,
   moveQueuePlatform,
   removeQueuePlatform,
@@ -76,10 +77,11 @@ export function QueuePanel({
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All'>('All');
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
+  const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const movePlatformOptions = activeQueuePlatforms;
-  const queueGameIds = useMemo(() => new Set(queueState.entries.map((entry) => `${entry.gameId}::${entry.targetPlatform}`)), [queueState.entries]);
+  const queueGameIds = useMemo(() => new Set(visibleQueueEntries.map((entry) => `${entry.gameId}::${entry.targetPlatform}`)), [visibleQueueEntries]);
   const displayedQueuePlatforms = useMemo(() => {
     const visiblePlatforms = platformFilter === 'All' ? activeQueuePlatforms : activeQueuePlatforms.filter((platform) => platform === platformFilter);
 
@@ -298,7 +300,7 @@ export function QueuePanel({
                 }
               }}
               queueScrollRef={queueListRef}
-              queueEntries={queueState.entries
+              queueEntries={visibleQueueEntries
                 .filter((entry) => entry.targetPlatform === platform)
                 .filter((entry) => {
                   const game = gamesById.get(entry.gameId);
