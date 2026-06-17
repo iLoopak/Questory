@@ -1972,10 +1972,10 @@ export function AppController() {
           onAccentColorChange={setAccentColorPreference}
         />
       ) : null}
-      <button className={`qs-setup-launcher ${isOnboardingComplete ? 'is-complete' : ''}`} onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
-        <Icon name={isOnboardingComplete ? 'check' : 'settings'} />
-        <strong>{isOnboardingComplete ? 'Setup complete' : formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
-      </button>
+      {!isOnboardingComplete ? <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
+        <Icon name="settings" />
+        <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
+      </button> : null}
     </main>
     </I18nProvider>
   );
