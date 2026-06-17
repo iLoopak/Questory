@@ -280,8 +280,8 @@ export function addGameToPlatformQueue(
   targetPlatform: GamePlatform,
   options: Partial<Pick<PlatformQueueEntry, 'queueNotes' | 'queuePriority'>> = {},
 ): PlatformQueueState {
-  const existingEntry = state.entries.find((entry) => entry.gameId === game.id);
-  const nextEntries = state.entries.filter((entry) => entry.gameId !== game.id);
+  const existingEntry = findPlatformQueueEntry(state.entries, game.id, targetPlatform);
+  const nextEntries = state.entries.filter((entry) => !isSamePlatformPlanEntry(entry, game.id, targetPlatform));
   const targetEntries = nextEntries.filter((entry) => entry.targetPlatform === targetPlatform);
   const entry: PlatformQueueEntry = {
     expectedCompletionDate: existingEntry?.expectedCompletionDate,
@@ -307,8 +307,8 @@ export function addGameToPlatformQueueTop(
   targetPlatform: GamePlatform,
   options: Partial<Pick<PlatformQueueEntry, 'queueNotes' | 'queuePriority'>> = {},
 ): PlatformQueueState {
-  const existingEntry = state.entries.find((entry) => entry.gameId === game.id);
-  const nextEntries = state.entries.filter((entry) => entry.gameId !== game.id);
+  const existingEntry = findPlatformQueueEntry(state.entries, game.id, targetPlatform);
+  const nextEntries = state.entries.filter((entry) => !isSamePlatformPlanEntry(entry, game.id, targetPlatform));
   const entry: PlatformQueueEntry = {
     expectedCompletionDate: existingEntry?.expectedCompletionDate,
     estimatedPlaytime: game.averagePlaytime ?? game.expectedPlaytime ?? existingEntry?.estimatedPlaytime ?? null,
@@ -327,15 +327,15 @@ export function addGameToPlatformQueueTop(
   });
 }
 
-export function removeGameFromPlatformQueue(state: PlatformQueueState, gameId: string): PlatformQueueState {
+export function removeGameFromPlatformQueue(state: PlatformQueueState, gameId: string, targetPlatform?: GamePlatform): PlatformQueueState {
   return normalizeQueuePositions({
     ...state,
-    entries: state.entries.filter((entry) => entry.gameId !== gameId),
+    entries: state.entries.filter((entry) => !isSamePlatformPlanEntry(entry, gameId, targetPlatform)),
   });
 }
 
-export function moveQueueEntry(state: PlatformQueueState, gameId: string, direction: 'top' | 'up' | 'down'): PlatformQueueState {
-  const entry = state.entries.find((queueEntry) => queueEntry.gameId === gameId);
+export function moveQueueEntry(state: PlatformQueueState, gameId: string, direction: 'top' | 'up' | 'down', targetPlatform?: GamePlatform): PlatformQueueState {
+  const entry = state.entries.find((queueEntry) => isSamePlatformPlanEntry(queueEntry, gameId, targetPlatform));
   if (!entry) {
     return state;
   }
@@ -343,7 +343,7 @@ export function moveQueueEntry(state: PlatformQueueState, gameId: string, direct
   const platformEntries = state.entries
     .filter((queueEntry) => queueEntry.targetPlatform === entry.targetPlatform)
     .sort(compareQueueEntries);
-  const currentIndex = platformEntries.findIndex((queueEntry) => queueEntry.gameId === gameId);
+  const currentIndex = platformEntries.findIndex((queueEntry) => queueEntry === entry);
 
   if (currentIndex < 0) {
     return state;
@@ -367,20 +367,23 @@ export function moveQueueEntryToPlatform(
   state: PlatformQueueState,
   gameId: string,
   targetPlatform: GamePlatform,
+  sourcePlatform?: GamePlatform,
 ): PlatformQueueState {
-  const entry = state.entries.find((queueEntry) => queueEntry.gameId === gameId);
+  const entry = state.entries.find((queueEntry) => isSamePlatformPlanEntry(queueEntry, gameId, sourcePlatform));
   if (!entry) {
     return state;
   }
 
-  const nextEntries = state.entries.map((queueEntry) =>
-    queueEntry.gameId === gameId
-      ? {
-          ...queueEntry,
-          targetPlatform,
-        }
-      : queueEntry,
-  );
+  const nextEntries = state.entries
+    .filter((queueEntry) => !isSamePlatformPlanEntry(queueEntry, gameId, targetPlatform))
+    .map((queueEntry) =>
+      queueEntry === entry
+        ? {
+            ...queueEntry,
+            targetPlatform,
+          }
+        : queueEntry,
+    );
 
   return normalizeQueuePositions({
     ...state,
@@ -498,7 +501,7 @@ function upsertPlatformQueueSetting(
 function normalizeQueuePositions(state: PlatformQueueState): PlatformQueueState {
   const groupedEntries = new Map<GamePlatform, PlatformQueueEntry[]>();
 
-  state.entries.forEach((entry) => {
+  dedupePlatformQueueEntries(state.entries).forEach((entry) => {
     const entries = groupedEntries.get(entry.targetPlatform) ?? [];
     entries.push(entry);
     groupedEntries.set(entry.targetPlatform, entries);
@@ -515,6 +518,55 @@ function normalizeQueuePositions(state: PlatformQueueState): PlatformQueueState 
       })),
     ),
   };
+}
+
+
+function dedupePlatformQueueEntries(entries: PlatformQueueEntry[]): PlatformQueueEntry[] {
+  const canonicalEntries = new Map<string, PlatformQueueEntry>();
+
+  entries.forEach((entry) => {
+    const normalizedEntry = {
+      ...entry,
+      gameId: entry.gameId.trim(),
+      targetPlatform: normalizePlatformName(entry.targetPlatform),
+    };
+    const entryKey = getPlatformPlanEntryKey(normalizedEntry.gameId, normalizedEntry.targetPlatform);
+    const currentEntry = canonicalEntries.get(entryKey);
+
+    canonicalEntries.set(entryKey, currentEntry ? mergePlatformQueueEntries(currentEntry, normalizedEntry) : normalizedEntry);
+  });
+
+  return Array.from(canonicalEntries.values());
+}
+
+function mergePlatformQueueEntries(currentEntry: PlatformQueueEntry, duplicateEntry: PlatformQueueEntry): PlatformQueueEntry {
+  const firstEntry = compareQueueEntries(currentEntry, duplicateEntry) <= 0 ? currentEntry : duplicateEntry;
+  const secondEntry = firstEntry === currentEntry ? duplicateEntry : currentEntry;
+
+  return {
+    ...firstEntry,
+    expectedCompletionDate: firstEntry.expectedCompletionDate ?? secondEntry.expectedCompletionDate,
+    estimatedPlaytime: firstEntry.estimatedPlaytime ?? secondEntry.estimatedPlaytime ?? null,
+    queueNotes: firstEntry.queueNotes || secondEntry.queueNotes || '',
+    queuePriority: firstEntry.queuePriority === 'normal' ? secondEntry.queuePriority : firstEntry.queuePriority,
+    queuedAt: firstEntry.queuedAt <= secondEntry.queuedAt ? firstEntry.queuedAt : secondEntry.queuedAt,
+  };
+}
+
+function findPlatformQueueEntry(entries: PlatformQueueEntry[], gameId: string, targetPlatform?: GamePlatform) {
+  return entries.find((entry) => isSamePlatformPlanEntry(entry, gameId, targetPlatform));
+}
+
+function isSamePlatformPlanEntry(entry: PlatformQueueEntry, gameId: string, targetPlatform?: GamePlatform) {
+  if (entry.gameId !== gameId) {
+    return false;
+  }
+
+  return targetPlatform ? normalizePlatformName(entry.targetPlatform) === normalizePlatformName(targetPlatform) : true;
+}
+
+function getPlatformPlanEntryKey(gameId: string, targetPlatform: GamePlatform) {
+  return `${gameId}::${normalizePlatformName(targetPlatform).toLowerCase()}`;
 }
 
 function normalizePlatformList(platforms: GamePlatform[]): GamePlatform[] {

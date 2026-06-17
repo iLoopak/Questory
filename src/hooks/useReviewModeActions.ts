@@ -2,6 +2,7 @@ import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { ReviewModeAction, ReviewModeActionContext } from '../components/ReviewModePanel';
 import { createTranslator } from '../i18n';
 import { formatGameToastMessage } from '../lib/notifications';
+import { removeGameFromPlatformQueue, type PlatformQueueState } from '../lib/platformQueueStorage';
 import {
   saveReviewModeState,
   type ReviewDecision,
@@ -26,6 +27,7 @@ type UseReviewModeActionsParams = {
   setActiveNavItem: (navItem: 'Library' | 'Wishlist' | 'Review Mode') => void;
   setActiveReviewSource: Dispatch<SetStateAction<ReviewSource>>;
   setIgnoredSteamGames: Dispatch<SetStateAction<IgnoredSteamGame[]>>;
+  setPlatformQueueState: Dispatch<SetStateAction<PlatformQueueState>>;
   setReviewModeState: Dispatch<SetStateAction<ReviewModeState>>;
   setSelectedGameId: Dispatch<SetStateAction<string | null>>;
   startMetadataWorkflow: (gameIds: string[]) => void;
@@ -53,6 +55,7 @@ export function useReviewModeActions({
   setActiveNavItem,
   setActiveReviewSource,
   setIgnoredSteamGames,
+  setPlatformQueueState,
   setReviewModeState,
   setSelectedGameId,
   startMetadataWorkflow,
@@ -195,8 +198,10 @@ export function useReviewModeActions({
 
     if (action === 'playing') {
       updateGameReviewFields(game.id, {
+        platform: targetPlatform ?? game.platform,
         status: 'Playing',
       });
+      setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, game.id, targetPlatform ?? game.platform));
       recordReviewDecision('playing');
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);
