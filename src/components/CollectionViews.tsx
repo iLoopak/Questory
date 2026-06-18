@@ -197,6 +197,9 @@ export function CollectionShelf({
     scrollElementRef: shelfScrollerRef,
   });
   const renderedShelfGames = games.slice(virtualItems.startIndex, virtualItems.endIndex + 1);
+  // Stable signature of game IDs in order. Only resets scroll when the set or
+  // order of games actually changes — not on every property mutation.
+  const shelfGameIdsSignature = useMemo(() => games.map((g) => g.id).join('|'), [games]);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') {
@@ -221,7 +224,7 @@ export function CollectionShelf({
   useEffect(() => {
     shelfScrollerRef.current?.scrollTo({ left: 0, behavior: 'auto' });
     shelfCardRefs.current = [];
-  }, [games]);
+  }, [shelfGameIdsSignature]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
