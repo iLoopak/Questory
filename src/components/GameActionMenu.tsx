@@ -421,7 +421,7 @@ function buildGameActionMenuSections({
     icon: 'trash-2',
     currentLabel: t('action.current'),
     isCurrent: game.status === 'Dropped',
-    label: t('action.dropped'),
+    label: t('action.drop'),
     onSelect: () => onStatusChange(game.id, 'Dropped'),
   });
 

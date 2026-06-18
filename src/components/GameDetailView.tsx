@@ -763,13 +763,14 @@ function GameDetailOverflowMenu({
     onClick: onClose,
   });
 
+  toolItems.push({
+    icon: 'trash-2',
+    label: t('action.drop'),
+    disabled: !onStatusChange,
+    onClick: () => closeAndRun(() => onStatusChange?.(game.id, 'Dropped')),
+  });
+
   const dangerItems: OverflowItem[] = [
-    {
-      icon: 'trash-2',
-      label: t('queue.drop'),
-      disabled: !onStatusChange,
-      onClick: () => closeAndRun(() => onStatusChange?.(game.id, 'Dropped')),
-    },
     {
       icon: 'eye-off',
       label: t('action.ignore'),
