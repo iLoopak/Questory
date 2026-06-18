@@ -241,7 +241,7 @@ export function HomePanel({
 
   return (
     <section ref={shellRef} className="qs-home-shell space-y-4 pb-4">
-      {/* #002 Compact Hero */}
+      {/* Compact Hero — full width */}
       <section className="flex items-center gap-3 rounded-xl border border-mint/18 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-3 shadow-panel">
         {avatar}
         <div className="min-w-0 flex-1">
@@ -271,214 +271,223 @@ export function HomePanel({
         ) : null}
       </section>
 
-      {/* #001/#005 Continue Playing */}
-      <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
-        {continuePlayingGames.length > 0 ? (
-          <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
-            {continuePlayingGames.map((game) => (
-              <GamePosterButton
-                key={game.id}
-                game={game}
-                eyebrow={t('home.currentlyPlaying')}
-                hero={continuePlayingGames.length === 1}
-                onClick={() => setActionSheetGame(game)}
-                queueState={queueState}
-              />
-            ))}
-          </div>
-        ) : (
-          <OnboardingSteps
-            onOpenLibrary={onOpenLibrary}
-            onOpenReviewMode={() => onOpenReviewMode('backlog')}
-            t={t}
-          />
-        )}
-      </HomeSection>
-
-      {/* #004 Keep Playing — clear-reason picks */}
-      {keepPlayingGames.length > 0 ? (
-        <HomeSection title={t('home.keepPlaying')}>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {keepPlayingGames.map(({ game, reason }) => (
-              <KeepPlayingCard
-                key={game.id}
-                game={game}
-                reason={reason}
-                onClick={() => setActionSheetGame(game)}
-                queueState={queueState}
-              />
-            ))}
-          </div>
-        </HomeSection>
-      ) : null}
-
-      {/* Platform Plans — Next Up */}
-      <HomeSection title={t('home.nextUp')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()}>
-        {activeQueuePreviews.length > 0 ? (
-          <div className="grid gap-3 xl:grid-cols-3">
-            {activeQueuePreviews.map((queue) => (
-              <article key={queue.platform} className="rounded-xl border border-skyglass/15 bg-ink-950/72 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-base font-semibold text-white">
-                    {queue.platform} {t('home.planSuffix')}
-                  </h4>
-                  <button
-                    className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
-                    data-home-focus="true"
-                    onClick={() => onOpenQueue(queue.platform)}
-                    type="button"
-                  >
-                    {t('home.open')}
-                  </button>
-                </div>
-                <ol className="mt-3 grid gap-2">
-                  {queue.entries.map(({ entry, game }) => (
-                    <li key={entry.gameId}>
-                      <button
-                        className="flex min-h-12 w-full items-center gap-3 rounded-lg border border-white/10 bg-ink-900/80 px-3 py-2 text-left transition hover:border-mint/40 hover:bg-mint/10"
-                        data-home-focus="true"
-                        onClick={() => setActionSheetGame(game)}
-                        type="button"
-                      >
-                        <span className="w-7 shrink-0 text-center text-xs font-semibold text-slate-500">
-                          #{entry.queuePosition}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate font-semibold text-white">{game.title}</span>
-                          <PlatformBadge
-                            className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
-                            platform={entry.targetPlatform}
-                            queueState={queueState}
-                          />
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title={t('home.noPlatformPlan')}
-            text={t('home.noPlatformPlanText')}
-            actionLabel={t('review.title')}
-            onAction={() => onOpenReviewMode('backlog')}
-          />
-        )}
-      </HomeSection>
-
-      {/* Quest Queue widget */}
-      <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
-        <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
-        <p className="mt-1 text-sm text-slate-300">
-          {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
-        </p>
-        <button
-          className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-          data-home-focus="true"
-          onClick={() => onOpenReviewMode('backlog')}
-          type="button"
-        >
-          {t('home.reviewNextGame')}
-        </button>
-      </section>
-
-      {/* #003 Wishlist Deals */}
-      <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
-        {wishlistDeals.length > 0 ? (
-          <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
-            {wishlistDeals.map((game) => (
-              <WishlistDealCard key={game.id} game={game} onClick={() => onOpenDetails(game)} t={t} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title={t('home.noWishlistDeals')}
-            text={t('home.noWishlistDealsText')}
-            actionLabel={t('home.openWishlist')}
-            onAction={onOpenWishlist}
-          />
-        )}
-      </HomeSection>
-
-      {/* Active Platforms */}
-      <HomeSection compact title={t('home.activePlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
-        {activePlayingPlatforms.length > 0 ? (
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {activePlayingPlatforms.map(({ platform, count }) => (
-              <button
-                key={platform}
-                className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-skyglass/15 bg-ink-950/72 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10"
-                data-home-focus="true"
-                onClick={() => onOpenQueue(platform)}
-                type="button"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold text-white">{platform}</span>
-                  <PlatformBadge
-                    className="mt-0.5 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
-                    platform={platform}
+      {/* Two-column layout on desktop — no overflow on either column, window scroll only */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4">
+        {/* Left: main content */}
+        <div className="space-y-4">
+          {/* Continue Playing */}
+          <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
+            {continuePlayingGames.length > 0 ? (
+              <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : 'sm:grid-cols-2'}`}>
+                {continuePlayingGames.map((game) => (
+                  <GamePosterButton
+                    key={game.id}
+                    game={game}
+                    eyebrow={t('home.currentlyPlaying')}
+                    hero={continuePlayingGames.length === 1}
+                    onClick={() => setActionSheetGame(game)}
                     queueState={queueState}
                   />
-                </span>
-                <span className="shrink-0 text-sm font-semibold text-mint">
-                  {count} {count === 1 ? t('home.activeGame') : t('home.activeGames')}
-                </span>
+                ))}
+              </div>
+            ) : (
+              <OnboardingSteps
+                onOpenLibrary={onOpenLibrary}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+                t={t}
+              />
+            )}
+          </HomeSection>
+
+          {/* Keep Playing — clear-reason picks */}
+          {keepPlayingGames.length > 0 ? (
+            <HomeSection title={t('home.keepPlaying')}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {keepPlayingGames.map(({ game, reason }) => (
+                  <KeepPlayingCard
+                    key={game.id}
+                    game={game}
+                    reason={reason}
+                    onClick={() => setActionSheetGame(game)}
+                    queueState={queueState}
+                  />
+                ))}
+              </div>
+            </HomeSection>
+          ) : null}
+
+          {/* Platform Plans — Next Up */}
+          <HomeSection title={t('home.nextUp')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()}>
+            {activeQueuePreviews.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {activeQueuePreviews.map((queue) => (
+                  <article key={queue.platform} className="rounded-xl border border-skyglass/15 bg-ink-950/72 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h4 className="text-base font-semibold text-white">
+                        {queue.platform} {t('home.planSuffix')}
+                      </h4>
+                      <button
+                        className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
+                        data-home-focus="true"
+                        onClick={() => onOpenQueue(queue.platform)}
+                        type="button"
+                      >
+                        {t('home.open')}
+                      </button>
+                    </div>
+                    <ol className="mt-3 grid gap-2">
+                      {queue.entries.map(({ entry, game }) => (
+                        <li key={entry.gameId}>
+                          <button
+                            className="flex min-h-12 w-full items-center gap-3 rounded-lg border border-white/10 bg-ink-900/80 px-3 py-2 text-left transition hover:border-mint/40 hover:bg-mint/10"
+                            data-home-focus="true"
+                            onClick={() => setActionSheetGame(game)}
+                            type="button"
+                          >
+                            <span className="w-7 shrink-0 text-center text-xs font-semibold text-slate-500">
+                              #{entry.queuePosition}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate font-semibold text-white">{game.title}</span>
+                              <PlatformBadge
+                                className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
+                                platform={entry.targetPlatform}
+                                queueState={queueState}
+                              />
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title={t('home.noPlatformPlan')}
+                text={t('home.noPlatformPlanText')}
+                actionLabel={t('review.title')}
+                onAction={() => onOpenReviewMode('backlog')}
+              />
+            )}
+          </HomeSection>
+
+          {/* Quest Queue widget */}
+          <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
+            <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
+            <p className="mt-1 text-sm text-slate-300">
+              {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
+            </p>
+            <button
+              className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+              data-home-focus="true"
+              onClick={() => onOpenReviewMode('backlog')}
+              type="button"
+            >
+              {t('home.reviewNextGame')}
+            </button>
+          </section>
+        </div>
+
+        {/* Right sidebar — stacks below main on mobile, sits beside it on desktop */}
+        <div className="mt-4 space-y-4 lg:mt-0">
+          {/* Wishlist Deals */}
+          <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
+            {wishlistDeals.length > 0 ? (
+              <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
+                {wishlistDeals.map((game) => (
+                  <WishlistDealCard key={game.id} game={game} onClick={() => onOpenDetails(game)} t={t} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title={t('home.noWishlistDeals')}
+                text={t('home.noWishlistDealsText')}
+                actionLabel={t('home.openWishlist')}
+                onAction={onOpenWishlist}
+              />
+            )}
+          </HomeSection>
+
+          {/* Active Platforms */}
+          <HomeSection compact title={t('home.activePlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
+            {activePlayingPlatforms.length > 0 ? (
+              <div className="grid gap-2">
+                {activePlayingPlatforms.map(({ platform, count }) => (
+                  <button
+                    key={platform}
+                    className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-skyglass/15 bg-ink-950/72 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10"
+                    data-home-focus="true"
+                    onClick={() => onOpenQueue(platform)}
+                    type="button"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-white">{platform}</span>
+                      <PlatformBadge
+                        className="mt-0.5 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
+                        platform={platform}
+                        queueState={queueState}
+                      />
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold text-mint">
+                      {count} {count === 1 ? t('home.activeGame') : t('home.activeGames')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title={t('home.noActivePlatforms')}
+                text={t('home.noActivePlatformsText')}
+                actionLabel={t('home.browseLibrary')}
+                onAction={onOpenLibrary}
+              />
+            )}
+          </HomeSection>
+
+          {/* Steam Sync */}
+          {hasSteamGames && onSyncSteamData ? (
+            <HomeSection compact title={t('home.steamSync')}>
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-ink-950/70 px-3 py-2.5">
+                  <span className="text-xs text-slate-400">{t('home.playtimeSync')}</span>
+                  <span className="text-xs font-semibold text-slate-200">
+                    {steamPlaytimeRefreshState?.status === 'loading'
+                      ? t('home.syncingSteamData')
+                      : formatRelativeTime(lastPlaytimeSyncAt, t('home.neverSynced'))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-ink-950/70 px-3 py-2.5">
+                  <span className="text-xs text-slate-400">{t('home.achievementSync')}</span>
+                  <span className="text-xs font-semibold text-slate-200">
+                    {steamAchievementSyncState?.status === 'loading'
+                      ? t('home.syncingSteamData')
+                      : formatRelativeTime(lastAchievementSyncAt, t('home.neverSynced'))}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:opacity-50"
+                data-home-focus="true"
+                disabled={isSteamSyncing}
+                onClick={onSyncSteamData}
+                type="button"
+              >
+                <Icon
+                  name={isSteamSyncing ? 'refresh-cw' : 'steam'}
+                  size={13}
+                  strokeWidth={2}
+                  className={isSteamSyncing ? 'animate-spin' : ''}
+                />
+                {isSteamSyncing ? t('home.syncingSteamData') : t('home.syncSteamData')}
               </button>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title={t('home.noActivePlatforms')}
-            text={t('home.noActivePlatformsText')}
-            actionLabel={t('home.browseLibrary')}
-            onAction={onOpenLibrary}
-          />
-        )}
-      </HomeSection>
+            </HomeSection>
+          ) : null}
+        </div>
+      </div>
 
-      {/* Steam Sync */}
-      {hasSteamGames && onSyncSteamData ? (
-        <HomeSection compact title={t('home.steamSync')}>
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-ink-950/70 px-3 py-2.5">
-              <span className="text-xs text-slate-400">{t('home.playtimeSync')}</span>
-              <span className="text-xs font-semibold text-slate-200">
-                {steamPlaytimeRefreshState?.status === 'loading'
-                  ? t('home.syncingSteamData')
-                  : formatRelativeTime(lastPlaytimeSyncAt, t('home.neverSynced'))}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-ink-950/70 px-3 py-2.5">
-              <span className="text-xs text-slate-400">{t('home.achievementSync')}</span>
-              <span className="text-xs font-semibold text-slate-200">
-                {steamAchievementSyncState?.status === 'loading'
-                  ? t('home.syncingSteamData')
-                  : formatRelativeTime(lastAchievementSyncAt, t('home.neverSynced'))}
-              </span>
-            </div>
-          </div>
-          <button
-            className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:opacity-50"
-            data-home-focus="true"
-            disabled={isSteamSyncing}
-            onClick={onSyncSteamData}
-            type="button"
-          >
-            <Icon
-              name={isSteamSyncing ? 'refresh-cw' : 'steam'}
-              size={13}
-              strokeWidth={2}
-              className={isSteamSyncing ? 'animate-spin' : ''}
-            />
-            {isSteamSyncing ? t('home.syncingSteamData') : t('home.syncSteamData')}
-          </button>
-        </HomeSection>
-      ) : null}
-
-      {/* #005 Action sheet for game cards */}
+      {/* Action sheet for game cards */}
       {actionSheetGame ? (
         <HomeActionSheet
           game={actionSheetGame}
