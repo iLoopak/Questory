@@ -53,10 +53,11 @@ function GameCardComponent({
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
+  const firstCoverSource = coverSources[0] ?? null;
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
-  }, [coverSources]);
+  }, [firstCoverSource]);
 
   const activeCoverSource = coverSources[coverSourceIndex];
 
