@@ -17,22 +17,6 @@ type UndoToastStackProps = {
   onViewGame: (gameId: string) => void;
 };
 
-// =============================================================================
-// INVESTIGATION TOGGLES — flip one at a time, rebuild, and test on device.
-// Remove this entire block once the root cause is confirmed.
-// =============================================================================
-//
-// Toggle C — suppress the entire toast stack so no toast renders after action.
-//   Hypothesis: a toast element floating above the scroll container absorbs
-//   touch-start events meant for the scroll area, preventing the next pan.
-const DBG_DISABLE_TOAST_STACK = false;
-//
-// Toggle D — make all toast items pointer-events:none (they render but absorb nothing).
-//   Tests whether the pointer-events:auto on individual items (not the container)
-//   is the interception point.
-const DBG_TOAST_POINTER_EVENTS_NONE = false;
-// =============================================================================
-
 export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onUndo, onViewGame }: UndoToastStackProps) {
   const { t } = useI18n();
   const [expandedDetailIds, setExpandedDetailIds] = useState<Set<string>>(new Set());
@@ -45,7 +29,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
     });
   }, [actions]);
 
-  if (DBG_DISABLE_TOAST_STACK || actions.length === 0) {
+  if (actions.length === 0) {
     return null;
   }
 
@@ -111,7 +95,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
         return (
           <div
             key={action.id}
-            className={`qs-toast ${DBG_TOAST_POINTER_EVENTS_NONE ? 'pointer-events-none' : 'pointer-events-auto'} flex w-full max-w-full translate-x-0 flex-col gap-2 overflow-hidden rounded-2xl border px-3 py-2 shadow-glow ${categoryStyles.container}`}
+            className={`qs-toast pointer-events-auto flex w-full max-w-full translate-x-0 flex-col gap-2 overflow-hidden rounded-2xl border px-3 py-2 shadow-glow ${categoryStyles.container}`}
           >
             <div className="flex min-w-0 items-start gap-2">
               <span className="qs-toast-message min-w-0 flex-1 text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
