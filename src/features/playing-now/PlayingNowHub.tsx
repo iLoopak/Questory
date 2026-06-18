@@ -49,10 +49,19 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
       groups.set(game.platform, group);
     });
 
+    const activePlatforms = queue?.activePlatforms ?? [];
+
     return Array.from(groups.entries())
-      .sort(([platformA], [platformB]) => platformA.localeCompare(platformB))
+      .sort(([platformA], [platformB]) => {
+        const indexA = activePlatforms.indexOf(platformA);
+        const indexB = activePlatforms.indexOf(platformB);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return platformA.localeCompare(platformB);
+      })
       .map(([platform, platformGames]) => [platform, platformGames.sort((a, b) => a.title.localeCompare(b.title))] as const);
-  }, [playingGames]);
+  }, [playingGames, queue?.activePlatforms]);
   const activityByGame = useMemo(() => getPlayingNowContexts(playingGames, activity, today), [activity, playingGames, today]);
 
   useEffect(() => {
