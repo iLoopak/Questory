@@ -183,6 +183,38 @@ export function HomePanel({
     steamAchievementSyncState?.status === 'loading' || steamPlaytimeRefreshState?.status === 'loading';
 
   useEffect(() => {
+    if (!import.meta.env.DEV || !shellRef.current) return;
+    const chain: Record<string, unknown>[] = [];
+    let el: Element | null = shellRef.current;
+    while (el) {
+      const h = el as HTMLElement;
+      const cs = window.getComputedStyle(h);
+      chain.push({
+        el: `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`,
+        cls: h.className.slice(0, 100),
+        scrollH: h.scrollHeight,
+        clientH: h.clientHeight,
+        overflowY: cs.overflowY,
+        height: cs.height,
+        minH: cs.minHeight,
+        display: cs.display,
+        flexGrow: cs.flexGrow,
+        flexShrink: cs.flexShrink,
+        flexBasis: cs.flexBasis,
+      });
+      el = el.parentElement;
+    }
+    const docEl = document.documentElement;
+    console.group('[QS scroll audit] Home chain — docScrollH:', docEl.scrollHeight, '/ winH:', window.innerHeight, '/ scrollable:', docEl.scrollHeight > window.innerHeight);
+    chain.forEach((e) => {
+      const overflow = (e.scrollH as number) > (e.clientH as number);
+      const clips = overflow && !['auto', 'scroll', 'visible'].includes(e.overflowY as string);
+      console.log(clips ? '🔴 CLIPPING' : overflow ? '🟡 overflow' : '✅', e.el, `scroll:${e.scrollH} client:${e.clientH}`, `overflowY:${e.overflowY}`, `h:${e.height} min-h:${e.minH}`, `flex g/s/b=${e.flexGrow}/${e.flexShrink}/${e.flexBasis}`, e.cls);
+    });
+    console.groupEnd();
+  }, []);
+
+  useEffect(() => {
     function handleHomeKeyDown(event: KeyboardEvent) {
       const target = event.target;
       if (

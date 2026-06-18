@@ -1506,7 +1506,7 @@ export function AppController() {
   return (
     <I18nProvider language={language}>
     <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${activeUtilityView === 'playing-now' ? 'h-dvh overflow-hidden' : ''} ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
-      <div className={`qs-handheld-shell mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5 ${activeUtilityView === 'playing-now' ? 'h-full min-h-0 overflow-hidden' : ''}`}>
+      <div className={`qs-handheld-shell mx-auto w-full max-w-7xl px-3 py-2 sm:px-4 lg:px-5 ${activeNavItem === 'Home' && activeUtilityView !== 'playing-now' ? 'min-h-screen' : `flex min-h-screen flex-col ${activeUtilityView === 'playing-now' ? 'h-full min-h-0 overflow-hidden' : ''}`}`}>
         <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="relative min-w-0 shrink-0" ref={shelfProfileRef}>
             <button
