@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
+import { getGameCoverSources } from '../../lib/gameCoverImages';
 import { useI18n, type TFunction } from '../../i18n';
 import type { PlatformQueueState, PlatformQueueSummary } from '../../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../../types/game';
@@ -160,12 +161,50 @@ function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
   return 'gamepad-2';
 }
 
+function PlayingNowCover({ game }: { game: Game }) {
+  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const activeCoverSource = coverSources[coverSourceIndex];
+
+  useEffect(() => {
+    setCoverSourceIndex(0);
+    setIsCoverLoaded(false);
+  }, [coverSources]);
+
+  return (
+    <span aria-hidden="true" className="relative block h-24 w-16 shrink-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900">
+      {activeCoverSource ? (
+        <>
+          {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+          <img
+            alt=""
+            className={`h-full w-full object-cover transition-opacity duration-200 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
+            decoding="async"
+            loading="lazy"
+            onError={() => {
+              setIsCoverLoaded(false);
+              setCoverSourceIndex((currentIndex) => currentIndex + 1);
+            }}
+            onLoad={() => setIsCoverLoaded(true)}
+            src={activeCoverSource}
+          />
+        </>
+      ) : (
+        <span className="grid h-full w-full place-items-center text-xl font-semibold text-mint/80">
+          {game.title.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange, t }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; t: TFunction }) {
   const statusBadge = getPlayingNowStatusBadge(context, t);
 
   return (
     <article className="flex h-full min-w-0 gap-2.5 rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20">
-      <img className="h-24 w-16 shrink-0 rounded-lg border border-skyglass/15 bg-ink-900 object-cover" src={game.coverImage} alt={`${game.title} cover`} />
+      <PlayingNowCover game={game} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="min-w-0">
           <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
