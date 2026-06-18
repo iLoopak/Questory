@@ -149,6 +149,24 @@ export function GameActionMenu({
   );
 }
 
+// =============================================================================
+// INVESTIGATION TOGGLES — flip one at a time, rebuild, and test on device.
+// Remove this entire block once the root cause is confirmed.
+// =============================================================================
+//
+// Toggle A — blur active element instead of restoring focus to the card's
+//   "more actions" button after the menu closes.
+//   Hypothesis: the focused button on the card intercepts the next scroll
+//   gesture (touch-start on a focused interactive element is mis-routed by
+//   Android WebView as a click rather than a pan).
+const DBG_BLUR_INSTEAD_OF_FOCUS_RESTORE = false;
+//
+// Toggle B — override touch-action:none on the backdrop with touch-action:auto.
+//   Hypothesis: removing touch-action:none from the backdrop eliminates the
+//   touch-event gap that appears when the fixed overlay disappears mid-gesture.
+const DBG_DISABLE_BACKDROP_TOUCH_ACTION = false;
+// =============================================================================
+
 function GameActionMenuOverlay({
   anchorRef,
   game,
@@ -192,7 +210,29 @@ function GameActionMenuOverlay({
     firstMenuItem?.focus({ preventScroll: true });
 
     return () => {
-      window.setTimeout(() => anchorRef.current?.focus({ preventScroll: true }), 0);
+      const scrollEl = document.querySelector<HTMLElement>('.qs-game-list-shell, .qs-content-panel');
+      const scrollTopAtClose = scrollEl?.scrollTop ?? 0;
+      console.debug('[GameActionMenu] close — activeElement=', document.activeElement?.tagName, 'scrollTop=', scrollTopAtClose);
+
+      if (DBG_BLUR_INSTEAD_OF_FOCUS_RESTORE) {
+        window.setTimeout(() => {
+          console.debug('[GameActionMenu] Toggle A: blurring', document.activeElement?.tagName, 'scrollTop=', scrollEl?.scrollTop ?? 0);
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          requestAnimationFrame(() => {
+            console.debug('[GameActionMenu] Toggle A: after blur — activeElement=', document.activeElement?.tagName, 'scrollTop=', scrollEl?.scrollTop ?? 0);
+          });
+        }, 0);
+        return;
+      }
+
+      window.setTimeout(() => {
+        const scrollTopBefore = scrollEl?.scrollTop ?? 0;
+        console.debug('[GameActionMenu] focus-restore: before — activeElement=', document.activeElement?.tagName, 'scrollTop=', scrollTopBefore);
+        anchorRef.current?.focus({ preventScroll: true });
+        requestAnimationFrame(() => {
+          console.debug('[GameActionMenu] focus-restore: after — activeElement=', document.activeElement?.tagName, 'scrollTop=', scrollEl?.scrollTop ?? 0);
+        });
+      }, 0);
     };
   }, [anchorRef]);
 
@@ -232,6 +272,7 @@ function GameActionMenuOverlay({
   return createPortal(
     <div
       className="qs-game-action-backdrop fixed inset-0 z-[1200] flex items-end justify-center p-2 sm:items-center sm:p-4"
+      style={DBG_DISABLE_BACKDROP_TOUCH_ACTION ? { touchAction: 'auto' } : undefined}
       onClick={onClose}
     >
       <div

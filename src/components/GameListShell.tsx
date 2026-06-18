@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import { useEffect, type ReactNode, type RefObject } from 'react';
 
 export type GameListShellProps = {
   children: ReactNode;
@@ -9,6 +9,13 @@ export type GameListShellProps = {
 };
 
 export function GameListShell({ children, className = '', scrollRef, stickyChrome, topChrome }: GameListShellProps) {
+  useEffect(() => {
+    console.debug('[GameListShell] mounted, scrollTop=', scrollRef.current?.scrollTop ?? 0);
+    return () => console.debug('[GameListShell] unmounted');
+  // scrollRef is a stable ref object — intentional empty deps to detect remounts only
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <section ref={scrollRef} className={`qs-game-list-shell qs-content-panel qs-glass min-w-0 rounded-lg border p-2 sm:p-3 ${className}`.trim()}>
       {stickyChrome ? <div className="qs-game-list-sticky-chrome -mx-2 px-2 pb-2 sm:-mx-3 sm:px-3">{stickyChrome}</div> : null}

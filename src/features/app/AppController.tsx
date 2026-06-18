@@ -2160,6 +2160,36 @@ function CollectionPanel({
     });
   }, [collectionType, games.length, realCoverCount, viewMode]);
 
+  // === INVESTIGATION: mount/unmount detection — confirms whether CollectionPanel is remounting
+  useEffect(() => {
+    console.debug('[CollectionPanel] mounted, collectionType=', collectionType);
+    return () => console.debug('[CollectionPanel] unmounted, collectionType=', collectionType);
+  // intentional: run only on mount/unmount to detect remount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // === INVESTIGATION: scroll-container monitor — captures programmatic scrolls and active element
+  useEffect(() => {
+    const panel = collectionPanelRef.current;
+    if (!panel) return;
+
+    function onScroll() {
+      const ae = document.activeElement;
+      console.debug('[CollectionPanel] scroll — scrollTop=', panel!.scrollTop, 'activeElement=', ae?.tagName, ae?.className?.slice(0, 50));
+    }
+
+    panel.addEventListener('scroll', onScroll, { passive: true });
+    return () => panel.removeEventListener('scroll', onScroll);
+  // collectionPanelRef is a stable ref; the panel it points to doesn't change after mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // === INVESTIGATION: log games array change and active element at that moment
+  useEffect(() => {
+    const ae = document.activeElement;
+    console.debug('[CollectionPanel] games changed — count=', games.length, 'scrollTop=', collectionPanelRef.current?.scrollTop ?? 0, 'activeElement=', ae?.tagName, ae?.className?.slice(0, 50));
+  }, [games]);
+
   useEffect(() => {
     setSelectedGameIds((currentSelection) => {
       const visibleGameIds = new Set(games.map((game) => game.id));
