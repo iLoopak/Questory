@@ -7,6 +7,7 @@ export type RawgSettings = {
 export type RawgSearchResult = {
   id: number;
   name: string;
+  slug?: string;
   released: string | null;
   background_image: string | null;
   metacritic: number | null;
@@ -32,6 +33,8 @@ export type RawgGameDetails = RawgSearchResult & {
 export type RawgMetadata = Pick<
   Game,
   | 'rawgId'
+  | 'rawgSlug'
+  | 'rawgTitle'
   | 'genres'
   | 'rawgTags'
   | 'developers'

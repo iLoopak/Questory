@@ -121,6 +121,8 @@ export type Game = {
   hltbMatchConfidence?: number;
   hltbLastSyncedAt?: string;
   rawgId?: number;
+  rawgSlug?: string;
+  rawgTitle?: string;
   genres?: string[];
   rawgTags?: string[];
   developers?: string[];
