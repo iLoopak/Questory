@@ -449,7 +449,7 @@ function buildGameActionMenuSections({
 
   addAction(dangerItems, {
     icon: 'trash-2',
-    label: game.collectionType === 'wishlist' ? t('action.removeFromWishlist') : t('action.remove'),
+    label: t('action.deleteGame'),
     onSelect: () => onRemove(game.id),
     tone: 'danger',
   });

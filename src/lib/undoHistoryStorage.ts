@@ -1,4 +1,5 @@
 import type { PlatformQueueState } from './platformQueueStorage';
+import type { PlayActivityRecord } from './playActivityStorage';
 import type { ReviewModeState } from './reviewModeStorage';
 import type { IgnoredSteamGame } from './steamIgnoredGamesStorage';
 import type { Game } from '../types/game';
@@ -10,6 +11,7 @@ export const undoActionTimeoutMs = 8000;
 export type UndoActionSnapshot = {
   games: Game[];
   ignoredSteamGames: IgnoredSteamGame[];
+  playActivity: PlayActivityRecord[];
   platformQueueState: PlatformQueueState;
   reviewModeState: ReviewModeState;
   selectedGameId: string | null;
@@ -87,6 +89,10 @@ function normalizePendingUndoAction(action: PendingUndoAction): PendingUndoActio
     ...action,
     actions: action.actions ?? [{ kind: 'undo', label: 'Undo' }],
     category: action.category ?? 'success',
+    snapshot: {
+      ...action.snapshot,
+      playActivity: action.snapshot.playActivity ?? [],
+    },
   };
 }
 
@@ -107,6 +113,7 @@ function isPendingUndoAction(value: unknown): value is PendingUndoAction {
     Boolean(candidate.snapshot) &&
     Array.isArray(candidate.snapshot.games) &&
     Array.isArray(candidate.snapshot.ignoredSteamGames) &&
+    (!candidate.snapshot.playActivity || Array.isArray(candidate.snapshot.playActivity)) &&
     Boolean(candidate.snapshot.platformQueueState) &&
     Array.isArray(candidate.snapshot.platformQueueState.entries) &&
     Array.isArray(candidate.snapshot.platformQueueState.settings) &&

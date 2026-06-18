@@ -8,6 +8,9 @@ import {
   type NotificationDraft,
 } from '../lib/notifications';
 import { addIgnoredSteamGame, type IgnoredSteamGame } from '../lib/steamIgnoredGamesStorage';
+import { removeGameFromPlatformQueue, type PlatformQueueState } from '../lib/platformQueueStorage';
+import type { PlayActivityRecord } from '../lib/playActivityStorage';
+import type { ReviewModeState } from '../lib/reviewModeStorage';
 import type { UndoActionHistoryEntry, UndoActionSnapshot } from '../lib/undoHistoryStorage';
 import type { Game, GameCollectionType, GameStatus } from '../types/game';
 
@@ -25,6 +28,9 @@ type UseGameLibraryActionsOptions = {
   games: Game[];
   setGames: Dispatch<SetStateAction<Game[]>>;
   setIgnoredSteamGames: Dispatch<SetStateAction<IgnoredSteamGame[]>>;
+  setPlayActivity: Dispatch<SetStateAction<PlayActivityRecord[]>>;
+  setPlatformQueueState: Dispatch<SetStateAction<PlatformQueueState>>;
+  setReviewModeState: Dispatch<SetStateAction<ReviewModeState>>;
   setSelectedGameId: Dispatch<SetStateAction<string | null>>;
   t: ReturnType<typeof createTranslator>;
 };
@@ -34,6 +40,9 @@ export function useGameLibraryActions({
   games,
   setGames,
   setIgnoredSteamGames,
+  setPlayActivity,
+  setPlatformQueueState,
+  setReviewModeState,
   setSelectedGameId,
   t,
 }: UseGameLibraryActionsOptions) {
@@ -207,16 +216,19 @@ export function useGameLibraryActions({
 
   function removeGame(gameId: string) {
     const game = games.find((currentGame) => currentGame.id === gameId);
+    if (!game || !confirmGameDeletion([game])) {
+      return;
+    }
+
     if (game) {
-      addUndoAction(`${game.title} removed from ${game.collectionType === 'wishlist' ? 'Wishlist' : 'Library'}`, {
-        actionType: game.collectionType === 'wishlist' ? 'remove-wishlist-item' : 'delete-game',
+      addUndoAction(formatMessageTemplate(t('toast.gameDeleted'), { game: game.title }), {
+        actionType: 'delete-game',
         affectedGameIds: [gameId],
         description: formatMessageTemplate(t('app.restoreGame'), { game: game.title }),
       });
     }
 
-    setGames((currentGames) => currentGames.filter((game) => game.id !== gameId));
-    setSelectedGameId((currentSelectedGameId) => (currentSelectedGameId === gameId ? null : currentSelectedGameId));
+    deleteGamesEverywhere([gameId]);
   }
 
   function removeAndIgnoreSteamGame(game: Game) {
@@ -240,17 +252,47 @@ export function useGameLibraryActions({
   function removeManyGames(gameIds: string[]) {
     const targetGameIds = new Set(gameIds);
     const removedGames = games.filter((game) => targetGameIds.has(game.id));
-    if (removedGames.length > 0) {
-      addUndoAction(`${removedGames.length} games removed from Library`, {
-        actionType: 'bulk-remove-games',
-        affectedGameIds: removedGames.map((game) => game.id),
-        description: formatMessageTemplate(t('app.restoreRemovedGames'), { count: removedGames.length }),
-      });
+    if (removedGames.length === 0 || !confirmGameDeletion(removedGames)) {
+      return;
     }
+
+    addUndoAction(formatMessageTemplate(t('toast.gamesDeleted'), { count: removedGames.length }), {
+      actionType: 'bulk-delete-games',
+      affectedGameIds: removedGames.map((game) => game.id),
+      description: formatMessageTemplate(t('app.restoreRemovedGames'), { count: removedGames.length }),
+    });
+
+    deleteGamesEverywhere(removedGames.map((game) => game.id));
+  }
+
+  function deleteGamesEverywhere(gameIds: string[]) {
+    const targetGameIds = new Set(gameIds);
     setGames((currentGames) => currentGames.filter((game) => !targetGameIds.has(game.id)));
+    setPlayActivity((currentActivity) => currentActivity.filter((record) => !targetGameIds.has(record.gameId)));
+    setPlatformQueueState((currentState) =>
+      gameIds.reduce((nextState, gameId) => removeGameFromPlatformQueue(nextState, gameId), currentState),
+    );
+    setReviewModeState((currentState) => ({
+      ...currentState,
+      ignoredGameIds: currentState.ignoredGameIds.filter((gameId) => !targetGameIds.has(gameId)),
+      queueOrder: currentState.queueOrder.filter((gameId) => !targetGameIds.has(gameId)),
+      reviewedGames: Object.fromEntries(Object.entries(currentState.reviewedGames).filter(([gameId]) => !targetGameIds.has(gameId))),
+    }));
     setSelectedGameId((currentSelectedGameId) =>
       currentSelectedGameId && targetGameIds.has(currentSelectedGameId) ? null : currentSelectedGameId,
     );
+  }
+
+  function confirmGameDeletion(targetGames: Game[]) {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    const message = targetGames.length === 1
+      ? formatMessageTemplate(t('action.confirmDeleteGame'), { game: targetGames[0].title })
+      : formatMessageTemplate(t('action.confirmDeleteGames'), { count: targetGames.length });
+
+    return window.confirm(message);
   }
 
   function removeAndIgnoreManyGames(targetGames: Game[]) {
