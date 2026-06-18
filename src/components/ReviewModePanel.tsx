@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
 import { useI18n, type TFunction } from '../i18n';
-import { getGameCoverSources } from '../lib/gameCoverImages';
+import { getGameCoverSources, getGeneratedFallbackCover } from '../lib/gameCoverImages';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -504,6 +504,7 @@ export function ReviewModePanel({
         <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
           {activeGame ? (
             <FocusedReviewCard
+              key={activeGame.id}
               game={activeGame}
               hasGamepad={hasGamepad}
               highlightedActionIndex={highlightedActionIndex}
@@ -581,18 +582,20 @@ function FocusedReviewCard({
 }) {
   const { t } = useI18n();
   const coverSources = getGameCoverSources(game);
+  const fallbackCoverSource = getGeneratedFallbackCover(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [swipeState, setSwipeState] = useState<SwipeState>(emptySwipeState);
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
+  const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
 
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
     setSwipeState(emptySwipeState);
     swipeStartRef.current = null;
-  }, [game.id]);
+  }, [game.id, game.coverImage, game.backgroundImage, game.steamAppId, game.title, game.platform]);
 
   const swipeTarget = getSwipeTarget(swipeState.offsetX, swipeState.offsetY);
   const swipeDirection = swipeTarget?.horizontal ?? getSwipeHorizontalDirection(swipeState.offsetX);
@@ -756,15 +759,24 @@ function FocusedReviewCard({
             <div className="qs-review-artwork-frame relative h-full w-full">
               {activeCoverSource ? (
                 <div className="relative h-full w-full">
-                  {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+                  {!isGeneratedFallbackActive && !isCoverLoaded ? (
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-contain p-2"
+                      decoding="async"
+                      draggable={false}
+                      src={fallbackCoverSource}
+                    />
+                  ) : null}
                   <img
                     alt={game.title}
-                    className={`h-full w-full object-contain p-2 transition-opacity duration-300 ${
-                      isCoverLoaded ? 'opacity-100' : 'opacity-0'
+                    className={`relative h-full w-full object-contain p-2 transition-opacity duration-300 ${
+                      isGeneratedFallbackActive || isCoverLoaded ? 'opacity-100' : 'opacity-0'
                     }`}
                     decoding="async"
                     draggable={false}
-                    loading="lazy"
+                    loading={isGeneratedFallbackActive ? 'eager' : 'lazy'}
                     onDragStart={(event) => event.preventDefault()}
                     onError={() => {
                       setIsCoverLoaded(false);
@@ -775,10 +787,14 @@ function FocusedReviewCard({
                   />
                 </div>
               ) : (
-                <div className="grid h-full place-items-center bg-ink-800 px-4 text-center">
-                  <div className="mx-auto grid h-24 w-24 place-items-center rounded-2xl border border-white/10 bg-ink-950 text-4xl font-semibold text-mint">
-                    {game.title.slice(0, 1).toUpperCase()}
-                  </div>
+                <div className="relative h-full w-full">
+                  <img
+                    alt={game.title}
+                    className="h-full w-full object-contain p-2"
+                    decoding="async"
+                    draggable={false}
+                    src={fallbackCoverSource}
+                  />
                 </div>
               )}
             </div>
