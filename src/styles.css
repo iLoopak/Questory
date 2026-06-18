@@ -1181,6 +1181,14 @@ body.qs-controller-active .qs-toast {
   min-height: 0;
 }
 
+.qs-toast-close {
+  line-height: 1;
+}
+
+:root[data-theme='light'] .qs-toast-close {
+  color: rgb(248 250 252);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .qs-toast {
     animation: qs-toast-enter 220ms ease-out both;

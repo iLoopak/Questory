@@ -4,11 +4,15 @@ export type ToastCategory = 'success' | 'warning' | 'error' | 'info';
 
 export type ToastActionKind = 'dismiss' | 'link-rawg-game' | 'open-queue' | 'open-steam-settings' | 'undo' | 'view-game';
 
+export type ToastActionVariant = 'primary' | 'secondary' | 'danger';
+
 export type ToastAction = {
   gameId?: string;
   rawgRetryMode?: 'metadata' | 'artwork';
-  kind: ToastActionKind;
-  label: 'Dismiss' | 'Link RAWG Game' | 'Open Platform Plans' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game';
+  kind?: ToastActionKind;
+  label: 'Dismiss' | 'Link RAWG Game' | 'Open Platform Plans' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game' | (string & {});
+  onClick?: () => void | Promise<void>;
+  variant?: ToastActionVariant;
 };
 
 export type NotificationDraft = {
@@ -17,11 +21,12 @@ export type NotificationDraft = {
   dedupeKey?: string;
   message: string;
   details?: string;
+  persistent?: boolean;
 };
 
 export type MergeableNotification = NotificationDraft & {
   createdAt: number;
-  expiresAt: number;
+  expiresAt: number | null;
   id: string;
   repeatCount?: number;
 };
@@ -97,27 +102,27 @@ export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: 
 }
 
 export function getViewGameAction(gameId: string): ToastAction {
-  return { gameId, kind: 'view-game', label: 'View Game' };
+  return { gameId, kind: 'view-game', label: 'View Game', variant: 'secondary' };
 }
 
 export function getLinkRawgGameAction(gameId: string, rawgRetryMode: 'metadata' | 'artwork'): ToastAction {
-  return { gameId, rawgRetryMode, kind: 'link-rawg-game', label: 'Link RAWG Game' };
+  return { gameId, rawgRetryMode, kind: 'link-rawg-game', label: 'Link RAWG Game', variant: 'primary' };
 }
 
 export function getOpenQueueAction(): ToastAction {
-  return { kind: 'open-queue', label: 'Open Platform Plans' };
+  return { kind: 'open-queue', label: 'Open Platform Plans', variant: 'secondary' };
 }
 
 export function getOpenSteamSettingsAction(): ToastAction {
-  return { kind: 'open-steam-settings', label: 'Open Steam settings' };
+  return { kind: 'open-steam-settings', label: 'Open Steam settings', variant: 'primary' };
 }
 
 export function getDismissAction(): ToastAction {
-  return { kind: 'dismiss', label: 'Dismiss' };
+  return { kind: 'dismiss', label: 'Dismiss', variant: 'secondary' };
 }
 
 export function getUndoAction(): ToastAction {
-  return { kind: 'undo', label: 'Undo' };
+  return { kind: 'undo', label: 'Undo', variant: 'primary' };
 }
 
 export function getToastDedupeKey(actionType: string, affectedGameIds: string[]) {

@@ -75,7 +75,7 @@ export function useQuestShelfNotifications({
       createdAt,
       dedupeKey: notification.dedupeKey ?? (activeNavItem === 'Review Mode' ? 'quest-queue-action' : getToastDedupeKey(historyEntry.actionType, historyEntry.affectedGameIds)),
       details: notification.details,
-      expiresAt: createdAt + undoActionTimeoutMs,
+      expiresAt: notification.persistent ? null : createdAt + undoActionTimeoutMs,
       historyEntry: {
         ...historyEntry,
         createdAt: new Date(createdAt).toISOString(),
@@ -101,7 +101,7 @@ export function useQuestShelfNotifications({
       createdAt,
       dedupeKey: notification.dedupeKey,
       details: notification.details,
-      expiresAt: createdAt + undoActionTimeoutMs,
+      expiresAt: notification.persistent ? null : createdAt + undoActionTimeoutMs,
       historyEntry: {
         actionType: 'notification',
         affectedGameIds: [],
@@ -131,14 +131,21 @@ export function useQuestShelfNotifications({
     setPlatformQueueState(action.snapshot.platformQueueState);
     setReviewModeState(action.snapshot.reviewModeState);
     setSelectedGameId(action.snapshot.selectedGameId);
-    dismissUndoAction(actionId);
+    dismissToast(actionId);
   }
 
-  function dismissUndoAction(actionId: string) {
+  function dismissToast(actionId: string) {
     setPendingUndoActions((currentActions) => {
       const nextActions = currentActions.filter((currentAction) => currentAction.id !== actionId);
       pendingUndoActionsRef.current = nextActions;
       return nextActions;
+    });
+  }
+
+  function dismissAllToasts() {
+    setPendingUndoActions(() => {
+      pendingUndoActionsRef.current = [];
+      return [];
     });
   }
 
@@ -152,11 +159,20 @@ export function useQuestShelfNotifications({
       return;
     }
 
+    const expiringActions = pendingUndoActions.filter((action) => action.expiresAt !== null);
+    if (expiringActions.length === 0) {
+      return;
+    }
+
     const now = Date.now();
-    const nextExpiry = Math.max(0, Math.min(...pendingUndoActions.map((action) => action.expiresAt)) - now);
+    const nextExpiry = Math.max(0, Math.min(...expiringActions.map((action) => action.expiresAt as number)) - now);
     const expiryTimer = window.setTimeout(() => {
       const currentTime = Date.now();
-      setPendingUndoActions((currentActions) => currentActions.filter((action) => action.expiresAt > currentTime));
+      setPendingUndoActions((currentActions) => {
+        const nextActions = currentActions.filter((action) => action.expiresAt === null || action.expiresAt > currentTime);
+        pendingUndoActionsRef.current = nextActions;
+        return nextActions;
+      });
     }, nextExpiry + 50);
 
     return () => window.clearTimeout(expiryTimer);
@@ -166,7 +182,9 @@ export function useQuestShelfNotifications({
     addToastNotification,
     addUndoAction,
     createUndoSnapshot,
-    dismissUndoAction,
+    dismissAllToasts,
+    dismissToast,
+    dismissUndoAction: dismissToast,
     pendingUndoActions,
     undoAction,
   };

@@ -289,7 +289,7 @@ export function AppController() {
   const gamesRef = useRef(games);
   gamesRef.current = games;
   const saveGamesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { addToastNotification, addUndoAction, createUndoSnapshot, dismissUndoAction, pendingUndoActions, undoAction } = useToastState({
+  const { addToastNotification, addUndoAction, createUndoSnapshot, dismissToast, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,
     ignoredSteamGames,
@@ -1961,7 +1961,7 @@ export function AppController() {
 
       <UndoToastStack
         actions={pendingUndoActions}
-        onDismiss={dismissUndoAction}
+        onDismiss={dismissToast}
         onOpenQueue={openQueueFromToast}
         onLinkRawgGame={openRawgRecoveryDialog}
         onOpenSteamSettings={() => {

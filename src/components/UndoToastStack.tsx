@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  getDismissAction,
   maxVisibleToastCount,
   type ToastAction,
   type ToastCategory,
@@ -18,13 +17,26 @@ type UndoToastStackProps = {
   onViewGame: (gameId: string) => void;
 };
 
+const swipeDismissThresholdPx = 72;
+
 export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onLinkRawgGame, onUndo, onViewGame }: UndoToastStackProps) {
   const { t } = useI18n();
   const [expandedDetailIds, setExpandedDetailIds] = useState<Set<string>>(new Set());
+  const [runningActionKeys, setRunningActionKeys] = useState<Set<string>>(new Set());
+  const [failedActionIds, setFailedActionIds] = useState<Set<string>>(new Set());
+  const swipeStartXByToastId = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const activeActionIds = new Set(actions.map((action) => action.id));
     setExpandedDetailIds((currentIds) => {
+      const nextIds = new Set([...currentIds].filter((actionId) => activeActionIds.has(actionId)));
+      return nextIds.size === currentIds.size ? currentIds : nextIds;
+    });
+    setRunningActionKeys((currentKeys) => {
+      const nextKeys = new Set([...currentKeys].filter((key) => activeActionIds.has(key.split(':')[0])));
+      return nextKeys.size === currentKeys.size ? currentKeys : nextKeys;
+    });
+    setFailedActionIds((currentIds) => {
       const nextIds = new Set([...currentIds].filter((actionId) => activeActionIds.has(actionId)));
       return nextIds.size === currentIds.size ? currentIds : nextIds;
     });
@@ -36,12 +48,39 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
 
   const visibleActions = actions.slice(-maxVisibleToastCount).reverse();
 
-  function runToastAction(actionId: string, toastAction: ToastAction) {
-    if (toastAction.kind === 'dismiss') {
-      onDismiss(actionId);
+  async function runToastAction(actionId: string, toastAction: ToastAction, actionKey: string) {
+    if (runningActionKeys.has(actionKey)) {
       return;
     }
 
+    setRunningActionKeys((currentKeys) => new Set(currentKeys).add(actionKey));
+    setFailedActionIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.delete(actionId);
+      return nextIds;
+    });
+
+    try {
+      if (toastAction.onClick) {
+        await toastAction.onClick();
+      } else {
+        runBuiltInToastAction(actionId, toastAction);
+      }
+
+      onDismiss(actionId);
+    } catch (error) {
+      console.warn('QuestShelf toast action failed.', error);
+      setFailedActionIds((currentIds) => new Set(currentIds).add(actionId));
+    } finally {
+      setRunningActionKeys((currentKeys) => {
+        const nextKeys = new Set(currentKeys);
+        nextKeys.delete(actionKey);
+        return nextKeys;
+      });
+    }
+  }
+
+  function runBuiltInToastAction(actionId: string, toastAction: ToastAction) {
     if (toastAction.kind === 'undo') {
       onUndo(actionId);
       return;
@@ -49,25 +88,21 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
 
     if (toastAction.kind === 'open-queue') {
       onOpenQueue();
-      onDismiss(actionId);
       return;
     }
 
     if (toastAction.kind === 'open-steam-settings') {
       onOpenSteamSettings();
-      onDismiss(actionId);
       return;
     }
 
     if (toastAction.kind === 'link-rawg-game' && toastAction.gameId) {
       onLinkRawgGame(toastAction.gameId, toastAction.rawgRetryMode);
-      onDismiss(actionId);
       return;
     }
 
     if (toastAction.kind === 'view-game' && toastAction.gameId) {
       onViewGame(toastAction.gameId);
-      onDismiss(actionId);
     }
   }
 
@@ -90,19 +125,28 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
       aria-label={t('app.questShelfNotifications')}
       aria-live="polite"
       className="qs-toast-stack pointer-events-none fixed top-[calc(3.25rem+max(0px,var(--qs-safe-top)))] z-[1300] grid justify-items-stretch gap-2 overflow-visible sm:top-[calc(3.75rem+max(0px,var(--qs-safe-top)))] sm:justify-items-end"
-      role="status"
+      role="region"
     >
       {visibleActions.map((action) => {
         const category = action.category ?? 'success';
         const categoryStyles = getToastCategoryStyles(category);
-        const toastActions = action.actions?.length ? action.actions : [getDismissAction()];
+        const toastActions = action.actions ?? [];
         const hasDetails = Boolean(action.details?.trim());
         const isDetailsExpanded = expandedDetailIds.has(action.id);
+        const hasActionError = failedActionIds.has(action.id);
 
         return (
           <div
             key={action.id}
-            className={`qs-toast pointer-events-auto flex w-full max-w-full translate-x-0 flex-col gap-2 overflow-hidden rounded-2xl border px-3 py-2 shadow-glow ${categoryStyles.container}`}
+            className={`qs-toast pointer-events-auto flex w-full max-w-full touch-pan-y translate-x-0 flex-col gap-2 overflow-hidden rounded-2xl border px-3 py-2 shadow-glow ${categoryStyles.container}`}
+            onPointerDown={(event) => swipeStartXByToastId.current.set(action.id, event.clientX)}
+            onPointerUp={(event) => {
+              const startX = swipeStartXByToastId.current.get(action.id);
+              swipeStartXByToastId.current.delete(action.id);
+              if (startX !== undefined && Math.abs(event.clientX - startX) >= swipeDismissThresholdPx) {
+                onDismiss(action.id);
+              }
+            }}
           >
             <div className="flex min-w-0 items-start gap-2">
               <span className="qs-toast-message min-w-0 flex-1 text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
@@ -113,6 +157,14 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
                   ×{action.repeatCount}
                 </span>
               ) : null}
+              <button
+                aria-label={t('app.dismiss')}
+                className="qs-toast-close shrink-0 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-sm font-black leading-5 text-slate-100 transition hover:border-mint/40 hover:bg-mint/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mint"
+                onClick={() => onDismiss(action.id)}
+                type="button"
+              >
+                ×
+              </button>
             </div>
             {hasDetails ? (
               <div className="min-w-0">
@@ -131,18 +183,31 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
                 ) : null}
               </div>
             ) : null}
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-              {toastActions.map((toastAction) => (
-                <button
-                  key={`${action.id}-${toastAction.kind}-${toastAction.gameId ?? toastAction.label}-${toastAction.rawgRetryMode ?? ''}`}
-                  className={getToastButtonClass(toastAction.kind)}
-                  onClick={() => runToastAction(action.id, toastAction)}
-                  type="button"
-                >
-                  {getLocalizedToastActionLabel(toastAction.label, t)}
-                </button>
-              ))}
-            </div>
+            {hasActionError ? (
+              <p className="m-0 rounded-xl border border-red-300/30 bg-red-950/35 px-2 py-1 text-xs font-semibold text-red-100">
+                {t('app.actionFailedTryAgain')}
+              </p>
+            ) : null}
+            {toastActions.length > 0 ? (
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                {toastActions.map((toastAction, index) => {
+                  const actionKey = `${action.id}:${toastAction.kind ?? toastAction.label}:${toastAction.gameId ?? ''}:${toastAction.rawgRetryMode ?? ''}:${index}`;
+                  const isRunning = runningActionKeys.has(actionKey);
+
+                  return (
+                    <button
+                      key={actionKey}
+                      className={getToastButtonClass(toastAction)}
+                      disabled={isRunning}
+                      onClick={() => void runToastAction(action.id, toastAction, actionKey)}
+                      type="button"
+                    >
+                      {getLocalizedToastActionLabel(toastAction.label, t)}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -174,16 +239,19 @@ function getToastCategoryStyles(category: ToastCategory) {
   };
 }
 
-function getToastButtonClass(kind: ToastAction['kind']) {
-  const baseClass = 'min-h-0 max-w-full whitespace-normal break-words rounded-full px-3 py-1 text-xs font-bold leading-tight transition focus-visible:translate-y-0 sm:text-sm';
+function getToastButtonClass(action: ToastAction) {
+  const baseClass = 'min-h-0 max-w-full whitespace-normal break-words rounded-full px-3 py-1 text-xs font-bold leading-tight transition focus-visible:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm';
 
-  if (kind === 'undo') {
+  if (action.variant === 'danger') {
+    return `${baseClass} bg-red-400 text-ink-950 shadow-glow hover:bg-red-300`;
+  }
+
+  if (action.variant === 'primary' || action.kind === 'undo') {
     return `${baseClass} bg-mint text-ink-950 shadow-glow hover:bg-mint/90`;
   }
 
   return `${baseClass} border border-skyglass/20 bg-white/5 text-slate-100 hover:border-mint/40 hover:bg-mint/10 hover:text-white`;
 }
-
 
 function getLocalizedToastActionLabel(label: ToastAction['label'], t: ReturnType<typeof useI18n>['t']) {
   if (label === 'Dismiss') {
