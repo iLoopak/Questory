@@ -42,6 +42,7 @@ type CollectionViewProps = CollectionActionHandlers &
   CollectionHighlightProps & {
     games: Game[];
     hideRecommendationBadge?: boolean;
+    suppressWantToPlayStatus?: boolean;
     includeDetailsAction?: boolean;
     debugLabel?: string;
     platformQueueState?: PlatformQueueState;
@@ -54,6 +55,7 @@ export function CollectionGrid({
   debugLabel = 'Collection grid',
   getHighlightLabel,
   hideRecommendationBadge = false,
+  suppressWantToPlayStatus = false,
   includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
@@ -144,6 +146,7 @@ export function CollectionGrid({
             game={game}
             getHighlightLabel={getHighlightLabel}
             hideRecommendationBadge={hideRecommendationBadge}
+            suppressWantToPlayStatus={suppressWantToPlayStatus}
             includeDetailsAction={includeDetailsAction}
             isMultiSelectMode={isMultiSelectMode}
             isSelected={selectedGameIds.has(game.id)}
@@ -170,6 +173,7 @@ export function CollectionShelf({
   debugLabel = 'Collection shelf',
   getHighlightLabel,
   hideRecommendationBadge = false,
+  suppressWantToPlayStatus = false,
   includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
@@ -323,6 +327,7 @@ export function CollectionShelf({
                   game={game}
                   getHighlightLabel={getHighlightLabel}
                   hideRecommendationBadge={hideRecommendationBadge}
+                  suppressWantToPlayStatus={suppressWantToPlayStatus}
                   includeDetailsAction={includeDetailsAction}
                   index={absoluteIndex}
                   isMultiSelectMode={isMultiSelectMode}
@@ -355,6 +360,7 @@ export function CollectionList({
   debugLabel = 'Collection list',
   getHighlightLabel,
   hideRecommendationBadge = false,
+  suppressWantToPlayStatus = false,
   includeDetailsAction = false,
   isMultiSelectMode = false,
   selectedGameIds = new Set(),
@@ -413,6 +419,7 @@ export function CollectionList({
             game={game}
             getHighlightLabel={getHighlightLabel}
             hideRecommendationBadge={hideRecommendationBadge}
+            suppressWantToPlayStatus={suppressWantToPlayStatus}
             includeDetailsAction={includeDetailsAction}
             isMultiSelectMode={isMultiSelectMode}
             isSelected={selectedGameIds.has(game.id)}
@@ -443,6 +450,7 @@ type VirtualGridGameCardProps = CollectionActionHandlers &
   CollectionHighlightProps & {
     game: Game;
     hideRecommendationBadge: boolean;
+    suppressWantToPlayStatus: boolean;
     includeDetailsAction: boolean;
     isMultiSelectMode: boolean;
     isSelected: boolean;
@@ -454,6 +462,7 @@ const VirtualGridGameCard = memo(function VirtualGridGameCard({
   game,
   getHighlightLabel,
   hideRecommendationBadge,
+  suppressWantToPlayStatus,
   includeDetailsAction,
   isMultiSelectMode,
   isSelected,
@@ -480,6 +489,7 @@ const VirtualGridGameCard = memo(function VirtualGridGameCard({
       includeDetailsAction={includeDetailsAction}
       isMultiSelectMode={isMultiSelectMode}
       isSelected={isSelected}
+      suppressWantToPlayStatus={suppressWantToPlayStatus}
       onAddToQueue={onAddToQueue}
       onAddToWishlist={onAddToWishlist}
       onFindMetadata={onFindMetadata}
@@ -499,6 +509,7 @@ type ShelfGameCardProps = {
   game: Game;
   getHighlightLabel?: (game: Game) => string | undefined;
   hideRecommendationBadge: boolean;
+  suppressWantToPlayStatus: boolean;
   includeDetailsAction: boolean;
   index: number;
   isMultiSelectMode: boolean;
@@ -522,6 +533,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
   game,
   getHighlightLabel,
   hideRecommendationBadge,
+  suppressWantToPlayStatus,
   includeDetailsAction,
   index,
   isMultiSelectMode,
@@ -547,6 +559,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
+  const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
   const openDetails = useCallback(() => onOpenDetails(game.id), [game.id, onOpenDetails]);
   const toggleSelected = useCallback(() => onToggleSelected?.(game.id), [game.id, onToggleSelected]);
 
@@ -622,11 +635,18 @@ const ShelfGameCard = memo(function ShelfGameCard({
           <MissingCover title={game.title} />
         )}
         <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <PlatformBadge
-          className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold"
-          platform={platformLabel}
-          queueState={platformQueueState}
-        />
+        <span className={`absolute bottom-3 left-3 z-10 flex flex-wrap items-center gap-1.5 ${game.collectionType === 'wishlist' ? 'max-w-[42%] sm:max-w-[48%]' : 'max-w-[calc(100%-1.5rem)]'}`}>
+          <PlatformBadge
+            className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+            platform={platformLabel}
+            queueState={platformQueueState}
+          />
+          {shouldShowStatusBadge ? (
+            <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
+              <span className="platform-badge__label">{translateOption(game.status, t)}</span>
+            </span>
+          ) : null}
+        </span>
         {game.status === 'Playing' || game.status === 'Paused' ? (
           <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
         ) : null}
@@ -635,7 +655,6 @@ const ShelfGameCard = memo(function ShelfGameCard({
 
       <span className="mt-3 block min-h-[3rem]">
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
-        <span className="mt-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{translateOption(game.status, t)}</span>
 
       </span>
 
@@ -677,6 +696,7 @@ type CompactGameRowProps = {
   game: Game;
   getHighlightLabel?: (game: Game) => string | undefined;
   hideRecommendationBadge: boolean;
+  suppressWantToPlayStatus: boolean;
   includeDetailsAction: boolean;
   isMultiSelectMode: boolean;
   isSelected: boolean;
@@ -700,6 +720,7 @@ const CompactGameRow = memo(function CompactGameRow({
   game,
   getHighlightLabel,
   hideRecommendationBadge,
+  suppressWantToPlayStatus,
   includeDetailsAction,
   isMultiSelectMode,
   isSelected,
@@ -724,6 +745,7 @@ const CompactGameRow = memo(function CompactGameRow({
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
+  const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
   const openDetails = useCallback(() => onOpenDetails(game.id), [game.id, onOpenDetails]);
   const removeGame = useCallback(() => onRemove(game.id), [game.id, onRemove]);
   const removeAndIgnoreGame = useCallback(() => onRemoveAndIgnore(game), [game, onRemoveAndIgnore]);
@@ -773,7 +795,7 @@ const CompactGameRow = memo(function CompactGameRow({
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <PlatformBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
-            <span>{translateOption(game.status, t)}</span>
+            {shouldShowStatusBadge ? <span className="platform-badge rounded-full px-2 py-0.5 font-semibold">{translateOption(game.status, t)}</span> : null}
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
 
           </span>
