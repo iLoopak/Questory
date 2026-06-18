@@ -2068,7 +2068,7 @@ textarea,
   --badge-bg: rgb(8 13 31 / 0.58);
   --badge-text: rgb(var(--text-primary-rgb));
   --badge-border: rgb(var(--qs-accent-secondary-rgb) / 0.28);
-  --badge-shadow: 0 10px 24px rgb(0 0 0 / 0.44), 0 0 22px rgb(var(--qs-accent-primary-rgb) / 0.12);
+  --badge-shadow: 0 10px 24px rgb(0 0 0 / 0.44), 0 0 22px rgb(var(--qs-accent-secondary-rgb) / 0.14);
   --body-background: radial-gradient(circle at 12% -10%, rgb(var(--qs-accent-primary-rgb) / 0.24), transparent 28rem), radial-gradient(circle at 84% 4%, rgb(var(--qs-accent-secondary-rgb) / 0.18), transparent 30rem), linear-gradient(135deg, rgb(2 5 18) 0%, rgb(5 9 27) 44%, rgb(18 7 29) 100%);
   --qs-app-background: var(--body-background);
   --qs-panel-background: var(--surface-primary);
@@ -2139,7 +2139,7 @@ textarea,
 .qs-template-neon-deck .qs-top-nav {
   border-color: rgb(var(--qs-accent-primary-rgb) / 0.16) !important;
   background: rgb(1 5 17 / 0.64) !important;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 24px rgb(var(--qs-accent-primary-rgb) / 0.08);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 20px rgb(var(--qs-accent-primary-rgb) / 0.07), 0 0 36px rgb(var(--qs-accent-secondary-rgb) / 0.07);
   backdrop-filter: blur(18px);
 }
 
@@ -2157,16 +2157,16 @@ textarea,
 .qs-template-neon-deck .qs-collection-toolbar-button:hover,
 .qs-template-neon-deck .qs-actions-menu summary:hover,
 .qs-template-neon-deck .qs-view-menu summary:hover {
-  border-color: rgb(var(--qs-accent-primary-rgb) / 0.34) !important;
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.38) !important;
   background: rgb(var(--qs-accent-primary-rgb) / 0.1) !important;
   color: var(--text-primary) !important;
-  box-shadow: 0 0 22px rgb(var(--qs-accent-primary-rgb) / 0.13);
+  box-shadow: 0 0 16px rgb(var(--qs-accent-primary-rgb) / 0.1), 0 0 28px rgb(var(--qs-accent-secondary-rgb) / 0.12);
 }
 
 .qs-template-neon-deck .qs-collection-toolbar,
 .qs-template-neon-deck .qs-settings-detail > header,
 .qs-template-neon-deck .qs-settings-list {
-  border-color: rgb(var(--qs-accent-primary-rgb) / 0.14) !important;
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.18) !important;
   border-radius: 1rem;
   background: rgb(3 7 20 / 0.72) !important;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 18px 50px rgb(0 0 0 / 0.32);
@@ -2174,7 +2174,7 @@ textarea,
 }
 
 .qs-template-neon-deck .qs-toolbar-menu-panel {
-  border-color: rgb(var(--qs-accent-primary-rgb) / 0.22) !important;
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.26) !important;
   background: var(--surface-menu) !important;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 20px 52px rgb(0 0 0 / 0.52);
   backdrop-filter: blur(20px);
@@ -2183,7 +2183,7 @@ textarea,
 .qs-template-neon-deck input,
 .qs-template-neon-deck select,
 .qs-template-neon-deck textarea {
-  border-color: rgb(var(--qs-accent-primary-rgb) / 0.16) !important;
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.22) !important;
   background-color: rgb(2 6 19 / 0.72) !important;
   color: var(--text-primary) !important;
 }
@@ -2220,13 +2220,13 @@ textarea,
 .qs-template-neon-deck .qs-game-card:focus-within,
 .qs-template-neon-deck .qs-game-card[aria-selected='true'] {
   border-color: rgb(var(--qs-accent-primary-rgb) / 0.62) !important;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 26px 78px rgb(0 0 0 / 0.56), 0 0 0 1px rgb(var(--qs-accent-primary-rgb) / 0.28), 0 0 38px rgb(var(--qs-accent-primary-rgb) / 0.26), 0 0 56px rgb(var(--qs-accent-secondary-rgb) / 0.12);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 26px 78px rgb(0 0 0 / 0.56), 0 0 0 1px rgb(var(--qs-accent-primary-rgb) / 0.28), 0 0 38px rgb(var(--qs-accent-primary-rgb) / 0.26), 0 0 60px rgb(var(--qs-accent-secondary-rgb) / 0.18);
 }
 
 .qs-template-neon-deck .qs-game-card-artwork {
   aspect-ratio: 21 / 11;
   max-height: 11.5rem;
-  border-bottom: 1px solid rgb(var(--qs-accent-primary-rgb) / 0.12);
+  border-bottom: 1px solid rgb(var(--qs-accent-secondary-rgb) / 0.2);
   background: linear-gradient(135deg, rgb(10 17 38), rgb(3 6 18));
 }
 
@@ -2235,28 +2235,28 @@ textarea,
 }
 
 .qs-template-neon-deck .platform-badge {
-  border-color: rgb(var(--qs-accent-primary-rgb) / 0.32);
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.44);
   background: rgb(3 8 24 / 0.58);
   color: var(--text-primary);
-  box-shadow: 0 0 20px rgb(var(--qs-accent-primary-rgb) / 0.15), 0 8px 20px rgb(0 0 0 / 0.34);
+  box-shadow: 0 0 16px rgb(var(--qs-accent-secondary-rgb) / 0.18), 0 8px 20px rgb(0 0 0 / 0.34);
   backdrop-filter: blur(14px);
 }
 
 .qs-template-neon-deck .qs-game-card-status {
-  border: 1px solid rgb(var(--qs-accent-primary-rgb) / 0.26);
-  background: rgb(var(--qs-accent-primary-rgb) / 0.1);
+  border: 1px solid rgb(var(--qs-accent-secondary-rgb) / 0.36);
+  background: rgb(var(--qs-accent-secondary-rgb) / 0.12);
   padding: 0.22rem 0.62rem;
-  color: rgb(var(--qs-accent-primary-rgb));
+  color: var(--qs-accent-secondary);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  box-shadow: 0 0 18px rgb(var(--qs-accent-primary-rgb) / 0.12);
+  box-shadow: 0 0 14px rgb(var(--qs-accent-secondary-rgb) / 0.14);
 }
 
 .qs-template-neon-deck .qs-game-card-details-button:hover,
 .qs-template-neon-deck .qs-game-card-details-button:focus-visible {
-  box-shadow: 0 0 30px rgb(var(--qs-accent-primary-rgb) / 0.38), 0 12px 28px rgb(0 0 0 / 0.44);
+  box-shadow: 0 0 26px rgb(var(--qs-accent-primary-rgb) / 0.34), 0 0 48px rgb(var(--qs-accent-secondary-rgb) / 0.2), 0 12px 28px rgb(0 0 0 / 0.44);
 }
 
 .qs-template-neon-deck .qs-platform-playing-panel,
@@ -2265,9 +2265,9 @@ textarea,
 .qs-template-neon-deck .qs-review-zone,
 .qs-template-neon-deck .qs-shelf-card,
 .qs-template-neon-deck .qs-compact-card {
-  border-color: rgb(var(--qs-accent-primary-rgb) / 0.18) !important;
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.22) !important;
   background: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.02)), rgb(7 12 30 / 0.76) !important;
-  box-shadow: 0 20px 60px rgb(0 0 0 / 0.42), 0 0 28px rgb(var(--qs-accent-primary-rgb) / 0.08);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.42), 0 0 28px rgb(var(--qs-accent-secondary-rgb) / 0.1);
 }
 
 .qs-template-neon-deck .qs-review-zone-negative {
@@ -2289,6 +2289,25 @@ textarea,
 .qs-template-neon-deck [aria-checked='true'] {
   border-color: rgb(var(--qs-accent-primary-rgb) / 0.62) !important;
   box-shadow: var(--shadow-glow);
+}
+
+.qs-template-neon-deck .qs-compact-header.qs-header-stuck {
+  background: rgb(1 5 17 / 0.92) !important;
+  backdrop-filter: blur(22px);
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.52), 0 0 22px rgb(var(--qs-accent-secondary-rgb) / 0.08);
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.2) !important;
+}
+
+.qs-template-neon-deck .qs-shelf-scroller {
+  scrollbar-color: rgb(var(--qs-accent-secondary-rgb) / 0.4) rgb(var(--qs-accent-secondary-rgb) / 0.06);
+}
+
+.qs-template-neon-deck .qs-shelf-scroller::-webkit-scrollbar-track {
+  background: rgb(var(--qs-accent-secondary-rgb) / 0.06);
+}
+
+.qs-template-neon-deck .qs-shelf-scroller::-webkit-scrollbar-thumb {
+  background: rgb(var(--qs-accent-secondary-rgb) / 0.4);
 }
 
 
