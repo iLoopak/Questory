@@ -1573,7 +1573,7 @@ export function AppController() {
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onBack={handleBackFromDetail}
-              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
               isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
               onIgnore={removeAndIgnoreSteamGame}
               onSyncSteamData={syncSteamDataForGame}
@@ -1615,7 +1615,7 @@ export function AppController() {
                     onAddToQueue={openBacklogPicker}
                     onAddToWishlist={addToWishlist}
                     onBack={handleBackFromDetail}
-                    onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
                     isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
@@ -1688,7 +1688,7 @@ export function AppController() {
                     onAddToQueue={openBacklogPicker}
                     onAddToWishlist={addToWishlist}
                     onBack={handleBackFromDetail}
-                    onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
                     isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
@@ -1791,7 +1791,7 @@ export function AppController() {
               games={games}
               onApplyArtworkUpdate={updateGameArtwork}
               onEnrichGames={startMetadataWorkflow}
-              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setDetailReturnSection('Artwork');

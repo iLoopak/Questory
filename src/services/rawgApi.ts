@@ -86,6 +86,8 @@ export async function getGameDetails(rawgId: number): Promise<RawgGameDetails> {
 export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {
   return {
     rawgId: details.id,
+    rawgSlug: details.slug,
+    rawgTitle: details.name,
     genres: details.genres?.map((genre) => genre.name) ?? [],
     rawgTags: details.tags?.slice(0, 12).map((tag) => tag.name) ?? [],
     developers: details.developers?.map((developer) => developer.name) ?? [],
