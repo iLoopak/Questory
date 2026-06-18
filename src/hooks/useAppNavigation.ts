@@ -9,7 +9,7 @@ import {
 } from '../lib/navigationVisibilityPreferences';
 
 export function useAppNavigation({ onSectionChange }: { onSectionChange?: () => void } = {}) {
-  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Library');
+  const [activeNavItem, setActiveNavItem] = useState<NavItem>('Home');
   const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
   const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
     loadNavigationVisibilityPreferences(),
