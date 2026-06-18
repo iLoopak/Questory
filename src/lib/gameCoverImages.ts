@@ -63,6 +63,19 @@ export function canUseRawgImageAsCover(game: Game) {
 
 export function getRawgMetadataWithCoverFallback(game: Game, metadata: RawgMetadata): RawgMetadata {
   if (!metadata.backgroundImage || hasProtectedArtwork(game) || !isMissingOrGeneratedCover(game.coverImage)) {
+    // Migrate legacy games where artworkSource was never stored explicitly: the heuristic
+    // (coverImage === backgroundImage) breaks as soon as RAWG returns a new backgroundImage URL,
+    // causing getStoredArtworkSource to return 'user' instead of 'rawg'. Stamping artworkSource
+    // here makes subsequent refreshes resilient to URL changes.
+    if (
+      metadata.backgroundImage &&
+      !hasProtectedArtwork(game) &&
+      !game.artworkSource &&
+      game.coverImage &&
+      game.coverImage === game.backgroundImage
+    ) {
+      return { ...metadata, artworkSource: 'rawg' };
+    }
     return metadata;
   }
 
