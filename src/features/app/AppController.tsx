@@ -1638,6 +1638,8 @@ export function AppController() {
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
               queueState={platformQueueState}
+              steamAchievementSyncState={steamAchievementSyncState}
+              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               onOpenDetails={openGameFromHome}
               onOpenLibrary={() => {
                 setSelectedGameId(null);
@@ -1648,6 +1650,10 @@ export function AppController() {
               onOpenWishlist={() => {
                 setSelectedGameId(null);
                 setActiveNavItem('Wishlist');
+              }}
+              onSyncSteamData={() => {
+                void refreshSteamPlaytime();
+                void syncSteamAchievements();
               }}
             />
           ) : activeNavItem === 'Library' ? (

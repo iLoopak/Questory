@@ -1,15 +1,16 @@
 import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
-export const navItems = ['Library', 'Wishlist', 'Queue', 'Review Mode', 'Recommendation'] as const;
+export const navItems = ['Home', 'Library', 'Wishlist', 'Queue', 'Review Mode', 'Recommendation'] as const;
 export const moreNavItems = ['Stats', 'Artwork'] as const;
-export const alwaysVisibleNavItems = ['Library'] as const;
+export const alwaysVisibleNavItems = ['Home', 'Library'] as const;
 
 export type TopNavItem = (typeof navItems)[number];
 export type MoreNavItem = (typeof moreNavItems)[number];
 
 export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Parameters<TFunction>[0]> = {
   Artwork: 'nav.artwork',
+  Home: 'nav.home',
   Library: 'nav.library',
   Queue: 'nav.queue',
   Recommendation: 'nav.recommendations',
@@ -28,10 +29,14 @@ export const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, P
   Wishlist: 'nav.wishlist',
 };
 
-export const allNavItems = ['Home', ...navItems, ...moreNavItems, 'Settings', 'Metadata'] as const;
+export const allNavItems = [...navItems, ...moreNavItems, 'Settings', 'Metadata'] as const;
 export type NavItem = (typeof allNavItems)[number];
 
 export function getNavDescription(activeNavItem: NavItem) {
+  if (activeNavItem === 'Home') {
+    return 'See what you are playing, what needs review, and Steam sync status.';
+  }
+
   if (activeNavItem === 'Settings') {
     return 'Settings are grouped for handheld use.';
   }

@@ -3,8 +3,10 @@ import { getGameCoverSources } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import { scoreGame } from '../lib/recommendationEngine';
 import type { ReviewSource } from '../lib/reviewModeStorage';
+import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../types/steam';
 import type { Game, GamePlatform } from '../types/game';
 import { useI18n } from '../i18n';
+import { Icon } from './Icon';
 import { PlatformBadge } from './PlatformBadge';
 
 type HomePanelProps = {
@@ -15,11 +17,14 @@ type HomePanelProps = {
   games: Game[];
   ignoredReviewGameIds: Set<string>;
   queueState: PlatformQueueState;
+  steamAchievementSyncState?: SteamAchievementSyncState;
+  steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
   onOpenDetails: (game: Game) => void;
   onOpenLibrary: () => void;
   onOpenQueue: (platform?: GamePlatform) => void;
   onOpenReviewMode: (source: ReviewSource) => void;
   onOpenWishlist: () => void;
+  onSyncSteamData?: () => void;
 };
 
 type QueuePreview = {
@@ -38,11 +43,14 @@ export function HomePanel({
   games,
   ignoredReviewGameIds,
   queueState,
+  steamAchievementSyncState,
+  steamPlaytimeRefreshState,
   onOpenDetails,
   onOpenLibrary,
   onOpenQueue,
   onOpenReviewMode,
   onOpenWishlist,
+  onSyncSteamData,
 }: HomePanelProps) {
   const { t } = useI18n();
   const queueEntries = queueState.entries;
@@ -110,6 +118,33 @@ export function HomePanel({
   const reviewRemainingCount = useMemo(() => {
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id)).length;
   }, [games, ignoredReviewGameIds]);
+
+  const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
+
+  const lastPlaytimeSyncAt = useMemo(() => {
+    const times = games
+      .filter((g) => g.steamAppId != null && g.lastSteamActivityAt)
+      .map((g) => g.lastSteamActivityAt as string);
+    return times.length > 0 ? times.reduce((a, b) => (a > b ? a : b)) : null;
+  }, [games]);
+
+  const lastAchievementSyncAt = useMemo(() => {
+    const times = games
+      .filter((g) => g.steamAchievementsLastCheckedAt != null)
+      .map((g) => g.steamAchievementsLastCheckedAt as number);
+    return times.length > 0 ? new Date(Math.max(...times)) : null;
+  }, [games]);
+
+  const activePlayingPlatforms = useMemo(() => {
+    const platformCounts = new Map<GamePlatform, number>();
+    continuePlayingGames.forEach((g) => {
+      platformCounts.set(g.platform, (platformCounts.get(g.platform) ?? 0) + 1);
+    });
+    return Array.from(platformCounts.entries()).map(([platform, count]) => ({ count, platform }));
+  }, [continuePlayingGames]);
+
+  const isSteamSyncing =
+    steamAchievementSyncState?.status === 'loading' || steamPlaytimeRefreshState?.status === 'loading';
 
   const recommendedToday = useMemo(() => {
     const queuedGameIds = new Set(queueEntries.map((entry) => entry.gameId));
@@ -228,13 +263,24 @@ export function HomePanel({
 
         <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
           {continuePlayingGames.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
               {continuePlayingGames.map((game) => (
-                <GamePosterButton key={game.id} game={game} eyebrow={t('home.currentlyPlaying')} onClick={() => onOpenDetails(game)} queueState={queueState} />
+                <GamePosterButton
+                  key={game.id}
+                  game={game}
+                  eyebrow={t('home.currentlyPlaying')}
+                  hero={continuePlayingGames.length === 1}
+                  onClick={() => onOpenDetails(game)}
+                  queueState={queueState}
+                />
               ))}
             </div>
           ) : (
-            <EmptyState title={t('home.noActiveGames')} text={t('home.noActiveGamesText')} actionLabel={t('home.browseLibrary')} onAction={onOpenLibrary} />
+            <OnboardingSteps
+              onOpenLibrary={onOpenLibrary}
+              onOpenReviewMode={() => onOpenReviewMode('backlog')}
+              t={t}
+            />
           )}
         </HomeSection>
 
@@ -308,27 +354,76 @@ export function HomePanel({
       </div>
 
       <aside className="min-w-0 space-y-4 lg:overflow-y-auto lg:pl-1">
-        <HomeSection compact title={t('home.yourPlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
-          {queueSnapshot.length > 0 ? (
+        <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
+          <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
+          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}</p>
+          <button
+            className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            data-home-focus="true"
+            onClick={() => onOpenReviewMode('backlog')}
+            type="button"
+          >
+            {t('home.reviewNextGame')}
+          </button>
+        </section>
+
+        {hasSteamGames && onSyncSteamData ? (
+          <HomeSection compact title={t('home.steamSync')}>
             <div className="grid gap-2">
-              {queueSnapshot.map((queue) => (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-ink-950/70 px-3 py-2.5">
+                <span className="text-xs text-slate-400">{t('home.playtimeSync')}</span>
+                <span className="text-xs font-semibold text-slate-200">
+                  {steamPlaytimeRefreshState?.status === 'loading'
+                    ? t('home.syncingSteamData')
+                    : formatRelativeTime(lastPlaytimeSyncAt, t('home.neverSynced'))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-ink-950/70 px-3 py-2.5">
+                <span className="text-xs text-slate-400">{t('home.achievementSync')}</span>
+                <span className="text-xs font-semibold text-slate-200">
+                  {steamAchievementSyncState?.status === 'loading'
+                    ? t('home.syncingSteamData')
+                    : formatRelativeTime(lastAchievementSyncAt, t('home.neverSynced'))}
+                </span>
+              </div>
+            </div>
+            <button
+              className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:opacity-50"
+              data-home-focus="true"
+              disabled={isSteamSyncing}
+              onClick={onSyncSteamData}
+              type="button"
+            >
+              <Icon name={isSteamSyncing ? 'refresh-cw' : 'steam'} size={13} strokeWidth={2} className={isSteamSyncing ? 'animate-spin' : ''} />
+              {isSteamSyncing ? t('home.syncingSteamData') : t('home.syncSteamData')}
+            </button>
+          </HomeSection>
+        ) : null}
+
+        <HomeSection compact title={t('home.activePlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
+          {activePlayingPlatforms.length > 0 ? (
+            <div className="grid gap-2">
+              {activePlayingPlatforms.map(({ platform, count }) => (
                 <button
-                  key={queue.platform}
+                  key={platform}
                   className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-skyglass/15 bg-ink-950/72 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10"
                   data-home-focus="true"
-                  onClick={() => onOpenQueue(queue.platform)}
+                  onClick={() => onOpenQueue(platform)}
                   type="button"
                 >
-                  <span>
-                    <span className="block font-semibold text-white">{queue.platform}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">{t('home.openQueue')}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-white">{platform}</span>
+                    <PlatformBadge className="mt-0.5 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platform} queueState={queueState} />
                   </span>
-                  <span className="text-sm font-semibold text-mint">{queue.count} {queue.count === 1 ? t('home.gamePlanned') : t('home.gamesPlanned')}</span>
+                  <span className="shrink-0 text-sm font-semibold text-mint">
+                    {count} {count === 1 ? t('home.activeGame') : t('home.activeGames')}
+                  </span>
                 </button>
               ))}
             </div>
           ) : (
-            <EmptyState title={t('home.noPlatformPlan')} text={t('home.noPlatformPlanText')} actionLabel={t('home.buildPlan')} onAction={() => onOpenReviewMode('backlog')} />
+            <EmptyState title={t('home.noActivePlatforms')} text={t('home.noActivePlatformsText')} actionLabel={t('home.browseLibrary')} onAction={onOpenLibrary} />
           )}
         </HomeSection>
 
@@ -363,20 +458,6 @@ export function HomePanel({
             <EmptyState title={t('home.nothingAdded')} text={t('home.nothingAddedText')} actionLabel={t('home.openLibrary')} onAction={onOpenLibrary} />
           )}
         </HomeSection>
-
-        <section className="rounded-2xl border border-mint/18 bg-mint/10 p-4 shadow-panel">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
-          <div className="mt-2 text-3xl font-semibold text-white">{reviewRemainingCount}</div>
-          <p className="mt-1 text-sm text-slate-300">{reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}</p>
-          <button
-            className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-            data-home-focus="true"
-            onClick={() => onOpenReviewMode('backlog')}
-            type="button"
-          >
-            Open Quest Queue
-          </button>
-        </section>
       </aside>
     </section>
   );
@@ -420,13 +501,30 @@ function HomeSection({
   );
 }
 
-function GamePosterButton({ game, eyebrow, onClick, queueState, wide = false }: { game: Game; eyebrow: string; onClick: () => void; queueState: PlatformQueueState; wide?: boolean }) {
+function GamePosterButton({
+  game,
+  eyebrow,
+  hero = false,
+  onClick,
+  queueState,
+  wide = false,
+}: {
+  game: Game;
+  eyebrow: string;
+  hero?: boolean;
+  onClick: () => void;
+  queueState: PlatformQueueState;
+  wide?: boolean;
+}) {
+  const { t } = useI18n();
   const coverSources = getGameCoverSources(game);
   const coverSource = coverSources[0];
+  const minHeightClass = hero ? 'min-h-72' : 'min-h-56';
+  const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
 
   return (
     <button
-      className={`group relative min-h-56 overflow-hidden rounded-xl border border-white/10 bg-ink-950 text-left shadow-panel transition hover:border-mint/40 hover:shadow-glow ${wide ? 'w-full' : ''}`}
+      className={`group relative overflow-hidden rounded-xl border border-white/10 bg-ink-950 text-left shadow-panel transition hover:border-mint/40 hover:shadow-glow ${minHeightClass} ${wide ? 'w-full' : ''}`}
       data-home-focus="true"
       onClick={onClick}
       type="button"
@@ -439,10 +537,13 @@ function GamePosterButton({ game, eyebrow, onClick, queueState, wide = false }: 
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/50 to-transparent" />
       </div>
-      <div className="relative flex min-h-56 flex-col justify-end p-3">
+      <div className={`relative flex flex-col justify-end p-3 ${minHeightClass}`}>
         <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint">{eyebrow}</span>
-        <span className="line-clamp-2 text-xl font-semibold leading-tight text-white drop-shadow">{game.title}</span>
-        <PlatformBadge className="mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-semibold" platform={getGamePlatformLabel(game, queueState)} queueState={queueState} />
+        <span className={`line-clamp-2 font-semibold leading-tight text-white drop-shadow ${hero ? 'text-2xl' : 'text-xl'}`}>{game.title}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <PlatformBadge className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold" platform={getGamePlatformLabel(game, queueState)} queueState={queueState} />
+          {playtime ? <span className="text-xs text-slate-400">{playtime}</span> : null}
+        </div>
       </div>
     </button>
   );
@@ -503,6 +604,65 @@ function getRecentTime(game: Game) {
 
 function getTime(value: string | null | undefined) {
   return value ? new Date(value).getTime() || 0 : 0;
+}
+
+function OnboardingSteps({
+  onOpenLibrary,
+  onOpenReviewMode,
+  t,
+}: {
+  onOpenLibrary: () => void;
+  onOpenReviewMode: () => void;
+  t: ReturnType<typeof useI18n>['t'];
+}) {
+  const steps = [
+    { action: onOpenLibrary, label: t('home.importGamesTitle'), text: t('home.importGamesText') },
+    { action: onOpenReviewMode, label: t('home.reviewQueueTitle'), text: t('home.reviewQueueText') },
+    { action: undefined, label: t('home.chooseToPlayTitle'), text: t('home.chooseToPlayText') },
+  ] as const;
+
+  return (
+    <div className="rounded-xl border border-dashed border-white/12 bg-ink-950/55 p-4">
+      <p className="mb-4 text-sm font-semibold text-white">{t('home.getStarted')}</p>
+      <p className="mb-4 text-xs text-slate-400">{t('home.getStartedSubtitle')}</p>
+      <ol className="space-y-3">
+        {steps.map((step, index) => (
+          <li key={step.label} className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-mint/20 text-xs font-bold text-mint">{index + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">{step.label}</p>
+              <p className="mt-0.5 text-xs text-slate-400">{step.text}</p>
+            </div>
+            {step.action ? (
+              <button
+                className="shrink-0 rounded-lg border border-mint/30 bg-mint/10 px-3 py-1.5 text-xs font-semibold text-mint transition hover:bg-mint/20"
+                data-home-focus="true"
+                onClick={step.action}
+                type="button"
+              >
+                {index === 0 ? t('home.openLibrary') : t('home.reviewNextGame')}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function formatRelativeTime(value: string | Date | number | null | undefined, neverLabel: string): string {
+  if (!value) return neverLabel;
+  const ms = typeof value === 'string' ? Date.parse(value) : value instanceof Date ? value.getTime() : value;
+  if (!ms || isNaN(ms)) return neverLabel;
+  const diffMs = Date.now() - ms;
+  const diffMins = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffMins < 2) return 'Just now';
+  if (diffHours < 1) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Date(ms).toLocaleDateString();
 }
 
 function getSourceLabel(game: Game, t: ReturnType<typeof useI18n>['t']) {
