@@ -8,13 +8,16 @@ import { getRuntimeEnvironment } from "../../lib/capacitorEnvironment";
 import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPreferences";
 import {
   defaultAccentColor,
+  defaultGradientOrientation,
   defaultNeonButtonGradientBalance,
   defaultNeonButtonGradientMidpoint,
   defaultSecondaryAccentColor,
+  getGradientOrientationCssDirection,
   getNeonButtonGradientStops,
   normalizeAccentColor,
   type AccentColorPreference,
   type AppTemplatePreference,
+  type GradientOrientationPreference,
   type ResolvedTheme,
   type ThemePreference,
 } from "../../lib/themePreferences";
@@ -30,6 +33,7 @@ export function AppearanceSettingsPanel({
   appTemplatePreference,
   accentColorPreference,
   secondaryAccentColorPreference,
+  gradientOrientationPreference,
   neonButtonGradientBalancePreference,
   neonButtonGradientMidpointPreference,
   language,
@@ -40,6 +44,7 @@ export function AppearanceSettingsPanel({
   onAppTemplatePreferenceChange,
   onAccentColorChange,
   onSecondaryAccentColorChange,
+  onGradientOrientationChange,
   onNeonButtonGradientBalanceChange,
   onNeonButtonGradientMidpointChange,
   onLanguageChange,
@@ -53,6 +58,7 @@ export function AppearanceSettingsPanel({
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   secondaryAccentColorPreference: AccentColorPreference;
+  gradientOrientationPreference: GradientOrientationPreference;
   neonButtonGradientBalancePreference: number;
   neonButtonGradientMidpointPreference: number;
   language: AppLanguage;
@@ -63,6 +69,7 @@ export function AppearanceSettingsPanel({
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
   onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
+  onGradientOrientationChange: (orientation: GradientOrientationPreference) => void;
   onNeonButtonGradientBalanceChange: (balance: number) => void;
   onNeonButtonGradientMidpointChange: (midpoint: number) => void;
   onLanguageChange: (language: AppLanguage) => void;
@@ -115,6 +122,13 @@ export function AppearanceSettingsPanel({
   const isDefaultAccentColor = accentColorPreference === null;
   const isDefaultSecondaryAccentColor = secondaryAccentColorPreference === null;
   const neonButtonGradientStops = getNeonButtonGradientStops(neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference);
+  const selectedGradientOrientation = gradientOrientationPreference ?? defaultGradientOrientation;
+  const gradientOrientationOptions: Array<{ label: string; value: GradientOrientationPreference }> = [
+    { label: t("settings.gradientOrientationHorizontal"), value: "horizontal" },
+    { label: t("settings.gradientOrientationVertical"), value: "vertical" },
+    { label: t("settings.gradientOrientationDiagonalDown"), value: "diagonal-down" },
+    { label: t("settings.gradientOrientationDiagonalUp"), value: "diagonal-up" },
+  ];
   const accentColorPresets = [
     { color: defaultAccentColor, label: t("settings.defaultAccentColor") },
     { color: "#1b75d0", label: "Steam blue" },
@@ -167,6 +181,7 @@ export function AppearanceSettingsPanel({
       );
       onNeonButtonGradientBalanceChange(defaultNeonButtonGradientBalance);
       onNeonButtonGradientMidpointChange(defaultNeonButtonGradientMidpoint);
+      onGradientOrientationChange(defaultGradientOrientation);
     }
   };
 
@@ -384,6 +399,7 @@ export function AppearanceSettingsPanel({
                     "--preview-button-gradient-start": neonButtonGradientStops.startStop,
                     "--preview-button-gradient-mid": neonButtonGradientStops.midStop,
                     "--preview-button-gradient-end": neonButtonGradientStops.endStop,
+                    "--preview-accent-gradient-direction": getGradientOrientationCssDirection(selectedGradientOrientation),
                   } as CSSProperties
                 }
               >
@@ -453,6 +469,39 @@ export function AppearanceSettingsPanel({
               </label>
             </div>
 
+
+            <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
+              <span className="font-semibold text-white">{t("settings.gradientOrientation")}</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                {t("settings.gradientOrientationHelp")}
+              </span>
+              <div
+                aria-label={t("settings.gradientOrientation")}
+                className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+                role="radiogroup"
+              >
+                {gradientOrientationOptions.map((option) => {
+                  const isSelected = selectedGradientOrientation === option.value;
+
+                  return (
+                    <button
+                      aria-checked={isSelected}
+                      className={`rounded-md border px-3 py-2 text-left text-xs font-semibold transition ${
+                        isSelected
+                          ? "border-mint/60 bg-mint/15 text-white shadow-glow"
+                          : "border-skyglass/20 bg-ink-950/70 text-slate-300 hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+                      }`}
+                      key={option.value}
+                      onClick={() => onGradientOrientationChange(option.value)}
+                      role="radio"
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <label className="block rounded-lg border border-skyglass/15 bg-ink-900/60 p-3 text-sm text-slate-300">
@@ -568,6 +617,8 @@ export function AppearanceSettingsPanel({
                   onSecondaryAccentColorChange(null);
                   onNeonButtonGradientBalanceChange(defaultNeonButtonGradientBalance);
                   onNeonButtonGradientMidpointChange(defaultNeonButtonGradientMidpoint);
+                  onGradientOrientationChange(defaultGradientOrientation);
+      onGradientOrientationChange(defaultGradientOrientation);
                 }}
                 type="button"
               >

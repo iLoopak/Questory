@@ -161,11 +161,13 @@ export function AppController() {
     isControllerDebugEnabled,
     isLandscapeLockEnabled,
     language,
+    gradientOrientationPreference,
     neonButtonGradientBalancePreference,
     neonButtonGradientMidpointPreference,
     resolvedTheme,
     secondaryAccentColorPreference,
     setAccentColorPreference,
+    setGradientOrientationPreference,
     setAppTemplatePreference,
     setControllerLayoutPreference,
     setIsControllerDebugEnabled,
@@ -1854,6 +1856,7 @@ export function AppController() {
               appTemplatePreference={appTemplatePreference}
               accentColorPreference={accentColorPreference}
               secondaryAccentColorPreference={secondaryAccentColorPreference}
+              gradientOrientationPreference={gradientOrientationPreference}
               neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
               neonButtonGradientMidpointPreference={neonButtonGradientMidpointPreference}
               language={language}
@@ -1898,6 +1901,7 @@ export function AppController() {
               onAppTemplatePreferenceChange={setAppTemplatePreference}
               onAccentColorChange={setAccentColorPreference}
               onSecondaryAccentColorChange={setSecondaryAccentColorPreference}
+              onGradientOrientationChange={setGradientOrientationPreference}
               onNeonButtonGradientBalanceChange={setNeonButtonGradientBalancePreference}
               onNeonButtonGradientMidpointChange={setNeonButtonGradientMidpointPreference}
               onLanguageChange={setLanguage}

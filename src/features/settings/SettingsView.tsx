@@ -21,7 +21,7 @@ import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibi
 import { onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { ShelfIdentitySettings } from '../../lib/shelfIdentity';
-import type { AccentColorPreference, AppTemplatePreference, ResolvedTheme, ThemePreference } from '../../lib/themePreferences';
+import type { AccentColorPreference, AppTemplatePreference, GradientOrientationPreference, ResolvedTheme, ThemePreference } from '../../lib/themePreferences';
 import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
 import type { IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
 import type { SteamWishlistHtmlImportSummary } from '../../utils/summaryFormatters';
@@ -54,6 +54,7 @@ export type SettingsViewProps = {
   appTemplatePreference: AppTemplatePreference;
   accentColorPreference: AccentColorPreference;
   secondaryAccentColorPreference: AccentColorPreference;
+  gradientOrientationPreference: GradientOrientationPreference;
   neonButtonGradientBalancePreference: number;
   neonButtonGradientMidpointPreference: number;
   language: AppLanguage;
@@ -89,6 +90,7 @@ export type SettingsViewProps = {
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
   onSecondaryAccentColorChange: (color: AccentColorPreference) => void;
+  onGradientOrientationChange: (orientation: GradientOrientationPreference) => void;
   onNeonButtonGradientBalanceChange: (balance: number) => void;
   onNeonButtonGradientMidpointChange: (midpoint: number) => void;
   onLanguageChange: (language: AppLanguage) => void;
@@ -128,6 +130,7 @@ export function SettingsView({
   appTemplatePreference,
   accentColorPreference,
   secondaryAccentColorPreference,
+  gradientOrientationPreference,
   neonButtonGradientBalancePreference,
   neonButtonGradientMidpointPreference,
   language,
@@ -163,6 +166,7 @@ export function SettingsView({
   onAppTemplatePreferenceChange,
   onAccentColorChange,
   onSecondaryAccentColorChange,
+  onGradientOrientationChange,
   onLanguageChange,
   onNeonButtonGradientBalanceChange,
   onNeonButtonGradientMidpointChange,
@@ -344,6 +348,7 @@ export function SettingsView({
                 appTemplatePreference={appTemplatePreference}
                 accentColorPreference={accentColorPreference}
                 secondaryAccentColorPreference={secondaryAccentColorPreference}
+                gradientOrientationPreference={gradientOrientationPreference}
                 neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
                 neonButtonGradientMidpointPreference={neonButtonGradientMidpointPreference}
                 language={language}
@@ -354,6 +359,7 @@ export function SettingsView({
                 onAppTemplatePreferenceChange={onAppTemplatePreferenceChange}
                 onAccentColorChange={onAccentColorChange}
                 onSecondaryAccentColorChange={onSecondaryAccentColorChange}
+                onGradientOrientationChange={onGradientOrientationChange}
                 onNeonButtonGradientBalanceChange={onNeonButtonGradientBalanceChange}
                 onNeonButtonGradientMidpointChange={onNeonButtonGradientMidpointChange}
                 onLanguageChange={onLanguageChange}
