@@ -20,6 +20,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.secondaryAccentColor.v1'
   | 'questshelf.neonButtonGradientBalance.v1'
   | 'questshelf.neonButtonGradientMidpoint.v1'
+  | 'questshelf.gradientOrientation.v1'
   | 'questshelf.appTemplate.v1'
   | 'questshelf.appPersonalization.v1'
   | 'questshelf.shelfIdentity.v1'
@@ -185,6 +186,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Custom Neon CTA/button gradient transition midpoint/spread.',
     scope: 'ui',
     schema: 'Integer 0-100, default 50 when absent.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.gradientOrientation.v1',
+    purpose: 'Custom primary-secondary accent gradient orientation.',
+    scope: 'ui',
+    schema: '\'horizontal\' | \'vertical\' | \'diagonal-down\' | \'diagonal-up\', default diagonal-down when absent.',
   },
   {
     backup: 'never',

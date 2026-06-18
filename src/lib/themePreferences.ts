@@ -4,20 +4,24 @@ export type AccentColorPreference = string | null;
 export type AppTemplatePreference = 'classic' | 'neon-deck';
 export type NeonButtonGradientBalancePreference = number;
 export type NeonButtonGradientMidpointPreference = number;
+export type GradientOrientationPreference = 'horizontal' | 'vertical' | 'diagonal-down' | 'diagonal-up';
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
 export const accentColorStorageKey = 'questshelf.accentColor.v1';
 export const secondaryAccentColorStorageKey = 'questshelf.secondaryAccentColor.v1';
 export const neonButtonGradientBalanceStorageKey = 'questshelf.neonButtonGradientBalance.v1';
 export const neonButtonGradientMidpointStorageKey = 'questshelf.neonButtonGradientMidpoint.v1';
+export const gradientOrientationStorageKey = 'questshelf.gradientOrientation.v1';
 export const appTemplateStorageKey = 'questshelf.appTemplate.v1';
 export const defaultAccentColor = '#ff5a2c';
 export const defaultSecondaryAccentColor = '#38bdf8';
 export const defaultNeonButtonGradientBalance = 50;
 export const defaultNeonButtonGradientMidpoint = 50;
+export const defaultGradientOrientation: GradientOrientationPreference = 'diagonal-down';
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
 export const darkOnlyAppTemplatePreferences: AppTemplatePreference[] = ['neon-deck'];
+export const gradientOrientationPreferences: GradientOrientationPreference[] = ['horizontal', 'vertical', 'diagonal-down', 'diagonal-up'];
 
 const preferenceModuleName = '@capacitor/preferences';
 const darkThemeQuery = '(prefers-color-scheme: dark)';
@@ -42,6 +46,28 @@ export function isAccentColor(value: unknown): value is string {
 
 export function isAppTemplatePreference(value: unknown): value is AppTemplatePreference {
   return typeof value === 'string' && appTemplatePreferences.includes(value as AppTemplatePreference);
+}
+
+export function isGradientOrientationPreference(value: unknown): value is GradientOrientationPreference {
+  return typeof value === 'string' && gradientOrientationPreferences.includes(value as GradientOrientationPreference);
+}
+
+export function normalizeGradientOrientation(value: unknown): GradientOrientationPreference {
+  return isGradientOrientationPreference(value) ? value : defaultGradientOrientation;
+}
+
+export function getGradientOrientationCssDirection(orientation: GradientOrientationPreference = defaultGradientOrientation) {
+  switch (normalizeGradientOrientation(orientation)) {
+    case 'horizontal':
+      return 'to right';
+    case 'vertical':
+      return 'to bottom';
+    case 'diagonal-up':
+      return 'to bottom left';
+    case 'diagonal-down':
+    default:
+      return 'to bottom right';
+  }
 }
 
 export function isDarkOnlyAppTemplate(preference: AppTemplatePreference): boolean {
@@ -208,6 +234,38 @@ export function saveAccentColorPreference(color: AccentColorPreference) {
   void saveAccentColorPreferenceToNativeStorage(accentColorStorageKey, color);
 }
 
+export function loadGradientOrientationPreference(): GradientOrientationPreference {
+  if (typeof window === 'undefined') {
+    return defaultGradientOrientation;
+  }
+
+  try {
+    return normalizeGradientOrientation(window.localStorage.getItem(gradientOrientationStorageKey));
+  } catch {
+    return defaultGradientOrientation;
+  }
+}
+
+export function saveGradientOrientationPreference(orientation: GradientOrientationPreference) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalizedOrientation = normalizeGradientOrientation(orientation);
+
+  try {
+    if (normalizedOrientation === defaultGradientOrientation) {
+      window.localStorage.removeItem(gradientOrientationStorageKey);
+    } else {
+      window.localStorage.setItem(gradientOrientationStorageKey, normalizedOrientation);
+    }
+  } catch {
+    // Gradient tuning should stay responsive even when storage is unavailable.
+  }
+
+  void saveAccentColorPreferenceToNativeStorage(gradientOrientationStorageKey, normalizedOrientation);
+}
+
 export function loadNeonButtonGradientBalancePreference(): NeonButtonGradientBalancePreference {
   if (typeof window === 'undefined') {
     return defaultNeonButtonGradientBalance;
@@ -312,6 +370,7 @@ export function getAccentColorThemeVariables(
   secondaryColor: AccentColorPreference = null,
   neonButtonGradientBalance: NeonButtonGradientBalancePreference = defaultNeonButtonGradientBalance,
   neonButtonGradientMidpoint: NeonButtonGradientMidpointPreference = defaultNeonButtonGradientMidpoint,
+  gradientOrientation: GradientOrientationPreference = defaultGradientOrientation,
 ) {
   const primaryColor = color ?? defaultAccentColor;
   const primaryRgb = hexToRgb(primaryColor);
@@ -335,6 +394,7 @@ export function getAccentColorThemeVariables(
     '--qs-neon-button-gradient-start': gradientStops.startStop,
     '--qs-neon-button-gradient-mid': gradientStops.midStop,
     '--qs-neon-button-gradient-end': gradientStops.endStop,
+    '--qs-accent-gradient-direction': getGradientOrientationCssDirection(gradientOrientation),
     '--qs-neon-button-text': getReadableTextColor(dominantButtonRgb),
     '--accent-contrast': getReadableTextColor(primaryRgb),
     '--qs-glow-primary': `0 0 28px rgb(${primaryRgbValue} / 0.26)`,
@@ -347,12 +407,13 @@ export function applyAccentColorPreference(
   secondaryColor: AccentColorPreference = null,
   neonButtonGradientBalance: NeonButtonGradientBalancePreference = defaultNeonButtonGradientBalance,
   neonButtonGradientMidpoint: NeonButtonGradientMidpointPreference = defaultNeonButtonGradientMidpoint,
+  gradientOrientation: GradientOrientationPreference = defaultGradientOrientation,
 ) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  const accentVariables = getAccentColorThemeVariables(color, secondaryColor, neonButtonGradientBalance, neonButtonGradientMidpoint);
+  const accentVariables = getAccentColorThemeVariables(color, secondaryColor, neonButtonGradientBalance, neonButtonGradientMidpoint, gradientOrientation);
   const themedRoots = [document.documentElement, ...Array.from(document.querySelectorAll<HTMLElement>('.qs-app-root'))];
 
   themedRoots.forEach((root) => {
@@ -365,6 +426,7 @@ export function applyAccentColorPreference(
   document.documentElement.dataset.secondaryAccentColor = secondaryColor ?? 'default';
   document.documentElement.dataset.neonButtonGradientBalance = String(normalizeNeonButtonGradientBalance(neonButtonGradientBalance));
   document.documentElement.dataset.neonButtonGradientMidpoint = String(normalizeNeonButtonGradientMidpoint(neonButtonGradientMidpoint));
+  document.documentElement.dataset.gradientOrientation = normalizeGradientOrientation(gradientOrientation);
 }
 
 export function applyThemePreference(

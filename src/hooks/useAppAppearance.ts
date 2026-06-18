@@ -6,6 +6,7 @@ import {
   applyThemePreference,
   getAccentColorThemeVariables,
   loadAccentColorPreference,
+  loadGradientOrientationPreference,
   loadAppTemplatePreference,
   loadNeonButtonGradientBalancePreference,
   loadNeonButtonGradientMidpointPreference,
@@ -13,6 +14,7 @@ import {
   loadThemePreference,
   normalizeThemePreferenceForTemplate,
   saveAccentColorPreference,
+  saveGradientOrientationPreference,
   saveAppTemplatePreference,
   saveNeonButtonGradientBalancePreference,
   saveNeonButtonGradientMidpointPreference,
@@ -21,6 +23,7 @@ import {
   watchSystemTheme,
   type AccentColorPreference,
   type AppTemplatePreference,
+  type GradientOrientationPreference,
   type NeonButtonGradientBalancePreference,
   type NeonButtonGradientMidpointPreference,
   type ResolvedTheme,
@@ -34,6 +37,7 @@ export function useAppAppearance() {
   );
   const [accentColorPreference, setAccentColorPreference] = useState<AccentColorPreference>(() => loadAccentColorPreference());
   const [secondaryAccentColorPreference, setSecondaryAccentColorPreference] = useState<AccentColorPreference>(() => loadSecondaryAccentColorPreference());
+  const [gradientOrientationPreference, setGradientOrientationPreference] = useState<GradientOrientationPreference>(() => loadGradientOrientationPreference());
   const [neonButtonGradientBalancePreference, setNeonButtonGradientBalancePreference] = useState<NeonButtonGradientBalancePreference>(() =>
     loadNeonButtonGradientBalancePreference(),
   );
@@ -51,8 +55,9 @@ export function useAppAppearance() {
         secondaryAccentColorPreference,
         neonButtonGradientBalancePreference,
         neonButtonGradientMidpointPreference,
+        gradientOrientationPreference,
       ) as CSSProperties,
-    [accentColorPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, secondaryAccentColorPreference],
+    [accentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, secondaryAccentColorPreference],
   );
 
   function setThemePreference(preference: ThemePreference) {
@@ -94,22 +99,26 @@ export function useAppAppearance() {
       secondaryAccentColorPreference,
       neonButtonGradientBalancePreference,
       neonButtonGradientMidpointPreference,
+      gradientOrientationPreference,
     );
     saveAccentColorPreference(accentColorPreference);
     saveSecondaryAccentColorPreference(secondaryAccentColorPreference);
     saveNeonButtonGradientBalancePreference(neonButtonGradientBalancePreference);
     saveNeonButtonGradientMidpointPreference(neonButtonGradientMidpointPreference);
-  }, [accentColorPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, secondaryAccentColorPreference]);
+    saveGradientOrientationPreference(gradientOrientationPreference);
+  }, [accentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, secondaryAccentColorPreference]);
 
   return {
     accentColorPreference,
     accentThemeStyle,
     appTemplatePreference,
+    gradientOrientationPreference,
     neonButtonGradientBalancePreference,
     neonButtonGradientMidpointPreference,
     resolvedTheme,
     secondaryAccentColorPreference,
     setAccentColorPreference,
+    setGradientOrientationPreference,
     setAppTemplatePreference,
     setNeonButtonGradientBalancePreference,
     setNeonButtonGradientMidpointPreference,
