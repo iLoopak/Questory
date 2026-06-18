@@ -136,20 +136,32 @@ function GameCardComponent({
         </div>
       ) : null}
 
-      {isMultiSelectMode ? (
-        <div className="absolute left-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full border border-mint/40 bg-ink-950/90 shadow-glow">
-          <input
-            aria-label={`Select ${game.title}`}
-            checked={isSelected}
-            className="h-4 w-4 accent-mint"
-            onChange={() => onToggleSelected?.()}
-            onClick={stopCardAction}
-            type="checkbox"
-          />
-        </div>
-      ) : null}
-
       <div className="qs-game-card-artwork relative aspect-[16/9] max-h-32 shrink-0 overflow-hidden bg-ink-700 sm:max-h-36">
+        {isMultiSelectMode ? (
+          <label
+            className={`absolute left-0 top-0 z-20 flex h-11 w-11 cursor-pointer items-center justify-center rounded-br-xl transition ${
+              isSelected ? 'bg-mint' : 'bg-ink-950/60 hover:bg-ink-950/80'
+            }`}
+            onClick={stopCardAction}
+          >
+            <input
+              aria-label={`Select ${game.title}`}
+              checked={isSelected}
+              className="sr-only"
+              onChange={() => onToggleSelected?.()}
+              type="checkbox"
+            />
+            {isSelected ? (
+              <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24" width="18" className="text-ink-950">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg aria-hidden="true" fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" width="16" className="text-white/70">
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            )}
+          </label>
+        ) : null}
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
