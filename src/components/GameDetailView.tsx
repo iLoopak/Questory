@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
@@ -7,7 +8,8 @@ import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameC
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
-import { translateOption, useI18n } from '../i18n';
+import { translateOption, useI18n, type TFunction } from '../i18n';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { formatDealPrice } from './DealCoverBadges';
 import { buildHltbSearchUrl, formatHltbBadge, getHltbGameSearchTitle, hasHltbData } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
@@ -62,6 +64,9 @@ export function GameDetailView({
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
   const [editError, setEditError] = useState('');
+  const [isOverflowOpen, setIsOverflowOpen] = useState(false);
+  const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
+  const overflowMenuId = useId();
 
   const coverSources = useMemo(() => {
     return getGameCoverSources(game);
@@ -169,75 +174,6 @@ export function GameDetailView({
       disabled: !onStatusChange,
     },
   ];
-  const steamActions: GameDetailAction[] = isSteamLibraryGame
-    ? [
-        {
-          icon: 'refresh-cw',
-          label: isSteamDataSyncing ? t('detail.syncingSteamData') : t('detail.syncSteamData'),
-          onClick: () => onSyncSteamData?.(game),
-          tone: 'neutral',
-          disabled: !onSyncSteamData || isSteamDataSyncing,
-        },
-      ]
-    : [];
-
-
-  const dealActions: GameDetailAction[] = game.itadCurrentBestUrl
-    ? [
-        {
-          icon: 'shopping-bag',
-          label: currentItadPrice ? `${t('itad.openDeal')} · ${currentItadPrice}` : t('itad.openDeal'),
-          onClick: () => {
-            window.open(game.itadCurrentBestUrl, '_blank', 'noopener,noreferrer');
-          },
-          tone: 'accent',
-        },
-      ]
-    : [];
-
-  const hltbSearchActions: GameDetailAction[] = [
-    {
-      icon: 'search',
-      label: t('hltb.findOn'),
-      onClick: () => {
-        window.open(buildHltbSearchUrl(getHltbGameSearchTitle(game)), '_blank', 'noopener,noreferrer');
-      },
-      tone: 'neutral',
-    },
-  ];
-
-  const artworkActions: GameDetailAction[] = canFindArtwork
-    ? [
-        {
-          icon: 'image',
-          label: isFindingArtwork
-            ? t('artwork.searching')
-            : (isArtworkMissing ? t('artwork.findArtwork') : t('artwork.enrichMetadata')),
-          onClick: () => {
-            void onFindArtwork?.(game);
-          },
-          tone: 'accent',
-          disabled: !onFindArtwork || isFindingArtwork,
-        },
-      ]
-    : [];
-
-  const destructiveActions: GameDetailAction[] = [
-    {
-      icon: 'trash-2',
-      label: t('queue.drop'),
-      onClick: () => onStatusChange?.(game.id, 'Dropped'),
-      tone: 'danger',
-      disabled: !onStatusChange,
-    },
-    {
-      icon: 'eye-off',
-      label: t('action.ignore'),
-      onClick: () => onIgnore?.(game),
-      tone: 'danger',
-      disabled: !onIgnore || typeof game.steamAppId !== 'number',
-    },
-  ];
 
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-116px)]">
@@ -318,32 +254,44 @@ export function GameDetailView({
 
             <section className="rounded-2xl border border-white/10 bg-ink-950/80 p-3" aria-label={t('detail.actionsA11y')}>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {destructiveActions.map((action) => (
-                    <GameDetailActionButton key={action.label} action={action} />
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {steamActions.map((action) => (
-                    <GameDetailActionButton key={action.label} action={action} />
-                  ))}
-                  {dealActions.map((action) => (
-                    <GameDetailActionButton key={action.label} action={action} />
-                  ))}
-                  {hltbSearchActions.map((action) => (
-                    <GameDetailActionButton key={action.label} action={action} />
-                  ))}
-                  {artworkActions.map((action) => (
-                    <GameDetailActionButton key={action.label} action={action} />
-                  ))}
-                </div>
-                <div className="min-w-4 flex-1" aria-hidden="true" />
-                <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
-                  {primaryActions.map((action) => (
-                    <GameDetailActionButton key={action.label} action={action} />
-                  ))}
-                </div>
+                {primaryActions.map((action) => (
+                  <GameDetailActionButton key={action.label} action={action} />
+                ))}
+                <button
+                  ref={overflowButtonRef}
+                  aria-controls={isOverflowOpen ? overflowMenuId : undefined}
+                  aria-expanded={isOverflowOpen}
+                  aria-haspopup="dialog"
+                  aria-label={t('action.moreActions')}
+                  className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                  onClick={() => setIsOverflowOpen(true)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon name="more-horizontal" />
+                    <span>{t('action.more')}</span>
+                  </span>
+                </button>
               </div>
+              {isOverflowOpen ? (
+                <GameDetailOverflowMenu
+                  anchorRef={overflowButtonRef}
+                  canFindArtwork={canFindArtwork}
+                  currentItadPrice={currentItadPrice}
+                  game={game}
+                  isArtworkMissing={isArtworkMissing}
+                  isFindingArtwork={isFindingArtwork}
+                  isSteamDataSyncing={isSteamDataSyncing}
+                  isSteamLibraryGame={isSteamLibraryGame}
+                  menuId={overflowMenuId}
+                  onClose={() => setIsOverflowOpen(false)}
+                  onFindArtwork={onFindArtwork}
+                  onIgnore={onIgnore}
+                  onStatusChange={onStatusChange}
+                  onSyncSteamData={onSyncSteamData}
+                  t={t}
+                />
+              ) : null}
             </section>
 
             {isEditing ? (
@@ -627,6 +575,238 @@ function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
   }
 
   return 'border-skyglass/15 bg-ink-950/70 text-slate-200 hover:bg-mint/10 hover:text-white';
+}
+
+type GameDetailOverflowMenuProps = {
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  canFindArtwork: boolean;
+  currentItadPrice?: string;
+  game: Game;
+  isArtworkMissing: boolean;
+  isFindingArtwork: boolean;
+  isSteamDataSyncing: boolean;
+  isSteamLibraryGame: boolean;
+  menuId: string;
+  onClose: () => void;
+  onFindArtwork?: (game: Game) => void | Promise<unknown>;
+  onIgnore?: (game: Game) => void;
+  onStatusChange?: (gameId: string, status: GameStatus) => void;
+  onSyncSteamData?: (game: Game) => void;
+  t: TFunction;
+};
+
+function GameDetailOverflowMenu({
+  anchorRef,
+  canFindArtwork,
+  currentItadPrice,
+  game,
+  isArtworkMissing,
+  isFindingArtwork,
+  isSteamDataSyncing,
+  isSteamLibraryGame,
+  menuId,
+  onClose,
+  onFindArtwork,
+  onIgnore,
+  onStatusChange,
+  onSyncSteamData,
+  t,
+}: GameDetailOverflowMenuProps) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useScrollLock();
+
+  useEffect(() => {
+    const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])');
+    firstItem?.focus({ preventScroll: true });
+    return () => {
+      window.setTimeout(() => anchorRef.current?.focus({ preventScroll: true }), 0);
+    };
+  }, [anchorRef]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onClose]);
+
+  function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+    const activeIndex = items.findIndex((item) => item === document.activeElement);
+    const nextIndex = event.key === 'ArrowDown'
+      ? (activeIndex + 1) % items.length
+      : (activeIndex - 1 + items.length) % items.length;
+    items[nextIndex]?.focus({ preventScroll: true });
+  }
+
+  function closeAndRun(fn: () => void) {
+    onClose();
+    window.setTimeout(fn, 0);
+  }
+
+  type OverflowItem = { icon: IconName; label: string; disabled?: boolean } & (
+    | { href: string; onClick?: () => void }
+    | { href?: never; onClick: () => void }
+  );
+
+  const toolItems: OverflowItem[] = [];
+
+  if (isSteamLibraryGame) {
+    toolItems.push({
+      icon: 'refresh-cw',
+      label: isSteamDataSyncing ? t('detail.syncingSteamData') : t('detail.syncSteamData'),
+      disabled: !onSyncSteamData || isSteamDataSyncing,
+      onClick: () => closeAndRun(() => onSyncSteamData?.(game)),
+    });
+  }
+
+  if (canFindArtwork) {
+    toolItems.push({
+      icon: 'image',
+      label: isFindingArtwork
+        ? t('artwork.searching')
+        : isArtworkMissing
+          ? t('artwork.findArtwork')
+          : t('artwork.enrichMetadata'),
+      disabled: !onFindArtwork || isFindingArtwork,
+      onClick: () => closeAndRun(() => { void onFindArtwork?.(game); }),
+    });
+  }
+
+  if (game.itadCurrentBestUrl) {
+    toolItems.push({
+      icon: 'shopping-bag',
+      label: currentItadPrice ? `${t('itad.openDeal')} · ${currentItadPrice}` : t('itad.openDeal'),
+      href: game.itadCurrentBestUrl,
+      onClick: onClose,
+    });
+  }
+
+  toolItems.push({
+    icon: 'search',
+    label: t('hltb.findOn'),
+    href: buildHltbSearchUrl(getHltbGameSearchTitle(game)),
+    onClick: onClose,
+  });
+
+  const dangerItems: OverflowItem[] = [
+    {
+      icon: 'trash-2',
+      label: t('queue.drop'),
+      disabled: !onStatusChange,
+      onClick: () => closeAndRun(() => onStatusChange?.(game.id, 'Dropped')),
+    },
+    {
+      icon: 'eye-off',
+      label: t('action.ignore'),
+      disabled: !onIgnore || typeof game.steamAppId !== 'number',
+      onClick: () => closeAndRun(() => onIgnore?.(game)),
+    },
+  ];
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="qs-game-action-backdrop fixed inset-0 z-[1200] flex items-end justify-center p-2 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        ref={menuRef}
+        id={menuId}
+        aria-label={`${t('action.actions')} ${game.title}`}
+        aria-modal="true"
+        className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-3xl sm:rounded-3xl"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={handleMenuKeyDown}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <div className="qs-game-action-header">
+          <div className="min-w-0">
+            <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
+            <h3 className="qs-game-action-title">{game.title}</h3>
+            <p className="qs-game-action-platform">{game.platform}</p>
+          </div>
+          <button
+            aria-label={t('action.close')}
+            className="qs-game-action-close"
+            onClick={onClose}
+            type="button"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <div className="qs-game-action-scroll">
+          <div aria-label={`${t('action.actions')} ${game.title}`} className="qs-game-action-sections" role="menu">
+            {toolItems.length > 0 ? (
+              <section className="qs-game-action-section">
+                <h4 className="qs-game-action-section-title">{t('action.sectionTools')}</h4>
+                <div aria-label={t('action.sectionTools')} className="qs-game-action-section-list" role="group">
+                  {toolItems.map((item) =>
+                    item.href ? (
+                      <a
+                        key={item.label}
+                        className="qs-game-action-row"
+                        href={item.href}
+                        onClick={item.onClick}
+                        rel="noreferrer"
+                        role="menuitem"
+                        target="_blank"
+                      >
+                        <span aria-hidden="true" className="qs-game-action-row-icon"><Icon name={item.icon} /></span>
+                        <span className="qs-game-action-row-label">{item.label}</span>
+                      </a>
+                    ) : (
+                      <button
+                        key={item.label}
+                        aria-disabled={item.disabled}
+                        className={`qs-game-action-row${item.disabled ? ' qs-game-action-row-disabled' : ''}`}
+                        disabled={item.disabled}
+                        onClick={item.onClick}
+                        role="menuitem"
+                        type="button"
+                      >
+                        <span aria-hidden="true" className="qs-game-action-row-icon"><Icon name={item.icon} /></span>
+                        <span className="qs-game-action-row-label">{item.label}</span>
+                      </button>
+                    ),
+                  )}
+                </div>
+              </section>
+            ) : null}
+            <section className="qs-game-action-section qs-game-action-section-danger">
+              <h4 className="qs-game-action-section-title">{t('action.sectionDanger')}</h4>
+              <div aria-label={t('action.sectionDanger')} className="qs-game-action-section-list" role="group">
+                {dangerItems.map((item) => (
+                  <button
+                    key={item.label}
+                    aria-disabled={item.disabled}
+                    className={`qs-game-action-row qs-game-action-row-danger${item.disabled ? ' qs-game-action-row-disabled' : ''}`}
+                    disabled={item.disabled}
+                    onClick={item.onClick}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="qs-game-action-row-icon"><Icon name={item.icon} /></span>
+                    <span className="qs-game-action-row-label">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 type DetailSectionProps = {
