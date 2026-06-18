@@ -25,6 +25,7 @@ type GameCardProps = {
   onToggleSelected?: () => void;
   platformQueueState?: PlatformQueueState;
   platformLabel?: string;
+  suppressWantToPlayStatus?: boolean;
 };
 
 function GameCardComponent({
@@ -44,6 +45,7 @@ function GameCardComponent({
   onToggleSelected,
   platformQueueState,
   platformLabel,
+  suppressWantToPlayStatus = false,
 }: GameCardProps) {
   const { t } = useI18n();
   const coverSources = useMemo(() => {
@@ -52,6 +54,7 @@ function GameCardComponent({
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
 
   const firstCoverSource = coverSources[0] ?? null;
   useEffect(() => {
@@ -192,11 +195,18 @@ function GameCardComponent({
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-transparent" />
-        <PlatformBadge
-          className="absolute bottom-3 left-3 max-w-[75%] truncate rounded-full px-2.5 py-1 text-xs font-semibold"
-          platform={platformLabel ?? game.platform}
-          queueState={platformQueueState}
-        />
+        <div className={`absolute bottom-3 left-3 z-10 flex flex-wrap items-center gap-1.5 ${game.collectionType === 'wishlist' ? 'max-w-[42%] sm:max-w-[48%]' : 'max-w-[calc(100%-1.5rem)]'}`}>
+          <PlatformBadge
+            className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+            platform={platformLabel ?? game.platform}
+            queueState={platformQueueState}
+          />
+          {shouldShowStatusBadge ? (
+            <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
+              <span className="platform-badge__label">{translateOption(game.status, t)}</span>
+            </span>
+          ) : null}
+        </div>
         {game.collectionType === 'wishlist' ? (
           <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-mint">
             {t('collection.wishlist')}
@@ -213,8 +223,6 @@ function GameCardComponent({
           >
             {game.title}
           </h3>
-
-          <div className="qs-game-card-status mt-2 inline-flex rounded-full text-sm text-slate-400">{translateOption(game.status, t)}</div>
 
         </div>
 

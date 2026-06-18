@@ -308,6 +308,7 @@ export function RecommendationPanel({
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
             scrollElementRef={panelRef}
+            suppressWantToPlayStatus
           />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
@@ -326,6 +327,7 @@ export function RecommendationPanel({
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
             scrollElementRef={panelRef}
+            suppressWantToPlayStatus
           />
         ) : (
           <CollectionGrid
@@ -344,6 +346,7 @@ export function RecommendationPanel({
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
             scrollElementRef={panelRef}
+            suppressWantToPlayStatus
           />
         )
       ) : (
