@@ -26,7 +26,7 @@ export type PendingUndoAction = {
   actions?: ToastAction[];
   category: ToastCategory;
   createdAt: number;
-  expiresAt: number;
+  expiresAt: number | null;
   dedupeKey?: string;
   details?: string;
   historyEntry: UndoActionHistoryEntry;
@@ -54,7 +54,7 @@ export function loadPendingUndoActions(now = Date.now()): PendingUndoAction[] {
 
     return parsedValue
       .filter(isPendingUndoAction)
-      .filter((action) => action.expiresAt > now)
+      .filter((action) => action.expiresAt === null || action.expiresAt > now)
       .map(normalizePendingUndoAction);
   } catch (error) {
     console.warn('QuestShelf could not load pending undo actions.', error);
@@ -100,7 +100,7 @@ function isPendingUndoAction(value: unknown): value is PendingUndoAction {
     typeof candidate.id === 'string' &&
     typeof candidate.message === 'string' &&
     typeof candidate.createdAt === 'number' &&
-    typeof candidate.expiresAt === 'number' &&
+    (candidate.expiresAt === null || typeof candidate.expiresAt === 'number') &&
     (!candidate.details || typeof candidate.details === 'string') &&
     (!candidate.category || isToastCategory(candidate.category)) &&
     (!candidate.actions || Array.isArray(candidate.actions)) &&
