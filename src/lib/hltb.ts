@@ -3,6 +3,15 @@ import type { Game } from '../types/game';
 const HLTB_CACHE_KEY = 'questshelf.hltbCache.v1';
 const HLTB_SEARCH_URL = '/api/hltb/search';
 const HLTB_SOURCE_BASE_URL = 'https://howlongtobeat.com/game';
+const HLTB_SEARCH_BASE_URL = 'https://howlongtobeat.com/';
+
+export function buildHltbSearchUrl(title: string): string {
+  return `${HLTB_SEARCH_BASE_URL}?${new URLSearchParams({ q: title }).toString()}`;
+}
+
+export function getHltbGameSearchTitle(game: Game): string {
+  return game.metadataSearchTitle || game.displayTitleOverride || game.title;
+}
 const MIN_SAFE_MATCH_CONFIDENCE = 0.82;
 const AMBIGUOUS_MATCH_DELTA = 0.08;
 
