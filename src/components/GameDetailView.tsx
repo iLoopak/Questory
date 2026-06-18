@@ -316,17 +316,10 @@ export function GameDetailView({
               <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
             ) : null}
 
-            <DetailSection kicker={t('detail.editable')} title={t('detail.myInformation')} description={t('detail.myInformationHelp')}>
-              <div className="grid gap-3 md:grid-cols-3">
-                <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} />
-                {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
-                <PersonalStatField label={t('toolbar.status')} value={translateOption(game.status, t)} />
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
+            <DetailSection kicker={t('detail.myGameLog')} title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.customTags')}</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.tags')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={tagText}
@@ -350,27 +343,36 @@ export function GameDetailView({
                 </label>
 
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('review.notes')}</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.myNotes')}</span>
                   <textarea
-                    className="mt-2 min-h-28 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20 xl:min-h-24"
+                    className="mt-2 min-h-24 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={game.notes}
                     onChange={(event) => updateTracking({ notes: event.target.value })}
                     placeholder={t('detail.notesPlaceholder')}
                   />
                 </label>
               </div>
-            </DetailSection>
 
+              <div className="grid gap-3 md:grid-cols-3">
+                {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+                <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
+                {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+              </div>
 
-            {isSteamLibraryGame ? (
-              <DetailSection kicker="Steam Activity" title="Steam Activity" description="Detected only when Steam reports higher total playtime than the previous sync.">
-                <div className="grid gap-3 md:grid-cols-3">
-                  <PersonalStatField label="Playtime" value={`${game.playtimeHours}h`} />
-                  <PersonalStatField label="Last Steam Activity" value={formatRelativeActivityDate(lastSteamActivityAt)} />
-                  <PersonalStatField label="Recent Delta" value={formatDeltaMinutes(recentSteamDeltaMinutes)} />
+              {isSteamLibraryGame ? (
+                <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Steam Activity</div>
+                    <p className="mt-1 text-xs text-slate-500">Detected only when Steam reports higher total playtime than the previous sync.</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {!hasPlaytime ? <PersonalStatField label="Playtime" value={`${game.playtimeHours}h`} /> : null}
+                    <PersonalStatField label="Last Steam Activity" value={formatRelativeActivityDate(lastSteamActivityAt)} />
+                    <PersonalStatField label="Recent Delta" value={formatDeltaMinutes(recentSteamDeltaMinutes)} />
+                  </div>
                 </div>
-              </DetailSection>
-            ) : null}
+              ) : null}
+            </DetailSection>
 
             <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
               <div className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.importedMetadata')}</div>
