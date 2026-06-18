@@ -3,9 +3,11 @@ import { loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
 import { normalizePlatformQueueState } from './platformQueueStorage';
+import { normalizePlayActivityRecords } from './playActivityStorage';
 import { normalizeRawgMetadataCache } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
 import { normalizeReviewModeState } from './reviewModeStorage';
+import { normalizeIsThereAnyDealSettings } from './isThereAnyDealSettingsStorage';
 import {
   coreBackupStorageKeys,
   deviceOnlyStorageKeys,
@@ -111,16 +113,21 @@ export function getQuestShelfBackupSummary(backup: QuestShelfBackup): QuestShelf
 }
 
 export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
+  // Pre-normalize all sections before touching storage so an unexpected normalize error
+  // cannot leave storage in a partially-written state.
+  const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
+  const removes: Array<(typeof allBackupStorageKeys)[number]> = [];
+
   allBackupStorageKeys.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
-      savePersistedJson(key, normalizeBackupDataSection(key, backup.data[key]));
-      return;
-    }
-
-    if (!integrationBackupStorageKeys.includes(key as (typeof integrationBackupStorageKeys)[number])) {
-      void removePersistedKeys([key]);
+      writes.push([key, normalizeBackupDataSection(key, backup.data[key])]);
+    } else if (!integrationBackupStorageKeys.includes(key as (typeof integrationBackupStorageKeys)[number])) {
+      removes.push(key);
     }
   });
+
+  writes.forEach(([key, value]) => savePersistedJson(key, value));
+  void removePersistedKeys(removes);
 
   return {
     games: loadGames(),
@@ -129,24 +136,22 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
 }
 
 export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
+  // Pre-normalize before touching storage so an unexpected normalize error cannot leave
+  // storage in a partially-written state.
   const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
-  savePersistedJson('questshelf.games.v1', mergedGames);
+  const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [['questshelf.games.v1', mergedGames]];
 
-  coreBackupStorageKeys.forEach((key) => {
+  allBackupStorageKeys.forEach((key) => {
     if (key === 'questshelf.games.v1') {
       return;
     }
 
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
-      savePersistedJson(key, normalizeBackupDataSection(key, backup.data[key]));
+      writes.push([key, normalizeBackupDataSection(key, backup.data[key])]);
     }
   });
 
-  integrationBackupStorageKeys.forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
-      savePersistedJson(key, normalizeBackupDataSection(key, backup.data[key]));
-    }
-  });
+  writes.forEach(([key, value]) => savePersistedJson(key, value));
 
   return {
     games: loadGames(),
@@ -221,28 +226,17 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
   }
 
   const backupData = backup.data as Partial<Record<(typeof allBackupStorageKeys)[number], unknown>>;
-  const dataKeys = Object.keys(backupData);
-  const unknownKey = dataKeys.find((key) => !knownBackupStorageKeys.has(key));
+  // Only validate keys this app version knows about; unknown keys from newer versions are ignored.
+  const knownDataKeys = Object.keys(backupData).filter((key) => knownBackupStorageKeys.has(key)) as Array<
+    (typeof allBackupStorageKeys)[number]
+  >;
 
-  if (unknownKey) {
-    return {
-      ok: false,
-      error: `Backup contains an unknown data section: ${unknownKey}.`,
-    };
-  }
-
-  const malformedKey = dataKeys.find(
-    (key) =>
-      !isValidBackupDataSection(
-        key as (typeof allBackupStorageKeys)[number],
-        backupData[key as (typeof allBackupStorageKeys)[number]],
-      ),
-  );
+  const malformedKey = knownDataKeys.find((key) => !isValidBackupDataSection(key, backupData[key]));
 
   if (malformedKey) {
     return {
       ok: false,
-      error: `Backup data section is malformed: ${malformedKey}.`,
+      error: `Backup section "${getBackupSectionDisplayName(malformedKey)}" has an unexpected format and cannot be imported. The backup file may be corrupted or was edited manually.`,
     };
   }
 
@@ -329,10 +323,12 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
   switch (key) {
     case 'questshelf.games.v1':
     case 'questshelf.steamIgnoredGames.v1':
+    case 'questshelf.playActivity.v1':
       return Array.isArray(value);
     case 'questshelf.rawgMetadataCache.v1':
     case 'questshelf.rawgSettings.v1':
     case 'questshelf.steamSettings.v1':
+    case 'questshelf.isThereAnyDealSettings.v1':
     case 'questshelf.libraryFilters.v1':
     case 'questshelf.wishlistFilters.v1':
     case 'questshelf.onboarding.v1':
@@ -354,12 +350,16 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
       return normalizeLoadedGames(value);
     case 'questshelf.steamIgnoredGames.v1':
       return normalizeIgnoredSteamGames(value);
+    case 'questshelf.playActivity.v1':
+      return normalizePlayActivityRecords(value);
     case 'questshelf.rawgMetadataCache.v1':
       return normalizeRawgMetadataCache(value);
     case 'questshelf.rawgSettings.v1':
       return normalizeRawgSettings(value);
     case 'questshelf.steamSettings.v1':
       return normalizeSteamSettings(value);
+    case 'questshelf.isThereAnyDealSettings.v1':
+      return normalizeIsThereAnyDealSettings(value);
     case 'questshelf.onboarding.v1':
       return normalizeOnboardingState(value);
     case 'questshelf.platformQueues.v1':
@@ -382,6 +382,27 @@ function getTitlePlatformKey(game: Game) {
 
 function isPlainObject(value: unknown) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getBackupSectionDisplayName(key: string): string {
+  const displayNames: Record<string, string> = {
+    'questshelf.games.v1': 'game library',
+    'questshelf.steamIgnoredGames.v1': 'ignored Steam games',
+    'questshelf.rawgMetadataCache.v1': 'RAWG metadata cache',
+    'questshelf.rawgSettings.v1': 'RAWG settings',
+    'questshelf.steamSettings.v1': 'Steam settings',
+    'questshelf.isThereAnyDealSettings.v1': 'IsThereAnyDeal settings',
+    'questshelf.libraryFilters.v1': 'library filters',
+    'questshelf.wishlistFilters.v1': 'wishlist filters',
+    'questshelf.onboarding.v1': 'onboarding state',
+    'questshelf.platformQueues.v1': 'platform queues',
+    'questshelf.playActivity.v1': 'play activity',
+    'questshelf.reviewMode.v1': 'quest queue settings',
+    'questshelf.appPersonalization.v1': 'app personalization',
+    'questshelf.shelfIdentity.v1': 'shelf identity',
+  };
+
+  return displayNames[key] ?? key;
 }
 
 function readStorageJson(key: string) {
