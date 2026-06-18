@@ -128,14 +128,14 @@ function GameCardComponent({
       aria-selected={isMultiSelectMode ? isSelected : undefined}
       className={`qs-game-card qs-glass relative flex h-full min-h-[260px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[292px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
-      } ${highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : ''} cursor-pointer`}
+      } ${highlightLabel ? 'qs-highlight-card-border ring-1' : ''} cursor-pointer`}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
       role="button"
       tabIndex={0}
     >
       {highlightLabel ? (
-        <div className="absolute right-3 top-3 z-10 rounded-full border border-amber-300/40 bg-amber-300 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-glow">
+        <div className="qs-highlight-badge absolute right-3 top-3 z-10 rounded-full border px-2.5 py-1 text-xs font-bold shadow-glow">
           {highlightLabel}
         </div>
       ) : null}
@@ -202,8 +202,8 @@ function GameCardComponent({
             queueState={platformQueueState}
           />
           {shouldShowStatusBadge ? (
-            <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
-              <span className="platform-badge__label">{translateOption(game.status, t)}</span>
+            <span className="qs-status-badge max-w-full rounded-md px-2 py-0.5 text-xs font-medium" title={translateOption(game.status, t)}>
+              {translateOption(game.status, t)}
             </span>
           ) : null}
         </div>

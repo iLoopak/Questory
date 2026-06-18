@@ -63,7 +63,7 @@ const negativeActions: Array<{
   tone: 'danger' | 'quiet';
 }> = [
   { action: 'ignore', hint: '', icon: 'eye-off', label: 'Ignore', tone: 'danger' },
-  { action: 'dropped', hint: '', icon: 'trash-2', label: 'Drop', tone: 'danger' },
+  { action: 'dropped', hint: '', icon: 'archive', label: 'Drop', tone: 'quiet' },
   { action: 'skip', hint: 'cancel', icon: 'chevrons-right', label: 'Skip', tone: 'quiet' },
 ];
 
@@ -836,7 +836,7 @@ function FocusedReviewCard({
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               <Icon name="refresh-cw" />
-              <span>{isRefreshingMetadata ? 'Enriching…' : 'Enrich metadata'}</span>
+              <span>{isRefreshingMetadata ? t('action.refreshingMetadata') : t('action.refreshMetadata')}</span>
             </span>
           </button>
           <button
@@ -847,7 +847,7 @@ function FocusedReviewCard({
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               <Icon name="image" />
-              <span>{isRefreshingMetadata ? 'Searching artwork…' : 'Find Artwork'}</span>
+              <span>{isRefreshingMetadata ? t('artwork.searching') : t('artwork.findArtwork')}</span>
             </span>
           </button>
         </div>
