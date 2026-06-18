@@ -736,62 +736,66 @@ function FocusedReviewCard({
       </section>
 
       <section
-        className={`qs-review-hero qs-review-swipe-card flex flex-col items-center ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
-        aria-label={`${game.title} Quest Queue card. Drag left to Skip, left and up to Ignore, drag right to add to Platform Plans, or right and down to Finished.`}
-        onPointerCancel={cancelSwipe}
-        onPointerDown={beginSwipe}
-        onPointerMove={updateSwipe}
-        onPointerUp={finishSwipe}
-        style={swipeStyle}
+        className="qs-review-hero flex flex-col items-center"
+        aria-label={`${game.title} Quest Queue card. Drag the cover or title left to Skip, left and up to Ignore, right to add to Platform Plans, or right and down to Finished.`}
       >
-        <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
-          {isSwipeEngaged && activeSwipeAction ? (
-            <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
-              {getReviewActionLabel(activeSwipeAction, t)}
-            </div>
-          ) : null}
-          <div className="qs-review-artwork-frame relative h-full w-full">
-            {activeCoverSource ? (
-              <div className="relative h-full w-full">
-                {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-                <img
-                  alt={game.title}
-                  className={`h-full w-full object-contain p-2 transition-opacity duration-300 ${
-                    isCoverLoaded ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  decoding="async"
-                  draggable={false}
-                  loading="lazy"
-                  onDragStart={(event) => event.preventDefault()}
-                  onError={() => {
-                    setIsCoverLoaded(false);
-                    setCoverSourceIndex((currentIndex) => currentIndex + 1);
-                  }}
-                  onLoad={() => setIsCoverLoaded(true)}
-                  src={activeCoverSource}
-                />
+        <div
+          className={`qs-review-identity-drag-region qs-review-swipe-card flex w-full flex-col items-center ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
+          onPointerCancel={cancelSwipe}
+          onPointerDown={beginSwipe}
+          onPointerMove={updateSwipe}
+          onPointerUp={finishSwipe}
+          style={swipeStyle}
+        >
+          <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
+            {isSwipeEngaged && activeSwipeAction ? (
+              <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
+                {getReviewActionLabel(activeSwipeAction, t)}
               </div>
-            ) : (
-              <div className="grid h-full place-items-center bg-ink-800 px-4 text-center">
-                <div className="mx-auto grid h-24 w-24 place-items-center rounded-2xl border border-white/10 bg-ink-950 text-4xl font-semibold text-mint">
-                  {game.title.slice(0, 1).toUpperCase()}
+            ) : null}
+            <div className="qs-review-artwork-frame relative h-full w-full">
+              {activeCoverSource ? (
+                <div className="relative h-full w-full">
+                  {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+                  <img
+                    alt={game.title}
+                    className={`h-full w-full object-contain p-2 transition-opacity duration-300 ${
+                      isCoverLoaded ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    decoding="async"
+                    draggable={false}
+                    loading="lazy"
+                    onDragStart={(event) => event.preventDefault()}
+                    onError={() => {
+                      setIsCoverLoaded(false);
+                      setCoverSourceIndex((currentIndex) => currentIndex + 1);
+                    }}
+                    onLoad={() => setIsCoverLoaded(true)}
+                    src={activeCoverSource}
+                  />
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="grid h-full place-items-center bg-ink-800 px-4 text-center">
+                  <div className="mx-auto grid h-24 w-24 place-items-center rounded-2xl border border-white/10 bg-ink-950 text-4xl font-semibold text-mint">
+                    {game.title.slice(0, 1).toUpperCase()}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="mt-3 text-center w-full px-2">
-          <div className="flex items-center justify-center gap-2">
-            <PlatformBadge
-              className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]"
-              platform={game.platform}
-              queueState={queueState}
-            />
+          <div className="mt-3 text-center w-full px-2">
+            <div className="flex items-center justify-center gap-2">
+              <PlatformBadge
+                className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]"
+                platform={game.platform}
+                queueState={queueState}
+              />
+            </div>
+            <h3 className="mt-2 text-2xl font-bold leading-snug text-white line-clamp-2 px-1 sm:text-3xl" title={game.title}>
+              {game.title}
+            </h3>
           </div>
-          <h3 className="mt-2 text-2xl font-bold leading-snug text-white line-clamp-2 px-1 sm:text-3xl" title={game.title}>
-            {game.title}
-          </h3>
         </div>
 
         {hasGamepad ? (
