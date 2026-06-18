@@ -166,6 +166,10 @@ function GameActionMenuOverlay({
   t,
 }: GameActionMenuOverlayProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  // Tracks whether the menu was dismissed via Escape key so focus can be
+  // restored for keyboard users. Touch/click closes must NOT restore focus —
+  // on Android WebView a focused button intercepts the next scroll gesture.
+  const closedViaKeyboardRef = useRef(false);
   useScrollLock();
   const sections = useMemo(
     () =>
@@ -186,13 +190,18 @@ function GameActionMenuOverlay({
     [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange, t],
   );
 
-
   useEffect(() => {
     const firstMenuItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])');
     firstMenuItem?.focus({ preventScroll: true });
 
     return () => {
-      window.setTimeout(() => anchorRef.current?.focus({ preventScroll: true }), 0);
+      window.setTimeout(() => {
+        if (closedViaKeyboardRef.current) {
+          anchorRef.current?.focus({ preventScroll: true });
+        } else {
+          (document.activeElement as HTMLElement | null)?.blur?.();
+        }
+      }, 0);
     };
   }, [anchorRef]);
 
@@ -201,6 +210,12 @@ function GameActionMenuOverlay({
       if (event.key === 'Escape' || event.key === 'BrowserBack' || event.key === 'GamepadB') {
         event.preventDefault();
         event.stopPropagation();
+        // Escape is a deliberate keyboard dismiss — restore focus to the trigger.
+        // BrowserBack / GamepadB are hardware back-navigation gestures and behave
+        // like a touch close: focus must NOT be restored.
+        if (event.key === 'Escape') {
+          closedViaKeyboardRef.current = true;
+        }
         onClose();
       }
     }
