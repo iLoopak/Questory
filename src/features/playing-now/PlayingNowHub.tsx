@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
+import { PlatformBadge } from '../../components/PlatformBadge';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { getGameCoverSources } from '../../lib/gameCoverImages';
 import { useI18n, type TFunction } from '../../i18n';
-import type { PlatformQueueState, PlatformQueueSummary } from '../../lib/platformQueueStorage';
+import { getPlatformAccentColor, type PlatformQueueState, type PlatformQueueSummary } from '../../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../../types/game';
 import { getContextualGreeting } from './contextualGreetings';
 import { createPlayingNowGreeting } from './playingNowGreeting';
@@ -112,11 +113,15 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
             </div></div>
           ) : (
             <div className="space-y-4">
-              {groupedGames.map(([platform, platformGames]) => (
-                <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3 shadow-panel">
+              {groupedGames.map(([platform, platformGames]) => {
+                const platformAccentColor = getPlayingNowPlatformAccentColor(queue, platform);
+                const platformStyle = getPlayingNowPlatformStyle(platformAccentColor);
+
+                return (
+                <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3 shadow-panel" style={platformStyle}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name={getPlayingNowPlatformIcon(platform)} size={16} /></span>
+                      <span className="playing-now-platform-icon grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name={getPlayingNowPlatformIcon(platform)} size={16} /></span>
                       <h3 className="truncate text-sm font-semibold uppercase tracking-[0.14em] text-slate-200" title={platform}>{platform}</h3>
                     </div>
                     <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs font-semibold text-slate-400">{platformGames.length}</span>
@@ -130,12 +135,15 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
                         onOpenDetails={onOpenDetails}
                         onPlayToday={onPlayToday}
                         onStatusChange={onStatusChange}
+                        platformAccentColor={platformAccentColor}
+                        queueState={queue ?? undefined}
                         t={t}
                       />
                     ))}
                   </div>
                 </section>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -199,20 +207,21 @@ function PlayingNowCover({ game }: { game: Game }) {
   );
 }
 
-function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange, t }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; t: TFunction }) {
+function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange, platformAccentColor, queueState, t }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; platformAccentColor?: string; queueState?: PlatformQueueState; t: TFunction }) {
   const statusBadge = getPlayingNowStatusBadge(context, t);
+  const platformStyle = getPlayingNowPlatformStyle(platformAccentColor);
 
   return (
-    <article className="flex h-full min-w-0 gap-2.5 rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20">
+    <article className="playing-now-card relative flex h-full min-w-0 gap-2.5 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20" style={platformStyle}>
       <PlayingNowCover game={game} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="min-w-0">
           <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
-          <p className="mt-0.5 truncate text-[0.7rem] font-medium text-slate-400" title={game.platform}>{game.platform}</p>
+          <PlatformBadge accentColor={platformAccentColor} className="mt-1 max-w-full rounded-full px-2 py-0.5 text-[0.62rem] font-semibold" platform={game.platform} queueState={queueState} />
         </div>
         <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
         <div className="mt-auto flex items-center gap-2 pt-3">
-          <button className="min-h-8 flex-1 max-w-[15rem] rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
+          <button className="playing-now-play-button min-h-8 flex-1 max-w-[15rem] rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
           <details className="group relative shrink-0">
             <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-skyglass/15 text-slate-200 transition hover:bg-mint/10 hover:text-white" aria-label={t('action.moreActions')}>
               <Icon name="more-horizontal" size={16} strokeWidth={2.2} />
@@ -233,6 +242,16 @@ function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusCha
       </div>
     </article>
   );
+}
+
+function getPlayingNowPlatformAccentColor(queueState: PlatformQueueState | null | undefined, platform: GamePlatform) {
+  const normalizedPlatform = platform.trim().toLowerCase();
+  if (!queueState || !normalizedPlatform || normalizedPlatform === 'other' || normalizedPlatform === 'unknown') return undefined;
+  return getPlatformAccentColor(queueState, platform);
+}
+
+function getPlayingNowPlatformStyle(accentColor?: string) {
+  return accentColor ? ({ '--playing-now-platform-accent': accentColor } as CSSProperties) : undefined;
 }
 
 function getPlayingNowStatusBadge(context: PlayingNowContext, t: TFunction) {

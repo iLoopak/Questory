@@ -3095,3 +3095,53 @@ body.qs-controller-active .qs-compact-card:focus-within {
   transform: translateX(-0.02em);
   text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.36);
 }
+
+.playing-now-platform-icon {
+  border-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 42%, rgb(var(--skyglass-rgb) / 0.35));
+  background: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 14%, transparent);
+  color: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 82%, white);
+}
+
+.playing-now-card {
+  border-left-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 72%, rgb(var(--skyglass-rgb) / 0.45));
+  border-left-width: 3px;
+}
+
+.playing-now-card::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 16%, transparent), transparent 38%),
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 12%, transparent), transparent 42%);
+  opacity: 0.72;
+}
+
+.playing-now-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.playing-now-play-button {
+  background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 78%, var(--qs-accent-primary));
+  color: var(--accent-contrast);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 28%, transparent);
+}
+
+:root[data-theme='light'] .playing-now-platform-icon {
+  border-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 28%, rgb(var(--skyglass-rgb) / 0.38));
+  background: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 10%, white);
+  color: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 58%, var(--text-primary));
+}
+
+:root[data-theme='light'] .playing-now-card::before {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 9%, transparent), transparent 34%),
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 8%, transparent), transparent 42%);
+  opacity: 0.58;
+}
+
+:root[data-theme='light'] .playing-now-play-button {
+  background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 70%, var(--qs-accent-primary));
+}
