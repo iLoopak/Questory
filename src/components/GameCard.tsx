@@ -126,7 +126,7 @@ function GameCardComponent({
     <article
       aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-game-card qs-glass relative flex h-full min-h-[260px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[292px] ${
+      className={`qs-game-card qs-glass relative flex min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : ''} cursor-pointer`}
       onClick={handleCardClick}
@@ -210,7 +210,7 @@ function GameCardComponent({
         <DealCoverBadges game={game} variant="grid" />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-3 sm:gap-3 sm:p-3.5">
+      <div className="flex min-h-0 flex-col gap-2.5 p-3 sm:p-3.5">
         <div className="min-w-0">
           <h3
             className="line-clamp-2 text-base font-semibold leading-6 text-white sm:text-lg"

@@ -137,7 +137,7 @@ export function CollectionGrid({
   return (
     <div ref={gridRef} className="relative" style={{ height: virtualRows.totalSize }}>
       <div
-        className="qs-game-grid absolute left-0 top-0 w-full grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4"
+        className="qs-game-grid absolute left-0 top-0 grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] items-start gap-2 2xl:grid-cols-4"
         style={{ transform: `translateY(${virtualRows.offsetBefore}px)` }}
       >
         {renderedGames.map((game) => (
@@ -841,10 +841,10 @@ function getVirtualGridColumns(width: number) {
 
 function getVirtualGridRowHeight() {
   if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
-    return 300;
+    return 252;
   }
 
-  return 276;
+  return 236;
 }
 
 function usePlatformLabelMap(games: Game[], platformQueueState?: PlatformQueueState) {

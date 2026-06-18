@@ -950,10 +950,6 @@ img {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.5rem), 1fr));
   }
 
-  .qs-game-card {
-    min-height: 330px;
-  }
-
   .qs-modal-panel {
     max-height: calc(100dvh - max(0.5rem, var(--qs-safe-top)) - max(0.5rem, var(--qs-safe-bottom)));
   }
@@ -1279,10 +1275,6 @@ textarea,
   .qs-game-grid {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
     gap: 0.5rem;
-  }
-
-  .qs-game-card {
-    min-height: 250px;
   }
 
   .qs-game-card > div:first-of-type {
@@ -2202,7 +2194,6 @@ textarea,
 }
 
 .qs-template-neon-deck .qs-game-card {
-  min-height: 340px;
   border-color: rgb(var(--qs-accent-secondary-rgb) / 0.16) !important;
   border-radius: 1.15rem;
   background: var(--qs-card-background) !important;
