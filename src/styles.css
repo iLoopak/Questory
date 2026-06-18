@@ -2455,7 +2455,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 /* Large-library scrolling: keep Library on one native scroll container and avoid 100vh WebView traps. */
 .qs-game-list-shell,
 .qs-collection-panel {
-  height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+  height: calc(100dvh - 4.75rem - var(--qs-safe-top) - var(--qs-safe-bottom));
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
@@ -2475,7 +2475,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 @media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
   .qs-game-list-shell,
   .qs-collection-panel {
-    height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
+    height: calc(100dvh - 3.75rem - var(--qs-safe-top) - var(--qs-safe-bottom));
   }
 }
 
