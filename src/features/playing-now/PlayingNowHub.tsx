@@ -212,7 +212,7 @@ function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusCha
         </div>
         <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
         <div className="mt-auto flex items-center gap-2 pt-3">
-          <button className="min-h-8 flex-1 rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
+          <button className="min-h-8 flex-1 max-w-[15rem] rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
           <details className="group relative shrink-0">
             <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-skyglass/15 text-slate-200 transition hover:bg-mint/10 hover:text-white" aria-label={t('action.moreActions')}>
               <Icon name="more-horizontal" size={16} strokeWidth={2.2} />
