@@ -7,6 +7,7 @@ import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
 import { GameListEmptyState, GameListShell } from '../../components/GameListShell';
 import { CollectionToolbar } from '../../components/CollectionToolbar';
+import { CollectionBulkToolbar } from '../../components/CollectionBulkToolbar';
 import { ViewportModal } from '../../components/ViewportModal';
 import { UndoToastStack } from '../../components/UndoToastStack';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
@@ -2499,72 +2500,26 @@ function CollectionPanel({
         }
         />
         {isMultiSelectMode ? (
-          <div className="mt-2 border-t border-mint/15 pt-2">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="text-sm font-semibold text-white">{selectedCount} selected</div>
-              <div className="flex flex-wrap gap-2">
-                <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={selectAllVisible} type="button">
-                  Select all visible
-                </button>
-                <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={clearSelection} type="button">
-                  Clear selection
-                </button>
-                <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500" disabled={selectedCount === 0} onClick={enrichSelectedGames} type="button">
-                  Enrich selected
-                </button>
-                {collectionType === 'library' ? (
-                  <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500" disabled={selectedCount === 0} onClick={addSelectedToWishlist} type="button">
-                    Add to Wishlist
-                  </button>
-                ) : null}
-                <button
-                  className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500"
-                  disabled={isHltbSyncing}
-                  onClick={syncVisibleOrSelectedHltb}
-                  type="button"
-                >
-                  {isHltbSyncing ? t('hltb.syncing') : t('hltb.sync')}
-                </button>
-                {hasWishlistDealSyncAction ? (
-                  <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={isWishlistDealSyncDisabled} onClick={syncVisibleOrSelectedWishlistDeals} title={wishlistDealSyncTitle} type="button">
-                    {isItadDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
-                  </button>
-                ) : null}
-                {collectionType === 'library' && onBulkRefreshSteamPlaytime ? (
-                  <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-slate-500" disabled={selectedRefreshableSteamCount === 0 || isSteamPlaytimeSyncing} onClick={refreshSelectedSteamPlaytime} type="button">
-                    Refresh Steam Playtime
-                  </button>
-                ) : null}
-                <select
-                  aria-label={t('app.changeSelectedStatus')}
-                  className="h-9 rounded-md border border-skyglass/15 bg-ink-900 px-3 text-sm text-slate-100 outline-none transition focus:border-mint disabled:cursor-not-allowed disabled:text-slate-500"
-                  disabled={selectedCount === 0}
-                  onChange={(event) => {
-                    if (event.target.value) {
-                      changeSelectedStatus(event.target.value as GameStatus);
-                      event.target.value = '';
-                    }
-                  }}
-                  value=""
-                >
-                  <option value="">{t('app.changeStatus')}</option>
-                  {gameStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                <button className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600" disabled={selectedCount === 0} onClick={removeSelectedGames} type="button">
-                  Remove selected
-                </button>
-                {collectionType === 'library' ? (
-                  <button className="h-9 rounded-md border border-red-400/30 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-600" disabled={selectedCount === 0} onClick={removeAndIgnoreSelectedGames} type="button">
-                    Remove + Ignore selected
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
+          <CollectionBulkToolbar
+            collectionType={collectionType}
+            selectedCount={selectedCount}
+            isHltbSyncing={isHltbSyncing}
+            isSteamPlaytimeSyncing={isSteamPlaytimeSyncing}
+            isWishlistDealSyncing={isItadDealSyncing}
+            isWishlistDealSyncDisabled={isWishlistDealSyncDisabled}
+            wishlistDealSyncTitle={wishlistDealSyncTitle}
+            onSelectAll={selectAllVisible}
+            onClearSelection={clearSelection}
+            onStatusChange={changeSelectedStatus}
+            onEnrich={enrichSelectedGames}
+            onSyncHltb={syncVisibleOrSelectedHltb}
+            onAddToWishlist={collectionType === 'library' ? addSelectedToWishlist : undefined}
+            onRefreshSteamPlaytime={collectionType === 'library' && onBulkRefreshSteamPlaytime ? refreshSelectedSteamPlaytime : undefined}
+            onSyncSteamAchievements={collectionType === 'library' && onBulkSyncSteamAchievements ? syncLibrarySteamAchievements : undefined}
+            onSyncWishlistDeals={hasWishlistDealSyncAction ? syncVisibleOrSelectedWishlistDeals : undefined}
+            onRemove={removeSelectedGames}
+            onRemoveAndIgnore={collectionType === 'library' ? removeAndIgnoreSelectedGames : undefined}
+          />
         ) : null}
         </>
       }

@@ -1598,6 +1598,11 @@ textarea,
   box-shadow: var(--shadow-panel);
 }
 
+.qs-toolbar-menu-panel--start {
+  right: auto;
+  left: 0;
+}
+
 .qs-header-back-to-top {
   display: inline-flex;
   min-height: 2rem;
