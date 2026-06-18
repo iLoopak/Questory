@@ -1651,6 +1651,11 @@ export function AppController() {
                 setSelectedGameId(null);
                 setActiveNavItem('Wishlist');
               }}
+              onPlayToday={(game) => {
+                logPlayedToday(game);
+                addToastNotification({ category: 'success', dedupeKey: `play-today:${game.id}`, message: `${game.title} tracked for today.` });
+              }}
+              onStatusChange={updateGameStatus}
               onSyncSteamData={() => {
                 void refreshSteamPlaytime();
                 void syncSteamAchievements();
