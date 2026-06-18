@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { createTranslator } from '../i18n';
 import type { NavItem } from '../config/navigation';
 import { mergeRawgMetadataIntoGame } from '../lib/metadataMerge';
-import { formatGameToastMessage, type NotificationDraft } from '../lib/notifications';
+import { formatGameToastMessage, getLinkRawgGameAction, type NotificationDraft } from '../lib/notifications';
 import { refreshRawgMetadataForGame } from '../lib/rawgMetadataEnrichment';
 import { RawgApiError } from '../services/rawgApi';
 import type { Game } from '../types/game';
@@ -129,6 +129,7 @@ export function useMetadataArtworkActions({
 
       if (result.status === 'no-match') {
         addToastNotification({
+          actions: [getLinkRawgGameAction(targetGame.id, mode)],
           category: 'info',
           dedupeKey: toastKey,
           message: formatGameToastMessage(isArtworkRefresh ? t('toast.noArtworkFound') : t('toast.noMetadataFound'), targetGame),
@@ -157,6 +158,7 @@ export function useMetadataArtworkActions({
         ? error.message
         : t('app.metadataRefreshFailed');
       addToastNotification({
+        actions: error instanceof RawgApiError && error.code === 'missing-api-key' ? undefined : [getLinkRawgGameAction(targetGame.id, mode)],
         category: error instanceof RawgApiError && error.code === 'missing-api-key' ? 'warning' : 'error',
         dedupeKey: toastKey,
         message: formatGameToastMessage(message, targetGame),

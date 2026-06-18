@@ -10,6 +10,7 @@ import { CollectionToolbar } from '../../components/CollectionToolbar';
 import { CollectionBulkToolbar } from '../../components/CollectionBulkToolbar';
 import { ViewportModal } from '../../components/ViewportModal';
 import { UndoToastStack } from '../../components/UndoToastStack';
+import { RawgLinkDialog } from '../../components/RawgLinkDialog';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
 import { HomePanel } from '../../components/HomePanel';
 import { MetadataEnrichmentPanel } from '../../components/MetadataEnrichmentPanel';
@@ -96,6 +97,7 @@ import { type UndoActionHistoryEntry } from '../../lib/undoHistoryStorage';
 import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, saveIgnoredSteamGames, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
 import { getOwnedGames, getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamApiError, SteamWishlistError } from '../../services/steamApi';
 import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from '../../types/game';
+import type { RawgSearchResult } from '../../types/rawg';
 import { gamePlatforms, gameStatuses, wishlistPriorities } from '../../types/game';
 import type { SteamAchievementSyncState, SteamAchievementSyncSummary, SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from '../../types/steam';
 import { useNavigationState } from '../navigation/useNavigationState';
@@ -279,6 +281,7 @@ export function AppController() {
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
+  const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
   const questShelfAchievements = useMemo(() => getQuestShelfAchievements(games, platformQueueState), [games, platformQueueState]);
   const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
   const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
@@ -339,6 +342,50 @@ export function AppController() {
     setSelectedGameId,
     t,
   });
+
+  function openRawgRecoveryDialog(gameId: string, retryMode: 'metadata' | 'artwork' = 'metadata') {
+    const game = gamesRef.current.find((currentGame) => currentGame.id === gameId);
+    if (!game) {
+      addToastNotification({ category: 'error', dedupeKey: `rawg-link-missing:${gameId}`, message: t('app.metadataRefreshGameNotFound') });
+      return;
+    }
+
+    setRawgRecoveryRequest({ gameId, retryMode });
+  }
+
+  function saveRawgRecoveryLink(result: RawgSearchResult) {
+    if (!rawgRecoveryRequest) {
+      return;
+    }
+
+    const game = gamesRef.current.find((currentGame) => currentGame.id === rawgRecoveryRequest.gameId);
+    if (!game) {
+      setRawgRecoveryRequest(null);
+      return;
+    }
+
+    const linkedGame: Game = {
+      ...game,
+      rawgId: result.id,
+      rawgSlug: result.slug,
+      rawgTitle: result.name,
+      metadataSkippedAt: undefined,
+      metadataManualManagedAt: undefined,
+    };
+
+    updateGameTracking(game.id, {
+      notes: game.notes,
+      rawgId: result.id,
+      rawgSlug: result.slug,
+      rawgTitle: result.name,
+      status: game.status,
+      tags: game.tags,
+      metadataSkippedAt: undefined,
+      metadataManualManagedAt: undefined,
+    });
+    setRawgRecoveryRequest(null);
+    void refreshGameMetadataFromActions(linkedGame, rawgRecoveryRequest.retryMode);
+  }
 
   useEffect(() => {
     isAppMountedRef.current = true;
@@ -1573,7 +1620,7 @@ export function AppController() {
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onBack={handleBackFromDetail}
-              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
+              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
               isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
               onIgnore={removeAndIgnoreSteamGame}
               onSyncSteamData={syncSteamDataForGame}
@@ -1615,7 +1662,7 @@ export function AppController() {
                     onAddToQueue={openBacklogPicker}
                     onAddToWishlist={addToWishlist}
                     onBack={handleBackFromDetail}
-                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
+                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
                     isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
@@ -1688,7 +1735,7 @@ export function AppController() {
                     onAddToQueue={openBacklogPicker}
                     onAddToWishlist={addToWishlist}
                     onBack={handleBackFromDetail}
-                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
+                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
                     isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
@@ -1791,7 +1838,7 @@ export function AppController() {
               games={games}
               onApplyArtworkUpdate={updateGameArtwork}
               onEnrichGames={startMetadataWorkflow}
-              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode)}
+              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
                 setDetailReturnSection('Artwork');
@@ -1918,6 +1965,7 @@ export function AppController() {
         actions={pendingUndoActions}
         onDismiss={dismissUndoAction}
         onOpenQueue={openQueueFromToast}
+        onLinkRawgGame={openRawgRecoveryDialog}
         onOpenSteamSettings={() => {
           setActiveUtilityView(null);
           setPlayingNowReturnContext(null);
@@ -1928,6 +1976,14 @@ export function AppController() {
         onUndo={undoAction}
         onViewGame={viewGameFromToast}
       />
+
+      {rawgRecoveryRequest && (games.find((game) => game.id === rawgRecoveryRequest.gameId) ?? gamesRef.current.find((game) => game.id === rawgRecoveryRequest.gameId)) ? (
+        <RawgLinkDialog
+          game={(games.find((game) => game.id === rawgRecoveryRequest.gameId) ?? gamesRef.current.find((game) => game.id === rawgRecoveryRequest.gameId)) as Game}
+          onClose={() => setRawgRecoveryRequest(null)}
+          onSelect={saveRawgRecoveryLink}
+        />
+      ) : null}
 
       {isAddGameOpen ? (
         <AddGameDialog

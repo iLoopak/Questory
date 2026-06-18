@@ -2,12 +2,13 @@ import type { Game, GamePlatform, GameStatus } from '../types/game';
 
 export type ToastCategory = 'success' | 'warning' | 'error' | 'info';
 
-export type ToastActionKind = 'dismiss' | 'open-queue' | 'open-steam-settings' | 'undo' | 'view-game';
+export type ToastActionKind = 'dismiss' | 'link-rawg-game' | 'open-queue' | 'open-steam-settings' | 'undo' | 'view-game';
 
 export type ToastAction = {
   gameId?: string;
+  rawgRetryMode?: 'metadata' | 'artwork';
   kind: ToastActionKind;
-  label: 'Dismiss' | 'Open Platform Plans' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game';
+  label: 'Dismiss' | 'Link RAWG Game' | 'Open Platform Plans' | 'Open Platforms' | 'Open Steam settings' | 'Undo' | 'View Game';
 };
 
 export type NotificationDraft = {
@@ -97,6 +98,10 @@ export function getRemoveQueueToastMessage(game: Pick<Game, 'title'>, platform: 
 
 export function getViewGameAction(gameId: string): ToastAction {
   return { gameId, kind: 'view-game', label: 'View Game' };
+}
+
+export function getLinkRawgGameAction(gameId: string, rawgRetryMode: 'metadata' | 'artwork'): ToastAction {
+  return { gameId, rawgRetryMode, kind: 'link-rawg-game', label: 'Link RAWG Game' };
 }
 
 export function getOpenQueueAction(): ToastAction {

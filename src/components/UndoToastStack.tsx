@@ -13,11 +13,12 @@ type UndoToastStackProps = {
   onDismiss: (actionId: string) => void;
   onOpenQueue: () => void;
   onOpenSteamSettings: () => void;
+  onLinkRawgGame: (gameId: string, retryMode?: 'metadata' | 'artwork') => void;
   onUndo: (actionId: string) => void;
   onViewGame: (gameId: string) => void;
 };
 
-export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onUndo, onViewGame }: UndoToastStackProps) {
+export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSettings, onLinkRawgGame, onUndo, onViewGame }: UndoToastStackProps) {
   const { t } = useI18n();
   const [expandedDetailIds, setExpandedDetailIds] = useState<Set<string>>(new Set());
 
@@ -54,6 +55,12 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
 
     if (toastAction.kind === 'open-steam-settings') {
       onOpenSteamSettings();
+      onDismiss(actionId);
+      return;
+    }
+
+    if (toastAction.kind === 'link-rawg-game' && toastAction.gameId) {
+      onLinkRawgGame(toastAction.gameId, toastAction.rawgRetryMode);
       onDismiss(actionId);
       return;
     }
@@ -127,7 +134,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               {toastActions.map((toastAction) => (
                 <button
-                  key={`${action.id}-${toastAction.kind}-${toastAction.gameId ?? toastAction.label}`}
+                  key={`${action.id}-${toastAction.kind}-${toastAction.gameId ?? toastAction.label}-${toastAction.rawgRetryMode ?? ''}`}
                   className={getToastButtonClass(toastAction.kind)}
                   onClick={() => runToastAction(action.id, toastAction)}
                   type="button"
@@ -181,6 +188,10 @@ function getToastButtonClass(kind: ToastAction['kind']) {
 function getLocalizedToastActionLabel(label: ToastAction['label'], t: ReturnType<typeof useI18n>['t']) {
   if (label === 'Dismiss') {
     return t('app.dismiss');
+  }
+
+  if (label === 'Link RAWG Game') {
+    return 'Link RAWG Game';
   }
 
   if (label === 'Open Platform Plans' || label === 'Open Platforms') {
