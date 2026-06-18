@@ -5,7 +5,6 @@ import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/p
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
-import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -239,12 +238,12 @@ export function GameDetailView({
                     </div>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:max-w-4xl">
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
                     <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+                    {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} /> : null}
                     {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                    {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} badge={<AchievementProgressBadge game={game} />} /> : null}
                   </div>
                 </div>
               </div>
@@ -531,12 +530,11 @@ function EditSelect({ label, onChange, options, value }: { label: string; onChan
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
-function HeroStat({ accent, badge, label, value }: { accent?: boolean; badge?: ReactNode; label: string; value: string }) {
+function HeroStat({ accent, label, value }: { accent?: boolean; label: string; value: string }) {
   return (
     <div className={`rounded-xl border px-3 py-2 ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'}`}>
       <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
-      {badge}
     </div>
   );
 }
