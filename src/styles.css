@@ -895,16 +895,15 @@ img {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 1px solid rgb(var(--skyglass-rgb) / 0.22);
-  background: rgb(var(--skyglass-rgb) / 0.08);
-  color: rgb(var(--text-muted-rgb));
+  border: 1px solid rgb(var(--skyglass-rgb) / 0.45);
+  background: rgb(var(--ink-950-rgb) / 0.78);
+  color: var(--badge-text);
+  backdrop-filter: blur(10px);
   vertical-align: middle;
 }
 
 :root[data-theme='light'] .qs-status-badge {
-  border-color: rgb(var(--skyglass-rgb) / 0.28);
-  background: rgb(var(--skyglass-rgb) / 0.1);
-  color: rgb(var(--text-muted-rgb));
+  border-color: rgb(var(--skyglass-rgb) / 0.4);
 }
 
 .qs-highlight-badge {
@@ -2282,9 +2281,9 @@ textarea,
 }
 
 .qs-template-neon-deck .qs-status-badge {
-  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.28);
-  background: rgb(var(--qs-accent-secondary-rgb) / 0.08);
-  color: rgb(var(--qs-accent-secondary-rgb) / 0.65);
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.5);
+  background: rgb(3 8 24 / 0.78);
+  color: var(--badge-text);
 }
 
 .qs-template-neon-deck .qs-game-card-status {
