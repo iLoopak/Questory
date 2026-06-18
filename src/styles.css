@@ -1994,6 +1994,22 @@ textarea,
   background: transparent;
 }
 
+@media (min-width: 640px) {
+  .qs-game-action-scroll {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .qs-game-action-sections {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  .qs-game-action-section-danger {
+    grid-column: 1 / -1;
+  }
+}
+
 
 .qs-viewport-modal {
   z-index: 1000;

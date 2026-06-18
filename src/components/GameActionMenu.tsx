@@ -254,7 +254,7 @@ function GameActionMenuOverlay({
         id={menuId}
         aria-label={`${t('action.actions')} ${game.title}`}
         aria-modal="true"
-        className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-3xl sm:rounded-3xl"
+        className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-3xl sm:max-w-xl sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleMenuKeyDown}
         role="dialog"
