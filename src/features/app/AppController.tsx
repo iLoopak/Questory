@@ -1466,11 +1466,9 @@ export function AppController() {
     setActiveUtilityView(null);
     setPlayingNowReturnContext(null);
     setDetailReturnSection(null);
+    setSelectedGameId(null);
     setActiveNavItem(item);
     setIsMoreMenuOpen(false);
-    if (item !== 'Library' && item !== 'Wishlist') {
-      setSelectedGameId(null);
-    }
   }
 
   const handleOpenDetailsFromCollection = useCallback((gameId: string) => {
