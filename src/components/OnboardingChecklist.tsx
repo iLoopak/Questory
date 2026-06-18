@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useI18n } from '../i18n';
 import { ViewportModal } from './ViewportModal';
 import { loadSteamSettings, saveSteamSettings } from '../lib/steamSettingsStorage';
 import { getOwnedGames, getRecentlyPlayedGames, getSteamPlayerSummary, mapSteamGamesToLocalGames, SteamApiError } from '../services/steamApi';
@@ -75,17 +76,18 @@ export function OnboardingChecklist({
   onAccentColorChange,
   skippedItemIds,
 }: OnboardingChecklistProps) {
+  const { t } = useI18n();
   const steamImported = games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam');
   const retroFolderCount = games.filter((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom').length;
   const rawgEnriched = games.some((game) => game.metadataSource === 'rawg');
   const steps = useMemo<WizardStep[]>(() => [
-    { id: 'steam-connect', title: 'Steam import / API setup', summary: 'Connect Steam credentials and optionally import your library into QuestShelf.', isConfigured: () => steamImported || Boolean(loadSteamSettings().steamId64.trim() && loadSteamSettings().apiKey.trim()) },
-    { id: 'rawg-api-key', title: 'RAWG enrichment setup', summary: 'Add a RAWG API key so covers and metadata can enrich your games.', isConfigured: () => Boolean(loadRawgSettings().apiKey.trim()) || rawgEnriched },
-    { id: 'retro-import', title: 'Retro folder import', summary: 'Pick a ROM folder or files to add retro entries without leaving the wizard.', isConfigured: () => retroFolderCount > 0 },
-    { id: 'backup-exported', title: 'Backup / export reminder', summary: 'Export a portable backup before large imports or destructive testing.', isConfigured: () => completedItemIds.has('backup-exported') },
-    { id: 'make-it-yours', title: 'Make it yours', summary: 'Name your shelf and choose the visual identity that makes QuestShelf feel like your collection.', isConfigured: () => completedItemIds.has('make-it-yours') },
-    { id: 'ready', title: 'Finish', summary: 'Celebrate setup completion and jump into your personalized library.', isConfigured: () => completedItemIds.has('ready') },
-  ], [completedItemIds, rawgEnriched, retroFolderCount, steamImported]);
+    { id: 'steam-connect', title: t('onboarding.stepSteamTitle'), summary: t('onboarding.stepSteamSummary'), isConfigured: () => steamImported || Boolean(loadSteamSettings().steamId64.trim() && loadSteamSettings().apiKey.trim()) },
+    { id: 'rawg-api-key', title: t('onboarding.stepRawgTitle'), summary: t('onboarding.stepRawgSummary'), isConfigured: () => Boolean(loadRawgSettings().apiKey.trim()) || rawgEnriched },
+    { id: 'retro-import', title: t('onboarding.stepRetroTitle'), summary: t('onboarding.stepRetroSummary'), isConfigured: () => retroFolderCount > 0 },
+    { id: 'backup-exported', title: t('onboarding.stepBackupTitle'), summary: t('onboarding.stepBackupSummary'), isConfigured: () => completedItemIds.has('backup-exported') },
+    { id: 'make-it-yours', title: t('onboarding.stepPersonalizeTitle'), summary: t('onboarding.stepPersonalizeSummary'), isConfigured: () => completedItemIds.has('make-it-yours') },
+    { id: 'ready', title: t('onboarding.stepFinishTitle'), summary: t('onboarding.stepFinishSummary'), isConfigured: () => completedItemIds.has('ready') },
+  ], [completedItemIds, rawgEnriched, retroFolderCount, steamImported, t]);
 
   useEffect(() => {
     steps.forEach((step) => {
@@ -109,49 +111,97 @@ export function OnboardingChecklist({
   function skipStep() { onSkip(activeStep.id); goNext(); }
   function openRelatedSettings(itemId: OnboardingItemId) { onClose?.(); onAction?.(itemId); }
 
+  const libraryGameCount = games.filter((game) => game.collectionType === 'library').length;
+  const libraryPlatformCount = new Set(games.filter((game) => game.collectionType === 'library').map((game) => game.platform)).size;
+
   return (
-    <ViewportModal ariaLabel="Setup wizard" placement="center" onClose={onClose ?? (() => undefined)}>
-      <section className="qs-setup-modal qs-setup-card rounded-2xl border p-4 shadow-panel">
-        <div className="flex items-start justify-between gap-3">
+    <ViewportModal ariaLabel={t('onboarding.assistant')} placement="fullscreen" onClose={onClose ?? (() => undefined)}>
+      <div className="qs-setup-modal">
+
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Setup wizard</div>
-            <h2 className="mt-1 text-xl font-semibold text-white">Configure QuestShelf</h2>
-            <p className="mt-1 max-w-xl text-sm text-slate-400">Move step by step, close anytime, and continue later from the floating setup button.</p>
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('onboarding.assistant')}</div>
+            <h2 className="mt-0.5 text-2xl font-semibold text-white">{t('onboarding.setupTitle')}</h2>
+            <p className="mt-1.5 max-w-xl text-sm text-slate-400">{t('onboarding.wizardSubtitle')}</p>
           </div>
-          <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm text-slate-200 hover:bg-mint/10" onClick={onClose} type="button">Close</button>
+          <button
+            className="mt-1 shrink-0 h-10 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200 hover:bg-mint/10"
+            onClick={onClose}
+            type="button"
+          >
+            {t('action.close')}
+          </button>
         </div>
 
-        <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/70 p-3">
-          <div className="flex justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"><span>{activeStep.title}</span><span>{progressPercent}%</span></div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-mint" style={{ width: `${progressPercent}%` }} /></div>
+        <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-900/50 p-3">
+          <div className="flex justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+            <span>{activeStep.title}</span>
+            <span>{progressPercent}%</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-mint transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
+          </div>
         </div>
 
-        <ol className="qs-setup-steps mt-4 grid gap-2 sm:grid-cols-6">
+        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-6">
           {steps.map((step, index) => {
             const isDone = completedItemIds.has(step.id);
             const isSkipped = skippedItemIds.has(step.id);
-            return <li key={step.id}><button className={`qs-setup-step ${index === activeStepIndex ? 'is-active' : ''} ${isDone ? 'is-complete' : ''}`} onClick={() => setActiveStepIndex(index)} type="button"><span>{isDone ? '✓' : isSkipped ? '–' : index + 1}</span><strong>{step.title}</strong></button></li>;
+            return (
+              <li key={step.id}>
+                <button
+                  className={`qs-setup-step ${index === activeStepIndex ? 'is-active' : ''} ${isDone ? 'is-complete' : ''}`}
+                  onClick={() => setActiveStepIndex(index)}
+                  type="button"
+                >
+                  <span>{isDone ? '✓' : isSkipped ? '–' : index + 1}</span>
+                  <strong>{step.title}</strong>
+                </button>
+              </li>
+            );
           })}
         </ol>
 
-        <div className="mt-4 rounded-lg border border-mint/25 bg-ink-950/80 p-4">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div><h3 className="text-2xl font-semibold text-white">{activeStep.title}</h3><p className="mt-1 text-sm text-slate-400">{activeStep.summary}</p></div>
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${stepComplete ? 'border-mint/40 bg-mint/10 text-mint' : stepSkipped ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}>{stepComplete ? 'Completed' : stepSkipped ? 'Skipped' : 'Open'}</span>
+        <div className="mt-5 flex-1 rounded-lg border border-mint/20 bg-ink-900/40 p-5">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-2xl font-semibold text-white">{activeStep.title}</h3>
+              <p className="mt-1 text-sm text-slate-400">{activeStep.summary}</p>
+            </div>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${stepComplete ? 'border-mint/40 bg-mint/10 text-mint' : stepSkipped ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}>
+              {stepComplete ? t('onboarding.completed') : stepSkipped ? t('onboarding.skipped') : t('onboarding.openStatus')}
+            </span>
           </div>
-          {activeStep.id === 'steam-connect' ? <SteamStep games={games} onComplete={() => onComplete('steam-connect')} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
-          {activeStep.id === 'rawg-api-key' ? <RawgStep onComplete={() => onComplete('rawg-api-key')} onOpenSettings={() => openRelatedSettings('rawg-api-key')} /> : null}
-          {activeStep.id === 'retro-import' ? <RetroStep games={games} onComplete={() => onComplete('retro-import')} onImportGames={onImportGames} onSkip={skipStep} /> : null}
-          {activeStep.id === 'backup-exported' ? <BackupStep onComplete={() => onComplete('backup-exported')} onOpenSettings={() => openRelatedSettings('backup-exported')} /> : null}
-          {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={games.filter((game) => game.collectionType === 'library').length} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={new Set(games.filter((game) => game.collectionType === 'library').map((game) => game.platform)).size} /> : null}
-          {activeStep.id === 'ready' ? <FinishStep shelfTitle={getComputedShelfTitle(games)} gameCount={games.filter((game) => game.collectionType === 'library').length} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={new Set(games.filter((game) => game.collectionType === 'library').map((game) => game.platform)).size} progress={`${finishedCount}/${steps.length}`} /> : null}
+          <div key={activeStepIndex} className="qs-setup-step-body">
+            {activeStep.id === 'steam-connect' ? <SteamStep games={games} onComplete={() => onComplete('steam-connect')} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
+            {activeStep.id === 'rawg-api-key' ? <RawgStep onComplete={() => onComplete('rawg-api-key')} onOpenSettings={() => openRelatedSettings('rawg-api-key')} /> : null}
+            {activeStep.id === 'retro-import' ? <RetroStep games={games} onComplete={() => onComplete('retro-import')} onImportGames={onImportGames} onSkip={skipStep} /> : null}
+            {activeStep.id === 'backup-exported' ? <BackupStep onComplete={() => onComplete('backup-exported')} onOpenSettings={() => openRelatedSettings('backup-exported')} /> : null}
+            {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
+            {activeStep.id === 'ready' ? <FinishStep shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
+          </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-200 disabled:opacity-40" disabled={activeStepIndex === 0} onClick={goBack} type="button">Back</button>
-          <div className="flex gap-2"><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-300" onClick={skipStep} type="button">Skip step</button><button className="h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950" onClick={goNext} type="button">{activeStepIndex === steps.length - 1 ? 'Stay here' : 'Next'}</button></div>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button
+            className="h-11 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-200 disabled:opacity-40"
+            disabled={activeStepIndex === 0}
+            onClick={goBack}
+            type="button"
+          >
+            {t('action.back')}
+          </button>
+          <div className="flex gap-2">
+            <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-300" onClick={skipStep} type="button">
+              {t('onboarding.skipStep')}
+            </button>
+            <button className="h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950" onClick={goNext} type="button">
+              {activeStepIndex === steps.length - 1 ? t('onboarding.stayHere') : t('onboarding.next')}
+            </button>
+          </div>
         </div>
-      </section>
+
+      </div>
     </ViewportModal>
   );
 }
