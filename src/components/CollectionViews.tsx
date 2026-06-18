@@ -840,11 +840,23 @@ function getVirtualGridColumns(width: number) {
 }
 
 function getVirtualGridRowHeight() {
-  if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
+  if (typeof window === 'undefined') {
+    return 268;
+  }
+
+  const isHandheld = window.matchMedia(
+    '(orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px)'
+  ).matches;
+
+  if (isHandheld) {
+    return 220;
+  }
+
+  if (window.matchMedia('(min-width: 640px)').matches) {
     return 300;
   }
 
-  return 276;
+  return 268;
 }
 
 function usePlatformLabelMap(games: Game[], platformQueueState?: PlatformQueueState) {

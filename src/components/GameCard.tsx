@@ -221,7 +221,7 @@ function GameCardComponent({
 
         </div>
 
-        <div className="border-t border-skyglass/15 pt-2.5 sm:pt-3">
+        <div className="mt-auto border-t border-skyglass/15 pt-2.5 sm:pt-3">
           <div className="flex items-center gap-2">
             <button
               className="qs-game-card-details-button h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
