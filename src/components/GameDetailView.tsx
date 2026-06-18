@@ -764,7 +764,7 @@ function GameDetailOverflowMenu({
   });
 
   toolItems.push({
-    icon: 'trash-2',
+    icon: 'archive',
     label: t('action.drop'),
     disabled: !onStatusChange,
     onClick: () => closeAndRun(() => onStatusChange?.(game.id, 'Dropped')),

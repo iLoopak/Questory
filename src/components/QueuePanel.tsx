@@ -946,32 +946,31 @@ function QueueEntryRow({
           </button>
         </div>
       </div>
-      <details className="mt-2">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.movePlatform')}</summary>
-        {platformOptions.length > 0 ? (
-          <select
-            className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-            value={platformOptions.includes(entry.targetPlatform) ? entry.targetPlatform : ''}
-            onChange={(event) => onMoveEntryToPlatform(game.id, entry.targetPlatform, event.target.value as GamePlatform)}
-          >
-            {!platformOptions.includes(entry.targetPlatform) ? (
-              <option disabled value="">
-                {entry.targetPlatform}
-              </option>
-            ) : null}
-            {platformOptions.map((platform) => (
-              <option key={platform} value={platform}>
-                {platform}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <div className="mt-2 rounded-md border border-dashed border-white/10 bg-ink-900/70 p-3 text-sm text-slate-300">
-            <div className="font-semibold text-white">{t('queue.noActivePlatformsConfigured')}</div>
-            <p className="mt-1 text-xs text-slate-400">{t('queue.managePlatformsHint')}</p>
-          </div>
-        )}
-      </details>
+      <div className="mt-2 flex min-w-0 items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.movePlatform')}:</span>
+          {platformOptions.length > 0 ? (
+            <select
+              className="h-7 min-w-0 flex-1 rounded border border-white/10 bg-ink-900 px-2 text-xs text-white outline-none focus:border-mint"
+              value={platformOptions.includes(entry.targetPlatform) ? entry.targetPlatform : ''}
+              onChange={(event) => onMoveEntryToPlatform(game.id, entry.targetPlatform, event.target.value as GamePlatform)}
+            >
+              {!platformOptions.includes(entry.targetPlatform) ? (
+                <option disabled value="">
+                  {entry.targetPlatform}
+                </option>
+              ) : null}
+              {platformOptions.map((platform) => (
+                <option key={platform} value={platform}>
+                  {platform}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-slate-500">{t('queue.noActivePlatformsConfigured')}</span>
+          )}
+        </label>
+      </div>
     </article>
   );
 }

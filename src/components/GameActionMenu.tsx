@@ -418,7 +418,7 @@ function buildGameActionMenuSections({
     onSelect: () => onStatusChange(game.id, 'Finished'),
   });
   addAction(statusItems, {
-    icon: 'trash-2',
+    icon: 'archive',
     currentLabel: t('action.current'),
     isCurrent: game.status === 'Dropped',
     label: t('action.drop'),

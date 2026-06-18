@@ -90,13 +90,13 @@ export function CollectionBulkToolbar({
 
   return (
     <div ref={toolbarRef} className="qs-bulk-toolbar mt-2 flex flex-wrap items-center gap-2 border-t border-mint/15 pt-2">
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-mint">{selectedCount} selected</span>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-mint">{t('bulk.selectedCount').replace('{count}', String(selectedCount))}</span>
 
       <button className={btnCls} onClick={onSelectAll} type="button">
-        All
+        {t('bulk.selectAll')}
       </button>
       <button className={btnCls} onClick={onClearSelection} type="button">
-        Clear
+        {t('toolbar.clear')}
       </button>
 
       <span className="h-5 w-px shrink-0 bg-white/10" aria-hidden="true" />
@@ -107,7 +107,7 @@ export function CollectionBulkToolbar({
           className={summaryCls}
           onClick={(e) => { e.preventDefault(); toggleMenu('status'); }}
         >
-          Status <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
+          {t('toolbar.status')} <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
           {STATUSES.map((status) => (
@@ -145,7 +145,7 @@ export function CollectionBulkToolbar({
           className={summaryCls}
           onClick={(e) => { e.preventDefault(); toggleMenu('data'); }}
         >
-          Data <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
+          {t('bulk.data')} <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
           <button className={itemCls} disabled={disabled} onClick={() => runAndClose(onEnrich)} type="button">
@@ -166,7 +166,7 @@ export function CollectionBulkToolbar({
               onClick={() => runAndClose(onRefreshSteamPlaytime)}
               type="button"
             >
-              {isSteamPlaytimeSyncing ? t('collection.syncingSteamPlaytime') : 'Refresh Steam Playtime'}
+              {isSteamPlaytimeSyncing ? t('collection.syncingSteamPlaytime') : t('bulk.refreshSteamPlaytime')}
             </button>
           ) : null}
           {onSyncSteamAchievements ? (
@@ -176,7 +176,7 @@ export function CollectionBulkToolbar({
               onClick={() => runAndClose(onSyncSteamAchievements)}
               type="button"
             >
-              Sync Steam Achievements
+              {t('collection.syncSteamAchievements')}
             </button>
           ) : null}
           {onSyncWishlistDeals ? (
@@ -199,7 +199,7 @@ export function CollectionBulkToolbar({
           className={`${summaryCls} border-red-400/25 text-red-300 hover:bg-red-500/10 hover:text-red-200`}
           onClick={(e) => { e.preventDefault(); toggleMenu('remove'); }}
         >
-          Remove <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
+          {t('action.remove')} <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
           <button
@@ -208,7 +208,7 @@ export function CollectionBulkToolbar({
             onClick={() => runAndClose(onRemove)}
             type="button"
           >
-            Remove selected
+            {t('bulk.removeSelected')}
           </button>
           {onRemoveAndIgnore ? (
             <button
@@ -217,7 +217,7 @@ export function CollectionBulkToolbar({
               onClick={() => runAndClose(onRemoveAndIgnore)}
               type="button"
             >
-              Remove + Ignore
+              {t('bulk.removeAndIgnore')}
             </button>
           ) : null}
         </div>

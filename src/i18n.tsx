@@ -881,6 +881,12 @@ const en = {
   'common.cancel': 'Cancel',
   'common.saveGame': 'Save game',
   'common.loadingLibrary': 'Loading library',
+  'bulk.selectedCount': '{count} selected',
+  'bulk.selectAll': 'All',
+  'bulk.data': 'Data',
+  'bulk.removeSelected': 'Remove selected',
+  'bulk.removeAndIgnore': 'Remove + Ignore',
+  'bulk.refreshSteamPlaytime': 'Refresh Steam Playtime',
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -1753,6 +1759,12 @@ const cs: Dictionary = {
   'common.cancel': 'Zrušit',
   'common.saveGame': 'Uložit hru',
   'common.loadingLibrary': 'Načítám knihovnu',
+  'bulk.selectedCount': '{count} vybráno',
+  'bulk.selectAll': 'Vše',
+  'bulk.data': 'Data',
+  'bulk.removeSelected': 'Odebrat vybrané',
+  'bulk.removeAndIgnore': 'Odebrat + Ignorovat',
+  'bulk.refreshSteamPlaytime': 'Obnovit Steam herní čas',
 };
 
 const dictionaries: Record<AppLanguage, Dictionary> = {

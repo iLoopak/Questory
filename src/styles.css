@@ -887,6 +887,37 @@ img {
   white-space: nowrap;
 }
 
+.qs-status-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid rgb(var(--skyglass-rgb) / 0.22);
+  background: rgb(var(--skyglass-rgb) / 0.08);
+  color: rgb(var(--text-muted-rgb));
+  vertical-align: middle;
+}
+
+:root[data-theme='light'] .qs-status-badge {
+  border-color: rgb(var(--skyglass-rgb) / 0.28);
+  background: rgb(var(--skyglass-rgb) / 0.1);
+  color: rgb(var(--text-muted-rgb));
+}
+
+.qs-highlight-badge {
+  background: var(--qs-accent-primary);
+  border-color: rgb(var(--qs-accent-primary-rgb) / 0.5);
+  color: var(--accent-contrast);
+}
+
+.qs-highlight-card-border {
+  border-color: rgb(var(--qs-accent-primary-rgb) / 0.7);
+  --tw-ring-color: rgb(var(--qs-accent-primary-rgb) / 0.3);
+}
+
 :root[data-theme='light'] .platform-badge--identity {
   border-color: color-mix(in srgb, var(--platform-badge-accent) 34%, var(--badge-border));
   background: linear-gradient(135deg, color-mix(in srgb, var(--platform-badge-accent) 14%, var(--badge-bg)), color-mix(in srgb, var(--platform-badge-accent) 6%, var(--badge-bg)));
@@ -2249,6 +2280,12 @@ textarea,
   color: var(--text-primary);
   box-shadow: 0 0 16px rgb(var(--qs-accent-secondary-rgb) / 0.18), 0 8px 20px rgb(0 0 0 / 0.34);
   backdrop-filter: blur(14px);
+}
+
+.qs-template-neon-deck .qs-status-badge {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.28);
+  background: rgb(var(--qs-accent-secondary-rgb) / 0.08);
+  color: rgb(var(--qs-accent-secondary-rgb) / 0.65);
 }
 
 .qs-template-neon-deck .qs-game-card-status {

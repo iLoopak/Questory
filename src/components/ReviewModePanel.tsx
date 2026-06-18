@@ -63,7 +63,7 @@ const negativeActions: Array<{
   tone: 'danger' | 'quiet';
 }> = [
   { action: 'ignore', hint: '', icon: 'eye-off', label: 'Ignore', tone: 'danger' },
-  { action: 'dropped', hint: '', icon: 'trash-2', label: 'Drop', tone: 'quiet' },
+  { action: 'dropped', hint: '', icon: 'archive', label: 'Drop', tone: 'quiet' },
   { action: 'skip', hint: 'cancel', icon: 'chevrons-right', label: 'Skip', tone: 'quiet' },
 ];
 
