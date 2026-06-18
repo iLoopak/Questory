@@ -223,10 +223,10 @@ function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusCha
                 <Metric label={t('playingNow.days7')} value={String(context.playedDaysLast7)} />
                 <Metric label={t('playingNow.days30')} value={String(context.playedDaysLast30)} />
               </div>
-              <OverflowAction icon="panel-top-open" label={t('playingNow.openDetail')} onClick={() => onOpenDetails(game.id)} />
-              <OverflowAction icon="x" label={t('status.paused')} onClick={() => onStatusChange(game.id, 'Paused')} />
               <OverflowAction icon="check-circle" label={t('action.finished')} onClick={() => onStatusChange(game.id, 'Finished')} />
+              <OverflowAction icon="x" label={t('status.paused')} onClick={() => onStatusChange(game.id, 'Paused')} />
               <OverflowAction icon="archive" label={t('queue.removeFromPlaying')} onClick={() => onStatusChange(game.id, 'Want to play')} />
+              <OverflowAction icon="panel-top-open" label={t('playingNow.openDetail')} onClick={() => onOpenDetails(game.id)} />
             </div>
           </details>
         </div>

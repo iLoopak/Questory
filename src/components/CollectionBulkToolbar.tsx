@@ -118,24 +118,26 @@ export function CollectionBulkToolbar({
               onClick={() => runAndClose(() => onStatusChange(status))}
               type="button"
             >
-              {status}
+              {status === 'Dropped' ? t('action.drop') : status}
             </button>
           ))}
-          {onAddToWishlist ? (
-            <>
-              <hr className="border-skyglass/15" />
-              <button
-                className={itemCls}
-                disabled={disabled}
-                onClick={() => runAndClose(onAddToWishlist)}
-                type="button"
-              >
-                Add to Wishlist
-              </button>
-            </>
-          ) : null}
         </div>
       </details>
+
+      {/* Collection menu */}
+      {onAddToWishlist ? (
+        <>
+          <span className="h-5 w-px shrink-0 bg-white/10" aria-hidden="true" />
+          <button
+            className={summaryCls}
+            disabled={disabled}
+            onClick={() => runAndClose(onAddToWishlist)}
+            type="button"
+          >
+            {t('wishlist.addToWishlist')}
+          </button>
+        </>
+      ) : null}
 
       {/* Data menu */}
       <details className="qs-toolbar-menu shrink-0" open={openMenu === 'data'}>
@@ -147,7 +149,7 @@ export function CollectionBulkToolbar({
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
           <button className={itemCls} disabled={disabled} onClick={() => runAndClose(onEnrich)} type="button">
-            Enrich selected
+            {t('action.refreshMetadata')}
           </button>
           <button
             className={itemCls}
