@@ -1999,15 +1999,6 @@ textarea,
     max-height: none;
     overflow-y: visible;
   }
-
-  .qs-game-action-sections {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
-
-  .qs-game-action-section-danger {
-    grid-column: 1 / -1;
-  }
 }
 
 
