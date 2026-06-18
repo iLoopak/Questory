@@ -4,6 +4,8 @@ import type { GameStatus } from '../types/game';
 
 const STATUSES: GameStatus[] = ['Finished', 'Playing', 'Paused', 'Want to play', 'Dropped'];
 
+type OpenMenu = 'status' | 'data' | 'remove' | null;
+
 type CollectionBulkToolbarProps = {
   collectionType: 'library' | 'wishlist';
   selectedCount: number;
@@ -45,35 +47,19 @@ export function CollectionBulkToolbar({
   onRemoveAndIgnore,
 }: CollectionBulkToolbarProps) {
   const { t } = useI18n();
-  const statusMenuRef = useRef<HTMLDetailsElement | null>(null);
-  const dataMenuRef = useRef<HTMLDetailsElement | null>(null);
-  const dangerMenuRef = useRef<HTMLDetailsElement | null>(null);
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [isDataOpen, setIsDataOpen] = useState(false);
-  const [isDangerOpen, setIsDangerOpen] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
   useEffect(() => {
-    if (!isStatusOpen && !isDataOpen && !isDangerOpen) return;
+    if (openMenu === null) return;
 
     function handlePointerDown(event: PointerEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (
-        statusMenuRef.current?.contains(target) ||
-        dataMenuRef.current?.contains(target) ||
-        dangerMenuRef.current?.contains(target)
-      ) return;
-      setIsStatusOpen(false);
-      setIsDataOpen(false);
-      setIsDangerOpen(false);
+      if (toolbarRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsStatusOpen(false);
-        setIsDataOpen(false);
-        setIsDangerOpen(false);
-      }
+      if (event.key === 'Escape') setOpenMenu(null);
     }
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -82,12 +68,15 @@ export function CollectionBulkToolbar({
       document.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isStatusOpen, isDataOpen, isDangerOpen]);
+  }, [openMenu]);
 
-  function closeAll() {
-    setIsStatusOpen(false);
-    setIsDataOpen(false);
-    setIsDangerOpen(false);
+  function toggleMenu(menu: Exclude<OpenMenu, null>) {
+    setOpenMenu((prev) => (prev === menu ? null : menu));
+  }
+
+  function runAndClose(fn: () => void) {
+    setOpenMenu(null);
+    fn();
   }
 
   const disabled = selectedCount === 0;
@@ -100,7 +89,7 @@ export function CollectionBulkToolbar({
     'flex w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
-    <div className="qs-bulk-toolbar mt-2 flex flex-wrap items-center gap-2 border-t border-mint/15 pt-2">
+    <div ref={toolbarRef} className="qs-bulk-toolbar mt-2 flex flex-wrap items-center gap-2 border-t border-mint/15 pt-2">
       <span className="shrink-0 text-sm font-semibold tabular-nums text-mint">{selectedCount} selected</span>
 
       <button className={btnCls} onClick={onSelectAll} type="button">
@@ -112,13 +101,12 @@ export function CollectionBulkToolbar({
 
       <span className="h-5 w-px shrink-0 bg-white/10" aria-hidden="true" />
 
-      <details
-        ref={statusMenuRef}
-        className="qs-toolbar-menu shrink-0"
-        open={isStatusOpen}
-        onToggle={(e) => setIsStatusOpen(e.currentTarget.open)}
-      >
-        <summary className={summaryCls}>
+      {/* Status menu */}
+      <details className="qs-toolbar-menu shrink-0" open={openMenu === 'status'}>
+        <summary
+          className={summaryCls}
+          onClick={(e) => { e.preventDefault(); toggleMenu('status'); }}
+        >
           Status <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
@@ -127,7 +115,7 @@ export function CollectionBulkToolbar({
               key={status}
               className={itemCls}
               disabled={disabled}
-              onClick={() => { closeAll(); onStatusChange(status); }}
+              onClick={() => runAndClose(() => onStatusChange(status))}
               type="button"
             >
               {status}
@@ -139,7 +127,7 @@ export function CollectionBulkToolbar({
               <button
                 className={itemCls}
                 disabled={disabled}
-                onClick={() => { closeAll(); onAddToWishlist(); }}
+                onClick={() => runAndClose(onAddToWishlist)}
                 type="button"
               >
                 Add to Wishlist
@@ -149,23 +137,22 @@ export function CollectionBulkToolbar({
         </div>
       </details>
 
-      <details
-        ref={dataMenuRef}
-        className="qs-toolbar-menu shrink-0"
-        open={isDataOpen}
-        onToggle={(e) => setIsDataOpen(e.currentTarget.open)}
-      >
-        <summary className={summaryCls}>
+      {/* Data menu */}
+      <details className="qs-toolbar-menu shrink-0" open={openMenu === 'data'}>
+        <summary
+          className={summaryCls}
+          onClick={(e) => { e.preventDefault(); toggleMenu('data'); }}
+        >
           Data <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
-          <button className={itemCls} disabled={disabled} onClick={() => { closeAll(); onEnrich(); }} type="button">
+          <button className={itemCls} disabled={disabled} onClick={() => runAndClose(onEnrich)} type="button">
             Enrich selected
           </button>
           <button
             className={itemCls}
             disabled={disabled || isHltbSyncing}
-            onClick={() => { closeAll(); onSyncHltb(); }}
+            onClick={() => runAndClose(onSyncHltb)}
             type="button"
           >
             {isHltbSyncing ? t('hltb.syncing') : t('hltb.sync')}
@@ -174,7 +161,7 @@ export function CollectionBulkToolbar({
             <button
               className={itemCls}
               disabled={disabled || isSteamPlaytimeSyncing}
-              onClick={() => { closeAll(); onRefreshSteamPlaytime(); }}
+              onClick={() => runAndClose(onRefreshSteamPlaytime)}
               type="button"
             >
               {isSteamPlaytimeSyncing ? t('collection.syncingSteamPlaytime') : 'Refresh Steam Playtime'}
@@ -184,7 +171,7 @@ export function CollectionBulkToolbar({
             <button
               className={itemCls}
               disabled={disabled}
-              onClick={() => { closeAll(); onSyncSteamAchievements(); }}
+              onClick={() => runAndClose(onSyncSteamAchievements)}
               type="button"
             >
               Sync Steam Achievements
@@ -195,7 +182,7 @@ export function CollectionBulkToolbar({
               className={itemCls}
               disabled={isWishlistDealSyncDisabled}
               title={wishlistDealSyncTitle}
-              onClick={() => { closeAll(); onSyncWishlistDeals(); }}
+              onClick={() => runAndClose(onSyncWishlistDeals)}
               type="button"
             >
               {isWishlistDealSyncing ? t('itad.syncingDeals') : t('itad.syncDeals')}
@@ -204,20 +191,19 @@ export function CollectionBulkToolbar({
         </div>
       </details>
 
-      <details
-        ref={dangerMenuRef}
-        className="qs-toolbar-menu shrink-0"
-        open={isDangerOpen}
-        onToggle={(e) => setIsDangerOpen(e.currentTarget.open)}
-      >
-        <summary className={`${summaryCls} border-red-400/25 text-red-300 hover:bg-red-500/10 hover:text-red-200`}>
+      {/* Remove (danger) menu */}
+      <details className="qs-toolbar-menu shrink-0" open={openMenu === 'remove'}>
+        <summary
+          className={`${summaryCls} border-red-400/25 text-red-300 hover:bg-red-500/10 hover:text-red-200`}
+          onClick={(e) => { e.preventDefault(); toggleMenu('remove'); }}
+        >
           Remove <span aria-hidden="true" className="opacity-60 text-xs">▾</span>
         </summary>
         <div className="qs-toolbar-menu-panel qs-toolbar-menu-panel--start">
           <button
             className={`${itemCls} text-red-300 hover:bg-red-500/10 hover:text-red-200`}
             disabled={disabled}
-            onClick={() => { closeAll(); onRemove(); }}
+            onClick={() => runAndClose(onRemove)}
             type="button"
           >
             Remove selected
@@ -226,7 +212,7 @@ export function CollectionBulkToolbar({
             <button
               className={`${itemCls} text-red-300 hover:bg-red-500/10 hover:text-red-200`}
               disabled={disabled}
-              onClick={() => { closeAll(); onRemoveAndIgnore(); }}
+              onClick={() => runAndClose(onRemoveAndIgnore)}
               type="button"
             >
               Remove + Ignore
