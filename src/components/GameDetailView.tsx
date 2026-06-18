@@ -174,7 +174,7 @@ export function GameDetailView({
   ];
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-900/70 lg:h-[calc(100vh-116px)]">
+    <section className="min-h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
