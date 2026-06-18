@@ -126,7 +126,7 @@ function GameCardComponent({
     <article
       aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-game-card qs-glass relative flex h-full min-h-[290px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[320px] ${
+      className={`qs-game-card qs-glass relative flex h-full min-h-[260px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[292px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : ''} cursor-pointer`}
       onClick={handleCardClick}
@@ -195,7 +195,7 @@ function GameCardComponent({
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-transparent" />
-        <div className={`absolute bottom-3 left-3 z-10 flex flex-wrap items-center gap-1.5 ${game.collectionType === 'wishlist' ? 'max-w-[42%] sm:max-w-[48%]' : 'max-w-[calc(100%-1.5rem)]'}`}>
+        <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5">
           <PlatformBadge
             className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
             platform={platformLabel ?? game.platform}
@@ -207,15 +207,10 @@ function GameCardComponent({
             </span>
           ) : null}
         </div>
-        {game.collectionType === 'wishlist' ? (
-          <span className="absolute right-3 top-3 rounded-full border border-mint/30 bg-ink-950/80 px-2.5 py-1 text-xs font-medium text-mint">
-            {t('collection.wishlist')}
-          </span>
-        ) : null}
         <DealCoverBadges game={game} variant="grid" />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-3 sm:gap-3 sm:p-3.5">
         <div className="min-w-0">
           <h3
             className="line-clamp-2 text-base font-semibold leading-6 text-white sm:text-lg"
@@ -226,7 +221,7 @@ function GameCardComponent({
 
         </div>
 
-        <div className="mt-auto border-t border-skyglass/15 pt-3">
+        <div className="border-t border-skyglass/15 pt-2.5 sm:pt-3">
           <div className="flex items-center gap-2">
             <button
               className="qs-game-card-details-button h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
