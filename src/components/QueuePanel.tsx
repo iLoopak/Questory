@@ -740,9 +740,9 @@ function PlatformQueueColumn({
   }
 
   return (
-    <section ref={setPlatformRef} style={accentStyle} className={`overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'shadow-glow' : hasGames ? '' : 'border-skyglass/10 opacity-80'}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'shadow-glow' : hasGames ? '' : 'border-skyglass/10 opacity-80'}`}>
       {displayArtworkUrl ? (
-        <div className="relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
+        <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
           <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
@@ -782,7 +782,7 @@ function PlatformQueueColumn({
       </div>
 
       {currentlyPlaying.length > 0 ? (
-        <div className="mb-3 grid w-full min-w-0 gap-2 border-b border-skyglass/15 pb-3">
+        <div className="qs-platform-playing-section mb-3 grid w-full min-w-0 gap-2 border-b border-skyglass/15 pb-3">
           <div className="qs-platform-playing-panel w-full min-w-0 rounded-xl border p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
@@ -826,7 +826,7 @@ function PlatformQueueColumn({
             })}
           </div>
         ) : (
-          <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
+          <div className="qs-queue-planned-empty rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
             {t('queue.noQueue')}
           </div>
         )}
