@@ -286,7 +286,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
       restoreQuestShelfBackup(selectedBackup);
     }
 
-    showMessage('Backup imported. QuestShelf will reload so the updated local library is shown.', 'success');
+    showMessage(t('data.backupImported'), 'success');
     window.setTimeout(() => window.location.reload(), 600);
   }
 
