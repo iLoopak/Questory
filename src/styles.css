@@ -1822,6 +1822,7 @@ textarea,
 .qs-game-action-sheet {
   display: flex;
   flex-direction: column;
+  overflow: clip;
   max-height: calc(100dvh - max(0.75rem, var(--qs-safe-top)) - max(0.75rem, var(--qs-safe-bottom)));
   background: var(--surface-menu);
   border: 1px solid var(--border);
