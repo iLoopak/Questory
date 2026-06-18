@@ -316,7 +316,7 @@ export function GameDetailView({
               <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
             ) : null}
 
-            <DetailSection kicker={t('detail.myGameLog')} title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
+            <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.tags')}</span>
@@ -345,7 +345,7 @@ export function GameDetailView({
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.myNotes')}</span>
                   <textarea
-                    className="mt-2 min-h-24 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
+                    className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={game.notes}
                     onChange={(event) => updateTracking({ notes: event.target.value })}
                     placeholder={t('detail.notesPlaceholder')}
@@ -353,25 +353,19 @@ export function GameDetailView({
                 </label>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-3">
-                {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
-                {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-              </div>
-
-              {isSteamLibraryGame ? (
-                <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Steam Activity</div>
-                    <p className="mt-1 text-xs text-slate-500">Detected only when Steam reports higher total playtime than the previous sync.</p>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {!hasPlaytime ? <PersonalStatField label="Playtime" value={`${game.playtimeHours}h`} /> : null}
-                    <PersonalStatField label="Last Steam Activity" value={formatRelativeActivityDate(lastSteamActivityAt)} />
-                    <PersonalStatField label="Recent Delta" value={formatDeltaMinutes(recentSteamDeltaMinutes)} />
-                  </div>
+              <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.activity')}</div>
+                  {isSteamLibraryGame ? <p className="mt-1 text-xs text-slate-500">{t('detail.steamActivityHelp')}</p> : null}
                 </div>
-              ) : null}
+                <div className="grid gap-3 md:grid-cols-3">
+                  <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
+                  {isSteamLibraryGame ? <PersonalStatField label={t('detail.lastSteamActivity')} value={formatRelativeActivityDate(lastSteamActivityAt)} /> : null}
+                  {isSteamLibraryGame ? <PersonalStatField label={t('detail.recentDelta')} value={formatDeltaMinutes(recentSteamDeltaMinutes)} /> : null}
+                  {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+                  {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+                </div>
+              </div>
             </DetailSection>
 
             <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
@@ -936,7 +930,7 @@ function GameDetailOverflowMenu({
 type DetailSectionProps = {
   children: ReactNode;
   description?: string;
-  kicker: string;
+  kicker?: string;
   title: string;
 };
 
@@ -945,8 +939,8 @@ function DetailSection({ children, description, kicker, title }: DetailSectionPr
     <section className="rounded-2xl border border-mint/20 bg-ink-800 p-4 shadow-panel">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{kicker}</div>
-          <h3 className="mt-1 text-lg font-semibold text-white">{title}</h3>
+          {kicker ? <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{kicker}</div> : null}
+          <h3 className={kicker ? 'mt-1 text-lg font-semibold text-white' : 'text-lg font-semibold text-white'}>{title}</h3>
           {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
         </div>
       </div>
