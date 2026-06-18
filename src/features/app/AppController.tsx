@@ -2093,7 +2093,6 @@ function CollectionPanel({
     collectionType === 'wishlist'
       ? t('collection.emptyWishlistText')
       : t('collection.emptyLibraryText');
-  const visibleGameIdsSignature = useMemo(() => games.map((game) => game.id).join('|'), [games]);
   const virtualResetKey = useMemo(
     () =>
       [
@@ -2108,9 +2107,8 @@ function CollectionPanel({
         filters.achievement,
         filters.sortBy,
         filters.quickFilters.join('|'),
-        visibleGameIdsSignature,
       ].join(':'),
-    [collectionType, filters, viewMode, visibleGameIdsSignature],
+    [collectionType, filters, viewMode],
   );
   const visibleGames = games;
   const realCoverCount = useMemo(() => games.reduce((count, game) => count + (isMissingOrGeneratedCover(game.coverImage) ? 0 : 1), 0), [games]);
