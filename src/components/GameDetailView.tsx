@@ -7,7 +7,6 @@ import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover 
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
-import { PlatformBadge } from './PlatformBadge';
 import { translateOption, useI18n, type TFunction } from '../i18n';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { formatDealPrice } from './DealCoverBadges';
@@ -87,7 +86,6 @@ export function GameDetailView({
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
-  const platformLabel = getGamePlatformLabel(game, platformQueueState);
   const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
   const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
@@ -242,7 +240,7 @@ export function GameDetailView({
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-3 xl:max-w-3xl">
-                    <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} badge={<PlatformBadge className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold" platform={platformLabel} queueState={platformQueueState} />} />
+                    <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
                     <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
                     {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
@@ -531,10 +529,6 @@ function EditText({ inputMode, label, onChange, value }: { inputMode?: 'decimal'
 
 function EditSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: readonly string[]; value: string }) {
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
-}
-
-function getGamePlatformLabel(game: Game, platformQueueState?: PlatformQueueState): GamePlatform {
-  return platformQueueState?.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
 }
 
 function HeroStat({ accent, badge, label, value }: { accent?: boolean; badge?: ReactNode; label: string; value: string }) {
@@ -1024,10 +1018,6 @@ function isValidUrl(value: string) {
 }
 
 function formatPlatformSource(game: Game) {
-  if (game.externalSource && game.externalSource !== 'manual') {
-    return `${game.platform} · ${game.externalSource}`;
-  }
-
   return game.platform;
 }
 
