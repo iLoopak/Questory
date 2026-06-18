@@ -9,7 +9,7 @@ import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PlatformBadge } from './PlatformBadge';
 import { translateOption, useI18n } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
-import { formatHltbBadge, hasHltbData } from '../lib/hltb';
+import { buildHltbSearchUrl, formatHltbBadge, getHltbGameSearchTitle, hasHltbData } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
 
 type GameDetailViewProps = {
@@ -195,6 +195,17 @@ export function GameDetailView({
       ]
     : [];
 
+  const hltbSearchActions: GameDetailAction[] = [
+    {
+      icon: 'search',
+      label: t('hltb.findOn'),
+      onClick: () => {
+        window.open(buildHltbSearchUrl(getHltbGameSearchTitle(game)), '_blank', 'noopener,noreferrer');
+      },
+      tone: 'neutral',
+    },
+  ];
+
   const artworkActions: GameDetailAction[] = canFindArtwork
     ? [
         {
@@ -317,6 +328,9 @@ export function GameDetailView({
                     <GameDetailActionButton key={action.label} action={action} />
                   ))}
                   {dealActions.map((action) => (
+                    <GameDetailActionButton key={action.label} action={action} />
+                  ))}
+                  {hltbSearchActions.map((action) => (
                     <GameDetailActionButton key={action.label} action={action} />
                   ))}
                   {artworkActions.map((action) => (

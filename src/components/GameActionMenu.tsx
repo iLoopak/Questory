@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent
 import { createPortal } from 'react-dom';
 import { useI18n, type TFunction } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
+import { buildHltbSearchUrl, getHltbGameSearchTitle } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
 import type { Game, GameStatus } from '../types/game';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -428,6 +429,8 @@ function buildGameActionMenuSections({
   if (game.storeUrl || game.externalUrl) {
     addAction(otherItems, { icon: 'external-link', label: t('action.openStore'), href: game.storeUrl ?? game.externalUrl });
   }
+
+  addAction(otherItems, { icon: 'search', label: t('hltb.findOn'), href: buildHltbSearchUrl(getHltbGameSearchTitle(game)) });
 
   addAction(dangerItems, {
     icon: 'trash-2',
