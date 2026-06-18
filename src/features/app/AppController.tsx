@@ -1593,7 +1593,7 @@ export function AppController() {
           <BackToTopButton />
         </header>
 
-        <section className={`min-h-0 flex-1 bg-ink-950 py-2 ${activeUtilityView === 'playing-now' ? 'flex flex-col overflow-hidden' : ''}`}>
+        <section className={`bg-ink-950 py-2 ${activeNavItem === 'Home' && activeUtilityView !== 'playing-now' ? '' : 'min-h-0 flex-1'} ${activeUtilityView === 'playing-now' ? 'flex flex-col overflow-hidden' : ''}`}>
           {activeUtilityView === 'playing-now' ? (
             <div className="qs-playing-now-scroll h-full min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-1">
               <PlayingNowHub
