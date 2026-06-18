@@ -1820,6 +1820,8 @@ textarea,
 }
 
 .qs-game-action-sheet {
+  display: flex;
+  flex-direction: column;
   max-height: calc(100dvh - max(0.75rem, var(--qs-safe-top)) - max(0.75rem, var(--qs-safe-bottom)));
   background: var(--surface-menu);
   border: 1px solid var(--border);
@@ -1829,6 +1831,7 @@ textarea,
 }
 
 .qs-game-action-header {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1899,8 +1902,10 @@ textarea,
 }
 
 .qs-game-action-scroll {
-  max-height: min(68dvh, 31rem);
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.75rem 0.75rem max(0.875rem, calc(var(--qs-safe-bottom) + 0.625rem));
 }
 
@@ -2029,7 +2034,6 @@ textarea,
 @media (min-width: 640px) {
   .qs-game-action-scroll {
     max-height: none;
-    overflow-y: visible;
   }
 }
 
