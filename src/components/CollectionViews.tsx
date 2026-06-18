@@ -635,7 +635,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
           <MissingCover title={game.title} />
         )}
         <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <span className={`absolute bottom-3 left-3 z-10 flex flex-wrap items-center gap-1.5 ${game.collectionType === 'wishlist' ? 'max-w-[42%] sm:max-w-[48%]' : 'max-w-[calc(100%-1.5rem)]'}`}>
+        <span className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5">
           <PlatformBadge
             className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
             platform={platformLabel}
@@ -653,13 +653,13 @@ const ShelfGameCard = memo(function ShelfGameCard({
         <DealCoverBadges game={game} variant="shelf" />
       </span>
 
-      <span className="mt-3 block min-h-[3rem]">
+      <span className="mt-2.5 block min-h-[2.75rem]">
         <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
 
       </span>
 
       {!isMultiSelectMode ? (
-        <span className="mt-3 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+        <span className="mt-2.5 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
           {onAddToQueue ? (
             <button
               className="min-h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow focus-visible:bg-mint focus-visible:text-ink-950"
@@ -841,10 +841,10 @@ function getVirtualGridColumns(width: number) {
 
 function getVirtualGridRowHeight() {
   if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
-    return 336;
+    return 300;
   }
 
-  return 306;
+  return 276;
 }
 
 function usePlatformLabelMap(games: Game[], platformQueueState?: PlatformQueueState) {
