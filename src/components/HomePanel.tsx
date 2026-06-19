@@ -8,6 +8,7 @@ import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 import { PlatformBadge } from './PlatformBadge';
+import { QSActionSheet } from './QSActionSheet';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -25,6 +26,7 @@ type HomePanelProps = {
   onOpenReviewMode: (source: ReviewSource) => void;
   onOpenWishlist: () => void;
   onPlayToday: (game: Game) => void;
+  onQuickNote: (gameId: string, note: string) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncSteamData?: () => void;
 };
@@ -55,6 +57,7 @@ export function HomePanel({
   onOpenReviewMode,
   onOpenWishlist,
   onPlayToday,
+  onQuickNote,
   onStatusChange,
   onSyncSteamData,
 }: HomePanelProps) {
@@ -523,8 +526,9 @@ export function HomePanel({
 
       {/* Action sheet for game cards */}
       {actionSheetGame ? (
-        <HomeActionSheet
+        <QSActionSheet
           game={actionSheetGame}
+          queueState={queueState}
           onClose={() => setActionSheetGame(null)}
           onOpenDetails={(game) => {
             setActionSheetGame(null);
@@ -534,11 +538,14 @@ export function HomePanel({
             onPlayToday(game);
             setActionSheetGame(null);
           }}
+          onQuickNote={(gameId, note) => {
+            onQuickNote(gameId, note);
+            setActionSheetGame(null);
+          }}
           onStatusChange={(gameId, status) => {
             onStatusChange(gameId, status);
             setActionSheetGame(null);
           }}
-          t={t}
         />
       ) : null}
     </section>
@@ -749,81 +756,6 @@ function WishlistDealCard({
   );
 }
 
-function HomeActionSheet({
-  game,
-  onClose,
-  onOpenDetails,
-  onPlayToday,
-  onStatusChange,
-  t,
-}: {
-  game: Game;
-  onClose: () => void;
-  onOpenDetails: (game: Game) => void;
-  onPlayToday: (game: Game) => void;
-  onStatusChange: (gameId: string, status: GameStatus) => void;
-  t: ReturnType<typeof useI18n>['t'];
-}) {
-  const isPlaying = game.status === 'Playing';
-  const toggleStatus: GameStatus = isPlaying ? 'Finished' : 'Playing';
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative rounded-t-2xl border-t border-skyglass/20 bg-ink-900 px-4 pb-safe-bottom pt-4 shadow-2xl">
-        <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-skyglass/30" />
-        <div className="mb-4">
-          <p className="font-semibold text-white">{game.title}</p>
-          <p className="text-xs text-slate-400">{game.platform}</p>
-        </div>
-        <div className="grid gap-2">
-          <button
-            className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-mint/25 bg-mint/10 px-4 text-left transition hover:bg-mint/20"
-            onClick={() => onPlayToday(game)}
-            type="button"
-          >
-            <Icon name="play-circle" size={18} strokeWidth={2} className="shrink-0 text-mint" />
-            <span className="font-semibold text-mint">{t('home.playToday')}</span>
-          </button>
-          <button
-            className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-skyglass/15 bg-ink-950/70 px-4 text-left transition hover:border-mint/35 hover:bg-mint/10"
-            onClick={() => onOpenDetails(game)}
-            type="button"
-          >
-            <Icon name="external-link" size={18} strokeWidth={2} className="shrink-0 text-slate-300" />
-            <span className="text-slate-200">{t('home.openDetails')}</span>
-          </button>
-          <button
-            className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 text-left transition ${
-              isPlaying
-                ? 'border-emerald-500/25 bg-emerald-500/10 hover:border-emerald-500/45 hover:bg-emerald-500/15'
-                : 'border-skyglass/15 bg-ink-950/70 hover:border-mint/35 hover:bg-mint/10'
-            }`}
-            onClick={() => onStatusChange(game.id, toggleStatus)}
-            type="button"
-          >
-            <Icon
-              name="check-circle"
-              size={18}
-              strokeWidth={2}
-              className={`shrink-0 ${isPlaying ? 'text-emerald-400' : 'text-slate-300'}`}
-            />
-            <span className={isPlaying ? 'text-emerald-300' : 'text-slate-200'}>
-              {isPlaying ? t('home.markFinished') : t('home.markAsPlaying')}
-            </span>
-          </button>
-        </div>
-        <button
-          className="mt-3 min-h-11 w-full rounded-xl text-sm text-slate-400 transition hover:text-slate-200"
-          onClick={onClose}
-          type="button"
-        >
-          {t('home.cancelAction')}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function OnboardingSteps({
   onOpenLibrary,

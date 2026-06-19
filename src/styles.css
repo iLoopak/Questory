@@ -1195,6 +1195,34 @@ body.qs-controller-active .qs-toast {
   }
 }
 
+@keyframes qs-sheet-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes qs-sheet-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.qs-action-sheet-panel {
+  animation: qs-sheet-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.qs-action-sheet-backdrop {
+  animation: qs-sheet-backdrop-in 0.22s ease;
+}
+
 @keyframes qs-toast-enter {
   from {
     opacity: 0;
