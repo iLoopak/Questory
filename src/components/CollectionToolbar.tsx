@@ -147,6 +147,48 @@ export function CollectionToolbar({
           </label>
         ) : null}
 
+        {viewMode ? (
+          <details
+            ref={viewMenuRef}
+            className="qs-toolbar-menu qs-view-menu"
+            open={isViewMenuOpen}
+            onToggle={(event) => setIsViewMenuOpen(event.currentTarget.open)}
+          >
+            <summary
+              aria-label={`${viewMode.label ?? t('toolbar.viewMode')}: ${selectedViewLabel}`}
+              className="qs-collection-toolbar-button grid h-9 cursor-pointer place-items-center rounded-md border border-skyglass/15 bg-ink-900/70 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10 hover:text-white"
+            >
+              <span>
+                <span className="qs-view-menu-label">{t('toolbar.view')}:</span> {selectedViewLabel} <span aria-hidden="true">▾</span>
+              </span>
+            </summary>
+            <div className="qs-toolbar-menu-panel" role="menu" aria-label={viewMode.label ?? t('toolbar.viewMode')}>
+              {viewMode.options.map((mode) => {
+                const isActive = viewMode.value === mode;
+                const modeLabel = translateOption(mode, t);
+
+                return (
+                  <button
+                    key={mode}
+                    aria-checked={isActive}
+                    className={`h-9 rounded-md px-3 text-left text-sm font-semibold transition ${
+                      isActive ? 'bg-mint text-ink-950 shadow-glow' : 'text-slate-200 hover:bg-mint/10 hover:text-white'
+                    }`}
+                    onClick={() => {
+                      viewMode.onChange(mode);
+                      setIsViewMenuOpen(false);
+                    }}
+                    role="menuitemradio"
+                    type="button"
+                  >
+                    {modeLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </details>
+        ) : null}
+
         {leadingAccessory ? <div className="qs-collection-toolbar-accessory min-w-0">{leadingAccessory}</div> : null}
 
         {selects.map((select) => (
@@ -183,48 +225,6 @@ export function CollectionToolbar({
             <span className="qs-short-label">{t('toolbar.filters')}</span>
             {moreFiltersActiveCount > 0 ? ` (${moreFiltersActiveCount})` : ''}
           </button>
-        ) : null}
-
-        {viewMode ? (
-          <details
-            ref={viewMenuRef}
-            className="qs-toolbar-menu qs-view-menu"
-            open={isViewMenuOpen}
-            onToggle={(event) => setIsViewMenuOpen(event.currentTarget.open)}
-          >
-            <summary
-              aria-label={`${viewMode.label ?? t('toolbar.viewMode')}: ${selectedViewLabel}`}
-              className="qs-collection-toolbar-button grid h-9 cursor-pointer place-items-center rounded-md border border-skyglass/15 bg-ink-900/70 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10 hover:text-white"
-            >
-              <span>
-                {t('toolbar.view')} <span aria-hidden="true">▾</span>
-              </span>
-            </summary>
-            <div className="qs-toolbar-menu-panel" role="menu" aria-label={viewMode.label ?? t('toolbar.viewMode')}>
-              {viewMode.options.map((mode) => {
-                const isActive = viewMode.value === mode;
-                const modeLabel = translateOption(mode, t);
-
-                return (
-                  <button
-                    key={mode}
-                    aria-checked={isActive}
-                    className={`h-9 rounded-md px-3 text-left text-sm font-semibold transition ${
-                      isActive ? 'bg-mint text-ink-950 shadow-glow' : 'text-slate-200 hover:bg-mint/10 hover:text-white'
-                    }`}
-                    onClick={() => {
-                      viewMode.onChange(mode);
-                      setIsViewMenuOpen(false);
-                    }}
-                    role="menuitemradio"
-                    type="button"
-                  >
-                    {modeLabel}
-                  </button>
-                );
-              })}
-            </div>
-          </details>
         ) : null}
 
         {primaryAction ? <div className="qs-collection-primary-action min-w-0">{primaryAction}</div> : null}
