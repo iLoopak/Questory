@@ -252,7 +252,7 @@ export function HomePanel({
   return (
     <section ref={shellRef} className="qs-home-shell space-y-4 pb-4">
       {/* Compact Hero — full width */}
-      <section className="flex items-center gap-3 rounded-xl border border-skyglass/15 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-3 shadow-panel">
+      <section className="qs-home-hero flex items-center gap-3 rounded-xl border border-skyglass/15 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-3 shadow-panel">
         {avatar}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
@@ -367,7 +367,7 @@ export function HomePanel({
           </HomeSection>
 
           {/* Quest Queue Remaining */}
-          <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+          <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
             <button
               className="mt-2 cursor-pointer text-left transition hover:opacity-75 focus:outline-none"
@@ -382,7 +382,7 @@ export function HomePanel({
             </p>
             {nextReviewCandidate ? (
               <div className="mt-3 flex items-center gap-2 rounded-lg border border-skyglass/15 bg-ink-950/50 px-3 py-2">
-                <span className="shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
+                <span className="qs-home-next-candidate-label shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
                 <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">{nextReviewCandidate.title}</span>
               </div>
             ) : null}
@@ -512,12 +512,12 @@ function HomeSection({
   onAction?: () => void;
 }) {
   return (
-    <section className={`rounded-2xl border border-skyglass/15 bg-ink-900/74 shadow-panel ${compact ? 'p-3' : 'p-4'}`}>
+    <section className={`qs-home-section rounded-2xl border border-skyglass/15 bg-ink-900/74 shadow-panel ${compact ? 'p-3' : 'p-4'}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <h3 className="qs-home-section-title text-lg font-semibold text-white">{title}</h3>
         {actionLabel && onAction ? (
           <button
-            className="min-h-10 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+            className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
             data-home-focus="true"
             onClick={onAction}
             type="button"
@@ -614,7 +614,7 @@ function NextAdventureCard({
 
   return (
     <button
-      className="relative w-full overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
+      className="qs-home-next-adventure-card relative w-full overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
       data-home-focus="true"
       onClick={onOpenPlan}
       type="button"
@@ -638,7 +638,7 @@ function NextAdventureCard({
           queueState={queueState}
         />
         <div>
-          <div className="text-xs text-slate-500">{t('home.nextCandidate')}</div>
+          <div className="qs-home-next-candidate-label text-xs text-slate-500">{t('home.nextCandidate')}</div>
           <h3 className="mt-0.5 text-lg font-bold leading-snug text-white">{game.title}</h3>
         </div>
         <div className="mt-auto">

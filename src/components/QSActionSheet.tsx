@@ -75,7 +75,7 @@ export function QSActionSheet({
       >
         {/* Drag handle */}
         <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
+          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
         </div>
 
         {noteMode ? (
@@ -172,7 +172,7 @@ export function QSActionSheet({
             {/* Manage group */}
             {(onQuickNote || onOpenDetails) ? (
               <div className="mt-3.5">
-                <div className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
+                <div className="qs-sheet-section-label mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
                   Manage
                 </div>
                 <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
@@ -198,7 +198,7 @@ export function QSActionSheet({
             {/* Status group */}
             {onStatusChange ? (
               <div className="mt-3.5">
-                <div className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
+                <div className="qs-sheet-section-label mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
                   Status
                 </div>
                 <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60">

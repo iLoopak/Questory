@@ -123,6 +123,7 @@ export function AppController() {
     gradientOrientationPreference,
     neonButtonGradientBalancePreference,
     neonButtonGradientMidpointPreference,
+    neonButtonStylePreference,
     resolvedTheme,
     secondaryAccentColorPreference,
     setAccentColorPreference,
@@ -134,6 +135,7 @@ export function AppController() {
     setLanguage,
     setNeonButtonGradientBalancePreference,
     setNeonButtonGradientMidpointPreference,
+    setNeonButtonStylePreference,
     setSecondaryAccentColorPreference,
     setThemePreference,
     t,
@@ -1185,6 +1187,7 @@ export function AppController() {
               gradientOrientationPreference={gradientOrientationPreference}
               neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
               neonButtonGradientMidpointPreference={neonButtonGradientMidpointPreference}
+              neonButtonStylePreference={neonButtonStylePreference}
               language={language}
               navigationVisibility={navigationVisibility}
               platformQueueState={platformQueueState}
@@ -1230,6 +1233,7 @@ export function AppController() {
               onGradientOrientationChange={setGradientOrientationPreference}
               onNeonButtonGradientBalanceChange={setNeonButtonGradientBalancePreference}
               onNeonButtonGradientMidpointChange={setNeonButtonGradientMidpointPreference}
+              onNeonButtonStyleChange={setNeonButtonStylePreference}
               onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}

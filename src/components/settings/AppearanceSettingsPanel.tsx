@@ -15,9 +15,11 @@ import {
   getGradientOrientationCssDirection,
   getNeonButtonGradientStops,
   normalizeAccentColor,
+  neonButtonStylePreferences,
   type AccentColorPreference,
   type AppTemplatePreference,
   type GradientOrientationPreference,
+  type NeonButtonStylePreference,
   type ResolvedTheme,
   type ThemePreference,
 } from "../../lib/themePreferences";
@@ -36,6 +38,7 @@ export function AppearanceSettingsPanel({
   gradientOrientationPreference,
   neonButtonGradientBalancePreference,
   neonButtonGradientMidpointPreference,
+  neonButtonStylePreference,
   language,
   onControllerDebugChange,
   onControllerLayoutChange,
@@ -47,6 +50,7 @@ export function AppearanceSettingsPanel({
   onGradientOrientationChange,
   onNeonButtonGradientBalanceChange,
   onNeonButtonGradientMidpointChange,
+  onNeonButtonStyleChange,
   onLanguageChange,
 }: {
   controllerLayoutPreference: ControllerLayoutPreference;
@@ -61,6 +65,7 @@ export function AppearanceSettingsPanel({
   gradientOrientationPreference: GradientOrientationPreference;
   neonButtonGradientBalancePreference: number;
   neonButtonGradientMidpointPreference: number;
+  neonButtonStylePreference: NeonButtonStylePreference;
   language: AppLanguage;
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
@@ -72,6 +77,7 @@ export function AppearanceSettingsPanel({
   onGradientOrientationChange: (orientation: GradientOrientationPreference) => void;
   onNeonButtonGradientBalanceChange: (balance: number) => void;
   onNeonButtonGradientMidpointChange: (midpoint: number) => void;
+  onNeonButtonStyleChange: (style: NeonButtonStylePreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
 }) {
   const t = useMemo(() => createTranslator(language), [language]);
@@ -497,6 +503,33 @@ export function AppearanceSettingsPanel({
                       type="button"
                     >
                       {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Button style
+              </p>
+              <div className="flex gap-2" role="radiogroup" aria-label="Button style">
+                {neonButtonStylePreferences.map((style) => {
+                  const isSelected = neonButtonStylePreference === style;
+                  return (
+                    <button
+                      aria-checked={isSelected}
+                      className={`min-h-9 flex-1 rounded-lg border px-3 text-xs font-semibold capitalize transition ${
+                        isSelected
+                          ? "border-mint/60 bg-mint/15 text-white shadow-glow"
+                          : "border-skyglass/20 bg-ink-950/70 text-slate-300 hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+                      }`}
+                      key={style}
+                      onClick={() => onNeonButtonStyleChange(style)}
+                      role="radio"
+                      type="button"
+                    >
+                      {style === 'gradient' ? 'Gradient' : 'Solid'}
                     </button>
                   );
                 })}
