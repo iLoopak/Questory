@@ -939,7 +939,7 @@ export function AppController() {
           <BackToTopButton />
         </header>
 
-        <section ref={mainContentRef} className="qs-main-scroll bg-ink-950 py-2">
+        <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
           {activeUtilityView === 'playing-now' ? (
             <div className="qs-playing-now-scroll overflow-y-auto overscroll-contain pb-8 pr-1">
               <PlayingNowHub
