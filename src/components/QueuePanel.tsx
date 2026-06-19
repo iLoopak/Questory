@@ -807,6 +807,8 @@ function PlatformQueueColumn({
           <div className="absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
             {renderedQueueEntries.map((entry) => {
               const game = gamesById.get(entry.gameId);
+              const isFirstEntry = entry.queuePosition <= 1;
+              const isLastEntry = entry.queuePosition >= queueEntries.length;
               if (!game) {
                 return null;
               }
@@ -818,6 +820,8 @@ function PlatformQueueColumn({
                   game={game}
                   platformAccentColor={accentColor}
                   platformOptions={platformOptions}
+                  isFirstEntry={isFirstEntry}
+                  isLastEntry={isLastEntry}
                   onMoveEntry={onMoveEntry}
                   onMoveEntryToPlatform={onMoveEntryToPlatform}
                   onOpenDetails={onOpenDetails}
@@ -864,6 +868,8 @@ function removePlatformArtworkWatermark(artworkUrl: string) {
 function QueueEntryRow({
   entry,
   game,
+  isFirstEntry,
+  isLastEntry,
   platformAccentColor,
   platformOptions,
   onMoveEntry,
@@ -874,6 +880,8 @@ function QueueEntryRow({
 }: {
   entry: PlatformQueueEntry;
   game: Game;
+  isFirstEntry: boolean;
+  isLastEntry: boolean;
   platformAccentColor: string;
   platformOptions: GamePlatform[];
   onMoveEntry: (gameId: string, platform: GamePlatform, direction: 'top' | 'up' | 'down') => void;
@@ -934,13 +942,13 @@ function QueueEntryRow({
             <Icon name="gamepad-2" />
             <span>{t('queue.playNow')}</span>
           </button>
-          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'top')} type="button">
+          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent" disabled={isFirstEntry} onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'top')} type="button">
             {t('queue.top')}
           </button>
-          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'up')} type="button">
+          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent" disabled={isFirstEntry} onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'up')} type="button">
             {t('settings.up')}
           </button>
-          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10" onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'down')} type="button">
+          <button className="h-9 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent" disabled={isLastEntry} onClick={() => onMoveEntry(game.id, entry.targetPlatform, 'down')} type="button">
             {t('settings.down')}
           </button>
           <button className="h-9 rounded-md border border-red-400/30 px-2 text-xs text-red-100 hover:bg-red-500/10" onClick={() => onRemoveEntry(game.id, entry.targetPlatform)} type="button">

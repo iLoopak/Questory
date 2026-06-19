@@ -2,6 +2,7 @@ import {
   addGameToPlatformQueue,
   addGameToPlatformQueueTop,
   getVisiblePlatformQueueEntries,
+  moveQueueEntry,
   normalizePlatformQueueState,
   removeCurrentlyPlayingFromPlatformQueue,
   removeGameFromPlatformQueue,
@@ -41,6 +42,17 @@ function assertVisiblePlatformEntryCount(state: PlatformQueueState, games: Game[
   const count = getVisiblePlatformQueueEntries(state, games).filter((entry) => entry.gameId === gameId && entry.targetPlatform === platform).length;
   if (count !== expectedCount) {
     throw new Error(`Expected ${expectedCount} visible entries for ${gameId} on ${platform}, received ${count}.`);
+  }
+}
+
+function assertPlatformOrder(state: PlatformQueueState, platform: string, expectedGameIds: string[]) {
+  const actualGameIds = state.entries
+    .filter((entry) => entry.targetPlatform === platform)
+    .sort((first, second) => first.queuePosition - second.queuePosition)
+    .map((entry) => entry.gameId);
+
+  if (actualGameIds.join('|') !== expectedGameIds.join('|')) {
+    throw new Error(`Expected ${platform} order ${expectedGameIds.join(', ')}, received ${actualGameIds.join(', ')}.`);
   }
 }
 
@@ -89,4 +101,24 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
   assertVisiblePlatformEntryCount(persistedConflictState, [playingPs2Game], baseGame.id, 'PS2', 0);
   const cleanedConflictState = removeCurrentlyPlayingFromPlatformQueue(persistedConflictState, [playingPs2Game]);
   assertPlatformEntryCount(cleanedConflictState, baseGame.id, 'PS2', 0);
+
+  const secondGame: Game = { ...baseGame, id: 'tekken-3', title: 'Tekken 3' };
+  const thirdGame: Game = { ...baseGame, id: 'tony-hawk', title: `Tony Hawk's Pro Skater` };
+  const otherPlatformGame: Game = { ...baseGame, id: 'ridge-racer', title: 'Ridge Racer', platform: 'PS1' };
+  let reorderState = addGameToPlatformQueue(emptyState, thirdGame, 'PS2');
+  reorderState = addGameToPlatformQueue(reorderState, secondGame, 'PS2');
+  reorderState = addGameToPlatformQueue(reorderState, otherPlatformGame, 'PS1');
+
+  reorderState = moveQueueEntry(reorderState, thirdGame.id, 'down', 'PS2');
+  assertPlatformOrder(reorderState, 'PS2', [secondGame.id, thirdGame.id]);
+  assertPlatformOrder(reorderState, 'PS1', [otherPlatformGame.id]);
+
+  reorderState = moveQueueEntry(reorderState, thirdGame.id, 'top', 'PS2');
+  assertPlatformOrder(reorderState, 'PS2', [thirdGame.id, secondGame.id]);
+
+  reorderState = moveQueueEntry(reorderState, secondGame.id, 'up', 'PS2');
+  assertPlatformOrder(reorderState, 'PS2', [secondGame.id, thirdGame.id]);
+  assertPlatformEntryCount(reorderState, secondGame.id, 'PS2', 1);
+  assertPlatformEntryCount(reorderState, thirdGame.id, 'PS2', 1);
+
 }

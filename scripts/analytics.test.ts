@@ -4,6 +4,7 @@ import { bucketCount } from '../src/lib/analytics/buckets';
 import { defaultAnalyticsSettings, analyticsSettingsStorageKey } from '../src/lib/analytics/settings';
 import { isAnalyticsConfigured, sendAnalyticsEvent, validateAnalyticsEvent } from '../src/lib/analytics/client';
 import type { MinimalAnalyticsEvent } from '../src/lib/analytics/types';
+import { runPlatformQueueUniquenessRegressionAssertions } from '../src/lib/platformQueueStorage.regression';
 
 const baseEvent: MinimalAnalyticsEvent = {
   schemaVersion: 1,
@@ -135,4 +136,8 @@ test('send failures are swallowed', async () => {
   await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
     throw new Error('network failed');
   }));
+});
+
+test('platform queue regression assertions', () => {
+  runPlatformQueueUniquenessRegressionAssertions();
 });
