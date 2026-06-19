@@ -8,6 +8,7 @@ import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameC
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { formatDealPrice } from './DealCoverBadges';
 import { buildHltbSearchUrl, formatHltbBadge, getHltbGameSearchTitle, hasHltbData } from '../lib/hltb';
 import type { RawgSearchResult } from '../types/rawg';
@@ -680,6 +681,7 @@ function GameDetailOverflowMenu({
   t,
 }: GameDetailOverflowMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef: menuRef, onClose });
   useScrollLock();
 
   useEffect(() => {
@@ -792,12 +794,13 @@ function GameDetailOverflowMenu({
         aria-label={`${t('action.actions')} ${game.title}`}
         aria-modal="true"
         className="qs-game-action-sheet pointer-events-auto w-full max-w-md overflow-hidden rounded-t-3xl sm:rounded-3xl"
+        style={dragStyle}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleMenuKeyDown}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="qs-game-action-header">
+        <div className="qs-game-action-header qs-sheet-drag-region" {...dragHandleProps}>
           <div className="min-w-0">
             <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
             <h3 className="qs-game-action-title">{game.title}</h3>
