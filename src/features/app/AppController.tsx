@@ -97,7 +97,7 @@ import { useAppPreferencesController } from '../settings/useAppPreferencesContro
 import { useSyncController } from '../integrations/useSyncController';
 import { useMetadataController } from '../metadata/useMetadataController';
 import { PlayingNowHub } from '../playing-now/PlayingNowHub';
-import { GameDetailsView } from '../game-details/GameDetailsView';
+import { AppGameDetailsView } from './AppGameDetailsView';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
 
@@ -1543,22 +1543,23 @@ export function AppController() {
               />
             </div>
           ) : activeNavItem === 'Review Mode' && selectedGame ? (
-            <GameDetailsView
-              activity={playActivity}
+            <AppGameDetailsView
               game={selectedGame}
+              playActivity={playActivity}
+              refreshingMetadataGameIds={refreshingMetadataGameIds}
+              steamAchievementSyncState={steamAchievementSyncState}
+              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+              platformQueueState={platformQueueState}
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onBack={handleBackFromDetail}
               onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-              isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
               onIgnore={removeAndIgnoreSteamGame}
               onSyncSteamData={syncSteamDataForGame}
-              isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
               onStatusChange={updateGameStatus}
               onTrackingChange={updateGameTracking}
               onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
               onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-              platformQueueState={platformQueueState}
             />
           ) : activeNavItem === 'Home' ? (
             <HomePanel
@@ -1602,22 +1603,23 @@ export function AppController() {
             <div className="relative">
               {selectedGame && (
                 <div className="absolute inset-0 z-10">
-                  <GameDetailsView
-                    activity={playActivity}
+                  <AppGameDetailsView
                     game={selectedGame}
+                    playActivity={playActivity}
+                    refreshingMetadataGameIds={refreshingMetadataGameIds}
+                    steamAchievementSyncState={steamAchievementSyncState}
+                    steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+                    platformQueueState={platformQueueState}
                     onAddToQueue={openBacklogPicker}
                     onAddToWishlist={addToWishlist}
                     onBack={handleBackFromDetail}
                     onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-                    isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
-                    isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
                     onStatusChange={updateGameStatus}
                     onTrackingChange={updateGameTracking}
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-                    platformQueueState={platformQueueState}
                   />
                 </div>
               )}
@@ -1676,22 +1678,23 @@ export function AppController() {
             <div className="relative">
               {selectedGame && (
                 <div className="absolute inset-0 z-10">
-                  <GameDetailsView
-                    activity={playActivity}
+                  <AppGameDetailsView
                     game={selectedGame}
+                    playActivity={playActivity}
+                    refreshingMetadataGameIds={refreshingMetadataGameIds}
+                    steamAchievementSyncState={steamAchievementSyncState}
+                    steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+                    platformQueueState={platformQueueState}
                     onAddToQueue={openBacklogPicker}
                     onAddToWishlist={addToWishlist}
                     onBack={handleBackFromDetail}
                     onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-                    isFindingArtwork={refreshingMetadataGameIds.has(selectedGame.id)}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
-                    isSteamDataSyncing={steamAchievementSyncState.status === 'loading' || steamPlaytimeRefreshState.status === 'loading'}
                     onStatusChange={updateGameStatus}
                     onTrackingChange={updateGameTracking}
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-                    platformQueueState={platformQueueState}
                   />
                 </div>
               )}
