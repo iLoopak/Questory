@@ -26,6 +26,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.shelfIdentity.v1'
   | 'questshelf.languagePreference.v1'
   | 'questshelf.navigationVisibility.v1'
+  | 'questshelf.analyticsSettings.v1'
   | 'questshelf.storageIssues.v1';
 
 export type StorageKeyScope = 'core' | 'integration' | 'device' | 'ui' | 'recovery';
@@ -228,6 +229,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Top navigation section visibility preferences.',
     scope: 'ui',
     schema: 'Record of configurable navigation section IDs to booleans.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.analyticsSettings.v1',
+    purpose: 'Local anonymous analytics opt-in/out and notice settings.',
+    scope: 'device',
+    schema: 'AnalyticsSettings.',
   },
   {
     backup: 'never',

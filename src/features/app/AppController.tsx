@@ -81,6 +81,7 @@ import { PlayingNowHub } from '../playing-now/PlayingNowHub';
 import { AppGameDetailsView } from './AppGameDetailsView';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
+import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
 
@@ -178,6 +179,26 @@ export function AppController() {
     shelfProfileRef,
   } = useShelfProfileController(games, platformQueueState, steamProfileName);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const analyticsCounts = useMemo<AnalyticsCounts>(() => ({
+    librarySize: games.filter((game) => game.collectionType === 'library').length,
+    wishlistSize: games.filter((game) => game.collectionType === 'wishlist').length,
+    platformCount: activeQueuePlatforms.length,
+    playingCount: games.filter((game) => game.collectionType === 'library' && game.status === 'Playing').length,
+    queueCount: queueSummary.queuedCount,
+  }), [activeQueuePlatforms.length, games, queueSummary.queuedCount]);
+  const trackedSessionEventsRef = useRef(new Set<string>());
+
+  function trackMinimalAnalyticsEvent(eventName: Parameters<typeof trackAnalyticsEvent>[0], importSource?: AnalyticsImportSource) {
+    trackAnalyticsEvent(eventName, analyticsCounts, importSource ? { importSource } : undefined);
+  }
+
+  function trackSessionAnalyticsEvent(eventName: Parameters<typeof trackAnalyticsEvent>[0], importSource?: AnalyticsImportSource) {
+    const eventKey = importSource ? `${eventName}:${importSource}` : eventName;
+    if (trackedSessionEventsRef.current.has(eventKey)) return;
+    trackedSessionEventsRef.current.add(eventKey);
+    trackMinimalAnalyticsEvent(eventName, importSource);
+  }
   const mainContentRef = useRef<HTMLElement | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
@@ -357,6 +378,36 @@ export function AppController() {
   }, []);
 
   useEffect(() => {
+    if (isAppReady) {
+      trackSessionAnalyticsEvent('app_open');
+    }
+  }, [isAppReady, analyticsCounts]);
+
+  useEffect(() => {
+    if (isOnboardingComplete) {
+      trackSessionAnalyticsEvent('first_run_completed');
+    }
+  }, [isOnboardingComplete, analyticsCounts]);
+
+  useEffect(() => {
+    if (activeNavItem === 'Queue') {
+      trackSessionAnalyticsEvent('quest_queue_opened');
+    }
+  }, [activeNavItem, analyticsCounts]);
+
+  useEffect(() => {
+    if (activeUtilityView === 'playing-now') {
+      trackSessionAnalyticsEvent('playing_now_opened');
+    }
+  }, [activeUtilityView, analyticsCounts]);
+
+  useEffect(() => {
+    if (activeNavItem === 'Settings' && activeSettingsCategory === 'Platforms') {
+      trackSessionAnalyticsEvent('platform_plans_opened');
+    }
+  }, [activeNavItem, activeSettingsCategory, analyticsCounts]);
+
+  useEffect(() => {
     const el = mainContentRef.current;
     if (!el) return;
     function handleScroll() {
@@ -519,9 +570,37 @@ export function AppController() {
     const createdGames = importGames(importedGames);
     if (createdGames.length > 0) {
       markOnboardingItemComplete('retro-import');
+      trackMinimalAnalyticsEvent('import_completed', 'retro');
     }
     setLastRetroImportGameIds(createdGames.map((game) => game.id));
     return createdGames;
+  }
+
+
+  function importSteamGames(importedGames: Game[]) {
+    const createdGames = importGames(importedGames);
+    if (createdGames.length > 0) {
+      trackMinimalAnalyticsEvent('import_completed', 'steam');
+    }
+    return createdGames;
+  }
+
+  function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
+    const summary = importSteamWishlistHtmlItems(...args);
+    if (summary.addedCount > 0) {
+      trackMinimalAnalyticsEvent('import_completed', 'wishlist_html');
+    }
+    return summary;
+  }
+
+  function handleBackupExported() {
+    markOnboardingItemComplete('backup-exported');
+    trackMinimalAnalyticsEvent('backup_exported');
+  }
+
+  function handleBackupImported() {
+    trackMinimalAnalyticsEvent('backup_imported');
+    trackMinimalAnalyticsEvent('import_completed', 'backup');
   }
 
   function viewRetroImportedGames(gameIds: string[]) {
@@ -1082,7 +1161,7 @@ export function AppController() {
                   onStartReview={startReviewMode}
                   onStatusChange={updateGameStatus}
                   onSyncSteamWishlist={syncSteamWishlist}
-                  onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
+                  onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
                   onSyncItadDeals={syncWishlistDeals}
                 />
               </div>
@@ -1216,14 +1295,15 @@ export function AppController() {
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               steamWishlistSyncState={steamWishlistSyncState}
               onAddRetroImportedToQueue={addRetroImportedGamesToQueue}
-              onBackupExported={() => markOnboardingItemComplete('backup-exported')}
+              onBackupExported={handleBackupExported}
+              onBackupImported={handleBackupImported}
               onCategoryChange={setActiveSettingsCategory}
               onLibraryOwnerNicknameChange={setLibraryOwnerNickname}
               onShelfIdentityChange={setShelfIdentity}
               onConnectionTested={() => markOnboardingItemComplete('steam-test')}
               onClearLibraryFilters={() => setLibraryFilters(initialCollectionFilters)}
               onEnrichRetroImportedGames={enrichRetroImportedGames}
-              onImportGames={importGames}
+              onImportGames={importSteamGames}
               onImportRetroGames={handleRetroImportGames}
               onControllerDebugChange={setIsControllerDebugEnabled}
               onControllerLayoutChange={setControllerLayoutPreference}
@@ -1245,7 +1325,7 @@ export function AppController() {
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamProfileNameChange={handleSteamProfileNameChange}
               onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
-              onImportSteamWishlistHtml={importSteamWishlistHtmlItems}
+              onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
               onSyncSteamWishlist={syncSteamWishlist}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
               onThemePreferenceChange={setThemePreference}

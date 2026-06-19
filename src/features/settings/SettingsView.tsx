@@ -65,6 +65,7 @@ export type SettingsViewProps = {
   steamWishlistSyncState: SteamWishlistSyncState;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
+  onBackupImported: () => void;
   onCategoryChange: (category: SettingsCategory) => void;
   onLibraryOwnerNicknameChange: (nickname: string) => void;
   onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
@@ -143,6 +144,7 @@ export function SettingsView({
   steamWishlistSyncState,
   onAddRetroImportedToQueue,
   onBackupExported,
+  onBackupImported,
   onCategoryChange,
   onLibraryOwnerNicknameChange,
   onShelfIdentityChange,
@@ -332,7 +334,7 @@ export function SettingsView({
           ) : null}
 
           {activeCategory === 'Data & Backup' ? (
-            <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} />
+            <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} onBackupImported={onBackupImported} />
           ) : null}
 
           {activeCategory === 'Appearance' ? (
