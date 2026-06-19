@@ -30,6 +30,16 @@ function installLocalStorage(settings = defaultAnalyticsSettings) {
   } as unknown as Window & typeof globalThis;
 }
 
+function enableLocalAnalytics() {
+  installLocalStorage({ schemaVersion: 1, isAnalyticsEnabled: true, hasSeenAnalyticsNotice: true, updatedAt: '2026-06-19T00:00:00.000Z' });
+}
+
+const configuredAnalytics = {
+  enabled: true,
+  webhookUrl: 'https://analytics.example.test/hook',
+  analyticsKey: 'real-test-key',
+};
+
 test('bucketCount boundaries', () => {
   assert.equal(bucketCount(-1), '0');
   assert.equal(bucketCount(0), '0');
@@ -58,31 +68,71 @@ test('analytics disabled by default', () => {
   assert.equal(defaultAnalyticsSettings.hasSeenAnalyticsNotice, false);
 });
 
-test('placeholder config prevents sending', () => {
-  assert.equal(isAnalyticsConfigured({ enabled: true, webhookUrl: 'https://example.invalid/questshelf-analytics', analyticsKey: 'replace-with-alpha-analytics-key' }), false);
+test('placeholder config prevents sending', async () => {
+  enableLocalAnalytics();
+  const placeholderConfigs = [
+    { enabled: false, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: 'real-test-key' },
+    { enabled: true, webhookUrl: '', analyticsKey: 'real-test-key' },
+    { enabled: true, webhookUrl: 'https://example.invalid/questshelf-analytics', analyticsKey: 'real-test-key' },
+    { enabled: true, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: '' },
+    { enabled: true, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: 'replace-with-alpha-analytics-key' },
+  ];
+
+  for (const config of placeholderConfigs) {
+    let calls = 0;
+    assert.equal(isAnalyticsConfigured(config), false);
+    await sendAnalyticsEvent(baseEvent, config, async () => {
+      calls += 1;
+      return new Response(null, { status: 200 });
+    });
+    assert.equal(calls, 0);
+  }
 });
 
-test('importSource rejected on non-import events', () => {
+test('importSource validation', () => {
   assert.equal(validateAnalyticsEvent({ ...baseEvent, importSource: 'steam' }), false);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'steam' }), true);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'wishlist_html' }), true);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'retro' }), true);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'backup' }), true);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'manual' }), true);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'unknown' }), true);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'steam_url' }), false);
 });
 
-test('unknown fields rejected', () => {
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, rawCount: 10 }), false);
+test('payload field validation rejects private and free-text fields', () => {
+  for (const field of ['rawCount', 'gameTitle', 'notes', 'tags', 'accountId', 'steamId', 'externalId', 'url', 'filePath', 'searchQuery', 'userInput', 'persistentId']) {
+    assert.equal(validateAnalyticsEvent({ ...baseEvent, [field]: 'private' }), false, `${field} should be rejected`);
+  }
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'removed_event' }), false);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, runtime: 'desktop' }), false);
+  assert.equal(validateAnalyticsEvent({ ...baseEvent, librarySizeBucket: '1001' }), false);
 });
 
 test('no send when local setting is disabled', async () => {
   installLocalStorage(defaultAnalyticsSettings);
   let calls = 0;
-  await sendAnalyticsEvent(baseEvent, { enabled: true, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: 'real-test-key' }, async () => {
+  await sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
     calls += 1;
     return new Response(null, { status: 200 });
   });
   assert.equal(calls, 0);
 });
 
+test('x-make-apikey header is used for Make.com API key auth', async () => {
+  enableLocalAnalytics();
+  await sendAnalyticsEvent(baseEvent, configuredAnalytics, async (_url, init) => {
+    const headers = init?.headers as Record<string, string>;
+    assert.equal(headers['x-make-apikey'], 'real-test-key');
+    assert.equal(headers['X-QS-Analytics-Key'], undefined);
+    assert.equal(headers['Content-Type'], 'application/json');
+    return new Response(null, { status: 200 });
+  });
+});
+
 test('send failures are swallowed', async () => {
-  installLocalStorage({ schemaVersion: 1, isAnalyticsEnabled: true, hasSeenAnalyticsNotice: true, updatedAt: '2026-06-19T00:00:00.000Z' });
-  await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, { enabled: true, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: 'real-test-key' }, async () => {
+  enableLocalAnalytics();
+  await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
     throw new Error('network failed');
   }));
 });
