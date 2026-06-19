@@ -81,7 +81,7 @@ export function OnboardingChecklist({
   const steamImported = games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam');
   const retroFolderCount = games.filter((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom').length;
   const rawgEnriched = games.some((game) => game.metadataSource === 'rawg');
-  const [analyticsSettings] = useState(() => loadAnalyticsSettings());
+  const [analyticsSettings, setAnalyticsSettings] = useState(() => loadAnalyticsSettings());
   const steps = useMemo<WizardStep[]>(() => [
     { id: 'steam-connect', title: t('onboarding.stepSteamTitle'), summary: t('onboarding.stepSteamSummary'), isConfigured: () => steamImported || Boolean(loadSteamSettings().steamId64.trim() && loadSteamSettings().apiKey.trim()) },
     { id: 'rawg-api-key', title: t('onboarding.stepRawgTitle'), summary: t('onboarding.stepRawgSummary'), isConfigured: () => Boolean(loadRawgSettings().apiKey.trim()) || rawgEnriched },
@@ -89,8 +89,8 @@ export function OnboardingChecklist({
     { id: 'backup-exported', title: t('onboarding.stepBackupTitle'), summary: t('onboarding.stepBackupSummary'), isConfigured: () => completedItemIds.has('backup-exported') },
     { id: 'make-it-yours', title: t('onboarding.stepPersonalizeTitle'), summary: t('onboarding.stepPersonalizeSummary'), isConfigured: () => completedItemIds.has('make-it-yours') },
     { id: 'ready', title: t('onboarding.stepFinishTitle'), summary: t('onboarding.stepFinishSummary'), isConfigured: () => completedItemIds.has('ready') },
-    ...(analyticsSettings.hasSeenAnalyticsNotice ? [] : [{ id: 'analytics-notice' as const, title: t('onboarding.stepAnalyticsTitle'), summary: t('onboarding.stepAnalyticsSummary'), isConfigured: () => loadAnalyticsSettings().hasSeenAnalyticsNotice }]),
-  ], [analyticsSettings.hasSeenAnalyticsNotice, completedItemIds, rawgEnriched, retroFolderCount, steamImported, t]);
+    { id: 'analytics-notice', title: t('onboarding.stepAnalyticsTitle'), summary: t('onboarding.stepAnalyticsSummary'), isConfigured: () => loadAnalyticsSettings().hasSeenAnalyticsNotice },
+  ], [completedItemIds, rawgEnriched, retroFolderCount, steamImported, t]);
 
   useEffect(() => {
     steps.forEach((step) => {
@@ -110,11 +110,18 @@ export function OnboardingChecklist({
   const stepSkipped = skippedItemIds.has(activeStep.id);
 
   function goNext() { setActiveStepIndex((index) => Math.min(index + 1, steps.length - 1)); }
+  function goToNextIncompleteStep(handledStepId: OnboardingItemId) {
+    const handledItemIds = new Set([...completedItemIds, ...skippedItemIds, handledStepId]);
+    const nextIncompleteStepIndex = steps.findIndex((step, index) => index > activeStepIndex && !handledItemIds.has(step.id));
+    if (nextIncompleteStepIndex !== -1) setActiveStepIndex(nextIncompleteStepIndex);
+  }
   function goBack() { setActiveStepIndex((index) => Math.max(index - 1, 0)); }
   function skipStep() {
     if (activeStep.id === 'analytics-notice') {
-      updateAnalyticsEnabled(false);
+      const nextSettings = updateAnalyticsEnabled(false);
+      setAnalyticsSettings(nextSettings);
       onComplete('analytics-notice');
+      goToNextIncompleteStep('analytics-notice');
       return;
     }
     onSkip(activeStep.id);
@@ -190,7 +197,7 @@ export function OnboardingChecklist({
             {activeStep.id === 'backup-exported' ? <BackupStep onComplete={() => onComplete('backup-exported')} onOpenSettings={() => openRelatedSettings('backup-exported')} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
             {activeStep.id === 'ready' ? <FinishStep shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
-            {activeStep.id === 'analytics-notice' ? <AnalyticsStep onChoose={(isEnabled) => { updateAnalyticsEnabled(isEnabled); onComplete('analytics-notice'); }} /> : null}
+            {activeStep.id === 'analytics-notice' ? <AnalyticsStep analyticsSettings={analyticsSettings} onChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); goToNextIncompleteStep('analytics-notice'); }} /> : null}
           </div>
         </div>
 
@@ -271,8 +278,9 @@ function PersonalizeStep({ accentColorPreference, appTemplatePreference, gameCou
 }
 
 
-function AnalyticsStep({ onChoose }: { onChoose: (isEnabled: boolean) => void }) {
+function AnalyticsStep({ analyticsSettings, onChoose }: { analyticsSettings: ReturnType<typeof loadAnalyticsSettings>; onChoose: (isEnabled: boolean) => void }) {
   const { t } = useI18n();
+  const selectedChoice = analyticsSettings.hasSeenAnalyticsNotice ? analyticsSettings.isAnalyticsEnabled ? 'enabled' : 'declined' : null;
   const checklistItems = [
     t('onboarding.analyticsNoGameTitles'),
     t('onboarding.analyticsNoNotes'),
@@ -282,18 +290,23 @@ function AnalyticsStep({ onChoose }: { onChoose: (isEnabled: boolean) => void })
   ];
 
   return (
-    <div className="rounded-2xl border border-mint/25 bg-ink-950/70 p-5">
+    <div className={`rounded-2xl border p-5 ${selectedChoice === 'enabled' ? 'border-mint/60 bg-mint/10 shadow-glow' : selectedChoice === 'declined' ? 'border-amber-300/40 bg-amber-300/10' : 'border-mint/25 bg-ink-950/70'}`}>
       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Community Alpha</div>
       <h3 className="mt-2 text-3xl font-semibold text-white">{t('onboarding.analyticsTitle')}</h3>
       <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-6 text-slate-300">{t('onboarding.analyticsBody')}</p>
+      {selectedChoice ? (
+        <div className={`mt-5 rounded-lg border px-3 py-2 text-sm font-semibold ${selectedChoice === 'enabled' ? 'border-mint/50 bg-mint/10 text-mint' : 'border-amber-300/40 bg-amber-300/10 text-amber-200'}`} role="status">
+          {selectedChoice === 'enabled' ? t('onboarding.analyticsEnabledConfirmation') : t('onboarding.analyticsDeclinedConfirmation')}
+        </div>
+      ) : null}
       <ul className="mt-5 grid gap-2 sm:grid-cols-2">
         {checklistItems.map((item) => (
           <li className="rounded-lg border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm font-medium text-slate-200" key={item}>✓ {item}</li>
         ))}
       </ul>
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => onChoose(true)} type="button">{t('onboarding.analyticsEnable')}</button>
-        <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={() => onChoose(false)} type="button">{t('onboarding.analyticsNotNow')}</button>
+        <button aria-pressed={selectedChoice === 'enabled'} className={`h-11 rounded-md px-4 text-sm font-semibold ${selectedChoice === 'enabled' ? 'border border-mint/50 bg-mint/20 text-mint' : 'bg-mint text-ink-950'}`} disabled={selectedChoice === 'enabled'} onClick={() => onChoose(true)} type="button">{selectedChoice === 'enabled' ? t('onboarding.analyticsEnabled') : t('onboarding.analyticsEnable')}</button>
+        <button aria-pressed={selectedChoice === 'declined'} className={`h-11 rounded-md border px-4 text-sm disabled:opacity-70 ${selectedChoice === 'declined' ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-200'}`} disabled={selectedChoice !== null} onClick={() => onChoose(false)} type="button">{selectedChoice ? t('onboarding.analyticsChangeLater') : t('onboarding.analyticsNotNow')}</button>
       </div>
     </div>
   );
