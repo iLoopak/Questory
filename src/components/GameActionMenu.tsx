@@ -7,6 +7,7 @@ import { buildHltbSearchUrl, getHltbGameSearchTitle } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
 import type { Game, GameStatus } from '../types/game';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { getGameCoverSources } from '../lib/gameCoverImages';
 
 type GameActionMenuProps = {
   game: Game;
@@ -190,6 +191,9 @@ function GameActionMenuOverlay({
     [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange, t],
   );
 
+  const coverSrc = getGameCoverSources(game)[0];
+  const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}h played` : null;
+
   useEffect(() => {
     const firstMenuItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])');
     firstMenuItem?.focus({ preventScroll: true });
@@ -261,10 +265,31 @@ function GameActionMenuOverlay({
         tabIndex={-1}
       >
         <div className="qs-game-action-header">
-          <div className="min-w-0">
+          <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800">
+            {coverSrc ? (
+              <img alt="" className="h-full w-full object-cover" src={coverSrc} />
+            ) : (
+              <div className="grid h-full place-items-center text-xl font-bold text-mint/50">
+                {game.title.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
             <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
             <h3 className="qs-game-action-title">{game.title}</h3>
-            <p className="qs-game-action-platform">{game.platform}</p>
+            <div className="qs-game-action-meta">
+              <span className="qs-game-action-platform">{game.platform}</span>
+              <span className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  game.status === 'Playing' ? 'bg-mint' :
+                  game.status === 'Finished' ? 'bg-emerald-400' :
+                  game.status === 'Dropped' ? 'bg-red-400' :
+                  'bg-slate-600'
+                }`} />
+                {getGameStatusLabel(game.status)}
+              </span>
+              {playtime ? <span className="text-xs text-[color:var(--text-subtle)]">{playtime}</span> : null}
+            </div>
           </div>
           <button
             aria-label={t('action.close')}
@@ -471,6 +496,16 @@ function buildGameActionMenuSections({
   ];
 
   return sections.filter((section) => section.items.length > 0);
+}
+
+function getGameStatusLabel(status: GameStatus): string {
+  switch (status) {
+    case 'Playing': return 'Currently Playing';
+    case 'Finished': return 'Finished';
+    case 'Dropped': return 'Dropped';
+    case 'Want to play': return 'Want to Play';
+    default: return status;
+  }
 }
 
 function getActionButtonClass(variant: GameActionMenuProps['variant']) {
