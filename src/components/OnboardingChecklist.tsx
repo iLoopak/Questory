@@ -13,6 +13,7 @@ import { maxLibraryOwnerNicknameLength } from '../lib/appPersonalization';
 import { ShelfAvatar, ShelfIdentityEditor } from './ShelfIdentity';
 import { getComputedShelfTitle, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 import { onboardingItemIds, type OnboardingItemId } from '../lib/onboardingStorage';
+import { loadAnalyticsSettings, updateAnalyticsEnabled } from '../lib/analytics';
 import { defaultAccentColor, normalizeAccentColor, type AccentColorPreference, type AppTemplatePreference } from '../lib/themePreferences';
 import type { Game } from '../types/game';
 import type { SteamSettings } from '../types/steam';
@@ -80,6 +81,7 @@ export function OnboardingChecklist({
   const steamImported = games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam');
   const retroFolderCount = games.filter((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom').length;
   const rawgEnriched = games.some((game) => game.metadataSource === 'rawg');
+  const [analyticsSettings] = useState(() => loadAnalyticsSettings());
   const steps = useMemo<WizardStep[]>(() => [
     { id: 'steam-connect', title: t('onboarding.stepSteamTitle'), summary: t('onboarding.stepSteamSummary'), isConfigured: () => steamImported || Boolean(loadSteamSettings().steamId64.trim() && loadSteamSettings().apiKey.trim()) },
     { id: 'rawg-api-key', title: t('onboarding.stepRawgTitle'), summary: t('onboarding.stepRawgSummary'), isConfigured: () => Boolean(loadRawgSettings().apiKey.trim()) || rawgEnriched },
@@ -87,11 +89,12 @@ export function OnboardingChecklist({
     { id: 'backup-exported', title: t('onboarding.stepBackupTitle'), summary: t('onboarding.stepBackupSummary'), isConfigured: () => completedItemIds.has('backup-exported') },
     { id: 'make-it-yours', title: t('onboarding.stepPersonalizeTitle'), summary: t('onboarding.stepPersonalizeSummary'), isConfigured: () => completedItemIds.has('make-it-yours') },
     { id: 'ready', title: t('onboarding.stepFinishTitle'), summary: t('onboarding.stepFinishSummary'), isConfigured: () => completedItemIds.has('ready') },
-  ], [completedItemIds, rawgEnriched, retroFolderCount, steamImported, t]);
+    ...(analyticsSettings.hasSeenAnalyticsNotice ? [] : [{ id: 'analytics-notice' as const, title: t('onboarding.stepAnalyticsTitle'), summary: t('onboarding.stepAnalyticsSummary'), isConfigured: () => loadAnalyticsSettings().hasSeenAnalyticsNotice }]),
+  ], [analyticsSettings.hasSeenAnalyticsNotice, completedItemIds, rawgEnriched, retroFolderCount, steamImported, t]);
 
   useEffect(() => {
     steps.forEach((step) => {
-      if (step.id !== 'backup-exported' && step.id !== 'make-it-yours' && step.id !== 'ready' && step.isConfigured() && !completedItemIds.has(step.id)) {
+      if (step.id !== 'backup-exported' && step.id !== 'make-it-yours' && step.id !== 'ready' && step.id !== 'analytics-notice' && step.isConfigured() && !completedItemIds.has(step.id)) {
         onComplete(step.id);
       }
     });
@@ -108,7 +111,15 @@ export function OnboardingChecklist({
 
   function goNext() { setActiveStepIndex((index) => Math.min(index + 1, steps.length - 1)); }
   function goBack() { setActiveStepIndex((index) => Math.max(index - 1, 0)); }
-  function skipStep() { onSkip(activeStep.id); goNext(); }
+  function skipStep() {
+    if (activeStep.id === 'analytics-notice') {
+      updateAnalyticsEnabled(false);
+      onComplete('analytics-notice');
+      return;
+    }
+    onSkip(activeStep.id);
+    goNext();
+  }
   function openRelatedSettings(itemId: OnboardingItemId) { onClose?.(); onAction?.(itemId); }
 
   const libraryGameCount = games.filter((game) => game.collectionType === 'library').length;
@@ -143,7 +154,7 @@ export function OnboardingChecklist({
           </div>
         </div>
 
-        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-6">
+        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-7">
           {steps.map((step, index) => {
             const isDone = completedItemIds.has(step.id);
             const isSkipped = skippedItemIds.has(step.id);
@@ -179,6 +190,7 @@ export function OnboardingChecklist({
             {activeStep.id === 'backup-exported' ? <BackupStep onComplete={() => onComplete('backup-exported')} onOpenSettings={() => openRelatedSettings('backup-exported')} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
             {activeStep.id === 'ready' ? <FinishStep shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
+            {activeStep.id === 'analytics-notice' ? <AnalyticsStep onChoose={(isEnabled) => { updateAnalyticsEnabled(isEnabled); onComplete('analytics-notice'); }} /> : null}
           </div>
         </div>
 
@@ -256,6 +268,35 @@ function PersonalizeStep({ accentColorPreference, appTemplatePreference, gameCou
   const chooseAccent = (color: string) => { const normalizedColor = normalizeAccentColor(color); if (normalizedColor) onAccentColorChange(normalizedColor === defaultAccentColor ? null : normalizedColor); };
 
   return <div className="space-y-5"><div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]"><div className="space-y-4"><ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={steamPersonaName || 'Loopak'} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} /><label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Name / Nickname</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" maxLength={maxLibraryOwnerNicknameLength} onChange={(event) => onLibraryOwnerNicknameChange(event.target.value)} placeholder="Loopak" value={libraryOwnerNickname} /></label><div className="flex flex-wrap gap-2">{shelfExamples.map((example) => <button className="rounded-full border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10" key={example} onClick={() => onShelfIdentityChange({ ...shelfIdentity, shelfName: example })} type="button">{example}</button>)}</div><div><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme selection</div><div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Theme selection"><button aria-pressed={appTemplatePreference === 'classic'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'classic' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('classic')} type="button"><strong>Default</strong><span className="mt-1 block text-xs text-slate-400">Clean dark QuestShelf identity.</span></button><button aria-pressed={appTemplatePreference === 'neon-deck'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'neon-deck' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('neon-deck')} type="button"><strong>Neon</strong><span className="mt-1 block text-xs text-slate-400">Arcade glow and deck-style panels.</span></button></div></div><div><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Accent color</div><div className="mt-2 flex flex-wrap items-center gap-2"><input className="h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1" onChange={(event) => chooseAccent(event.target.value)} type="color" value={selectedAccentColor} />{accentPresets.map((color) => <button aria-label={`Use ${color} accent`} aria-pressed={selectedAccentColor === color} className={`h-11 w-11 rounded-md border ${selectedAccentColor === color ? 'border-white shadow-glow' : 'border-white/10'}`} key={color} onClick={() => chooseAccent(color)} style={{ backgroundColor: color }} type="button" />)}</div></div></div><div className="rounded-2xl border border-mint/25 bg-ink-950/80 p-4 shadow-glow"><div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Live preview</div><div className="mt-3 flex items-center gap-3"><ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" /><h4 className="text-2xl font-semibold text-white">{previewTitle}</h4></div><p className="mt-2 text-sm text-slate-400">Welcome back — your backlog, wishlist, and queue now share this Shelf Identity.</p><div className="mt-5 grid gap-2 text-sm"><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{gameCount} games imported</span><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{platformCount} platforms configured</span><span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-mint">Avatar persists after restart</span></div></div></div><div className="flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={onComplete} type="button">Save personalization</button><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip for now</button></div></div>;
+}
+
+
+function AnalyticsStep({ onChoose }: { onChoose: (isEnabled: boolean) => void }) {
+  const { t } = useI18n();
+  const checklistItems = [
+    t('onboarding.analyticsNoGameTitles'),
+    t('onboarding.analyticsNoNotes'),
+    t('onboarding.analyticsNoTags'),
+    t('onboarding.analyticsNoAccountInfo'),
+    t('onboarding.analyticsNoPersonalData'),
+  ];
+
+  return (
+    <div className="rounded-2xl border border-mint/25 bg-ink-950/70 p-5">
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Community Alpha</div>
+      <h3 className="mt-2 text-3xl font-semibold text-white">{t('onboarding.analyticsTitle')}</h3>
+      <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-6 text-slate-300">{t('onboarding.analyticsBody')}</p>
+      <ul className="mt-5 grid gap-2 sm:grid-cols-2">
+        {checklistItems.map((item) => (
+          <li className="rounded-lg border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm font-medium text-slate-200" key={item}>✓ {item}</li>
+        ))}
+      </ul>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => onChoose(true)} type="button">{t('onboarding.analyticsEnable')}</button>
+        <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={() => onChoose(false)} type="button">{t('onboarding.analyticsNotNow')}</button>
+      </div>
+    </div>
+  );
 }
 
 function FinishStep({ gameCount, onComplete, onOpenLibrary, onOpenQueue, personalizedQuestShelfTitle, platformCount, progress, shelfTitle }: { gameCount: number; onComplete: () => void; onOpenLibrary: () => void; onOpenQueue: () => void; personalizedQuestShelfTitle: string; platformCount: number; progress: string; shelfTitle: string }) { return <div className="rounded-2xl border border-mint/30 bg-mint/10 p-5 text-center shadow-glow"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-mint text-2xl text-ink-950">✓</div><h3 className="mt-4 text-3xl font-semibold text-white">Your QuestShelf is ready.</h3><p className="mt-2 text-lg text-mint">{personalizedQuestShelfTitle}</p>{shelfTitle ? <p className="mt-1 text-sm font-semibold text-white">🏆 {shelfTitle}</p> : null}<div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-slate-200"><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{gameCount} games imported</span><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{platformCount} platforms configured</span><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">Setup progress: {progress}</span></div><div className="mt-5 flex flex-wrap justify-center gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => { onComplete(); onOpenLibrary(); }} type="button">Start exploring</button><button className="h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint" onClick={() => { onComplete(); onOpenLibrary(); }} type="button">Open Library</button></div></div>; }

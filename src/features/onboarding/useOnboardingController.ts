@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { isMockGame, loadGames } from '../../lib/gameStorage';
 import { loadOnboardingState, onboardingItemIds, type OnboardingItemId, type OnboardingState } from '../../lib/onboardingStorage';
 import { loadSteamSettings } from '../../lib/steamSettingsStorage';
+import { loadAnalyticsSettings } from '../../lib/analytics';
 import type { SettingsCategory } from '../../config/settings';
 import type { NavItem } from '../../config/navigation';
 import type { Game } from '../../types/game';
@@ -23,10 +24,12 @@ export function useOnboardingController({ setActiveNavItem, setActiveSettingsCat
     return !initialState.hasSeenChecklist && !initialState.skipped && !hasExistingLibrary && !hasExistingSettings;
   });
 
-  const completedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId]))), [onboardingState.completedAt]);
+  const analyticsSettings = loadAnalyticsSettings();
+  const requiredOnboardingItemIds = useMemo(() => onboardingItemIds.filter((itemId) => itemId !== 'analytics-notice' || !analyticsSettings.hasSeenAnalyticsNotice), [analyticsSettings.hasSeenAnalyticsNotice]);
+  const completedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => itemId === 'analytics-notice' && analyticsSettings.hasSeenAnalyticsNotice || Boolean(onboardingState.completedAt[itemId]))), [analyticsSettings.hasSeenAnalyticsNotice, onboardingState.completedAt]);
   const skippedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.skippedAt[itemId]))), [onboardingState.skippedAt]);
-  const finishedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId))), [completedOnboardingItemIds, skippedOnboardingItemIds]);
-  const isOnboardingComplete = finishedOnboardingItemIds.size === onboardingItemIds.length;
+  const finishedOnboardingItemIds = useMemo(() => new Set(requiredOnboardingItemIds.filter((itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId))), [completedOnboardingItemIds, requiredOnboardingItemIds, skippedOnboardingItemIds]);
+  const isOnboardingComplete = finishedOnboardingItemIds.size === requiredOnboardingItemIds.length;
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
