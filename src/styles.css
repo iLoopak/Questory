@@ -963,6 +963,15 @@ img {
 }
 
 @media (orientation: landscape) and (max-height: 540px) {
+  :root {
+    --qs-review-compact-shell-padding: clamp(0.25rem, 0.8dvh, 0.5rem);
+    --qs-review-compact-gap: clamp(0.35rem, 0.8vw, 0.65rem);
+    --qs-review-compact-side: clamp(8rem, 18vw, 11.5rem);
+    --qs-review-compact-card: clamp(12rem, 25vw, 17rem);
+    --qs-review-compact-header-space: 2.9rem;
+    --qs-review-compact-card-chrome: 9.75rem;
+  }
+
   .qs-app-shell > div {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
@@ -998,36 +1007,90 @@ img {
   }
 
   .qs-review-shell {
-    height: auto;
-    max-height: none;
+    height: min-content;
+    max-height: calc(100dvh - (var(--qs-review-compact-shell-padding) * 2) - var(--qs-safe-top) - var(--qs-safe-bottom));
+    overflow: hidden;
   }
+
   .qs-review-overlay-controls {
     right: max(0.35rem, var(--qs-safe-right));
     top: max(0.35rem, var(--qs-safe-top));
   }
 
+  .qs-review-shell .qs-scroll-panel {
+    overflow-x: hidden;
+    padding: var(--qs-review-compact-shell-padding);
+  }
 
   .qs-review-stage {
-    grid-template-columns: minmax(8rem, 1fr) minmax(15rem, 2.5fr) minmax(8rem, 1fr);
-    gap: 0.45rem;
+    grid-template-columns:
+      minmax(7rem, var(--qs-review-compact-side))
+      minmax(12rem, var(--qs-review-compact-card))
+      minmax(7rem, var(--qs-review-compact-side));
+    justify-content: center;
+    align-items: center;
+    gap: var(--qs-review-compact-gap);
+    max-width: min(100%, calc((var(--qs-review-compact-side) * 2) + var(--qs-review-compact-card) + (var(--qs-review-compact-gap) * 2)));
+    min-height: calc(100dvh - var(--qs-review-compact-header-space) - (var(--qs-review-compact-shell-padding) * 2) - var(--qs-safe-top) - var(--qs-safe-bottom));
+    margin-inline: auto;
+    overflow: visible;
   }
 
   .qs-review-hero {
-    width: min(100%, 46vw, 18rem);
+    width: min(100%, var(--qs-review-compact-card));
   }
 
   .qs-review-cover {
-    max-height: calc(100dvh - 4.75rem);
+    max-height: min(
+      calc((100dvh - var(--qs-review-compact-header-space) - var(--qs-review-compact-card-chrome) - var(--qs-safe-top) - var(--qs-safe-bottom)) * 0.98),
+      calc(var(--qs-review-compact-card) * 1.5)
+    );
     aspect-ratio: 2 / 3;
+    padding: clamp(0.2rem, 0.7vw, 0.4rem);
+  }
+
+  .qs-review-hero h3 {
+    margin-top: 0.35rem;
+    font-size: clamp(1rem, 2.3dvh, 1.35rem);
+    line-height: 1.1;
+  }
+
+  .qs-review-hero .platform-badge--identity {
+    padding-block: 0.1rem;
+    font-size: 0.62rem;
+  }
+
+  .qs-review-hero > .mt-3,
+  .qs-review-swipe-card > .mt-3 {
+    margin-top: 0.45rem;
+  }
+
+  .qs-review-hero > .mt-3.grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding-inline: 0;
+  }
+
+  .qs-review-hero > .mt-3.grid button {
+    min-height: 2.35rem;
+    padding-inline: 0.5rem;
+    font-size: 0.72rem;
   }
 
   .qs-review-zone {
-    padding: 0.6rem;
+    align-self: center;
+    max-width: var(--qs-review-compact-side);
+    padding: 0.45rem;
   }
 
   .qs-review-action-side {
-    min-height: 3rem;
+    min-height: 2.75rem;
     padding: 0.4rem 0.5rem;
+  }
+
+  .qs-review-action-side .text-xs,
+  .qs-review-action-side .sm\:text-sm {
+    font-size: 0.72rem;
   }
 
   .qs-review-zone-label,
@@ -1041,10 +1104,18 @@ img {
   }
 
   .qs-setup-widget {
-    right: max(0.5rem, var(--qs-safe-right));
-    bottom: max(0.5rem, var(--qs-safe-bottom));
-    width: min(520px, calc(100vw - 1rem));
+    top: max(0.5rem, var(--qs-safe-top));
+    right: auto;
+    bottom: auto;
+    left: max(0.5rem, var(--qs-safe-left));
+    width: auto;
+    max-width: min(15rem, 26vw);
     max-height: calc(100dvh - 1rem);
+    min-height: 2.25rem;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0 0.65rem;
+    font-size: 0.75rem;
   }
 }
 
