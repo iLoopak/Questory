@@ -271,6 +271,11 @@ img {
   display: none;
 }
 
+.qs-main-scroll--home {
+  background: transparent;
+  overflow-x: clip;
+}
+
 .qs-handheld-panel {
   scroll-padding: 1rem;
   overscroll-behavior: contain;
