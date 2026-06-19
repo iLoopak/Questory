@@ -1,8 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useI18n } from '../i18n';
 
-const scrollablePanelSelector =
-  '.qs-main-scroll, .qs-content-panel, .qs-queue-shell, .qs-review-shell, .qs-settings-detail, .qs-settings-list, .qs-scroll-panel';
+const scrollablePanelSelector = '.qs-main-scroll';
 const scrollThresholdPx = 300;
 
 function getScrollablePanels() {

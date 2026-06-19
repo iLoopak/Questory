@@ -40,6 +40,7 @@ type QueuePanelProps = {
   games: Game[];
   initialPlatform?: GamePlatform;
   queueState: PlatformQueueState;
+  contentScrollRef: RefObject<HTMLElement | null>;
   onAddGameToQueue: (game: Game, platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onQueueStateChange: (state: PlatformQueueState) => void;
@@ -56,6 +57,7 @@ export function QueuePanel({
   games,
   initialPlatform,
   queueState,
+  contentScrollRef,
   onAddGameToQueue,
   onLimitChange,
   onQueueStateChange,
@@ -278,7 +280,7 @@ export function QueuePanel({
         </div>
       ) : null}
 
-      <div ref={queueListRef} className="qs-queue-list min-h-0 flex-1 overflow-y-auto pr-1">
+      <div ref={queueListRef} className="qs-queue-list pr-1">
         <div className="grid gap-2 xl:grid-cols-2">
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
@@ -299,7 +301,7 @@ export function QueuePanel({
                   platformRefs.current.delete(platform);
                 }
               }}
-              queueScrollRef={queueListRef}
+              queueScrollRef={contentScrollRef}
               queueEntries={visibleQueueEntries
                 .filter((entry) => entry.targetPlatform === platform)
                 .filter((entry) => {

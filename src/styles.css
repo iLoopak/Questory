@@ -2528,23 +2528,6 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.qs-content-panel,
-.qs-queue-shell,
-.qs-review-shell,
-.qs-settings-shell {
-  max-height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  touch-action: pan-y pinch-zoom;
-  -webkit-overflow-scrolling: touch;
-}
-
-.qs-queue-shell {
-  height: calc(100dvh - 4.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
-  overflow: hidden;
-}
-
 .qs-queue-list,
 .qs-game-action-scroll,
 .qs-viewport-modal .qs-filter-drawer,
@@ -2579,28 +2562,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
   outline-offset: 3px;
 }
 
-@media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
-  .qs-content-panel,
-  .qs-queue-shell,
-  .qs-review-shell,
-  .qs-settings-shell {
-    max-height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
-  }
-
-  .qs-queue-shell {
-    height: calc(100dvh - 3.25rem - var(--qs-safe-top) - var(--qs-safe-bottom));
-  }
-}
-
-/* Large-library scrolling: keep Library on one native scroll container and avoid 100vh WebView traps. */
-.qs-game-list-shell,
-.qs-collection-panel {
-  height: calc(100dvh - 4.75rem - var(--qs-safe-top) - var(--qs-safe-bottom));
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
 .qs-game-list-shell {
   padding-top: 0;
 }
@@ -2610,13 +2571,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
 .qs-shelf-card img,
 .qs-compact-card img {
   contain: paint;
-}
-
-@media (orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px) {
-  .qs-game-list-shell,
-  .qs-collection-panel {
-    height: calc(100dvh - 3.75rem - var(--qs-safe-top) - var(--qs-safe-bottom));
-  }
 }
 
 /* Large-library performance mode: virtualized cards should be cheap to paint on Android WebView. */

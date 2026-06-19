@@ -194,7 +194,7 @@ export function SettingsView({
   }
 
   return (
-    <section className="qs-settings-shell min-w-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-900/45 lg:h-[calc(100vh-116px)]">
+    <section className="qs-settings-shell min-w-0 rounded-lg border border-skyglass/15 bg-ink-900/45">
       <div className="qs-settings-shell-header border-b border-skyglass/15 bg-ink-950/90 px-3 py-3 backdrop-blur sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -215,7 +215,7 @@ export function SettingsView({
         </div>
       </div>
 
-      <div className="grid h-full min-h-0 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside
           className={`qs-settings-list border-b border-skyglass/15 bg-ink-950/70 p-3 lg:block lg:border-b-0 lg:border-r ${
             isCategoryListOpen ? 'block' : 'hidden'
@@ -233,7 +233,7 @@ export function SettingsView({
           </nav>
         </aside>
 
-        <div className={`qs-settings-detail min-h-0 overflow-y-auto p-3 sm:p-4 ${isCategoryListOpen ? 'hidden lg:block' : 'block'}`}>
+        <div className={`qs-settings-detail p-3 sm:p-4 ${isCategoryListOpen ? 'hidden lg:block' : 'block'}`}>
           <header className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
             <div className="flex items-start gap-3">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-mint/25 bg-mint/10 text-mint">

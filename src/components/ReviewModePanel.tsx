@@ -419,7 +419,7 @@ export function ReviewModePanel({
 
 
   return (
-    <section className="qs-review-shell relative overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/90 lg:h-[calc(100vh-74px)]">
+    <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
       <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
         <div
           aria-label={`Quest Queue progress ${progressLabel}`}
@@ -500,8 +500,8 @@ export function ReviewModePanel({
         </div>
       </div>
 
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="qs-scroll-panel min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+      <div className="flex flex-col">
+        <div className="qs-scroll-panel p-2 sm:p-3">
           {activeGame ? (
             <FocusedReviewCard
               key={activeGame.id}
