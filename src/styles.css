@@ -2477,6 +2477,66 @@ textarea,
   background: rgb(3 7 24 / 0.8) !important;
 }
 
+/* ── Home: Hero — secondary accent border glow ── */
+.qs-template-neon-deck .qs-home-hero {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.28) !important;
+  box-shadow: 0 0 32px rgb(var(--qs-accent-secondary-rgb) / 0.08);
+}
+
+/* ── Home: Section — secondary accent borders ── */
+.qs-template-neon-deck .qs-home-section {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.18) !important;
+}
+
+/* ── Home: Section action buttons — secondary accent text + hover ── */
+.qs-template-neon-deck .qs-home-section-action {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.24) !important;
+  color: rgb(var(--qs-accent-secondary-rgb)) !important;
+}
+.qs-template-neon-deck .qs-home-section-action:hover {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.5) !important;
+  background: rgb(var(--qs-accent-secondary-rgb) / 0.1) !important;
+  color: rgb(var(--qs-accent-secondary-rgb)) !important;
+}
+
+/* ── Home: Quest Queue widget — secondary accent glow + label ── */
+.qs-template-neon-deck .qs-home-queue-widget {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.28) !important;
+  box-shadow: 0 0 28px rgb(var(--qs-accent-secondary-rgb) / 0.1);
+}
+
+/* ── Home: Next candidate / Next up labels — secondary accent ── */
+.qs-template-neon-deck .qs-home-next-candidate-label {
+  color: rgb(var(--qs-accent-secondary-rgb) / 0.72) !important;
+}
+
+/* ── Home: Next Adventure cards — secondary accent border ── */
+.qs-template-neon-deck .qs-home-next-adventure-card {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.22) !important;
+}
+.qs-template-neon-deck .qs-home-next-adventure-card:hover {
+  border-color: rgb(var(--qs-accent-secondary-rgb) / 0.48) !important;
+  box-shadow: 0 0 24px rgb(var(--qs-accent-secondary-rgb) / 0.14);
+}
+
+/* ── Action sheet: drag handle — secondary accent ── */
+.qs-template-neon-deck .qs-sheet-handle {
+  background: rgb(var(--qs-accent-secondary-rgb) / 0.38) !important;
+}
+
+/* ── Action sheet: section labels — secondary accent ── */
+.qs-template-neon-deck .qs-sheet-section-label {
+  color: rgb(var(--qs-accent-secondary-rgb) / 0.65) !important;
+}
+
+/* ── Button style: solid (overrides gradient) ── */
+html[data-neon-button-style='solid'] .qs-template-neon-deck .qs-top-nav button.bg-mint,
+html[data-neon-button-style='solid'] .qs-template-neon-deck .qs-collection-primary-action > button,
+html[data-neon-button-style='solid'] .qs-template-neon-deck .qs-game-card-details-button,
+html[data-neon-button-style='solid'] .qs-template-neon-deck button.bg-mint {
+  background: rgb(var(--qs-accent-primary-rgb)) !important;
+}
+
 
 
 

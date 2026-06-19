@@ -10,6 +10,7 @@ import {
   loadAppTemplatePreference,
   loadNeonButtonGradientBalancePreference,
   loadNeonButtonGradientMidpointPreference,
+  loadNeonButtonStylePreference,
   loadSecondaryAccentColorPreference,
   loadThemePreference,
   normalizeThemePreferenceForTemplate,
@@ -18,14 +19,17 @@ import {
   saveAppTemplatePreference,
   saveNeonButtonGradientBalancePreference,
   saveNeonButtonGradientMidpointPreference,
+  saveNeonButtonStylePreference,
   saveSecondaryAccentColorPreference,
   saveThemePreference,
+  applyNeonButtonStylePreference,
   watchSystemTheme,
   type AccentColorPreference,
   type AppTemplatePreference,
   type GradientOrientationPreference,
   type NeonButtonGradientBalancePreference,
   type NeonButtonGradientMidpointPreference,
+  type NeonButtonStylePreference,
   type ResolvedTheme,
   type ThemePreference,
 } from '../lib/themePreferences';
@@ -43,6 +47,9 @@ export function useAppAppearance() {
   );
   const [neonButtonGradientMidpointPreference, setNeonButtonGradientMidpointPreference] = useState<NeonButtonGradientMidpointPreference>(() =>
     loadNeonButtonGradientMidpointPreference(),
+  );
+  const [neonButtonStylePreference, setNeonButtonStylePreference] = useState<NeonButtonStylePreference>(() =>
+    loadNeonButtonStylePreference(),
   );
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     applyThemePreference(themePreference, appTemplatePreference),
@@ -108,6 +115,11 @@ export function useAppAppearance() {
     saveGradientOrientationPreference(gradientOrientationPreference);
   }, [accentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, secondaryAccentColorPreference]);
 
+  useEffect(() => {
+    applyNeonButtonStylePreference(neonButtonStylePreference);
+    saveNeonButtonStylePreference(neonButtonStylePreference);
+  }, [neonButtonStylePreference]);
+
   return {
     accentColorPreference,
     accentThemeStyle,
@@ -122,6 +134,8 @@ export function useAppAppearance() {
     setAppTemplatePreference,
     setNeonButtonGradientBalancePreference,
     setNeonButtonGradientMidpointPreference,
+    neonButtonStylePreference,
+    setNeonButtonStylePreference,
     setSecondaryAccentColorPreference,
     setThemePreference,
     themePreference,

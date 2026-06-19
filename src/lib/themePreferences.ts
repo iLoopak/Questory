@@ -5,6 +5,7 @@ export type AppTemplatePreference = 'classic' | 'neon-deck';
 export type NeonButtonGradientBalancePreference = number;
 export type NeonButtonGradientMidpointPreference = number;
 export type GradientOrientationPreference = 'horizontal' | 'vertical' | 'diagonal-down' | 'diagonal-up';
+export type NeonButtonStylePreference = 'gradient' | 'solid';
 
 export const themePreferenceStorageKey = 'questshelf.themePreference.v1';
 export const accentColorStorageKey = 'questshelf.accentColor.v1';
@@ -12,12 +13,15 @@ export const secondaryAccentColorStorageKey = 'questshelf.secondaryAccentColor.v
 export const neonButtonGradientBalanceStorageKey = 'questshelf.neonButtonGradientBalance.v1';
 export const neonButtonGradientMidpointStorageKey = 'questshelf.neonButtonGradientMidpoint.v1';
 export const gradientOrientationStorageKey = 'questshelf.gradientOrientation.v1';
+export const neonButtonStyleStorageKey = 'questshelf.neonButtonStyle.v1';
 export const appTemplateStorageKey = 'questshelf.appTemplate.v1';
 export const defaultAccentColor = '#ff5a2c';
 export const defaultSecondaryAccentColor = '#38bdf8';
 export const defaultNeonButtonGradientBalance = 50;
 export const defaultNeonButtonGradientMidpoint = 50;
 export const defaultGradientOrientation: GradientOrientationPreference = 'diagonal-down';
+export const defaultNeonButtonStyle: NeonButtonStylePreference = 'gradient';
+export const neonButtonStylePreferences: NeonButtonStylePreference[] = ['gradient', 'solid'];
 export const themePreferences: ThemePreference[] = ['light', 'dark', 'system'];
 export const appTemplatePreferences: AppTemplatePreference[] = ['classic', 'neon-deck'];
 export const darkOnlyAppTemplatePreferences: AppTemplatePreference[] = ['neon-deck'];
@@ -328,6 +332,37 @@ export function saveNeonButtonGradientMidpointPreference(midpoint: NeonButtonGra
   }
 
   void saveAccentColorPreferenceToNativeStorage(neonButtonGradientMidpointStorageKey, String(normalizedMidpoint));
+}
+
+export function normalizeNeonButtonStyle(value: unknown): NeonButtonStylePreference {
+  return value === 'solid' ? 'solid' : 'gradient';
+}
+
+export function loadNeonButtonStylePreference(): NeonButtonStylePreference {
+  if (typeof window === 'undefined') return defaultNeonButtonStyle;
+  try {
+    return normalizeNeonButtonStyle(window.localStorage.getItem(neonButtonStyleStorageKey));
+  } catch {
+    return defaultNeonButtonStyle;
+  }
+}
+
+export function saveNeonButtonStylePreference(style: NeonButtonStylePreference) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (style === defaultNeonButtonStyle) {
+      window.localStorage.removeItem(neonButtonStyleStorageKey);
+    } else {
+      window.localStorage.setItem(neonButtonStyleStorageKey, style);
+    }
+  } catch {
+    // Non-critical preference.
+  }
+}
+
+export function applyNeonButtonStylePreference(style: NeonButtonStylePreference) {
+  if (typeof document === 'undefined') return;
+  document.documentElement.dataset.neonButtonStyle = style;
 }
 
 export function saveSecondaryAccentColorPreference(color: AccentColorPreference) {

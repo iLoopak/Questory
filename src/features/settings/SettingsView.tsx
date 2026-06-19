@@ -21,7 +21,7 @@ import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibi
 import { onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { ShelfIdentitySettings } from '../../lib/shelfIdentity';
-import type { AccentColorPreference, AppTemplatePreference, GradientOrientationPreference, ResolvedTheme, ThemePreference } from '../../lib/themePreferences';
+import type { AccentColorPreference, AppTemplatePreference, GradientOrientationPreference, NeonButtonStylePreference, ResolvedTheme, ThemePreference } from '../../lib/themePreferences';
 import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
 import type { IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
 import type { SteamWishlistHtmlImportSummary } from '../../utils/summaryFormatters';
@@ -57,6 +57,7 @@ export type SettingsViewProps = {
   gradientOrientationPreference: GradientOrientationPreference;
   neonButtonGradientBalancePreference: number;
   neonButtonGradientMidpointPreference: number;
+  neonButtonStylePreference: NeonButtonStylePreference;
   language: AppLanguage;
   navigationVisibility: NavigationVisibilityPreferences;
   platformQueueState: PlatformQueueState;
@@ -93,6 +94,7 @@ export type SettingsViewProps = {
   onGradientOrientationChange: (orientation: GradientOrientationPreference) => void;
   onNeonButtonGradientBalanceChange: (balance: number) => void;
   onNeonButtonGradientMidpointChange: (midpoint: number) => void;
+  onNeonButtonStyleChange: (style: NeonButtonStylePreference) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
@@ -133,6 +135,7 @@ export function SettingsView({
   gradientOrientationPreference,
   neonButtonGradientBalancePreference,
   neonButtonGradientMidpointPreference,
+  neonButtonStylePreference,
   language,
   navigationVisibility,
   platformQueueState,
@@ -170,6 +173,7 @@ export function SettingsView({
   onLanguageChange,
   onNeonButtonGradientBalanceChange,
   onNeonButtonGradientMidpointChange,
+  onNeonButtonStyleChange,
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
@@ -351,6 +355,7 @@ export function SettingsView({
                 gradientOrientationPreference={gradientOrientationPreference}
                 neonButtonGradientBalancePreference={neonButtonGradientBalancePreference}
                 neonButtonGradientMidpointPreference={neonButtonGradientMidpointPreference}
+                neonButtonStylePreference={neonButtonStylePreference}
                 language={language}
                 onControllerDebugChange={onControllerDebugChange}
                 onControllerLayoutChange={onControllerLayoutChange}
@@ -362,6 +367,7 @@ export function SettingsView({
                 onGradientOrientationChange={onGradientOrientationChange}
                 onNeonButtonGradientBalanceChange={onNeonButtonGradientBalanceChange}
                 onNeonButtonGradientMidpointChange={onNeonButtonGradientMidpointChange}
+                onNeonButtonStyleChange={onNeonButtonStyleChange}
                 onLanguageChange={onLanguageChange}
               />
             </div>
