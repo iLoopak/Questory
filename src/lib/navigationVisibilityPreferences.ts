@@ -7,7 +7,6 @@ export const configurableNavigationItems = [
   'Queue',
   'Review Mode',
   'Artwork',
-  'Recommendation',
   'Stats',
 ] as const;
 
@@ -17,7 +16,6 @@ export type NavigationVisibilityPreferences = Record<ConfigurableNavigationItem,
 export const defaultNavigationVisibilityPreferences: NavigationVisibilityPreferences = {
   Artwork: true,
   Queue: true,
-  Recommendation: true,
   'Review Mode': true,
   Stats: true,
   Wishlist: true,

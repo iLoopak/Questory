@@ -847,7 +847,7 @@ export function AppController() {
                       type="button"
                     >
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
-                        <Icon name={item === 'Stats' ? 'panel-top-open' : 'image-frame'} size={15} strokeWidth={2.2} />
+                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Recommendation' ? 'sparkles' : 'image-frame'} size={15} strokeWidth={2.2} />
                       </span>
                       <span>{t(navItemLabelKeys[item])}</span>
                     </button>

@@ -1,8 +1,8 @@
 import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
-export const navItems = ['Home', 'Library', 'Wishlist', 'Queue', 'Review Mode', 'Recommendation'] as const;
-export const moreNavItems = ['Stats', 'Artwork'] as const;
+export const navItems = ['Home', 'Library', 'Review Mode', 'Queue', 'Wishlist'] as const;
+export const moreNavItems = ['Recommendation', 'Stats', 'Artwork'] as const;
 export const alwaysVisibleNavItems = ['Home', 'Library'] as const;
 
 export type TopNavItem = (typeof navItems)[number];
@@ -23,7 +23,6 @@ export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Par
 export const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, Parameters<TFunction>[0]> = {
   Artwork: 'nav.artwork',
   Queue: 'settings.navigation.platformsQueue',
-  Recommendation: 'nav.recommendations',
   'Review Mode': 'settings.navigation.questQueueReviewMode',
   Stats: 'nav.stats',
   Wishlist: 'nav.wishlist',
