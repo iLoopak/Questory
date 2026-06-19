@@ -185,6 +185,11 @@ export function HomePanel({
   const isSteamSyncing =
     steamAchievementSyncState?.status === 'loading' || steamPlaytimeRefreshState?.status === 'loading';
 
+  const greeting = useRef<string | null>(null);
+  if (!greeting.current) {
+    greeting.current = pickGreeting(queueEntries.length, continuePlayingGames.length, reviewRemainingCount);
+  }
+
   useEffect(() => {
     if (!import.meta.env.DEV || !shellRef.current) return;
     const chain: Record<string, unknown>[] = [];
@@ -284,28 +289,37 @@ export function HomePanel({
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
           {shelfTitle ? <div className="text-xs font-semibold text-mint">{shelfTitle}</div> : null}
+          <div className="mt-0.5 truncate text-xs text-slate-500">{greeting.current}</div>
         </div>
-        <div className="flex shrink-0 items-center gap-4">
-          <div className="text-right">
-            <div className="text-xl font-bold text-white">{continuePlayingGames.length}</div>
-            <div className="text-xs text-slate-400">{t('home.heroActiveGames')}</div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-xl font-bold text-white">{continuePlayingGames.length}</div>
+              <div className="text-xs text-slate-400">{t('home.heroActiveGames')}</div>
+            </div>
+            <div className="h-8 w-px bg-skyglass/20" />
+            <button
+              aria-label="Open Quest Queue"
+              className="cursor-pointer rounded text-right transition hover:opacity-75 focus:outline-none focus:ring-1 focus:ring-mint/40"
+              data-home-focus="true"
+              onClick={() => onOpenQueue()}
+              type="button"
+            >
+              <div className="text-xl font-bold text-white">{reviewRemainingCount}</div>
+              <div className="text-xs text-slate-400">{t('home.heroQueueCount')}</div>
+            </button>
           </div>
-          <div className="h-8 w-px bg-skyglass/20" />
-          <div className="text-right">
-            <div className="text-xl font-bold text-white">{reviewRemainingCount}</div>
-            <div className="text-xs text-slate-400">{t('home.heroQueueCount')}</div>
-          </div>
+          {featuredGame ? (
+            <button
+              className="max-w-[160px] truncate rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-xs font-semibold text-mint transition hover:bg-mint/20"
+              data-home-focus="true"
+              onClick={() => onOpenDetails(featuredGame)}
+              type="button"
+            >
+              ⭐ {featuredGame.title}
+            </button>
+          ) : null}
         </div>
-        {featuredGame ? (
-          <button
-            className="ml-1 shrink-0 rounded-full border border-mint/30 bg-mint/10 px-3 py-1.5 text-xs font-semibold text-mint transition hover:bg-mint/20"
-            data-home-focus="true"
-            onClick={() => onOpenDetails(featuredGame)}
-            type="button"
-          >
-            ⭐ {featuredGame.title}
-          </button>
-        ) : null}
       </section>
 
       {/* Two-column layout on desktop — no overflow on either column, window scroll only */}
@@ -855,4 +869,19 @@ function formatRelativeTime(value: string | Date | number | null | undefined, ne
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return new Date(ms).toLocaleDateString();
+}
+
+function pickGreeting(queueCount: number, activeCount: number, reviewCount: number): string {
+  const s = (n: number) => (n === 1 ? '' : 's');
+  const options = [
+    queueCount > 0 ? `${queueCount} game${s(queueCount)} in Queue. No pressure.` : null,
+    activeCount > 0 ? `${activeCount} active game${s(activeCount)}. Totally under control.` : null,
+    reviewCount > 0 ? `${reviewCount} game${s(reviewCount)} waiting for a verdict.` : null,
+    'Your backlog called. It misses you.',
+    'Pick one. Future you will thank you.',
+    'The queue grows. The queue is patient.',
+    'Progress is progress. Even at 2%.',
+    'One game closer. Probably.',
+  ].filter((x): x is string => x !== null);
+  return options[Math.floor(Math.random() * options.length)];
 }
