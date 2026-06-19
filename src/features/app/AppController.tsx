@@ -835,7 +835,7 @@ export function AppController() {
                 <Icon name="chevrons-right" size={13} className="rotate-90" strokeWidth={2.4} />
               </button>
               {isMoreMenuOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl" role="menu">
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl" role="menu">
                   {moreNavItems.map((item) => (
                     <button
                       key={item}
@@ -849,7 +849,7 @@ export function AppController() {
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
                         <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Recommendation' ? 'sparkles' : 'image-frame'} size={15} strokeWidth={2.2} />
                       </span>
-                      <span>{t(navItemLabelKeys[item])}</span>
+                      <span className="whitespace-nowrap">{t(navItemLabelKeys[item])}</span>
                     </button>
                   ))}
                 </div>
