@@ -83,7 +83,7 @@ import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 
-const questShelfIcon = '/icons/questshelf-icon.png';
+const appLogo = '/icons/questshelf-icon.png';
 
 
 
@@ -95,7 +95,7 @@ function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { clas
       {hasImageError ? (
         <span className={`font-semibold leading-none ${fallbackClassName}`}>QS</span>
       ) : (
-        <img className="qs-logo-glow h-full w-full object-cover" src={questShelfIcon} alt="" onError={() => setHasImageError(true)} />
+        <img className="qs-logo-glow h-full w-full object-cover" src={appLogo} alt="" onError={() => setHasImageError(true)} />
       )}
     </div>
   );
@@ -895,7 +895,7 @@ export function AppController() {
               onClick={() => setIsShelfProfileOpen((isOpen) => !isOpen)}
               type="button"
             >
-              <ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-7 w-7" />
+              <QuestShelfLogo className="h-7 w-7 rounded-md" />
               <span className="hidden min-w-0 max-w-[12rem] truncate text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">{personalizedQuestShelfTitle}</span>
             </button>
             {isShelfProfileOpen ? (
@@ -1332,6 +1332,7 @@ export function AppController() {
               onCategoryChange={setActiveSettingsCategory}
               onLibraryOwnerNicknameChange={setLibraryOwnerNickname}
               onShelfIdentityChange={setShelfIdentity}
+              onSteamAvatarImported={handleSteamProfileNameChange}
               onConnectionTested={() => markOnboardingItemComplete('steam-test')}
               onClearLibraryFilters={() => setLibraryFilters(initialCollectionFilters)}
               onEnrichRetroImportedGames={enrichRetroImportedGames}

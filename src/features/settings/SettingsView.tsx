@@ -69,6 +69,7 @@ export type SettingsViewProps = {
   onCategoryChange: (category: SettingsCategory) => void;
   onLibraryOwnerNicknameChange: (nickname: string) => void;
   onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
+  onSteamAvatarImported?: (personaName: string) => void;
   onClearLibraryFilters: () => void;
   onConnectionTested: () => void;
   onEnrichRetroImportedGames: (gameIds: string[]) => void;
@@ -148,6 +149,7 @@ export function SettingsView({
   onCategoryChange,
   onLibraryOwnerNicknameChange,
   onShelfIdentityChange,
+  onSteamAvatarImported,
   onClearLibraryFilters,
   onConnectionTested,
   onEnrichRetroImportedGames,
@@ -329,6 +331,7 @@ export function SettingsView({
                 steamAvatarUrl={steamAvatarUrl}
                 steamPersonaName={steamPersonaName}
                 onShelfIdentityChange={onShelfIdentityChange}
+                onSteamAvatarImported={onSteamAvatarImported}
               />
             </div>
           ) : null}
