@@ -31,13 +31,7 @@ type HomePanelProps = {
   onSyncSteamData?: () => void;
 };
 
-type QueuePreview = {
-  entries: Array<{ entry: PlatformQueueEntry; game: Game }>;
-  platform: GamePlatform;
-  totalCount: number;
-};
-
-type KeepPlayingEntry = { game: Game; reason: string };
+type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
 
 const focusSelector = '[data-home-focus="true"]';
 
@@ -76,66 +70,23 @@ export function HomePanel({
       .slice(0, 4);
   }, [libraryGames]);
 
-  const activeQueuePreviews = useMemo<QueuePreview[]>(() => {
-    const groupedEntries = new Map<GamePlatform, PlatformQueueEntry[]>();
-    queueEntries.forEach((entry) => {
-      const game = gamesById.get(entry.gameId);
-      if (!game) return;
-      const platformEntries = groupedEntries.get(entry.targetPlatform) ?? [];
-      platformEntries.push(entry);
-      groupedEntries.set(entry.targetPlatform, platformEntries);
-    });
-    return Array.from(groupedEntries.entries())
-      .map(([platform, entries]) => ({
-        entries: entries
-          .sort(compareQueueEntries)
-          .slice(0, 2)
-          .map((entry) => ({ entry, game: gamesById.get(entry.gameId) as Game })),
-        platform,
-        totalCount: entries.length,
-      }))
-      .sort((a, b) => {
-        const ae = a.entries[0]?.entry;
-        const be = b.entries[0]?.entry;
-        return (ae?.queuePosition ?? 99) - (be?.queuePosition ?? 99) || b.totalCount - a.totalCount;
-      })
-      .slice(0, 3);
-  }, [gamesById, queueEntries]);
-
-  const keepPlayingGames = useMemo<KeepPlayingEntry[]>(() => {
-    const shownIds = new Set(continuePlayingGames.map((g) => g.id));
-    const result: KeepPlayingEntry[] = [];
-
-    const addedPlatforms = new Set<GamePlatform>();
+  const nextAdventureEntry = useMemo<NextAdventureEntry | null>(() => {
+    const playingIds = new Set(continuePlayingGames.map((g) => g.id));
     for (const entry of [...queueEntries].sort(compareQueueEntries)) {
-      if (result.length >= 3) break;
       const game = gamesById.get(entry.gameId);
-      if (!game || shownIds.has(game.id) || game.status === 'Playing') continue;
-      if (addedPlatforms.has(entry.targetPlatform)) continue;
-      result.push({ game, reason: `${t('home.topPlanCandidate')} · ${entry.targetPlatform}` });
-      addedPlatforms.add(entry.targetPlatform);
-      shownIds.add(game.id);
+      if (!game || playingIds.has(game.id) || game.status === 'Playing') continue;
+      return { game, entry };
     }
+    return null;
+  }, [continuePlayingGames, gamesById, queueEntries]);
 
-    if (result.length < 3) {
-      const recentlyPlayed = libraryGames
-        .filter(
-          (g) =>
-            !shownIds.has(g.id) &&
-            g.status !== 'Finished' &&
-            g.status !== 'Dropped' &&
-            g.status !== 'Playing' &&
-            getActivityTime(g) > 0,
-        )
-        .sort((a, b) => getActivityTime(b) - getActivityTime(a));
-      for (const game of recentlyPlayed) {
-        if (result.length >= 3) break;
-        result.push({ game, reason: t('home.playedRecently') });
-      }
-    }
-
-    return result;
-  }, [continuePlayingGames, gamesById, libraryGames, queueEntries, t]);
+  const nextReviewCandidate = useMemo<Game | null>(() => {
+    return (
+      games
+        .filter((g) => isBacklogReviewCandidate(g) && !ignoredReviewGameIds.has(g.id))
+        .sort((a, b) => getActivityTime(a) - getActivityTime(b))[0] ?? null
+    );
+  }, [games, ignoredReviewGameIds]);
 
   const wishlistDeals = useMemo(() => {
     return games
@@ -351,73 +302,21 @@ export function HomePanel({
             )}
           </HomeSection>
 
-          {/* Keep Playing — clear-reason picks */}
-          {keepPlayingGames.length > 0 ? (
-            <HomeSection title={t('home.keepPlaying')}>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {keepPlayingGames.map(({ game, reason }) => (
-                  <KeepPlayingCard
-                    key={game.id}
-                    game={game}
-                    reason={reason}
-                    onClick={() => setActionSheetGame(game)}
-                    queueState={queueState}
-                  />
-                ))}
-              </div>
-            </HomeSection>
-          ) : null}
-
-          {/* Platform Plans — Next Up */}
-          <HomeSection title={t('home.nextUp')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()}>
-            {activeQueuePreviews.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {activeQueuePreviews.map((queue) => (
-                  <article key={queue.platform} className="rounded-xl border border-skyglass/15 bg-ink-950/72 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-base font-semibold text-white">
-                        {queue.platform} {t('home.planSuffix')}
-                      </h4>
-                      <button
-                        className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
-                        data-home-focus="true"
-                        onClick={() => onOpenQueue(queue.platform)}
-                        type="button"
-                      >
-                        {t('home.open')}
-                      </button>
-                    </div>
-                    <ol className="mt-3 grid gap-2">
-                      {queue.entries.map(({ entry, game }) => (
-                        <li key={entry.gameId}>
-                          <button
-                            className="flex min-h-12 w-full items-center gap-3 rounded-lg border border-skyglass/15 bg-ink-900/80 px-3 py-2 text-left transition hover:border-mint/40 hover:bg-mint/10"
-                            data-home-focus="true"
-                            onClick={() => setActionSheetGame(game)}
-                            type="button"
-                          >
-                            <span className="w-7 shrink-0 text-center text-xs font-semibold text-slate-500">
-                              #{entry.queuePosition}
-                            </span>
-                            <span className="min-w-0">
-                              <span className="block truncate font-semibold text-white">{game.title}</span>
-                              <PlatformBadge
-                                className="mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
-                                platform={entry.targetPlatform}
-                                queueState={queueState}
-                              />
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ol>
-                  </article>
-                ))}
-              </div>
+          {/* Next Adventure — single best Platform Plan candidate */}
+          <HomeSection title={t('home.nextAdventure')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()}>
+            {nextAdventureEntry ? (
+              <NextAdventureCard
+                entry={nextAdventureEntry.entry}
+                game={nextAdventureEntry.game}
+                queueState={queueState}
+                onPlay={() => setActionSheetGame(nextAdventureEntry.game)}
+                onOpenPlan={() => onOpenQueue(nextAdventureEntry.entry.targetPlatform)}
+                t={t}
+              />
             ) : (
               <EmptyState
                 title={t('home.noPlatformPlan')}
-                text={t('home.noPlatformPlanText')}
+                text={t('home.noKeepPlayingText')}
                 actionLabel={t('review.title')}
                 onAction={() => onOpenReviewMode('backlog')}
               />
@@ -460,6 +359,12 @@ export function HomePanel({
             <p className="mt-1 text-sm text-slate-300">
               {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
             </p>
+            {nextReviewCandidate ? (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-skyglass/15 bg-ink-950/50 px-3 py-2">
+                <span className="shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">{nextReviewCandidate.title}</span>
+              </div>
+            ) : null}
             <button
               className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
               data-home-focus="true"
@@ -685,51 +590,68 @@ function GamePosterButton({
   );
 }
 
-function KeepPlayingCard({
+function NextAdventureCard({
+  entry,
   game,
-  onClick,
-  reason,
   queueState,
+  onPlay,
+  onOpenPlan,
+  t,
 }: {
+  entry: PlatformQueueEntry;
   game: Game;
-  onClick: () => void;
-  reason: string;
   queueState: PlatformQueueState;
+  onPlay: () => void;
+  onOpenPlan: () => void;
+  t: ReturnType<typeof useI18n>['t'];
 }) {
-  const coverSources = getGameCoverSources(game);
-  const coverSource = coverSources[0];
+  const coverSource = getGameCoverSources(game)[0];
 
   return (
-    <button
-      className="group relative min-h-32 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35 hover:shadow-glow"
-      data-home-focus="true"
-      onClick={onClick}
-      type="button"
-    >
+    <div className="relative overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70">
       {coverSource ? (
         <div className="absolute inset-0">
           <img
             alt=""
-            className="h-full w-full object-cover opacity-20 transition duration-300 group-hover:opacity-30"
+            className="h-full w-full object-cover opacity-15"
             decoding="async"
             loading="lazy"
             src={coverSource}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 to-transparent" />
         </div>
       ) : null}
-      <div className="relative p-3">
-        <span className="inline-block rounded-full border border-skyglass/15 bg-skyglass/8 px-2 py-0.5 text-xs text-slate-300">
-          {reason}
-        </span>
+      <div className="relative flex flex-col gap-3 p-4">
         <PlatformBadge
-          className="mt-2 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
-          platform={getGamePlatformLabel(game, queueState)}
+          className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
+          platform={entry.targetPlatform}
           queueState={queueState}
         />
-        <p className="mt-1 line-clamp-2 text-sm font-semibold text-white">{game.title}</p>
+        <div>
+          <div className="text-xs text-slate-500">{t('home.nextCandidate')}</div>
+          <h3 className="mt-0.5 text-lg font-bold leading-snug text-white">{game.title}</h3>
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            data-home-focus="true"
+            onClick={onPlay}
+            type="button"
+          >
+            <Icon name="play-circle" size={16} strokeWidth={2.5} />
+            {t('home.playToday')}
+          </button>
+          <button
+            className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+            data-home-focus="true"
+            onClick={onOpenPlan}
+            type="button"
+          >
+            {t('home.open')} Plan
+          </button>
+        </div>
       </div>
-    </button>
+    </div>
   );
 }
 
