@@ -32,7 +32,8 @@ type HomePanelProps = {
   onQuickNote: (gameId: string, note: string) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncItadDeals?: () => void;
-  onSyncSteamData?: () => void;
+  onSyncSteamAchievements?: () => void;
+  onSyncSteamPlaytime?: () => void;
 };
 
 type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
@@ -60,7 +61,8 @@ export function HomePanel({
   onQuickNote,
   onStatusChange,
   onSyncItadDeals,
-  onSyncSteamData,
+  onSyncSteamAchievements,
+  onSyncSteamPlaytime,
 }: HomePanelProps) {
   const { t } = useI18n();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
@@ -133,27 +135,31 @@ export function HomePanel({
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
 
-  const lastSteamSyncAt = useMemo(() => {
-    const playtimeTimes = games
+  const lastPlaytimeSyncAt = useMemo(() => {
+    const times = games
       .filter((g) => g.steamAppId != null && g.lastSteamActivityAt)
       .map((g) => new Date(g.lastSteamActivityAt as string).getTime());
-    const achievementTimes = games
+    return times.length > 0 ? new Date(Math.max(...times)) : null;
+  }, [games]);
+
+  const lastAchievementSyncAt = useMemo(() => {
+    const times = games
       .filter((g) => g.steamAchievementsLastCheckedAt != null)
       .map((g) => g.steamAchievementsLastCheckedAt as number);
-    const all = [...playtimeTimes, ...achievementTimes];
-    return all.length > 0 ? new Date(Math.max(...all)) : null;
+    return times.length > 0 ? new Date(Math.max(...times)) : null;
   }, [games]);
 
   const lastItadSyncAt = useMemo(() => {
     const times = games
-      .filter((g) => g.wishlistSyncedAt)
-      .map((g) => g.wishlistSyncedAt as string);
+      .filter((g) => g.itadLastSyncedAt)
+      .map((g) => g.itadLastSyncedAt as string);
     return times.length > 0 ? times.reduce((a, b) => (a > b ? a : b)) : null;
   }, [games]);
 
-  const isSteamSyncing =
-    steamAchievementSyncState?.status === 'loading' || steamPlaytimeRefreshState?.status === 'loading';
-  const hasSyncActions = (hasSteamGames && !!onSyncSteamData) || !!onSyncItadDeals;
+  const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
+  const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
+  const isSteamSyncing = isSteamAchievementSyncing || isSteamPlaytimeSyncing;
+  const hasSyncActions = (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
   const isAnySyncing = isSteamSyncing || itadDealSyncState?.status === 'loading';
 
   const greeting = useRef<string | null>(null);
@@ -406,13 +412,16 @@ export function HomePanel({
       {syncSheetOpen ? (
         <SyncMaintenanceSheet
           hasSteamGames={hasSteamGames}
-          isSteamSyncing={isSteamSyncing}
+          isSteamAchievementSyncing={isSteamAchievementSyncing}
+          isSteamPlaytimeSyncing={isSteamPlaytimeSyncing}
           itadDealSyncState={itadDealSyncState}
+          lastAchievementSyncAt={lastAchievementSyncAt}
           lastItadSyncAt={lastItadSyncAt}
-          lastSteamSyncAt={lastSteamSyncAt}
+          lastPlaytimeSyncAt={lastPlaytimeSyncAt}
           onClose={() => setSyncSheetOpen(false)}
           onSyncItadDeals={onSyncItadDeals}
-          onSyncSteamData={onSyncSteamData}
+          onSyncSteamAchievements={onSyncSteamAchievements}
+          onSyncSteamPlaytime={onSyncSteamPlaytime}
         />
       ) : null}
 
@@ -877,22 +886,28 @@ function WishlistDealActionSheet({
 
 function SyncMaintenanceSheet({
   hasSteamGames,
-  isSteamSyncing,
+  isSteamAchievementSyncing,
+  isSteamPlaytimeSyncing,
   itadDealSyncState,
+  lastAchievementSyncAt,
   lastItadSyncAt,
-  lastSteamSyncAt,
+  lastPlaytimeSyncAt,
   onClose,
   onSyncItadDeals,
-  onSyncSteamData,
+  onSyncSteamAchievements,
+  onSyncSteamPlaytime,
 }: {
   hasSteamGames: boolean;
-  isSteamSyncing: boolean;
+  isSteamAchievementSyncing: boolean;
+  isSteamPlaytimeSyncing: boolean;
   itadDealSyncState?: ItadDealSyncState;
+  lastAchievementSyncAt: Date | null;
   lastItadSyncAt: string | null;
-  lastSteamSyncAt: Date | null;
+  lastPlaytimeSyncAt: Date | null;
   onClose: () => void;
   onSyncItadDeals?: () => void;
-  onSyncSteamData?: () => void;
+  onSyncSteamAchievements?: () => void;
+  onSyncSteamPlaytime?: () => void;
 }) {
   const { t } = useI18n();
   const isItadSyncing = itadDealSyncState?.status === 'loading';
@@ -906,93 +921,50 @@ function SyncMaintenanceSheet({
   }, [onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('home.syncMaintenance')}
-    >
+    <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={t('home.syncMaintenance')}>
       <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}
-      >
-        <div className="flex justify-center pb-2 pt-3">
-          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" />
-        </div>
+      <div className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl" style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}>
+        <div className="flex justify-center pb-2 pt-3"><div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" /></div>
         <div className="px-4 pb-2 pt-1">
           <h3 className="mb-4 text-base font-bold text-white">{t('home.syncMaintenance')}</h3>
-
           <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
-            {hasSteamGames && onSyncSteamData ? (
-              <button
-                className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50"
-                disabled={isSteamSyncing}
-                onClick={onSyncSteamData}
-                type="button"
-              >
-                <Icon
-                  name={isSteamSyncing ? 'refresh-cw' : 'steam'}
-                  size={18}
-                  strokeWidth={2}
-                  className={`shrink-0 text-slate-400 ${isSteamSyncing ? 'animate-spin' : ''}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-slate-200">{t('home.syncSteamData')}</span>
-                  <span className={`block text-xs ${isSteamSyncing ? 'text-mint' : 'text-slate-500'}`}>
-                    {isSteamSyncing
-                      ? t('home.syncingSteamData')
-                      : lastSteamSyncAt
-                        ? formatRelativeTime(lastSteamSyncAt, t('home.neverSynced'))
-                        : t('home.neverSynced')}
-                  </span>
-                </div>
-                {!isSteamSyncing ? (
-                  <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" />
-                ) : null}
-              </button>
+            {hasSteamGames && onSyncSteamAchievements ? (
+              <SyncSheetButton icon="trophy" label="Sync Achievements" syncingLabel="Syncing achievements…" isSyncing={isSteamAchievementSyncing} lastSyncAt={lastAchievementSyncAt} onClick={onSyncSteamAchievements} neverLabel={t('home.neverSynced')} />
+            ) : null}
+            {hasSteamGames && onSyncSteamPlaytime ? (
+              <SyncSheetButton icon="gamepad-2" label="Sync Playtime" syncingLabel="Syncing playtime…" isSyncing={isSteamPlaytimeSyncing} lastSyncAt={lastPlaytimeSyncAt} onClick={onSyncSteamPlaytime} neverLabel={t('home.neverSynced')} />
             ) : null}
             {onSyncItadDeals ? (
-              <button
-                className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50"
-                disabled={isItadSyncing}
-                onClick={onSyncItadDeals}
-                type="button"
-              >
-                <Icon
-                  name={isItadSyncing ? 'refresh-cw' : 'shopping-bag'}
-                  size={18}
-                  strokeWidth={2}
-                  className={`shrink-0 text-slate-400 ${isItadSyncing ? 'animate-spin' : ''}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-slate-200">{t('home.syncDeals')}</span>
-                  <span className={`block text-xs ${isItadSyncing ? 'text-mint' : 'text-slate-500'}`}>
-                    {isItadSyncing
-                      ? t('home.syncingSteamData')
-                      : lastItadSyncAt
-                        ? formatRelativeTime(lastItadSyncAt, t('home.neverSynced'))
-                        : t('home.neverSynced')}
-                  </span>
-                </div>
-                {!isItadSyncing ? (
-                  <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" />
-                ) : null}
-              </button>
+              <SyncSheetButton icon="shopping-bag" label="Sync ITAD Deals" syncingLabel="Syncing ITAD deals…" isSyncing={isItadSyncing} lastSyncAt={lastItadSyncAt} onClick={onSyncItadDeals} neverLabel={t('home.neverSynced')} />
             ) : null}
           </div>
-
-          <button
-            className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
+          <div className="mt-3 rounded-2xl border border-skyglass/10 bg-ink-900/35 p-4 text-xs text-slate-400">
+            <SyncStatusLine label="Achievement Sync" value={lastAchievementSyncAt ? formatRelativeTime(lastAchievementSyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
+            <SyncStatusLine label="Playtime Sync" value={lastPlaytimeSyncAt ? formatRelativeTime(lastPlaytimeSyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
+            <SyncStatusLine label="ITAD Sync" value={lastItadSyncAt ? formatRelativeTime(lastItadSyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
+          </div>
+          <button className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300" onClick={onClose} type="button">Cancel</button>
         </div>
       </div>
     </div>
   );
+}
+
+function SyncSheetButton({ icon, isSyncing, label, lastSyncAt, neverLabel, onClick, syncingLabel }: { icon: Parameters<typeof Icon>[0]['name']; isSyncing: boolean; label: string; lastSyncAt: Date | string | null; neverLabel: string; onClick: () => void; syncingLabel: string }) {
+  return (
+    <button className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50" disabled={isSyncing} onClick={onClick} type="button">
+      <Icon name={isSyncing ? 'refresh-cw' : icon} size={18} strokeWidth={2} className={`shrink-0 text-slate-400 ${isSyncing ? 'animate-spin' : ''}`} />
+      <div className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-slate-200">{label}</span>
+        <span className={`block text-xs ${isSyncing ? 'text-mint' : 'text-slate-500'}`}>{isSyncing ? syncingLabel : lastSyncAt ? formatRelativeTime(lastSyncAt, neverLabel) : neverLabel}</span>
+      </div>
+      {!isSyncing ? <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" /> : null}
+    </button>
+  );
+}
+
+function SyncStatusLine({ label, value }: { label: string; value: string }) {
+  return <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{label}</span><span className="text-right text-slate-300">Last sync: {value}</span></div>;
 }
 
 function pickGreeting(queueCount: number, activeCount: number, reviewCount: number): string {

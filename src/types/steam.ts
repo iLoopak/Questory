@@ -116,6 +116,7 @@ export type SteamAchievementSyncState =
   | { status: 'error'; message: string; progress: SteamAchievementSyncProgress; summary: SteamAchievementSyncSummary | null };
 
 export type SteamPlaytimeRefreshSummary = {
+  deltaMinutes: number;
   failedCount: number;
   skippedNonSteamCount: number;
   unchangedCount: number;

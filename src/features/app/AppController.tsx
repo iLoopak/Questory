@@ -583,6 +583,20 @@ export function AppController() {
     t,
   });
 
+
+  const homeSteamSyncGameIds = useMemo(() => {
+    const relevantIds = new Set<string>();
+    games.forEach((game) => {
+      if (game.collectionType === 'library' && game.status === 'Playing') {
+        relevantIds.add(game.id);
+      }
+    });
+    platformQueueState.entries.forEach((entry) => relevantIds.add(entry.gameId));
+    return games
+      .filter((game) => relevantIds.has(game.id) && game.collectionType === 'library' && typeof game.steamAppId === 'number')
+      .map((game) => game.id);
+  }, [games, platformQueueState.entries]);
+
   const {
     addGameToQueue,
     addQueuePlatform,
@@ -922,9 +936,17 @@ export function AppController() {
                 const wishlistIds = games.filter((g) => g.collectionType === 'wishlist').map((g) => g.id);
                 void syncWishlistDeals(wishlistIds);
               }}
-              onSyncSteamData={() => {
-                void refreshSteamPlaytime();
-                void syncSteamAchievements();
+              onSyncSteamAchievements={() => {
+                void syncSteamAchievements(homeSteamSyncGameIds, {
+                  emptyToastMessage: 'No Playing Now or Platform Plan Steam games are eligible for achievement sync.',
+                  showToast: true,
+                });
+              }}
+              onSyncSteamPlaytime={() => {
+                void refreshSteamPlaytime(homeSteamSyncGameIds, {
+                  emptyToastMessage: 'No Playing Now or Platform Plan Steam games are eligible for playtime sync.',
+                  showToast: true,
+                });
               }}
             />
           ) : activeNavItem === 'Library' ? (

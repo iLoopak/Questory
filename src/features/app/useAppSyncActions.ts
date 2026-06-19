@@ -18,6 +18,7 @@ import {
   formatMessageTemplate,
   formatSteamAchievementSyncSummary,
   formatSteamDataPartialDetails,
+  formatSteamPlaytimeRefreshSummary,
   formatSteamWishlistHtmlImportSummary,
   formatSteamWishlistSyncSummary,
   type SteamWishlistHtmlImportSummary,
@@ -329,6 +330,7 @@ export function useAppSyncActions({
 
     if (total === 0) {
       const summary: SteamPlaytimeRefreshSummary = {
+        deltaMinutes: 0,
         failedCount: 0,
         skippedNonSteamCount: targetGames.length,
         unchangedCount: 0,
@@ -370,7 +372,7 @@ export function useAppSyncActions({
       }
       setSteamPlaytimeRefreshState({
         status: 'success',
-        message: formatMessageTemplate(t('app.steamPlaytimeRefreshComplete'), { updated: result.summary.updatedCount, unchanged: result.summary.unchangedCount, failed: result.summary.failedCount }),
+        message: formatSteamPlaytimeRefreshSummary(result.summary),
         progress: { completed, total },
         summary: result.summary,
       });
@@ -381,7 +383,7 @@ export function useAppSyncActions({
           actions: [getViewGameAction(refreshableGames[0].id)],
           category: hasPartialFailures ? 'warning' : 'success',
           dedupeKey: `steam-playtime-refresh:${refreshableGames[0].id}`,
-          details: options.completionToastMessage?.(result.summary) ?? formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: result.summary.updatedCount }),
+          details: options.completionToastMessage?.(result.summary) ?? formatSteamPlaytimeRefreshSummary(result.summary),
           message: refreshableGames.length === 1
             ? formatGameToastMessage(hasPartialFailures ? t('toast.steamPlaytimePartiallyRefreshed') : t('toast.steamPlaytimeRefreshed'), refreshableGames[0])
             : hasPartialFailures ? t('app.steamPlaytimePartiallyRefreshed') : t('app.steamPlaytimeRefreshed'),
@@ -501,8 +503,9 @@ export function useAppSyncActions({
           updatedCount: currentSummary.updatedCount + (result.status === 'updated' ? 1 : 0),
           noMatchCount: currentSummary.noMatchCount + (result.status === 'no-match' ? 1 : 0),
           failedCount: currentSummary.failedCount + (result.status === 'failed' ? 1 : 0),
+          historicalLowCount: currentSummary.historicalLowCount + (result.status === 'updated' && result.deal?.isHistoricalLow ? 1 : 0),
         }),
-        { updatedCount: 0, noMatchCount: 0, failedCount: 0 },
+        { updatedCount: 0, noMatchCount: 0, failedCount: 0, historicalLowCount: 0 },
       );
       const resultByGameId = new Map(results.map((result) => [result.gameId, result]));
 
@@ -549,7 +552,7 @@ export function useAppSyncActions({
         };
       }));
 
-      const message = formatMessageTemplate(t('app.bulkItadSummary'), { updated: summary.updatedCount, noMatch: summary.noMatchCount, failed: summary.failedCount });
+      const message = `${summary.updatedCount} deals updated · ${summary.historicalLowCount} historical lows found · ${summary.failedCount} failures${summary.noMatchCount > 0 ? ` · ${summary.noMatchCount} no match` : ''}.`;
       setItadDealSyncState({ status: summary.failedCount > 0 ? 'error' : 'success', message, summary });
       addToastNotification({ category: summary.failedCount > 0 ? 'warning' : 'success', dedupeKey: 'itad-deal-sync-complete', message });
       return summary;

@@ -22,6 +22,7 @@ export function refreshSteamPlaytimeForGames(
   const activityRecords: PlayActivityRecord[] = [];
   const detectedAt = new Date(refreshedAt);
   const summary: SteamPlaytimeRefreshSummary = {
+    deltaMinutes: 0,
     failedCount: 0,
     skippedNonSteamCount: 0,
     unchangedCount: 0,
@@ -62,6 +63,7 @@ export function refreshSteamPlaytimeForGames(
     });
     if (activityRecord) {
       activityRecords.push(activityRecord);
+      summary.deltaMinutes += Math.max(0, activityRecord.deltaMinutes ?? 0);
     }
 
     const hasChanged = game.playtimeHours !== playtimeHours
