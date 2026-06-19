@@ -26,6 +26,10 @@ export function useAppPersistence({
   gamesRef.current = games;
 
   const saveGamesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ignoredSteamGamesSnapshotRef = useRef(JSON.stringify(ignoredSteamGames));
+  const playActivitySnapshotRef = useRef(JSON.stringify(playActivity));
+  const onboardingStateSnapshotRef = useRef(JSON.stringify(onboardingState));
+  const platformQueueStateSnapshotRef = useRef(JSON.stringify(platformQueueState));
 
   // Flush on unmount
   useEffect(() => {
@@ -64,20 +68,47 @@ export function useAppPersistence({
   }, []);
 
   useEffect(() => {
+    if (!hasPersistedValueChanged(ignoredSteamGamesSnapshotRef, ignoredSteamGames)) {
+      return;
+    }
+
     saveIgnoredSteamGames(ignoredSteamGames);
   }, [ignoredSteamGames]);
 
   useEffect(() => {
+    if (!hasPersistedValueChanged(playActivitySnapshotRef, playActivity)) {
+      return;
+    }
+
     savePlayActivity(playActivity);
   }, [playActivity]);
 
   useEffect(() => {
+    if (!hasPersistedValueChanged(onboardingStateSnapshotRef, onboardingState)) {
+      return;
+    }
+
     saveOnboardingState(onboardingState);
   }, [onboardingState]);
 
   useEffect(() => {
+    if (!hasPersistedValueChanged(platformQueueStateSnapshotRef, platformQueueState)) {
+      return;
+    }
+
     savePlatformQueueState(platformQueueState);
   }, [platformQueueState]);
 
   return { gamesRef };
+}
+
+function hasPersistedValueChanged<T>(snapshotRef: { current: string }, value: T) {
+  // Seeded from loaded state so mount-time effects do not rewrite unchanged persisted slices.
+  const nextSnapshot = JSON.stringify(value);
+  if (snapshotRef.current === nextSnapshot) {
+    return false;
+  }
+
+  snapshotRef.current = nextSnapshot;
+  return true;
 }
