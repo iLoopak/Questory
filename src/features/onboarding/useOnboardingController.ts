@@ -25,7 +25,7 @@ export function useOnboardingController({ setActiveNavItem, setActiveSettingsCat
   });
 
   const analyticsSettings = loadAnalyticsSettings();
-  const requiredOnboardingItemIds = useMemo(() => onboardingItemIds.filter((itemId) => itemId !== 'analytics-notice' || !analyticsSettings.hasSeenAnalyticsNotice), [analyticsSettings.hasSeenAnalyticsNotice]);
+  const requiredOnboardingItemIds = useMemo(() => onboardingItemIds, []);
   const completedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => itemId === 'analytics-notice' && analyticsSettings.hasSeenAnalyticsNotice || Boolean(onboardingState.completedAt[itemId]))), [analyticsSettings.hasSeenAnalyticsNotice, onboardingState.completedAt]);
   const skippedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.skippedAt[itemId]))), [onboardingState.skippedAt]);
   const finishedOnboardingItemIds = useMemo(() => new Set(requiredOnboardingItemIds.filter((itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId))), [completedOnboardingItemIds, requiredOnboardingItemIds, skippedOnboardingItemIds]);
