@@ -760,11 +760,37 @@ const CompactGameRow = memo(function CompactGameRow({
   return (
     <article
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-compact-card flex min-w-0 flex-col gap-2 rounded-lg border bg-ink-950/70 p-2 transition hover:border-mint/35 hover:bg-mint/10 focus-within:border-mint/70 sm:flex-row sm:items-center ${
+      className={`qs-compact-card flex min-w-0 gap-2 rounded-lg border bg-ink-950/70 p-2 transition hover:border-mint/35 hover:bg-mint/10 focus-within:border-mint/70 ${
+        isMultiSelectMode ? 'flex-row items-center' : 'flex-col sm:flex-row sm:items-center'
+      } ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/25' : 'border-skyglass/15'
       }`}
     >
-      <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={isMultiSelectMode ? toggleSelected : openDetails} type="button">
+      {isMultiSelectMode ? (
+        <label
+          className={`grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md border transition focus-within:ring-2 focus-within:ring-mint/70 ${
+            isSelected ? 'border-mint bg-mint text-ink-950 shadow-glow' : 'border-skyglass/30 bg-ink-950/70 text-slate-300 hover:border-mint/60 hover:text-white'
+          }`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <input aria-label={`Select ${game.title}`} checked={isSelected} className="sr-only" onChange={toggleSelected} type="checkbox" />
+          {isSelected ? (
+            <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-current opacity-80" />
+          )}
+        </label>
+      ) : null}
+
+      <button
+        aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
+        aria-pressed={isMultiSelectMode ? isSelected : undefined}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        onClick={isMultiSelectMode ? toggleSelected : openDetails}
+        type="button"
+      >
         <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-md bg-ink-700">
           {activeCoverSource ? (
             <img
