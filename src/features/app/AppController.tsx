@@ -219,6 +219,7 @@ export function AppController() {
     shelfProfileRef,
   } = useShelfProfileController(games, platformQueueState, steamProfileName);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const mainContentRef = useRef<HTMLElement | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
@@ -453,12 +454,14 @@ export function AppController() {
   }, []);
 
   useEffect(() => {
+    const el = mainContentRef.current;
+    if (!el) return;
     function handleScroll() {
-      const nextIsScrolled = window.scrollY > 15;
+      const nextIsScrolled = el.scrollTop > 15;
       setIsScrolled((currentIsScrolled) => (currentIsScrolled === nextIsScrolled ? currentIsScrolled : nextIsScrolled));
     }
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
@@ -1505,9 +1508,9 @@ export function AppController() {
 
   return (
     <I18nProvider language={language}>
-    <main className={`qs-app-root min-h-screen bg-ink-950 text-slate-100 ${activeUtilityView === 'playing-now' ? 'h-dvh overflow-hidden' : ''} ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
-      <div className={`qs-handheld-shell mx-auto w-full max-w-7xl px-3 py-2 sm:px-4 lg:px-5 ${activeNavItem === 'Home' && activeUtilityView !== 'playing-now' ? '' : `flex min-h-screen flex-col ${activeUtilityView === 'playing-now' ? 'h-full min-h-0 overflow-hidden' : ''}`}`}>
-        <header className={`qs-compact-header qs-glass flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
+    <main className={`qs-app-root bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
+      <div className="qs-handheld-shell mx-auto flex w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
+        <header className={`qs-compact-header qs-glass shrink-0 flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="relative min-w-0 shrink-0" ref={shelfProfileRef}>
             <button
               aria-expanded={isShelfProfileOpen}
@@ -1593,9 +1596,9 @@ export function AppController() {
           <BackToTopButton />
         </header>
 
-        <section className={`bg-ink-950 py-2 ${activeNavItem === 'Home' && activeUtilityView !== 'playing-now' ? '' : 'min-h-0 flex-1'} ${activeUtilityView === 'playing-now' ? 'flex flex-col overflow-hidden' : ''}`}>
+        <section ref={mainContentRef} className="qs-main-scroll bg-ink-950 py-2">
           {activeUtilityView === 'playing-now' ? (
-            <div className="qs-playing-now-scroll h-full min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-1">
+            <div className="qs-playing-now-scroll overflow-y-auto overscroll-contain pb-8 pr-1">
               <PlayingNowHub
                 activity={playActivity}
                 featuredGame={resolvedFeaturedGame}
