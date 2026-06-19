@@ -38,11 +38,12 @@ function formatMessageTemplate(template: string, values: Record<string, string |
 type DataManagementPanelProps = {
   autoBackupSignal?: string;
   onBackupExported?: () => void;
+  onBackupImported?: () => void;
 };
 
 type ImportMode = 'merge' | 'replace';
 
-export function DataManagementPanel({ autoBackupSignal, onBackupExported }: DataManagementPanelProps) {
+export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBackupImported }: DataManagementPanelProps) {
   const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [includeIntegrationSettings, setIncludeIntegrationSettings] = useState(false);
@@ -287,6 +288,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported }: Data
     }
 
     showMessage(t('data.backupImported'), 'success');
+    onBackupImported?.();
     window.setTimeout(() => window.location.reload(), 600);
   }
 
