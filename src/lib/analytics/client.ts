@@ -133,7 +133,7 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-QS-Analytics-Key': config.analyticsKey,
+        'x-make-apikey': config.analyticsKey,
       },
       body: JSON.stringify(event),
       keepalive: true,
