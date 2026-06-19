@@ -631,7 +631,7 @@ function NextAdventureCard({
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 to-transparent" />
         </div>
       ) : null}
-      <div className="relative flex flex-col gap-3 p-4">
+      <div className="relative flex h-full flex-col gap-3 p-4">
         <PlatformBadge
           className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
           platform={entry.targetPlatform}
@@ -641,7 +641,7 @@ function NextAdventureCard({
           <div className="text-xs text-slate-500">{t('home.nextCandidate')}</div>
           <h3 className="mt-0.5 text-lg font-bold leading-snug text-white">{game.title}</h3>
         </div>
-        <div className="flex gap-2">
+        <div className="mt-auto flex gap-2">
           <button
             className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             data-home-focus="true"
