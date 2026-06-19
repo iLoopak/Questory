@@ -473,24 +473,21 @@ export function HomePanel({
           {/* Active Platforms */}
           <HomeSection compact title={t('home.activePlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
             {activePlayingPlatforms.length > 0 ? (
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 {activePlayingPlatforms.map(({ platform, count }) => (
                   <button
                     key={platform}
-                    className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-skyglass/15 bg-ink-950/72 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10"
+                    className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-skyglass/15 bg-ink-950/72 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10"
                     data-home-focus="true"
                     onClick={() => onOpenQueue(platform)}
                     type="button"
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold text-white">{platform}</span>
-                      <PlatformBadge
-                        className="mt-0.5 w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
-                        platform={platform}
-                        queueState={queueState}
-                      />
-                    </span>
-                    <span className="shrink-0 text-sm font-semibold text-mint">
+                    <PlatformBadge
+                      className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                      platform={platform}
+                      queueState={queueState}
+                    />
+                    <span className="shrink-0 text-xs font-semibold text-mint">
                       {count} {count === 1 ? t('home.activeGame') : t('home.activeGames')}
                     </span>
                   </button>
