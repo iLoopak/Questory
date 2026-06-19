@@ -65,6 +65,7 @@ export function HomePanel({
   const { t } = useI18n();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
   const [dealSheetGame, setDealSheetGame] = useState<Game | null>(null);
+  const [syncSheetOpen, setSyncSheetOpen] = useState(false);
   const queueEntries = queueState.entries;
   const shellRef = useRef<HTMLElement | null>(null);
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
@@ -152,6 +153,8 @@ export function HomePanel({
 
   const isSteamSyncing =
     steamAchievementSyncState?.status === 'loading' || steamPlaytimeRefreshState?.status === 'loading';
+  const hasSyncActions = (hasSteamGames && !!onSyncSteamData) || !!onSyncItadDeals;
+  const isAnySyncing = isSteamSyncing || itadDealSyncState?.status === 'loading';
 
   const greeting = useRef<string | null>(null);
   if (!greeting.current) {
@@ -276,6 +279,25 @@ export function HomePanel({
               <div className="text-xl font-bold text-white">{reviewRemainingCount}</div>
               <div className="text-xs text-slate-400">{t('home.heroQueueCount')}</div>
             </button>
+            {hasSyncActions ? (
+              <>
+                <div className="h-8 w-px bg-skyglass/20" />
+                <button
+                  aria-label={t('home.syncMaintenance')}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-slate-300 focus:outline-none focus:ring-1 focus:ring-mint/40"
+                  data-home-focus="true"
+                  onClick={() => setSyncSheetOpen(true)}
+                  type="button"
+                >
+                  <Icon
+                    name="refresh-cw"
+                    size={15}
+                    strokeWidth={2}
+                    className={isAnySyncing ? 'animate-spin text-mint' : ''}
+                  />
+                </button>
+              </>
+            ) : null}
           </div>
           {featuredGame ? (
             <button
@@ -396,61 +418,6 @@ export function HomePanel({
             </button>
           </section>
 
-          {/* Sync */}
-          {(hasSteamGames && onSyncSteamData) || onSyncItadDeals ? (
-            <HomeSection compact title={t('home.sync')}>
-              <div className="grid gap-1.5">
-                {hasSteamGames && onSyncSteamData ? (
-                  <button
-                    className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-skyglass/15 bg-ink-950/70 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10 disabled:opacity-50"
-                    data-home-focus="true"
-                    disabled={isSteamSyncing}
-                    onClick={onSyncSteamData}
-                    type="button"
-                  >
-                    <Icon
-                      name={isSteamSyncing ? 'refresh-cw' : 'steam'}
-                      size={14}
-                      strokeWidth={2}
-                      className={`shrink-0 text-slate-400 ${isSteamSyncing ? 'animate-spin' : ''}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold text-slate-200">{t('home.syncSteamData')}</span>
-                      {!isSteamSyncing && lastSteamSyncAt ? (
-                        <span className="block text-[0.6875rem] text-slate-500">{formatRelativeTime(lastSteamSyncAt, '')}</span>
-                      ) : isSteamSyncing ? (
-                        <span className="block text-[0.6875rem] text-mint">{t('home.syncingSteamData')}</span>
-                      ) : null}
-                    </span>
-                  </button>
-                ) : null}
-                {onSyncItadDeals ? (
-                  <button
-                    className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-skyglass/15 bg-ink-950/70 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10 disabled:opacity-50"
-                    data-home-focus="true"
-                    disabled={itadDealSyncState?.status === 'loading'}
-                    onClick={onSyncItadDeals}
-                    type="button"
-                  >
-                    <Icon
-                      name={itadDealSyncState?.status === 'loading' ? 'refresh-cw' : 'shopping-bag'}
-                      size={14}
-                      strokeWidth={2}
-                      className={`shrink-0 text-slate-400 ${itadDealSyncState?.status === 'loading' ? 'animate-spin' : ''}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold text-slate-200">{t('home.syncDeals')}</span>
-                      {itadDealSyncState?.status === 'loading' ? (
-                        <span className="block text-[0.6875rem] text-mint">{t('home.syncingSteamData')}</span>
-                      ) : lastItadSyncAt ? (
-                        <span className="block text-[0.6875rem] text-slate-500">{formatRelativeTime(lastItadSyncAt, '')}</span>
-                      ) : null}
-                    </span>
-                  </button>
-                ) : null}
-              </div>
-            </HomeSection>
-          ) : null}
         </div>
       </div>
 
@@ -463,6 +430,20 @@ export function HomePanel({
             setDealSheetGame(null);
             onOpenDetails(game);
           }}
+        />
+      ) : null}
+
+      {/* Sync & Maintenance sheet */}
+      {syncSheetOpen ? (
+        <SyncMaintenanceSheet
+          hasSteamGames={hasSteamGames}
+          isSteamSyncing={isSteamSyncing}
+          itadDealSyncState={itadDealSyncState}
+          lastItadSyncAt={lastItadSyncAt}
+          lastSteamSyncAt={lastSteamSyncAt}
+          onClose={() => setSyncSheetOpen(false)}
+          onSyncItadDeals={onSyncItadDeals}
+          onSyncSteamData={onSyncSteamData}
         />
       ) : null}
 
@@ -912,6 +893,126 @@ function WishlistDealActionSheet({
           </div>
 
           {/* Cancel */}
+          <button
+            className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300"
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SyncMaintenanceSheet({
+  hasSteamGames,
+  isSteamSyncing,
+  itadDealSyncState,
+  lastItadSyncAt,
+  lastSteamSyncAt,
+  onClose,
+  onSyncItadDeals,
+  onSyncSteamData,
+}: {
+  hasSteamGames: boolean;
+  isSteamSyncing: boolean;
+  itadDealSyncState?: ItadDealSyncState;
+  lastItadSyncAt: string | null;
+  lastSteamSyncAt: Date | null;
+  onClose: () => void;
+  onSyncItadDeals?: () => void;
+  onSyncSteamData?: () => void;
+}) {
+  const { t } = useI18n();
+  const isItadSyncing = itadDealSyncState?.status === 'loading';
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('home.syncMaintenance')}
+    >
+      <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
+        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}
+      >
+        <div className="flex justify-center pb-2 pt-3">
+          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" />
+        </div>
+        <div className="px-4 pb-2 pt-1">
+          <h3 className="mb-4 text-base font-bold text-white">{t('home.syncMaintenance')}</h3>
+
+          <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
+            {hasSteamGames && onSyncSteamData ? (
+              <button
+                className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50"
+                disabled={isSteamSyncing}
+                onClick={onSyncSteamData}
+                type="button"
+              >
+                <Icon
+                  name={isSteamSyncing ? 'refresh-cw' : 'steam'}
+                  size={18}
+                  strokeWidth={2}
+                  className={`shrink-0 text-slate-400 ${isSteamSyncing ? 'animate-spin' : ''}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-200">{t('home.syncSteamData')}</span>
+                  <span className={`block text-xs ${isSteamSyncing ? 'text-mint' : 'text-slate-500'}`}>
+                    {isSteamSyncing
+                      ? t('home.syncingSteamData')
+                      : lastSteamSyncAt
+                        ? formatRelativeTime(lastSteamSyncAt, t('home.neverSynced'))
+                        : t('home.neverSynced')}
+                  </span>
+                </div>
+                {!isSteamSyncing ? (
+                  <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" />
+                ) : null}
+              </button>
+            ) : null}
+            {onSyncItadDeals ? (
+              <button
+                className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50"
+                disabled={isItadSyncing}
+                onClick={onSyncItadDeals}
+                type="button"
+              >
+                <Icon
+                  name={isItadSyncing ? 'refresh-cw' : 'shopping-bag'}
+                  size={18}
+                  strokeWidth={2}
+                  className={`shrink-0 text-slate-400 ${isItadSyncing ? 'animate-spin' : ''}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-200">{t('home.syncDeals')}</span>
+                  <span className={`block text-xs ${isItadSyncing ? 'text-mint' : 'text-slate-500'}`}>
+                    {isItadSyncing
+                      ? t('home.syncingSteamData')
+                      : lastItadSyncAt
+                        ? formatRelativeTime(lastItadSyncAt, t('home.neverSynced'))
+                        : t('home.neverSynced')}
+                  </span>
+                </div>
+                {!isItadSyncing ? (
+                  <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" />
+                ) : null}
+              </button>
+            ) : null}
+          </div>
+
           <button
             className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300"
             onClick={onClose}
