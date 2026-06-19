@@ -3408,3 +3408,18 @@ body.qs-controller-active .qs-compact-card:focus-within {
 :root[data-theme='light'] .playing-now-play-button {
   background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 70%, var(--qs-accent-primary));
 }
+
+.qs-sheet-drag-region {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.qs-sheet-drag-region:active {
+  cursor: grabbing;
+}
+
+.qs-action-sheet-panel,
+.qs-game-action-scroll {
+  touch-action: pan-y;
+}

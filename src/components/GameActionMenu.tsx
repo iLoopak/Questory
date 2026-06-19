@@ -7,6 +7,7 @@ import { buildHltbSearchUrl, getHltbGameSearchTitle } from '../lib/hltb';
 import { Icon, type IconName } from './Icon';
 import type { Game, GameStatus } from '../types/game';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 
 type GameActionMenuProps = {
@@ -167,6 +168,7 @@ function GameActionMenuOverlay({
   t,
 }: GameActionMenuOverlayProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef: menuRef, onClose });
   // Tracks whether the menu was dismissed via Escape key so focus can be
   // restored for keyboard users. Touch/click closes must NOT restore focus —
   // on Android WebView a focused button intercepts the next scroll gesture.
@@ -259,12 +261,13 @@ function GameActionMenuOverlay({
         aria-label={`${t('action.actions')} ${game.title}`}
         aria-modal="true"
         className="qs-game-action-sheet pointer-events-auto w-full max-w-md rounded-t-3xl sm:max-w-xl sm:rounded-3xl"
+        style={dragStyle}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleMenuKeyDown}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="qs-game-action-header">
+        <div className="qs-game-action-header qs-sheet-drag-region" {...dragHandleProps}>
           <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800">
             {coverSrc ? (
               <img alt="" className="h-full w-full object-cover" src={coverSrc} />

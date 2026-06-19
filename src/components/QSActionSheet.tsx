@@ -4,6 +4,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { Icon, type IconName } from './Icon';
 import { PlatformBadge } from './PlatformBadge';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 export type QSActionSheetProps = {
   game: Game;
@@ -27,6 +28,8 @@ export function QSActionSheet({
   const [noteMode, setNoteMode] = useState(false);
   const [noteDraft, setNoteDraft] = useState(game.notes ?? '');
   const noteRef = useRef<HTMLTextAreaElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
 
   const coverSource = getGameCoverSources(game)[0];
   const platformLabel: GamePlatform =
@@ -71,10 +74,11 @@ export function QSActionSheet({
 
       <div
         className="qs-action-sheet-panel relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}
+        ref={panelRef}
+        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))', ...dragStyle }}
       >
         {/* Drag handle */}
-        <div className="flex justify-center pb-2 pt-3">
+        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}>
           <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
         </div>
 
