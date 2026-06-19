@@ -1658,6 +1658,12 @@ export function AppController() {
                 logPlayedToday(game);
                 addToastNotification({ category: 'success', dedupeKey: `play-today:${game.id}`, message: `${game.title} tracked for today.` });
               }}
+              onQuickNote={(gameId, notes) => {
+                const target = games.find((g) => g.id === gameId);
+                if (!target) return;
+                updateGameTracking(gameId, { notes, status: target.status, tags: target.tags });
+                addToastNotification({ category: 'success', dedupeKey: `quick-note:${gameId}`, message: 'Note saved.' });
+              }}
               onStatusChange={updateGameStatus}
               onSyncSteamData={() => {
                 void refreshSteamPlaytime();
