@@ -160,11 +160,11 @@ export function QSActionSheet({
             {/* Primary action */}
             {onPlayToday ? (
               <button
-                className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-[0.9375rem] font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-bold text-ink-950 transition active:scale-[0.97] hover:bg-mint/90"
                 onClick={() => { onPlayToday(game); onClose(); }}
                 type="button"
               >
-                <Icon name="play-circle" size={20} strokeWidth={2.5} />
+                <Icon name="play-circle" size={17} strokeWidth={2.5} />
                 Play Today
               </button>
             ) : null}
@@ -175,7 +175,7 @@ export function QSActionSheet({
                 <div className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
                   Manage
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-skyglass/12">
+                <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
                   {onQuickNote ? (
                     <SheetAction
                       icon="pencil"
