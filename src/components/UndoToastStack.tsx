@@ -130,7 +130,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
       {visibleActions.map((action) => {
         const category = action.category ?? 'success';
         const categoryStyles = getToastCategoryStyles(category);
-        const toastActions = action.actions ?? [];
+        const toastActions = (action.actions ?? []).filter((toastAction) => !isGenericDismissToastAction(toastAction));
         const hasDetails = Boolean(action.details?.trim());
         const isDetailsExpanded = expandedDetailIds.has(action.id);
         const hasActionError = failedActionIds.has(action.id);
@@ -213,6 +213,10 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
       })}
     </aside>
   );
+}
+
+function isGenericDismissToastAction(action: ToastAction) {
+  return action.kind === 'dismiss' || (action.label === 'Dismiss' && !action.onClick);
 }
 
 function getToastCategoryStyles(category: ToastCategory) {
