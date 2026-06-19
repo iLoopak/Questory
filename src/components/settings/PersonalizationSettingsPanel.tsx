@@ -9,6 +9,8 @@ import {
   type ShelfIdentitySettings,
 } from '../../lib/shelfIdentity';
 import { useI18n } from '../../i18n';
+import { getSteamProfileDisplayName, loadSteamSettings, saveSteamSettings } from '../../lib/steamSettingsStorage';
+import { getSteamPlayerSummary } from '../../services/steamApi';
 import type { Game } from '../../types/game';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import { SettingsSection } from './SettingsSection';
@@ -50,6 +52,7 @@ export function PersonalizationSettingsPanel({
   steamAvatarUrl = '',
   steamPersonaName = '',
   onShelfIdentityChange,
+  onSteamAvatarImported,
 }: {
   personalizedQuestShelfTitle: string;
   shelfIdentity: ShelfIdentitySettings;
@@ -59,12 +62,14 @@ export function PersonalizationSettingsPanel({
   steamAvatarUrl?: string;
   steamPersonaName?: string;
   onShelfIdentityChange: (identity: ShelfIdentitySettings) => void;
+  onSteamAvatarImported?: (personaName: string) => void;
 }) {
   const { t } = useI18n();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarUploadStatus, setAvatarUploadStatus] = useState('');
   const [avatarUploadError, setAvatarUploadError] = useState('');
   const [manualGameSearch, setManualGameSearch] = useState('');
+  const [isImportingSteamAvatar, setIsImportingSteamAvatar] = useState(false);
 
   function updateShelfName(shelfName: string) {
     onShelfIdentityChange({ ...shelfIdentity, shelfName });
@@ -96,6 +101,39 @@ export function PersonalizationSettingsPanel({
     setAvatarUploadError('');
   }
 
+  async function useSteamAvatar() {
+    setAvatarUploadStatus('');
+    setAvatarUploadError('');
+    if (steamAvatarUrl) {
+      updateShelfAvatar('steam');
+      setAvatarUploadStatus(t('personalization.steamAvatarSelected'));
+      return;
+    }
+
+    const steamSettings = loadSteamSettings();
+    if (!steamSettings.apiKey.trim() || !steamSettings.steamId64.trim()) {
+      setAvatarUploadError(t('personalization.steamAvatarCredentialsMissing'));
+      return;
+    }
+
+    setIsImportingSteamAvatar(true);
+    try {
+      const profile = await getSteamPlayerSummary(steamSettings);
+      if (!profile?.avatarUrl) {
+        setAvatarUploadError(t('personalization.steamAvatarUnavailable'));
+        return;
+      }
+      const nextSettings = { ...steamSettings, profile: { ...profile, updatedAt: new Date().toISOString() } };
+      saveSteamSettings(nextSettings);
+      onShelfIdentityChange({ ...shelfIdentity, avatarSelection: 'steam', shelfAvatar: 'steam' });
+      onSteamAvatarImported?.(getSteamProfileDisplayName(nextSettings));
+      setAvatarUploadStatus(t('personalization.steamAvatarImported'));
+    } catch (error) {
+      setAvatarUploadError(error instanceof Error ? error.message : t('personalization.steamAvatarFetchFailed'));
+    } finally {
+      setIsImportingSteamAvatar(false);
+    }
+  }
 
   function updateFeaturedGameMode(featuredGameMode: FeaturedGameMode) {
     onShelfIdentityChange({ ...shelfIdentity, featuredGameMode });
@@ -193,6 +231,15 @@ export function PersonalizationSettingsPanel({
                 {t('personalization.clearCustomAvatar')}
               </button>
             ) : null}
+            <button
+              className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isImportingSteamAvatar}
+              onClick={() => void useSteamAvatar()}
+              type="button"
+            >
+              {isImportingSteamAvatar ? t('personalization.steamAvatarImporting') : t('personalization.useSteamAvatar')}
+            </button>
+            <span className="text-xs leading-5 text-slate-500">{steamAvatarUrl ? t('personalization.steamAvatarAvailableHelp') : t('personalization.steamAvatarMissingHelp')}</span>
             <span className="text-xs leading-5 text-slate-500">{t('personalization.avatarCropHelp')}</span>
           </div>
           {avatarUploadStatus ? <div className="mt-2 text-sm text-mint">{avatarUploadStatus}</div> : null}
