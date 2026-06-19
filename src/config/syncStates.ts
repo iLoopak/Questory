@@ -23,7 +23,7 @@ export const initialSteamPlaytimeRefreshState: SteamPlaytimeRefreshState = {
 export type ItadDealSyncState = {
   status: 'idle' | 'loading' | 'success' | 'error';
   message: string;
-  summary: { updatedCount: number; noMatchCount: number; failedCount: number } | null;
+  summary: { updatedCount: number; noMatchCount: number; failedCount: number; historicalLowCount: number } | null;
 };
 
 export const initialItadDealSyncState: ItadDealSyncState = {

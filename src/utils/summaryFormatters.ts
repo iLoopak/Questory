@@ -53,7 +53,7 @@ export function formatSteamDataPartialDetails(
 }
 
 export function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncSummary) {
-  const completionPrefix = 'Steam achievements sync complete.';
+  const completionPrefix = summary.updatedCount > 0 ? `${summary.updatedCount} games updated with achievement changes.` : 'No new achievements found.';
   const parts = [
     `${summary.updatedCount} updated`,
     summary.unchangedCount > 0 ? `${summary.unchangedCount} unchanged` : null,
@@ -63,6 +63,22 @@ export function formatSteamAchievementSyncSummary(summary: SteamAchievementSyncS
   ].filter(Boolean);
 
   return `${completionPrefix} ${parts.join(' · ')}.`;
+}
+
+
+export function formatSteamPlaytimeRefreshSummary(summary: SteamPlaytimeRefreshSummary) {
+  const delta = formatPlaytimeDelta(summary.deltaMinutes);
+  const prefix = summary.deltaMinutes > 0 ? `+${delta} updated` : 'No new playtime found';
+  return `${prefix}. ${summary.updatedCount} games updated · ${summary.unchangedCount} unchanged · ${summary.failedCount} failed${summary.skippedNonSteamCount > 0 ? ` · ${summary.skippedNonSteamCount} non-Steam skipped` : ''}.`;
+}
+
+function formatPlaytimeDelta(totalMinutes: number) {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours > 0 && remainingMinutes > 0) return `${hours}h ${remainingMinutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${remainingMinutes}m`;
 }
 
 export function formatBulkSummary(summary: BulkActionSummary) {
