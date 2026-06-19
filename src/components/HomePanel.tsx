@@ -17,6 +17,7 @@ type HomePanelProps = {
   featuredGame?: Game | null;
   games: Game[];
   ignoredReviewGameIds: Set<string>;
+  reviewQueueOrder: string[];
   queueState: PlatformQueueState;
   steamAchievementSyncState?: SteamAchievementSyncState;
   steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
@@ -42,6 +43,7 @@ export function HomePanel({
   featuredGame = null,
   games,
   ignoredReviewGameIds,
+  reviewQueueOrder,
   queueState,
   steamAchievementSyncState,
   steamPlaytimeRefreshState,
@@ -86,12 +88,20 @@ export function HomePanel({
   }, [continuePlayingGames, gamesById, queueEntries]);
 
   const nextReviewCandidate = useMemo<Game | null>(() => {
+    const queueOrderPositions = new Map(reviewQueueOrder.map((id, i) => [id, i]));
     return (
       games
         .filter((g) => isBacklogReviewCandidate(g) && !ignoredReviewGameIds.has(g.id))
-        .sort((a, b) => getActivityTime(a) - getActivityTime(b))[0] ?? null
+        .sort((a, b) => {
+          const qa = queueOrderPositions.get(a.id);
+          const qb = queueOrderPositions.get(b.id);
+          if (qa !== undefined || qb !== undefined) {
+            return (qa ?? Number.MAX_SAFE_INTEGER) - (qb ?? Number.MAX_SAFE_INTEGER);
+          }
+          return getTime(b.importedAt ?? b.updatedAt) - getTime(a.importedAt ?? a.updatedAt);
+        })[0] ?? null
     );
-  }, [games, ignoredReviewGameIds]);
+  }, [games, ignoredReviewGameIds, reviewQueueOrder]);
 
   const wishlistDeals = useMemo(() => {
     return games
@@ -114,6 +124,12 @@ export function HomePanel({
   const reviewRemainingCount = useMemo(() => {
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id)).length;
   }, [games, ignoredReviewGameIds]);
+
+  const lastPlayedGame = useMemo(() => {
+    return libraryGames
+      .filter((g) => getActivityTime(g) > 0)
+      .sort((a, b) => getActivityTime(b) - getActivityTime(a))[0] ?? null;
+  }, [libraryGames]);
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
 
@@ -247,6 +263,11 @@ export function HomePanel({
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
           {shelfTitle ? <div className="text-xs font-semibold text-mint">{shelfTitle}</div> : null}
           <div className="mt-0.5 truncate text-xs text-slate-500">{greeting.current}</div>
+          {lastPlayedGame ? (
+            <div className="mt-0.5 truncate text-xs text-slate-600">
+              {lastPlayedGame.title} · {formatRelativeTime(lastPlayedGame.lastPlayedAt ?? lastPlayedGame.updatedAt ?? lastPlayedGame.importedAt, '')}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div className="flex items-center gap-4">
@@ -286,7 +307,7 @@ export function HomePanel({
           {/* Continue Playing */}
           <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
-              <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : 'sm:grid-cols-2'}`}>
+              <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : continuePlayingGames.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                 {continuePlayingGames.map((game) => (
                   <GamePosterButton
                     key={game.id}
@@ -388,21 +409,21 @@ export function HomePanel({
           {/* Active Platforms */}
           <HomeSection compact title={t('home.activePlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
             {activePlayingPlatforms.length > 0 ? (
-              <div className="grid gap-1.5">
+              <div className="grid gap-1">
                 {activePlayingPlatforms.map(({ platform, count }) => (
                   <button
                     key={platform}
-                    className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-skyglass/15 bg-ink-950/72 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10"
+                    className="flex min-h-8 items-center justify-between gap-2 rounded-md border border-skyglass/15 bg-ink-950/72 px-2.5 text-left transition hover:border-mint/35 hover:bg-mint/10"
                     data-home-focus="true"
                     onClick={() => onOpenQueue(platform)}
                     type="button"
                   >
                     <PlatformBadge
-                      className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                      className="w-fit rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold"
                       platform={platform}
                       queueState={queueState}
                     />
-                    <span className="shrink-0 text-xs font-semibold text-mint">
+                    <span className="shrink-0 text-[0.6875rem] font-semibold text-mint">
                       {count} {count === 1 ? t('home.activeGame') : t('home.activeGames')}
                     </span>
                   </button>
@@ -618,7 +639,12 @@ function NextAdventureCard({
   const coverSource = getGameCoverSources(game)[0];
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70">
+    <button
+      className="relative w-full overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
+      data-home-focus="true"
+      onClick={onOpenPlan}
+      type="button"
+    >
       {coverSource ? (
         <div className="absolute inset-0">
           <img
@@ -641,27 +667,19 @@ function NextAdventureCard({
           <div className="text-xs text-slate-500">{t('home.nextCandidate')}</div>
           <h3 className="mt-0.5 text-lg font-bold leading-snug text-white">{game.title}</h3>
         </div>
-        <div className="mt-auto flex gap-2">
+        <div className="mt-auto">
           <button
-            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             data-home-focus="true"
-            onClick={onPlay}
+            onClick={(e) => { e.stopPropagation(); onPlay(); }}
             type="button"
           >
             <Icon name="play-circle" size={16} strokeWidth={2.5} />
             {t('home.playToday')}
           </button>
-          <button
-            className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
-            data-home-focus="true"
-            onClick={onOpenPlan}
-            type="button"
-          >
-            {t('home.open')} {entry.targetPlatform} {t('home.planSuffix')}
-          </button>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
