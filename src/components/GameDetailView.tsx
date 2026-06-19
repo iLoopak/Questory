@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
@@ -68,11 +68,16 @@ export function GameDetailView({
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isRawgLinkOpen, setIsRawgLinkOpen] = useState(false);
   const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
 
   const coverSources = useMemo(() => {
     return getGameCoverSources(game);
   }, [game]);
+
+  useLayoutEffect(() => {
+    detailScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [game.id]);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -193,7 +198,7 @@ export function GameDetailView({
   return (
     <section className="min-h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+        <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
             <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
               {game.backgroundImage ? (

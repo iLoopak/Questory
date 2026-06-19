@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { Icon } from '../../components/Icon';
 
@@ -200,6 +200,7 @@ export function AppController() {
     trackMinimalAnalyticsEvent(eventName, importSource);
   }
   const mainContentRef = useRef<HTMLElement | null>(null);
+  const selectedGameScrollRestoreRef = useRef<number | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
@@ -417,6 +418,37 @@ export function AppController() {
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useLayoutEffect(() => {
+    const isCollectionDetailOpen = Boolean(selectedGameId) && (activeNavItem === 'Library' || activeNavItem === 'Wishlist');
+    const el = mainContentRef.current;
+    if (!isCollectionDetailOpen || !el) return;
+
+    if (selectedGameScrollRestoreRef.current === null) {
+      selectedGameScrollRestoreRef.current = el.scrollTop;
+    }
+
+    const previousOverflow = el.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    el.scrollTo({ top: 0, behavior: 'auto' });
+    el.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      el.style.overflow = previousOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+
+      const scrollTop = selectedGameScrollRestoreRef.current;
+      if (scrollTop !== null) {
+        el.scrollTo({ top: scrollTop, behavior: 'auto' });
+        selectedGameScrollRestoreRef.current = null;
+      }
+    };
+  }, [activeNavItem, selectedGameId]);
 
   useEffect(() => {
     markOnboardingItemsComplete([
