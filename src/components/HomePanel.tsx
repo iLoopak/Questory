@@ -70,14 +70,19 @@ export function HomePanel({
       .slice(0, 4);
   }, [libraryGames]);
 
-  const nextAdventureEntry = useMemo<NextAdventureEntry | null>(() => {
+  const nextAdventureEntries = useMemo<NextAdventureEntry[]>(() => {
     const playingIds = new Set(continuePlayingGames.map((g) => g.id));
+    const seenPlatforms = new Set<GamePlatform>();
+    const result: NextAdventureEntry[] = [];
     for (const entry of [...queueEntries].sort(compareQueueEntries)) {
+      if (result.length >= 5) break;
       const game = gamesById.get(entry.gameId);
       if (!game || playingIds.has(game.id) || game.status === 'Playing') continue;
-      return { game, entry };
+      if (seenPlatforms.has(entry.targetPlatform)) continue;
+      result.push({ game, entry });
+      seenPlatforms.add(entry.targetPlatform);
     }
-    return null;
+    return result;
   }, [continuePlayingGames, gamesById, queueEntries]);
 
   const nextReviewCandidate = useMemo<Game | null>(() => {
@@ -302,17 +307,22 @@ export function HomePanel({
             )}
           </HomeSection>
 
-          {/* Next Adventure — single best Platform Plan candidate */}
-          <HomeSection title={t('home.nextAdventure')} actionLabel={t('home.openQueue')} onAction={() => onOpenQueue()}>
-            {nextAdventureEntry ? (
-              <NextAdventureCard
-                entry={nextAdventureEntry.entry}
-                game={nextAdventureEntry.game}
-                queueState={queueState}
-                onPlay={() => setActionSheetGame(nextAdventureEntry.game)}
-                onOpenPlan={() => onOpenQueue(nextAdventureEntry.entry.targetPlatform)}
-                t={t}
-              />
+          {/* Next Adventure — top candidate per active Platform Plan */}
+          <HomeSection title={t('home.nextAdventure')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
+            {nextAdventureEntries.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {nextAdventureEntries.map(({ entry, game }) => (
+                  <NextAdventureCard
+                    key={entry.gameId}
+                    entry={entry}
+                    game={game}
+                    queueState={queueState}
+                    onPlay={() => setActionSheetGame(game)}
+                    onOpenPlan={() => onOpenQueue(entry.targetPlatform)}
+                    t={t}
+                  />
+                ))}
+              </div>
             ) : (
               <EmptyState
                 title={t('home.noPlatformPlan')}
@@ -647,7 +657,7 @@ function NextAdventureCard({
             onClick={onOpenPlan}
             type="button"
           >
-            {t('home.open')} Plan
+            {t('home.open')} {entry.targetPlatform} {t('home.planSuffix')}
           </button>
         </div>
       </div>
