@@ -233,11 +233,13 @@ export function HomePanel({
       const activeIndex = activeElement ? focusableItems.indexOf(activeElement) : -1;
 
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        if (activeIndex === -1) return;
         event.preventDefault();
-        focusableItems[(activeIndex + 1 + focusableItems.length) % focusableItems.length].focus();
+        focusableItems[(activeIndex + 1) % focusableItems.length].focus();
         return;
       }
       if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        if (activeIndex === -1) return;
         event.preventDefault();
         focusableItems[(activeIndex - 1 + focusableItems.length) % focusableItems.length].focus();
         return;
