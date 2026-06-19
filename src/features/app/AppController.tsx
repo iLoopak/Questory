@@ -32,15 +32,15 @@ import {
 } from '../../config/collection';
 import { I18nProvider, createTranslator, useI18n, translateOption } from '../../i18n';
 import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
-import { loadGames, saveGames } from '../../lib/gameStorage';
+import { loadGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import { loadLanguagePreference } from '../../lib/languagePreference';
 import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
 import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
-import { saveOnboardingState, onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
+import { onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
-import { savePlatformQueueState, type PlatformQueueState } from '../../lib/platformQueueStorage';
-import { appendSteamPlaytimeDeltaActivity, formatLocalDate, loadPlayActivity, savePlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
+import type { PlatformQueueState } from '../../lib/platformQueueStorage';
+import { appendSteamPlaytimeDeltaActivity, formatLocalDate, loadPlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadIsThereAnyDealSettings } from '../../lib/isThereAnyDealSettingsStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
@@ -75,12 +75,13 @@ import {
 import { loadReviewModeState, type ReviewModeState, type ReviewSource } from '../../lib/reviewModeStorage';
 import { getAppTemplateClassName, type AccentColorPreference, type AppTemplatePreference, type ResolvedTheme, type ThemePreference } from '../../lib/themePreferences';
 import { type UndoActionHistoryEntry } from '../../lib/undoHistoryStorage';
-import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, saveIgnoredSteamGames, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
+import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
 import { getOwnedGames, getSteamWishlist, mapSteamWishlistItemToLocalGame, SteamApiError, SteamWishlistError } from '../../services/steamApi';
 import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from '../../types/game';
 import type { RawgSearchResult } from '../../types/rawg';
 import { gamePlatforms, gameStatuses, wishlistPriorities } from '../../types/game';
 import type { SteamAchievementSyncState, SteamAchievementSyncSummary, SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistItem, SteamWishlistSyncState, SteamWishlistSyncSummary } from '../../types/steam';
+import { useAppPersistence } from './useAppPersistence';
 import { useNavigationState } from '../navigation/useNavigationState';
 import { useCollectionFilters } from '../collection/useCollectionFilters';
 import { CollectionPanel } from '../collection/CollectionPanel';
@@ -262,9 +263,7 @@ export function AppController() {
   const activeShelfAchievement = useMemo(() => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState), [games, platformQueueState, shelfIdentity.selectedActiveBadgeId]);
   const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
   const isAppMountedRef = useRef(true);
-  const gamesRef = useRef(games);
-  gamesRef.current = games;
-  const saveGamesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { gamesRef } = useAppPersistence({ games, ignoredSteamGames, onboardingState, platformQueueState, playActivity });
   const { addToastNotification, addUndoAction, createUndoSnapshot, dismissToast, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,
@@ -365,38 +364,7 @@ export function AppController() {
 
   useEffect(() => {
     isAppMountedRef.current = true;
-
-    return () => {
-      isAppMountedRef.current = false;
-      if (saveGamesTimerRef.current !== null) {
-        clearTimeout(saveGamesTimerRef.current);
-        saveGamesTimerRef.current = null;
-      }
-      saveGames(gamesRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (saveGamesTimerRef.current !== null) {
-      clearTimeout(saveGamesTimerRef.current);
-    }
-    saveGamesTimerRef.current = setTimeout(() => {
-      saveGamesTimerRef.current = null;
-      saveGames(gamesRef.current);
-    }, 400);
-  }, [games]);
-
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden' && saveGamesTimerRef.current !== null) {
-        clearTimeout(saveGamesTimerRef.current);
-        saveGamesTimerRef.current = null;
-        saveGames(gamesRef.current);
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    return () => { isAppMountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -406,21 +374,6 @@ export function AppController() {
     });
   }, [games, steamAchievementSyncState]);
 
-  useEffect(() => {
-    saveIgnoredSteamGames(ignoredSteamGames);
-  }, [ignoredSteamGames]);
-
-  useEffect(() => {
-    savePlayActivity(playActivity);
-  }, [playActivity]);
-
-  useEffect(() => {
-    saveOnboardingState(onboardingState);
-  }, [onboardingState]);
-
-  useEffect(() => {
-    savePlatformQueueState(platformQueueState);
-  }, [platformQueueState]);
 
   useEffect(() => {
     const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
