@@ -891,6 +891,7 @@ export function AppController() {
               ignoredReviewGameIds={reviewIgnoredGameIds}
               reviewQueueOrder={reviewModeState.queueOrder}
               queueState={platformQueueState}
+              itadDealSyncState={itadDealSyncState}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
               onOpenDetails={openGameFromHome}
@@ -915,6 +916,10 @@ export function AppController() {
                 addToastNotification({ category: 'success', dedupeKey: `quick-note:${gameId}`, message: 'Note saved.' });
               }}
               onStatusChange={updateGameStatus}
+              onSyncItadDeals={() => {
+                const wishlistIds = games.filter((g) => g.collectionType === 'wishlist').map((g) => g.id);
+                void syncWishlistDeals(wishlistIds);
+              }}
               onSyncSteamData={() => {
                 void refreshSteamPlaytime();
                 void syncSteamAchievements();

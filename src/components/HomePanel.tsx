@@ -3,6 +3,7 @@ import { formatDealPrice } from './DealCoverBadges';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { ReviewSource } from '../lib/reviewModeStorage';
+import type { ItadDealSyncState } from '../config/syncStates';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../types/steam';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { useI18n } from '../i18n';
@@ -19,6 +20,7 @@ type HomePanelProps = {
   ignoredReviewGameIds: Set<string>;
   reviewQueueOrder: string[];
   queueState: PlatformQueueState;
+  itadDealSyncState?: ItadDealSyncState;
   steamAchievementSyncState?: SteamAchievementSyncState;
   steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
   onOpenDetails: (game: Game) => void;
@@ -29,6 +31,7 @@ type HomePanelProps = {
   onPlayToday: (game: Game) => void;
   onQuickNote: (gameId: string, note: string) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
+  onSyncItadDeals?: () => void;
   onSyncSteamData?: () => void;
 };
 
@@ -45,6 +48,7 @@ export function HomePanel({
   ignoredReviewGameIds,
   reviewQueueOrder,
   queueState,
+  itadDealSyncState,
   steamAchievementSyncState,
   steamPlaytimeRefreshState,
   onOpenDetails,
@@ -55,6 +59,7 @@ export function HomePanel({
   onPlayToday,
   onQuickNote,
   onStatusChange,
+  onSyncItadDeals,
   onSyncSteamData,
 }: HomePanelProps) {
   const { t } = useI18n();
@@ -125,35 +130,25 @@ export function HomePanel({
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id)).length;
   }, [games, ignoredReviewGameIds]);
 
-  const lastPlayedGame = useMemo(() => {
-    return libraryGames
-      .filter((g) => getActivityTime(g) > 0)
-      .sort((a, b) => getActivityTime(b) - getActivityTime(a))[0] ?? null;
-  }, [libraryGames]);
-
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
 
-  const lastPlaytimeSyncAt = useMemo(() => {
-    const times = games
+  const lastSteamSyncAt = useMemo(() => {
+    const playtimeTimes = games
       .filter((g) => g.steamAppId != null && g.lastSteamActivityAt)
-      .map((g) => g.lastSteamActivityAt as string);
-    return times.length > 0 ? times.reduce((a, b) => (a > b ? a : b)) : null;
-  }, [games]);
-
-  const lastAchievementSyncAt = useMemo(() => {
-    const times = games
+      .map((g) => new Date(g.lastSteamActivityAt as string).getTime());
+    const achievementTimes = games
       .filter((g) => g.steamAchievementsLastCheckedAt != null)
       .map((g) => g.steamAchievementsLastCheckedAt as number);
-    return times.length > 0 ? new Date(Math.max(...times)) : null;
+    const all = [...playtimeTimes, ...achievementTimes];
+    return all.length > 0 ? new Date(Math.max(...all)) : null;
   }, [games]);
 
-  const activePlayingPlatforms = useMemo(() => {
-    const platformCounts = new Map<GamePlatform, number>();
-    continuePlayingGames.forEach((g) => {
-      platformCounts.set(g.platform, (platformCounts.get(g.platform) ?? 0) + 1);
-    });
-    return Array.from(platformCounts.entries()).map(([platform, count]) => ({ count, platform }));
-  }, [continuePlayingGames]);
+  const lastItadSyncAt = useMemo(() => {
+    const times = games
+      .filter((g) => g.wishlistSyncedAt)
+      .map((g) => g.wishlistSyncedAt as string);
+    return times.length > 0 ? times.reduce((a, b) => (a > b ? a : b)) : null;
+  }, [games]);
 
   const isSteamSyncing =
     steamAchievementSyncState?.status === 'loading' || steamPlaytimeRefreshState?.status === 'loading';
@@ -263,11 +258,6 @@ export function HomePanel({
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
           {shelfTitle ? <div className="text-xs font-semibold text-mint">{shelfTitle}</div> : null}
           <div className="mt-0.5 truncate text-xs text-slate-500">{greeting.current}</div>
-          {lastPlayedGame ? (
-            <div className="mt-0.5 truncate text-xs text-slate-600">
-              {lastPlayedGame.title} · {formatRelativeTime(lastPlayedGame.lastPlayedAt ?? lastPlayedGame.updatedAt ?? lastPlayedGame.importedAt, '')}
-            </div>
-          ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div className="flex items-center gap-4">
@@ -406,75 +396,59 @@ export function HomePanel({
             </button>
           </section>
 
-          {/* Active Platforms */}
-          <HomeSection compact title={t('home.activePlatforms')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
-            {activePlayingPlatforms.length > 0 ? (
-              <div className="grid gap-1">
-                {activePlayingPlatforms.map(({ platform, count }) => (
+          {/* Sync */}
+          {(hasSteamGames && onSyncSteamData) || onSyncItadDeals ? (
+            <HomeSection compact title={t('home.sync')}>
+              <div className="grid gap-1.5">
+                {hasSteamGames && onSyncSteamData ? (
                   <button
-                    key={platform}
-                    className="flex min-h-8 items-center justify-between gap-2 rounded-md border border-skyglass/15 bg-ink-950/72 px-2.5 text-left transition hover:border-mint/35 hover:bg-mint/10"
+                    className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-skyglass/15 bg-ink-950/70 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10 disabled:opacity-50"
                     data-home-focus="true"
-                    onClick={() => onOpenQueue(platform)}
+                    disabled={isSteamSyncing}
+                    onClick={onSyncSteamData}
                     type="button"
                   >
-                    <PlatformBadge
-                      className="w-fit rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold"
-                      platform={platform}
-                      queueState={queueState}
+                    <Icon
+                      name={isSteamSyncing ? 'refresh-cw' : 'steam'}
+                      size={14}
+                      strokeWidth={2}
+                      className={`shrink-0 text-slate-400 ${isSteamSyncing ? 'animate-spin' : ''}`}
                     />
-                    <span className="shrink-0 text-[0.6875rem] font-semibold text-mint">
-                      {count} {count === 1 ? t('home.activeGame') : t('home.activeGames')}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-slate-200">{t('home.syncSteamData')}</span>
+                      {!isSteamSyncing && lastSteamSyncAt ? (
+                        <span className="block text-[0.6875rem] text-slate-500">{formatRelativeTime(lastSteamSyncAt, '')}</span>
+                      ) : isSteamSyncing ? (
+                        <span className="block text-[0.6875rem] text-mint">{t('home.syncingSteamData')}</span>
+                      ) : null}
                     </span>
                   </button>
-                ))}
+                ) : null}
+                {onSyncItadDeals ? (
+                  <button
+                    className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-skyglass/15 bg-ink-950/70 px-3 text-left transition hover:border-mint/35 hover:bg-mint/10 disabled:opacity-50"
+                    data-home-focus="true"
+                    disabled={itadDealSyncState?.status === 'loading'}
+                    onClick={onSyncItadDeals}
+                    type="button"
+                  >
+                    <Icon
+                      name={itadDealSyncState?.status === 'loading' ? 'refresh-cw' : 'shopping-bag'}
+                      size={14}
+                      strokeWidth={2}
+                      className={`shrink-0 text-slate-400 ${itadDealSyncState?.status === 'loading' ? 'animate-spin' : ''}`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-slate-200">{t('home.syncDeals')}</span>
+                      {itadDealSyncState?.status === 'loading' ? (
+                        <span className="block text-[0.6875rem] text-mint">{t('home.syncingSteamData')}</span>
+                      ) : lastItadSyncAt ? (
+                        <span className="block text-[0.6875rem] text-slate-500">{formatRelativeTime(lastItadSyncAt, '')}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                ) : null}
               </div>
-            ) : (
-              <EmptyState
-                title={t('home.noActivePlatforms')}
-                text={t('home.noActivePlatformsText')}
-                actionLabel={t('home.browseLibrary')}
-                onAction={onOpenLibrary}
-              />
-            )}
-          </HomeSection>
-
-          {/* Steam Sync */}
-          {hasSteamGames && onSyncSteamData ? (
-            <HomeSection compact title={t('home.steamSync')}>
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-skyglass/15 bg-ink-950/70 px-3 py-2.5">
-                  <span className="text-xs text-slate-400">{t('home.playtimeSync')}</span>
-                  <span className="text-xs font-semibold text-slate-200">
-                    {steamPlaytimeRefreshState?.status === 'loading'
-                      ? t('home.syncingSteamData')
-                      : formatRelativeTime(lastPlaytimeSyncAt, t('home.neverSynced'))}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-skyglass/15 bg-ink-950/70 px-3 py-2.5">
-                  <span className="text-xs text-slate-400">{t('home.achievementSync')}</span>
-                  <span className="text-xs font-semibold text-slate-200">
-                    {steamAchievementSyncState?.status === 'loading'
-                      ? t('home.syncingSteamData')
-                      : formatRelativeTime(lastAchievementSyncAt, t('home.neverSynced'))}
-                  </span>
-                </div>
-              </div>
-              <button
-                className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:opacity-50"
-                data-home-focus="true"
-                disabled={isSteamSyncing}
-                onClick={onSyncSteamData}
-                type="button"
-              >
-                <Icon
-                  name={isSteamSyncing ? 'refresh-cw' : 'steam'}
-                  size={13}
-                  strokeWidth={2}
-                  className={isSteamSyncing ? 'animate-spin' : ''}
-                />
-                {isSteamSyncing ? t('home.syncingSteamData') : t('home.syncSteamData')}
-              </button>
             </HomeSection>
           ) : null}
         </div>
