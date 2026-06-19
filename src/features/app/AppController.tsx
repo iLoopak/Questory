@@ -72,6 +72,7 @@ import {
   didSteamPlaytimeSyncSucceed,
   formatBulkSummary,
   formatHltbSyncSummary,
+  formatMessageTemplate,
   formatSteamAchievementSyncSummary,
   formatSteamDataPartialDetails,
   formatSteamWishlistHtmlImportSummary,
@@ -121,11 +122,6 @@ import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
 
 const questShelfIcon = '/icons/questshelf-icon.png';
-
-
-function formatMessageTemplate(template: string, values: Record<string, string | number>) {
-  return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, String(value)), template);
-}
 
 
 

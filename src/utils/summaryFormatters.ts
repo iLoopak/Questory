@@ -1,4 +1,11 @@
 import type { TFunction } from '../i18n';
+
+export function formatMessageTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
 import type { HltbSyncSummary } from '../lib/hltb';
 import type {
   SteamAchievementSyncSummary,
