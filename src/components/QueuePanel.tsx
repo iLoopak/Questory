@@ -84,6 +84,21 @@ export function QueuePanel({
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const movePlatformOptions = activeQueuePlatforms;
   const queueGameIds = useMemo(() => new Set(visibleQueueEntries.map((entry) => `${entry.gameId}::${entry.targetPlatform}`)), [visibleQueueEntries]);
+  const playingGamesByPlatform = useMemo(() => {
+    const nextPlayingGamesByPlatform = new Map<GamePlatform, Game[]>();
+
+    games.forEach((game) => {
+      if (game.status !== 'Playing') {
+        return;
+      }
+
+      const platformGames = nextPlayingGamesByPlatform.get(game.platform) ?? [];
+      platformGames.push(game);
+      nextPlayingGamesByPlatform.set(game.platform, platformGames);
+    });
+
+    return nextPlayingGamesByPlatform;
+  }, [games]);
   const displayedQueuePlatforms = useMemo(() => {
     const visiblePlatforms = platformFilter === 'All' ? activeQueuePlatforms : activeQueuePlatforms.filter((platform) => platform === platformFilter);
 
@@ -95,14 +110,16 @@ export function QueuePanel({
   }, [activeQueuePlatforms, initialPlatform, platformFilter]);
 
   const normalizedQueueSearch = queueSearchTerm.trim().toLowerCase();
-  const addableGames = games
-    .filter((game) => game.collectionType === 'library' && (!selectedPlatform || !queueGameIds.has(`${game.id}::${selectedPlatform}`)))
-    .filter((game) =>
-      normalizedQueueSearch
-        ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch)
-        : true,
-    )
-    .sort((first, second) => first.title.localeCompare(second.title));
+  const addableGames = useMemo(() => {
+    return games
+      .filter((game) => game.collectionType === 'library' && (!selectedPlatform || !queueGameIds.has(`${game.id}::${selectedPlatform}`)))
+      .filter((game) =>
+        normalizedQueueSearch
+          ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch)
+          : true,
+      )
+      .sort((first, second) => first.title.localeCompare(second.title));
+  }, [games, normalizedQueueSearch, queueGameIds, selectedPlatform]);
 
   useEffect(() => {
     if (!initialPlatform) {
@@ -285,8 +302,8 @@ export function QueuePanel({
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
               key={platform}
-              games={games}
               gamesById={gamesById}
+              currentlyPlaying={playingGamesByPlatform.get(platform) ?? []}
               maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
               accentColor={getPlatformAccentColor(queueState, platform)}
               artworkUrl={getPlatformArtworkUrl(queueState, platform)}
@@ -650,8 +667,8 @@ function PlatformOptionsMenu({ children, label }: PlatformOptionsMenuProps) {
 }
 
 function PlatformQueueColumn({
-  games,
   gamesById,
+  currentlyPlaying,
   accentColor,
   artworkUrl,
   maxActiveGames,
@@ -676,7 +693,7 @@ function PlatformQueueColumn({
 }: {
   accentColor: string;
   artworkUrl: string;
-  games: Game[];
+  currentlyPlaying: Game[];
   gamesById: Map<string, Game>;
   maxActiveGames: number;
   isHighlighted: boolean;
@@ -700,7 +717,6 @@ function PlatformQueueColumn({
 }) {
   const { t } = useI18n();
   const playingNowLabel = t('nav.playingNow');
-  const currentlyPlaying = games.filter((game) => game.status === 'Playing' && game.platform === platform);
   const queueEntriesVirtualizerRef = useRef<HTMLDivElement | null>(null);
   const virtualQueueEntries = useVirtualWindow({
     itemCount: queueEntries.length,

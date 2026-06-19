@@ -61,8 +61,17 @@ export function loadLocalJson<T>(key: string, fallback: T, normalize: (value: un
 }
 
 export function savePersistedJson<T>(key: string, value: T) {
-  saveLocalJson(key, value);
-  void savePreferenceJson(key, value);
+  let serializedValue: string;
+
+  try {
+    serializedValue = JSON.stringify(value);
+  } catch (error) {
+    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    return;
+  }
+
+  saveLocalJsonStringified(key, serializedValue);
+  void savePreferenceJsonStringified(key, serializedValue);
 }
 
 export async function hydrateLocalStorageFromPreferences(keys: string[]) {
@@ -146,12 +155,25 @@ export function exportRawQuestShelfLocalData() {
 }
 
 export function saveLocalJson<T>(key: string, value: T) {
+  let serializedValue: string;
+
+  try {
+    serializedValue = JSON.stringify(value);
+  } catch (error) {
+    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    return;
+  }
+
+  saveLocalJsonStringified(key, serializedValue);
+}
+
+function saveLocalJsonStringified(key: string, serializedValue: string) {
   if (!isBrowser) {
     return;
   }
 
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(key, serializedValue);
   } catch (error) {
     recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     // Local persistence should never block the UI if the browser storage quota is unavailable.
@@ -197,7 +219,7 @@ function normalizeStorageIssues(value: unknown): LocalStorageIssue[] {
     : [];
 }
 
-async function savePreferenceJson<T>(key: string, value: T) {
+async function savePreferenceJsonStringified(key: string, serializedValue: string) {
   const preferences = await getPreferencesPlugin();
 
   if (!preferences) {
@@ -205,7 +227,7 @@ async function savePreferenceJson<T>(key: string, value: T) {
   }
 
   try {
-    await preferences.Preferences.set({ key, value: JSON.stringify(value) });
+    await preferences.Preferences.set({ key, value: serializedValue });
   } catch {
     // Capacitor persistence mirrors localStorage; the app remains usable if the native write fails.
   }
