@@ -462,6 +462,12 @@ export function CollectionPanel({
         moreFiltersButtonRef={advancedFiltersButtonRef}
         onMoreFiltersClick={() => setIsAdvancedFiltersOpen(true)}
         onClearFilters={hasActiveFilters ? onClearFilters : undefined}
+        viewMode={{
+          label: t('toolbar.viewMode'),
+          value: viewMode,
+          options: [...collectionViewModes],
+          onChange: (value) => setViewMode(value as CollectionViewMode),
+        }}
         primaryAction={
           <button
             aria-label={collectionType === 'wishlist' ? t('toolbar.addWishlistGame') : t('toolbar.addGame')}
@@ -650,13 +656,6 @@ export function CollectionPanel({
                   value={filters.sortBy}
                   options={[...librarySortOptions]}
                   onChange={(value) => onFiltersChange({ sortBy: value as LibrarySortOption })}
-                />
-
-                <FilterSelect
-                  label={t('toolbar.viewMode')}
-                  value={viewMode}
-                  options={[...collectionViewModes]}
-                  onChange={(value) => setViewMode(value as CollectionViewMode)}
                 />
 
                 <FilterSelect
