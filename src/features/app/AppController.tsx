@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { Icon } from '../../components/Icon';
 
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent, ReactNode, RefObject } from 'react';
 import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
 import { GameListEmptyState, GameListShell } from '../../components/GameListShell';
@@ -1690,6 +1690,7 @@ export function AppController() {
               <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
                 <CollectionPanel
                   collectionType="library"
+                  contentScrollRef={mainContentRef}
                   filters={libraryFilters}
                   steamAchievementSyncState={steamAchievementSyncState}
                   steamPlaytimeRefreshState={steamPlaytimeRefreshState}
@@ -1763,6 +1764,7 @@ export function AppController() {
               <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
                 <CollectionPanel
                   collectionType="wishlist"
+                  contentScrollRef={mainContentRef}
                   filters={wishlistFilters}
                   games={filteredWishlistGames}
                   platformOptions={platformOptions}
@@ -1801,6 +1803,7 @@ export function AppController() {
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
               games={games}
+              contentScrollRef={mainContentRef}
               initialPlatform={targetQueuePlatform}
               queueState={platformQueueState}
               onAddGameToQueue={addGameToQueue}
@@ -1861,6 +1864,7 @@ export function AppController() {
           ) : activeNavItem === 'Recommendation' ? (
             <RecommendationPanel
               games={games}
+              contentScrollRef={mainContentRef}
               queueState={platformQueueState}
               onOpenDetails={(gameId) => {
                 const targetGame = games.find((game) => game.id === gameId);
@@ -2070,6 +2074,7 @@ type AddGameDialogProps = {
 
 type CollectionPanelProps = {
   collectionType: GameCollectionType;
+  contentScrollRef: RefObject<HTMLElement | null>;
   filters: CollectionFilters;
   games: Game[];
   platformOptions: GamePlatform[];
@@ -2110,6 +2115,7 @@ type CollectionPanelProps = {
 
 function CollectionPanel({
   collectionType,
+  contentScrollRef,
   filters,
   games,
   platformOptions,
@@ -2203,8 +2209,8 @@ function CollectionPanel({
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
 
   useEffect(() => {
-    collectionPanelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [virtualResetKey]);
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [contentScrollRef, virtualResetKey]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -2811,7 +2817,7 @@ function CollectionPanel({
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
-            scrollElementRef={collectionPanelRef}
+            scrollElementRef={contentScrollRef}
           />
         ) : (
           <CollectionGrid
@@ -2829,7 +2835,7 @@ function CollectionPanel({
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
-            scrollElementRef={collectionPanelRef}
+            scrollElementRef={contentScrollRef}
           />
         )
       ) : (

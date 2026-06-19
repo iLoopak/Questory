@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { useI18n } from '../i18n';
 import { CollectionGrid, CollectionList, CollectionShelf } from './CollectionViews';
 import { CollectionToolbar } from './CollectionToolbar';
@@ -21,6 +22,7 @@ import { gamePlatforms } from '../types/game';
 type RecommendationPanelProps = {
   games: Game[];
   queueState: PlatformQueueState;
+  contentScrollRef: RefObject<HTMLElement | null>;
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
@@ -40,6 +42,7 @@ const recommendationViewModes: readonly RecommendationViewMode[] = ['Grid View',
 export function RecommendationPanel({
   games,
   queueState,
+  contentScrollRef,
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
@@ -152,8 +155,8 @@ export function RecommendationPanel({
   }
 
   useEffect(() => {
-    panelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [availableTime, includeFinishedGames, includeWishlist, mood, preferredPlatform, recommendationSearchTerm, recommendFromQueueOnly, recommendNextGame, viewMode]);
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [availableTime, contentScrollRef, includeFinishedGames, includeWishlist, mood, preferredPlatform, recommendationSearchTerm, recommendFromQueueOnly, recommendNextGame, viewMode]);
 
   return (
     <GameListShell
@@ -307,7 +310,7 @@ export function RecommendationPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
-            scrollElementRef={panelRef}
+            scrollElementRef={contentScrollRef}
             suppressWantToPlayStatus
           />
         ) : viewMode === 'Compact View' ? (
@@ -326,7 +329,7 @@ export function RecommendationPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
-            scrollElementRef={panelRef}
+            scrollElementRef={contentScrollRef}
             suppressWantToPlayStatus
           />
         ) : (
@@ -345,7 +348,7 @@ export function RecommendationPanel({
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             platformQueueState={queueState}
-            scrollElementRef={panelRef}
+            scrollElementRef={contentScrollRef}
             suppressWantToPlayStatus
           />
         )
