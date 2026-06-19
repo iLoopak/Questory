@@ -285,7 +285,7 @@ export function HomePanel({
   return (
     <section ref={shellRef} className="qs-home-shell space-y-4 pb-4">
       {/* Compact Hero — full width */}
-      <section className="flex items-center gap-3 rounded-xl border border-mint/18 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-3 shadow-panel">
+      <section className="flex items-center gap-3 rounded-xl border border-skyglass/15 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-3 shadow-panel">
         {avatar}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
