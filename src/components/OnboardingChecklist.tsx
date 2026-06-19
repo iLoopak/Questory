@@ -129,14 +129,14 @@ export function OnboardingChecklist({
     <ViewportModal ariaLabel={t('onboarding.assistant')} placement="fullscreen" onClose={onClose ?? (() => undefined)}>
       <div className="qs-setup-modal">
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="qs-setup-header flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('onboarding.assistant')}</div>
             <h2 className="mt-0.5 text-2xl font-semibold text-white">{t('onboarding.setupTitle')}</h2>
             <p className="mt-1.5 max-w-xl text-sm text-slate-400">{t('onboarding.wizardSubtitle')}</p>
           </div>
           <button
-            className="mt-1 shrink-0 h-10 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200 hover:bg-mint/10"
+            className="qs-setup-close mt-1 shrink-0 h-10 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200 hover:bg-mint/10"
             onClick={onClose}
             type="button"
           >
@@ -144,7 +144,7 @@ export function OnboardingChecklist({
           </button>
         </div>
 
-        <div className="mt-5 rounded-md border border-skyglass/15 bg-ink-900/50 p-3">
+        <div className="qs-setup-progress mt-5 rounded-md border border-skyglass/15 bg-ink-900/50 p-3">
           <div className="flex justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
             <span>{activeStep.title}</span>
             <span>{progressPercent}%</span>
@@ -173,7 +173,7 @@ export function OnboardingChecklist({
           })}
         </ol>
 
-        <div className="mt-5 flex-1 rounded-lg border border-mint/20 bg-ink-900/40 p-5">
+        <div className="qs-setup-content mt-5 flex-1 rounded-lg border border-mint/20 bg-ink-900/40 p-5">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="text-2xl font-semibold text-white">{activeStep.title}</h3>
@@ -194,7 +194,7 @@ export function OnboardingChecklist({
           </div>
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-3">
+        <div className="qs-setup-footer mt-5 flex items-center justify-between gap-3">
           <button
             className="h-11 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-200 disabled:opacity-40"
             disabled={activeStepIndex === 0}
