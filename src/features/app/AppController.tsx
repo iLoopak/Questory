@@ -358,7 +358,7 @@ export function AppController() {
     const el = mainContentRef.current;
     if (!el) return;
     function handleScroll() {
-      const nextIsScrolled = el.scrollTop > 15;
+      const nextIsScrolled = el!.scrollTop > 15;
       setIsScrolled((currentIsScrolled) => (currentIsScrolled === nextIsScrolled ? currentIsScrolled : nextIsScrolled));
     }
     el.addEventListener('scroll', handleScroll, { passive: true });

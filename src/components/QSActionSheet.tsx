@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { getGameCoverSources } from '../lib/gameCoverImages';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { PlatformBadge } from './PlatformBadge';
 
 export type QSActionSheetProps = {
@@ -86,11 +86,11 @@ export function QSActionSheet({
               onClick={() => setNoteMode(false)}
               type="button"
             >
-              <Icon name="chevron-left" size={16} strokeWidth={2} />
+              <Icon name="arrow-left" size={16} strokeWidth={2} />
               Back
             </button>
             <div className="mb-3 flex items-center gap-3">
-              <Icon name="file-text" size={18} strokeWidth={2} className="shrink-0 text-mint" />
+              <Icon name="pencil" size={18} strokeWidth={2} className="shrink-0 text-mint" />
               <div>
                 <h3 className="text-sm font-semibold text-white">Quick Note</h3>
                 <p className="text-xs text-slate-500">{game.title}</p>
@@ -178,7 +178,7 @@ export function QSActionSheet({
                 <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-skyglass/12">
                   {onQuickNote ? (
                     <SheetAction
-                      icon="file-text"
+                      icon="pencil"
                       label="Quick Note"
                       sublabel={notePreview}
                       onClick={() => setNoteMode(true)}
@@ -261,7 +261,7 @@ function SheetAction({
   accent = 'default',
   onClick,
 }: {
-  icon: string;
+  icon: IconName;
   label: string;
   sublabel?: string;
   accent?: 'default' | 'emerald';
@@ -281,7 +281,7 @@ function SheetAction({
         <span className={`block text-sm font-medium ${labelClass}`}>{label}</span>
         {sublabel ? <span className="block truncate text-xs text-slate-500">{sublabel}</span> : null}
       </span>
-      <Icon name="chevron-right" size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+      <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
     </button>
   );
 }
