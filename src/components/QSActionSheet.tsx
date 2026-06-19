@@ -70,12 +70,12 @@ export function QSActionSheet({
       />
 
       <div
-        className="qs-action-sheet-panel relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-white/8 bg-ink-950 shadow-2xl"
+        className="qs-action-sheet-panel relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
         style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}
       >
         {/* Drag handle */}
         <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1.5 w-16 rounded-full bg-slate-600/60" title="Swipe down to dismiss" />
+          <div className="h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
         </div>
 
         {noteMode ? (
@@ -126,7 +126,7 @@ export function QSActionSheet({
           <div className="px-4 pb-2 pt-1">
             {/* Game header */}
             <div className="mb-5 flex gap-3.5">
-              <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-ink-800 shadow-panel">
+              <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800 shadow-panel">
                 {coverSource ? (
                   <img alt="" className="h-full w-full object-cover" src={coverSource} />
                 ) : (
@@ -175,7 +175,7 @@ export function QSActionSheet({
                 <div className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
                   Manage
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-skyglass/12 bg-ink-900/60 divide-y divide-skyglass/10">
+                <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-skyglass/12">
                   {onQuickNote ? (
                     <SheetAction
                       icon="file-text"
@@ -201,7 +201,7 @@ export function QSActionSheet({
                 <div className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-600">
                   Status
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-skyglass/12 bg-ink-900/60">
+                <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60">
                   <SheetAction
                     icon="check-circle"
                     label={isPlaying ? 'Mark Finished' : 'Mark as Playing'}
@@ -272,7 +272,7 @@ function SheetAction({
 
   return (
     <button
-      className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left transition hover:bg-white/[0.04] active:bg-white/[0.07]"
+      className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10]"
       onClick={onClick}
       type="button"
     >
@@ -281,7 +281,7 @@ function SheetAction({
         <span className={`block text-sm font-medium ${labelClass}`}>{label}</span>
         {sublabel ? <span className="block truncate text-xs text-slate-500">{sublabel}</span> : null}
       </span>
-      <Icon name="chevron-right" size={14} strokeWidth={2} className="shrink-0 text-slate-700" />
+      <Icon name="chevron-right" size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
     </button>
   );
 }

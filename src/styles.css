@@ -2185,7 +2185,8 @@ textarea,
 .qs-template-neon-deck .qs-settings-shell,
 .qs-template-neon-deck .qs-queue-shell,
 .qs-template-neon-deck .qs-review-shell,
-.qs-template-neon-deck .qs-modal-panel {
+.qs-template-neon-deck .qs-modal-panel,
+.qs-template-neon-deck .qs-action-sheet-panel {
   border-color: var(--qs-border-color) !important;
   background: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.018)), var(--qs-panel-background) !important;
   box-shadow: var(--shadow-panel);
