@@ -376,13 +376,22 @@ export function moveQueueEntry(state: PlatformQueueState, gameId: string, direct
   const [targetEntry] = nextPlatformEntries.splice(currentIndex, 1);
   const nextIndex =
     direction === 'top' ? 0 : direction === 'up' ? Math.max(0, currentIndex - 1) : Math.min(nextPlatformEntries.length, currentIndex + 1);
+
+  if (nextIndex === currentIndex) {
+    return state;
+  }
+
   nextPlatformEntries.splice(nextIndex, 0, targetEntry);
 
+  const reorderedPlatformEntries = nextPlatformEntries.map((queueEntry, index) => ({
+    ...queueEntry,
+    queuePosition: index + 1,
+  }));
   const otherEntries = state.entries.filter((queueEntry) => queueEntry.targetPlatform !== entry.targetPlatform);
 
   return normalizeQueuePositions({
     ...state,
-    entries: [...otherEntries, ...nextPlatformEntries],
+    entries: [...otherEntries, ...reorderedPlatformEntries],
   });
 }
 
