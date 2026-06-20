@@ -54,6 +54,7 @@ type ReviewModePanelProps = {
 };
 
 const anyPlatform = 'Any platform';
+const reviewSessionBatchSize = 20;
 
 const negativeActions: Array<{
   action: ReviewModeAction;
@@ -150,6 +151,7 @@ export function ReviewModePanel({
   const hasGamepad = useGamepadDetection();
   const buttonLabels = getControllerButtonLabels(controllerLayout);
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
+  const [sessionGameIds, setSessionGameIds] = useState<string[]>([]);
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
   const [actionStats, setActionStats] = useState<ReviewActionStats>(emptyReviewActionStats);
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);
@@ -171,12 +173,23 @@ export function ReviewModePanel({
     );
   }, [games]);
 
-  const reviewableGames = useMemo(() => {
+  const baseSourceGames = useMemo(() => {
     return games
       .filter((game) => matchesReviewSource(game, source))
       .filter((game) => selectedPlatform === anyPlatform || game.platform === selectedPlatform)
-      .filter((game) => !ignoredGameIds.has(game.id));
-  }, [games, ignoredGameIds, selectedPlatform, source]);
+      .filter((game) => !ignoredGameIds.has(game.id))
+      .filter((game) => !reviewedGameIds.has(game.id))
+      .sort((firstGame, secondGame) => {
+        const firstQueuePosition = queueOrderPositions.get(firstGame.id);
+        const secondQueuePosition = queueOrderPositions.get(secondGame.id);
+
+        if (firstQueuePosition !== undefined || secondQueuePosition !== undefined) {
+          return (firstQueuePosition ?? Number.MAX_SAFE_INTEGER) - (secondQueuePosition ?? Number.MAX_SAFE_INTEGER);
+        }
+
+        return compareReviewGames(firstGame, secondGame);
+      });
+  }, [games, ignoredGameIds, queueOrderPositions, reviewedGameIds, selectedPlatform, source]);
 
   const sourceGames = useMemo(() => {
     return games
@@ -203,9 +216,13 @@ export function ReviewModePanel({
       });
   }, [games, ignoredGameIds, queueOrderPositions, retainedUtilityGameIds, reviewedGameIds, selectedPlatform, source]);
 
+  const sourceGamesById = useMemo(() => new Map(sourceGames.map((game) => [game.id, game])), [sourceGames]);
+
   const reviewQueue = useMemo(() => {
-    return sourceGames.filter((game) => !processedGameIds.has(game.id));
-  }, [processedGameIds, sourceGames]);
+    return sessionGameIds
+      .map((gameId) => sourceGamesById.get(gameId))
+      .filter((game): game is Game => game !== undefined && !processedGameIds.has(game.id));
+  }, [processedGameIds, sessionGameIds, sourceGamesById]);
 
   const sourceCounts = useMemo(() => {
     const counts = new Map<ReviewSource, number>();
@@ -218,12 +235,12 @@ export function ReviewModePanel({
   const activeGame = reviewQueue[0] ?? null;
   const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
-  const completedCount = reviewableGames.filter((game) => reviewedGameIds.has(game.id)).length;
-  const remainingCount = reviewQueue.length;
-  const totalCount = completedCount + remainingCount;
+  const completedCount = sessionGameIds.filter((gameId) => processedGameIds.has(gameId)).length;
+  const totalCount = sessionGameIds.length;
 
   useEffect(() => {
     setProcessedGameIds(new Set());
+    setSessionGameIds(baseSourceGames.slice(0, reviewSessionBatchSize).map((game) => game.id));
     setReviewHistory([]);
     setActionStats(emptyReviewActionStats);
     setHighlightedActionIndex(firstPositiveActionIndex);
@@ -353,10 +370,8 @@ export function ReviewModePanel({
   }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
-    onAction(game, action, note, targetPlatform, { queueGameIds: reviewQueue.map((queuedGame) => queuedGame.id) });
-    if (action !== 'skip') {
-      setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
-    }
+    onAction(game, action, note, targetPlatform, { queueGameIds: sessionGameIds });
+    setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
     setReviewHistory((currentHistory) => [...currentHistory, { action, gameId: game.id }]);
     setActionStats((currentStats) => getNextActionStats(currentStats, action));
     setHighlightedActionIndex(firstPositiveActionIndex);
@@ -443,7 +458,7 @@ export function ReviewModePanel({
     <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
       <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
         <div
-          aria-label={`Quest Queue: ${completedCount} of ${totalCount} games reviewed`}
+          aria-label={`Quest Queue: ${completedCount} of ${totalCount} session games reviewed`}
           className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-center shadow-panel backdrop-blur-md"
         >
           <div className="text-sm font-bold text-mint leading-none">{totalCount === 0 ? '—' : `${completedCount} of ${totalCount}`}</div>
@@ -571,7 +586,12 @@ export function ReviewModePanel({
               sourceLabel={sourceLabel}
               onOpenQueue={onOpenQueue}
               onReturnToLibrary={onReturnToLibrary}
-              onReviewAnother={() => onSourceChange('backlog')}
+              onReviewAnother={() => {
+                setProcessedGameIds(new Set());
+                setReviewHistory([]);
+                setActionStats(emptyReviewActionStats);
+                setSessionGameIds(sourceGames.filter((game) => !processedGameIds.has(game.id)).slice(0, reviewSessionBatchSize).map((game) => game.id));
+              }}
             />
           )}
         </div>
@@ -1138,10 +1158,10 @@ function ReviewComplete({
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('review.complete')}</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue Session Complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">Great work!</h3>
         <p className="mt-3 text-sm text-slate-400">
-          You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
+          You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} from {sourceLabel}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
         </p>
         {hasStats && (
           <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
@@ -1180,7 +1200,7 @@ function ReviewComplete({
             onClick={onReviewAnother}
             type="button"
           >
-            Review another group
+            Continue Reviewing
           </button>
           <button
             className="min-h-12 rounded-xl border border-skyglass/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
