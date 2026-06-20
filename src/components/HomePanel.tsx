@@ -101,7 +101,7 @@ export function HomePanel({
     const queueOrderPositions = new Map(reviewQueueOrder.map((id, i) => [id, i]));
     return (
       games
-        .filter((g) => isBacklogReviewCandidate(g) && !ignoredReviewGameIds.has(g.id))
+        .filter((g) => isBacklogReviewCandidate(g) && !ignoredReviewGameIds.has(g.id) && !reviewModeState.reviewedGames[g.id])
         .sort((a, b) => {
           const qa = queueOrderPositions.get(a.id);
           const qb = queueOrderPositions.get(b.id);
