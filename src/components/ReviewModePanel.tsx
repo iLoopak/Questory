@@ -449,7 +449,7 @@ export function ReviewModePanel({
 
               <div className="mt-3 grid gap-3">
                 <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400" htmlFor="review-source">
-                  Status filter
+                  {t('toolbar.source')}
                   <select
                     className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
                     id="review-source"
@@ -1016,7 +1016,7 @@ function ReviewComplete({
   onReviewAnother: () => void;
 }) {
   const { t } = useI18n();
-  void actionStats;
+  const hasStats = actionStats.queued > 0 || actionStats.playing > 0 || actionStats.wishlisted > 0 || actionStats.dropped > 0 || actionStats.ignored > 0;
 
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
@@ -1024,6 +1024,15 @@ function ReviewComplete({
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('review.complete')}</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
         <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer platform decisions. Analytics stay in Stats.</p>
+        {hasStats && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
+            {actionStats.queued > 0 && <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">{actionStats.queued} queued</span>}
+            {actionStats.playing > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.playing} playing</span>}
+            {actionStats.wishlisted > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.wishlisted} wishlisted</span>}
+            {actionStats.dropped > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.dropped} dropped</span>}
+            {actionStats.ignored > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.ignored} ignored</span>}
+          </div>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"

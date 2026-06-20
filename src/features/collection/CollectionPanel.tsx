@@ -93,6 +93,7 @@ export type CollectionPanelProps = {
   onImportSteamWishlistHtml?: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
   itadDealSyncState?: ItadDealSyncState;
   onSyncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
+  onOpenOnboarding?: () => void;
 };
 
 export function CollectionPanel({
@@ -133,6 +134,7 @@ export function CollectionPanel({
   onImportSteamWishlistHtml,
   itadDealSyncState,
   onSyncItadDeals,
+  onOpenOnboarding,
   isHltbSyncing = false,
 }: CollectionPanelProps) {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -816,6 +818,31 @@ export function CollectionPanel({
             scrollElementRef={contentScrollRef}
           />
         )
+      ) : collectionType === 'library' && !hasActiveFilters ? (
+        <div className="qs-game-list-empty grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-6 text-center">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Your library is empty</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">Import games to get started, or reopen the Setup Assistant to walk through the process.</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <button
+                className="h-9 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+                onClick={onAddGame}
+                type="button"
+              >
+                Import Games
+              </button>
+              {onOpenOnboarding && (
+                <button
+                  className="h-9 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+                  onClick={onOpenOnboarding}
+                  type="button"
+                >
+                  Reopen Setup Assistant
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         <GameListEmptyState title={emptyTitle} text={emptyText} />
       )}

@@ -221,7 +221,7 @@ export function RecommendationPanel({
             <div className="max-h-[min(72dvh,28rem)] overflow-y-auto p-3">
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="text-sm font-medium text-slate-300">
-                  <span>{t('toolbar.status')}</span>
+                  <span>{t('recommendations.availableTime')}</span>
                   <select className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint" value={availableTime} onChange={(event) => updatePreference(() => setAvailableTime(event.target.value as AvailableTime))}>
                     {availableTimeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
