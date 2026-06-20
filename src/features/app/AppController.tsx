@@ -40,6 +40,8 @@ import type { ItadDealSyncState } from '../../config/syncStates';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import { formatLocalDate, loadPlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
+import { loadPsnSettings } from '../../lib/psnSettingsStorage';
+import { syncPsnTrophiesForGames } from '../../lib/psnTrophySync';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
 import {
   formatMessageTemplate,
@@ -634,8 +636,28 @@ export function AppController() {
     return createdGames;
   }
 
+  const [isPsnTrophySyncing, setIsPsnTrophySyncing] = useState(false);
+
   function updateGamesFromPsnTrophySync(updatedGames: Game[]) {
     setGames(updatedGames);
+  }
+
+  async function syncPsnTrophiesFromHome() {
+    const settings = loadPsnSettings();
+    if (!settings?.accessToken) {
+      addToastNotification({ category: 'error', dedupeKey: 'psn-sync-no-token', message: 'PSN not connected. Configure in Settings → Integrations.' });
+      return;
+    }
+    setIsPsnTrophySyncing(true);
+    try {
+      const { games: updatedGames, summary } = await syncPsnTrophiesForGames(games, settings.accessToken, new Date().toISOString());
+      setGames(updatedGames);
+      addToastNotification({ category: 'success', dedupeKey: 'psn-sync-done', message: `PSN trophy sync complete. ${summary.updatedCount} game(s) updated.` });
+    } catch {
+      addToastNotification({ category: 'error', dedupeKey: 'psn-sync-error', message: 'PSN trophy sync failed. Check connection in Settings.' });
+    } finally {
+      setIsPsnTrophySyncing(false);
+    }
   }
 
   function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
@@ -1083,6 +1105,8 @@ export function AppController() {
                   showToast: true,
                 });
               }}
+              isPsnTrophySyncing={isPsnTrophySyncing}
+              onSyncPsnTrophies={() => { void syncPsnTrophiesFromHome(); }}
             />
           ) : activeNavItem === 'Library' ? (
             <div className="relative">
