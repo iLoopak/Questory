@@ -218,7 +218,11 @@ function GameCardComponent({
           >
             {game.title}
           </h3>
-
+          {game.status === 'Finished' && typeof game.rating === 'number' && game.rating > 0 ? (
+            <div className="mt-1.5 text-sm leading-none tracking-wider text-amber-400">
+              {'★'.repeat(game.rating)}{'☆'.repeat(5 - game.rating)}
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-2.5 sm:pt-3">

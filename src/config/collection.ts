@@ -11,6 +11,7 @@ export const enrichmentFilterOptions = ['All', 'Enriched', 'Missing info', 'Manu
 export const librarySortOptions = [
   'Title A-Z',
   'Favorites First',
+  'Highest rated',
   'Recently played',
   'Most playtime',
   'Least playtime',

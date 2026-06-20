@@ -62,6 +62,10 @@ export function compareGames(firstGame: Game, secondGame: Game, sortBy: LibraryS
     return Number(secondGame.favorite) - Number(firstGame.favorite) || compareTitle(firstGame, secondGame);
   }
 
+  if (sortBy === 'Highest rated') {
+    return (secondGame.rating ?? -1) - (firstGame.rating ?? -1) || compareTitle(firstGame, secondGame);
+  }
+
   return compareTitle(firstGame, secondGame);
 }
 

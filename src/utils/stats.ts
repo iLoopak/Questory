@@ -43,6 +43,7 @@ export type QuestShelfStats = {
   statusBreakdown: StatsBarItem[];
   statusCounts: Record<GameStatus, number>;
   topPlayedGames: Game[];
+  topRatedGames: Game[];
   totalTrackedPlaytime: number;
   wishlistTotal: number;
 };
@@ -117,6 +118,10 @@ export function getQuestShelfStats(games: Game[], scope: StatsScope): QuestShelf
     topPlayedGames: [...scopedGames]
       .filter((game) => game.playtimeHours > 0)
       .sort((firstGame, secondGame) => secondGame.playtimeHours - firstGame.playtimeHours || compareTitle(firstGame, secondGame))
+      .slice(0, 10),
+    topRatedGames: scopedGames
+      .filter((game) => game.status === 'Finished' && typeof game.rating === 'number' && game.rating > 0)
+      .sort((firstGame, secondGame) => (secondGame.rating ?? 0) - (firstGame.rating ?? 0) || compareTitle(firstGame, secondGame))
       .slice(0, 10),
     totalTrackedPlaytime: scopedGames.reduce((sum, game) => sum + game.playtimeHours, 0),
     wishlistTotal: wishlistGames.length,
