@@ -84,6 +84,14 @@ export function QueuePanel({
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const movePlatformOptions = activeQueuePlatforms;
   const queueGameIds = useMemo(() => new Set(visibleQueueEntries.map((entry) => `${entry.gameId}::${entry.targetPlatform}`)), [visibleQueueEntries]);
+  const suggestedPlatform = useMemo<GamePlatform | null>(() => {
+    const libraryGames = games.filter((game) => game.collectionType === 'library');
+    if (libraryGames.length === 0) return null;
+    const counts = new Map<string, number>();
+    libraryGames.forEach((game) => counts.set(game.platform, (counts.get(game.platform) ?? 0) + 1));
+    const topEntry = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
+    return topEntry ? (topEntry[0] as GamePlatform) : null;
+  }, [games]);
   const playingGamesByPlatform = useMemo(() => {
     const nextPlayingGamesByPlatform = new Map<GamePlatform, Game[]>();
 
@@ -148,6 +156,18 @@ export function QueuePanel({
     onQueueStateChange(nextState);
     setSelectedPlatform(platform);
     setCustomPlatformName('');
+  }
+
+  function addSuggestedPlatform(platform: GamePlatform) {
+    const nextAccentColor = getDefaultPlatformAccentColor(platform);
+    const artworkUrl = createPlatformArtworkPreset(platform, nextAccentColor, 'Aurora');
+    const nextState = updatePlatformQueueVisualSettings(
+      addActiveQueuePlatform(queueState, platform),
+      platform,
+      { accentColor: nextAccentColor, artworkUrl, platformTag: '' },
+    );
+    onQueueStateChange(nextState);
+    setSelectedPlatform(platform);
   }
 
   function addCustomQueuePlatform() {
@@ -288,12 +308,29 @@ export function QueuePanel({
       <p className="-mt-1 mb-2 px-1 text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
 
       {displayedQueuePlatforms.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-4 text-sm text-slate-200">
-          <div className="font-semibold text-white">{t('queue.noPlatformsYet')}</div>
-          <p className="mt-1 text-slate-300">{t('queue.noPlatformsCreateHelp')}</p>
-          <button className="mt-3 h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => setIsPlatformModalOpen(true)} type="button">
-            ＋ {t('queue.addPlatform')}
-          </button>
+        <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-5 text-sm text-slate-200">
+          {suggestedPlatform ? (
+            <>
+              <div className="font-semibold text-white">Your library already contains games.</div>
+              <p className="mt-1 text-slate-300">Create your first Platform Plan to organise what you'll play next.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => addSuggestedPlatform(suggestedPlatform)} type="button">
+                  ＋ Add {suggestedPlatform}
+                </button>
+                <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20" onClick={() => setIsPlatformModalOpen(true)} type="button">
+                  Choose a different platform
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="font-semibold text-white">{t('queue.noPlatformsYet')}</div>
+              <p className="mt-1 text-slate-300">{t('queue.noPlatformsCreateHelp')}</p>
+              <button className="mt-3 h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => setIsPlatformModalOpen(true)} type="button">
+                ＋ {t('queue.addPlatform')}
+              </button>
+            </>
+          )}
         </div>
       ) : null}
 
