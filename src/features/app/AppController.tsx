@@ -1135,7 +1135,7 @@ export function AppController() {
                   onOpenDetails={handleOpenDetailsFromCollection}
                   onRemove={removeGame}
                   onRemoveAndIgnore={removeAndIgnoreSteamGame}
-                  onOpenQueue={openQueue}
+                  onOpenQueue={() => startReviewMode('backlog')}
                   onStartReview={startReviewMode}
                   onStatusChange={updateGameStatus}
                   onOpenOnboarding={openOnboarding}
