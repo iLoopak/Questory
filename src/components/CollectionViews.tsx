@@ -529,6 +529,22 @@ type ShelfGameCardProps = {
   platformQueueState?: PlatformQueueState;
 };
 
+function useStableCollectionCoverSources(game: Game) {
+  const coverSources = useMemo(
+    () => getGameCoverSources(game, { includeGeneratedFallback: false }),
+    [
+      game.artworkSource,
+      game.backgroundImage,
+      game.coverImage,
+      game.externalSource,
+      game.steamAppId,
+    ],
+  );
+  const coverSourceSignature = useMemo(() => coverSources.join('\n'), [coverSources]);
+
+  return { coverSourceSignature, coverSources };
+}
+
 const ShelfGameCard = memo(function ShelfGameCard({
   game,
   getHighlightLabel,
@@ -553,7 +569,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
   platformQueueState,
 }: ShelfGameCardProps) {
   const { t } = useI18n();
-  const coverSources = useMemo(() => getGameCoverSources(game, { includeGeneratedFallback: false }), [game]);
+  const { coverSourceSignature, coverSources } = useStableCollectionCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
@@ -566,7 +582,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
-  }, [coverSources]);
+  }, [coverSourceSignature]);
 
   function handleShelfCardKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
@@ -740,7 +756,7 @@ const CompactGameRow = memo(function CompactGameRow({
   platformQueueState,
 }: CompactGameRowProps) {
   const { t } = useI18n();
-  const coverSources = useMemo(() => getGameCoverSources(game, { includeGeneratedFallback: false }), [game]);
+  const { coverSourceSignature, coverSources } = useStableCollectionCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
@@ -755,7 +771,7 @@ const CompactGameRow = memo(function CompactGameRow({
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
-  }, [coverSources]);
+  }, [coverSourceSignature]);
 
   return (
     <article
