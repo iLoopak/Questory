@@ -351,7 +351,7 @@ export function HomePanel({
           />
 
           {/* Continue Playing */}
-          <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
+          <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
               <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : continuePlayingGames.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                 {continuePlayingGames.map((game) => (
@@ -381,7 +381,7 @@ export function HomePanel({
           </HomeSection>
 
           {/* Next Adventure — top candidate per active Platform Plan */}
-          <HomeSection title={t('home.nextAdventure')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
+          <HomeSection title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
             {nextAdventureEntries.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {nextAdventureEntries.map(({ entry, game }) => (
@@ -580,19 +580,24 @@ function HomeSection({
   actionLabel,
   children,
   compact = false,
+  subtitle,
   title,
   onAction,
 }: {
   actionLabel?: string;
   children: ReactNode;
   compact?: boolean;
+  subtitle?: string;
   title: string;
   onAction?: () => void;
 }) {
   return (
     <section className={`qs-home-section rounded-2xl border border-skyglass/15 bg-ink-900/74 shadow-panel ${compact ? 'p-3' : 'p-4'}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="qs-home-section-title text-lg font-semibold text-white">{title}</h3>
+        <div>
+          <h3 className="qs-home-section-title text-lg font-semibold text-white">{title}</h3>
+          {subtitle ? <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p> : null}
+        </div>
         {actionLabel && onAction ? (
           <button
             className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
