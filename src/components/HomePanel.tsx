@@ -631,7 +631,7 @@ function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
     ['Library', 'All your games.'],
     ['Quest Queue', 'Decide what to plan, drop, or wishlist.'],
     ['Platform Plans', 'Games you want to play next.'],
-    ['Playing Now', 'What you're actively playing.'],
+    ['Playing Now', 'What you are actively playing.'],
   ];
   return (
     <div className="relative rounded-xl border border-skyglass/15 bg-ink-900/50 px-4 py-3">
