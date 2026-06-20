@@ -313,6 +313,25 @@ export function QueuePanel({
       />
       <p className="-mt-1 mb-2 px-1 text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
 
+      {activeQueuePlatforms.length > 0 ? (
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
+          {activeQueuePlatforms.map((platform) => {
+            const count = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
+            return (
+              <button
+                key={platform}
+                className="min-w-[8rem] rounded-xl border border-skyglass/15 bg-ink-950/60 px-3 py-2 text-left transition hover:border-mint/30 hover:bg-mint/10"
+                onClick={() => setPlatformFilter(platform)}
+                type="button"
+              >
+                <div className="truncate text-sm font-semibold text-white">{platform} Plan</div>
+                <div className="mt-1 text-xs text-slate-400"><span className="text-lg font-bold text-mint">{count}</span> {count === 1 ? 'game' : 'games'}</div>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {showQueueHint && (
         <div className="relative mb-3 rounded-xl border border-mint/20 bg-mint/5 p-3 text-xs">
           <button

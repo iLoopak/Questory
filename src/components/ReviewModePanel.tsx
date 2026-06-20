@@ -237,6 +237,8 @@ export function ReviewModePanel({
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = sessionGameIds.filter((gameId) => processedGameIds.has(gameId)).length;
   const totalCount = sessionGameIds.length;
+  const lifetimeReviewedCount = Object.keys(reviewModeState.reviewedGames).length + completedCount;
+  const fullRemainingCount = Math.max(0, baseSourceGames.length - completedCount);
 
   useEffect(() => {
     setProcessedGameIds(new Set());
@@ -583,6 +585,8 @@ export function ReviewModePanel({
               actionStats={actionStats}
               queuePlatforms={queuePlatforms}
               reviewedCount={completedCount}
+              lifetimeReviewedCount={lifetimeReviewedCount}
+              remainingCount={fullRemainingCount}
               sourceLabel={sourceLabel}
               onOpenQueue={onOpenQueue}
               onReturnToLibrary={onReturnToLibrary}
@@ -1138,6 +1142,8 @@ function ReviewComplete({
   actionStats,
   queuePlatforms,
   reviewedCount,
+  lifetimeReviewedCount,
+  remainingCount,
   sourceLabel,
   onOpenQueue,
   onReturnToLibrary,
@@ -1146,6 +1152,8 @@ function ReviewComplete({
   actionStats: ReviewActionStats;
   queuePlatforms: GamePlatform[];
   reviewedCount: number;
+  lifetimeReviewedCount: number;
+  remainingCount: number;
   sourceLabel: string;
   onOpenQueue: () => void;
   onReturnToLibrary: () => void;
@@ -1163,6 +1171,23 @@ function ReviewComplete({
         <p className="mt-3 text-sm text-slate-400">
           You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} from {sourceLabel}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
         </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">This Session</div>
+            <div className="mt-1 text-2xl font-semibold text-white">{reviewedCount}</div>
+            <div className="text-xs text-slate-400">reviewed</div>
+          </div>
+          <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Lifetime</div>
+            <div className="mt-1 text-2xl font-semibold text-white">{lifetimeReviewedCount}</div>
+            <div className="text-xs text-slate-400">reviewed</div>
+          </div>
+          <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Review Queue Remaining</div>
+            <div className="mt-1 text-2xl font-semibold text-white">{remainingCount}</div>
+            <div className="text-xs text-slate-400">still waiting</div>
+          </div>
+        </div>
         {hasStats && (
           <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
             {actionStats.queued > 0 && <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">{actionStats.queued} added to Platform Plans</span>}
