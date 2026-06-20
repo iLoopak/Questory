@@ -523,6 +523,7 @@ export function ReviewModePanel({
           ) : (
             <ReviewComplete
               actionStats={actionStats}
+              queuePlatforms={queuePlatforms}
               reviewedCount={completedCount}
               sourceLabel={sourceLabel}
               onOpenQueue={onOpenQueue}
@@ -1002,6 +1003,7 @@ function getSwipeTarget(offsetX: number, offsetY: number) {
 
 function ReviewComplete({
   actionStats,
+  queuePlatforms,
   reviewedCount,
   sourceLabel,
   onOpenQueue,
@@ -1009,6 +1011,7 @@ function ReviewComplete({
   onReviewAnother,
 }: {
   actionStats: ReviewActionStats;
+  queuePlatforms: GamePlatform[];
   reviewedCount: number;
   sourceLabel: string;
   onOpenQueue: () => void;
@@ -1017,6 +1020,7 @@ function ReviewComplete({
 }) {
   const { t } = useI18n();
   const hasStats = actionStats.queued > 0 || actionStats.playing > 0 || actionStats.wishlisted > 0 || actionStats.dropped > 0 || actionStats.ignored > 0;
+  const noPlatformsWarning = actionStats.queued > 0 && queuePlatforms.length === 0;
 
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
@@ -1033,6 +1037,21 @@ function ReviewComplete({
             {actionStats.ignored > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.ignored} ignored</span>}
           </div>
         )}
+        {noPlatformsWarning ? (
+          <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-left">
+            <div className="text-sm font-semibold text-amber-200">
+              {actionStats.queued} {actionStats.queued === 1 ? 'game was' : 'games were'} sent to Platform Plans — but no platforms are configured yet.
+            </div>
+            <p className="mt-1 text-xs text-amber-100/70">Set up at least one platform so your queued games have somewhere to go.</p>
+            <button
+              className="mt-3 h-9 rounded-md bg-amber-300/80 px-4 text-sm font-semibold text-ink-950 transition hover:bg-amber-300"
+              onClick={onOpenQueue}
+              type="button"
+            >
+              Set Up Platform Plans
+            </button>
+          </div>
+        ) : null}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"

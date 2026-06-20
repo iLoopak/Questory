@@ -79,22 +79,16 @@ export function OnboardingChecklist({
 }: OnboardingChecklistProps) {
   const { t } = useI18n();
   const steamImported = games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam');
-  const retroFolderCount = games.filter((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom').length;
-  const rawgEnriched = games.some((game) => game.metadataSource === 'rawg');
   const [analyticsSettings, setAnalyticsSettings] = useState(() => loadAnalyticsSettings());
   const steps = useMemo<WizardStep[]>(() => [
     { id: 'steam-connect', title: t('onboarding.stepSteamTitle'), summary: t('onboarding.stepSteamSummary'), isConfigured: () => steamImported || Boolean(loadSteamSettings().steamId64.trim() && loadSteamSettings().apiKey.trim()) },
-    { id: 'rawg-api-key', title: t('onboarding.stepRawgTitle'), summary: t('onboarding.stepRawgSummary'), isConfigured: () => Boolean(loadRawgSettings().apiKey.trim()) || rawgEnriched },
-    { id: 'retro-import', title: t('onboarding.stepRetroTitle'), summary: t('onboarding.stepRetroSummary'), isConfigured: () => retroFolderCount > 0 },
-    { id: 'backup-exported', title: t('onboarding.stepBackupTitle'), summary: t('onboarding.stepBackupSummary'), isConfigured: () => completedItemIds.has('backup-exported') },
     { id: 'make-it-yours', title: t('onboarding.stepPersonalizeTitle'), summary: t('onboarding.stepPersonalizeSummary'), isConfigured: () => completedItemIds.has('make-it-yours') },
     { id: 'ready', title: t('onboarding.stepFinishTitle'), summary: t('onboarding.stepFinishSummary'), isConfigured: () => completedItemIds.has('ready') },
-    { id: 'analytics-notice', title: t('onboarding.stepAnalyticsTitle'), summary: t('onboarding.stepAnalyticsSummary'), isConfigured: () => loadAnalyticsSettings().hasSeenAnalyticsNotice },
-  ], [completedItemIds, rawgEnriched, retroFolderCount, steamImported, t]);
+  ], [completedItemIds, steamImported, t]);
 
   useEffect(() => {
     steps.forEach((step) => {
-      if (step.id !== 'backup-exported' && step.id !== 'make-it-yours' && step.id !== 'ready' && step.id !== 'analytics-notice' && step.isConfigured() && !completedItemIds.has(step.id)) {
+      if (step.id !== 'make-it-yours' && step.id !== 'ready' && step.isConfigured() && !completedItemIds.has(step.id)) {
         onComplete(step.id);
       }
     });
@@ -117,13 +111,6 @@ export function OnboardingChecklist({
   }
   function goBack() { setActiveStepIndex((index) => Math.max(index - 1, 0)); }
   function skipStep() {
-    if (activeStep.id === 'analytics-notice') {
-      const nextSettings = updateAnalyticsEnabled(false);
-      setAnalyticsSettings(nextSettings);
-      onComplete('analytics-notice');
-      goToNextIncompleteStep('analytics-notice');
-      return;
-    }
     onSkip(activeStep.id);
     goNext();
   }
@@ -161,7 +148,7 @@ export function OnboardingChecklist({
           </div>
         </div>
 
-        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-7">
+        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-3">
           {steps.map((step, index) => {
             const isDone = completedItemIds.has(step.id);
             const isSkipped = skippedItemIds.has(step.id);
@@ -192,12 +179,8 @@ export function OnboardingChecklist({
           </div>
           <div key={activeStepIndex} className="qs-setup-step-body">
             {activeStep.id === 'steam-connect' ? <SteamStep games={games} onComplete={() => onComplete('steam-connect')} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
-            {activeStep.id === 'rawg-api-key' ? <RawgStep onComplete={() => onComplete('rawg-api-key')} onOpenSettings={() => openRelatedSettings('rawg-api-key')} /> : null}
-            {activeStep.id === 'retro-import' ? <RetroStep games={games} onComplete={() => onComplete('retro-import')} onImportGames={onImportGames} onSkip={skipStep} /> : null}
-            {activeStep.id === 'backup-exported' ? <BackupStep onComplete={() => onComplete('backup-exported')} onOpenSettings={() => openRelatedSettings('backup-exported')} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
-            {activeStep.id === 'ready' ? <FinishStep shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
-            {activeStep.id === 'analytics-notice' ? <AnalyticsStep analyticsSettings={analyticsSettings} onChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); goToNextIncompleteStep('analytics-notice'); }} /> : null}
+            {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
           </div>
         </div>
 
@@ -242,7 +225,50 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
     } catch (error) { setStatus(error instanceof SteamApiError ? error.message : 'Steam import failed. Check credentials and profile privacy.'); }
     finally { setIsLoading(false); }
   }
-  return <div><div className="grid gap-3 lg:grid-cols-3"><Input label="Steam Web API key" value={settings.apiKey} onChange={(v) => setSettings({ ...settings, apiKey: v })} type="password" /><Input label="SteamID64" value={settings.steamId64} onChange={(v) => setSettings({ ...settings, steamId64: v })} /><Input label="Steam profile URL or vanity" value={settings.wishlistUrl} onChange={(v) => setSettings({ ...settings, wishlistUrl: v })} /></div><Status text={status} /><Actions primary="Import Steam Library" onPrimary={importLibrary} onSkip={onSkip} loading={isLoading} /></div>;
+  return (
+    <div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Steam Web API key</span>
+            <input
+              className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
+              onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
+              type="password"
+              value={settings.apiKey}
+            />
+          </label>
+          <p className="mt-1.5 text-xs leading-5 text-slate-400">
+            Required to import your Steam library.{' '}
+            <a className="text-mint underline hover:text-mint/80" href="https://steamcommunity.com/dev/apikey" rel="noreferrer" target="_blank">
+              Get your free key
+            </a>{' '}
+            — takes about 30 seconds.
+          </p>
+        </div>
+        <div>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SteamID64</span>
+            <input
+              className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
+              onChange={(e) => setSettings({ ...settings, steamId64: e.target.value })}
+              value={settings.steamId64}
+            />
+          </label>
+          <p className="mt-1.5 text-xs leading-5 text-slate-400">
+            Your unique Steam account identifier. Find it at{' '}
+            <a className="text-mint underline hover:text-mint/80" href="https://steamidfinder.com" rel="noreferrer" target="_blank">
+              steamidfinder.com
+            </a>
+            .
+          </p>
+        </div>
+        <Input label="Steam profile URL or vanity" value={settings.wishlistUrl} onChange={(v) => setSettings({ ...settings, wishlistUrl: v })} />
+      </div>
+      <Status text={status} />
+      <Actions primary="Import Steam Library" onPrimary={importLibrary} onSkip={onSkip} loading={isLoading} />
+    </div>
+  );
 }
 
 function RawgStep({ onComplete, onOpenSettings }: { onComplete: () => void; onOpenSettings: () => void }) {
@@ -312,7 +338,86 @@ function AnalyticsStep({ analyticsSettings, onChoose }: { analyticsSettings: Ret
   );
 }
 
-function FinishStep({ gameCount, onComplete, onOpenLibrary, onOpenQueue, personalizedQuestShelfTitle, platformCount, progress, shelfTitle }: { gameCount: number; onComplete: () => void; onOpenLibrary: () => void; onOpenQueue: () => void; personalizedQuestShelfTitle: string; platformCount: number; progress: string; shelfTitle: string }) { return <div className="rounded-2xl border border-mint/30 bg-mint/10 p-5 text-center shadow-glow"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-mint text-2xl text-ink-950">✓</div><h3 className="mt-4 text-3xl font-semibold text-white">Your QuestShelf is ready.</h3><p className="mt-2 text-lg text-mint">{personalizedQuestShelfTitle}</p>{shelfTitle ? <p className="mt-1 text-sm font-semibold text-white">🏆 {shelfTitle}</p> : null}<div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-slate-200"><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{gameCount} games imported</span><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{platformCount} platforms configured</span><span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">Setup progress: {progress}</span></div><div className="mt-5 flex flex-wrap justify-center gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => { onComplete(); onOpenLibrary(); }} type="button">Start exploring</button><button className="h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint" onClick={() => { onComplete(); onOpenQueue(); }} type="button">Open Platform Plans</button></div></div>; }
+function FinishStep({
+  analyticsSettings,
+  gameCount,
+  onAnalyticsChoose,
+  onComplete,
+  onOpenLibrary,
+  onOpenQueue,
+  personalizedQuestShelfTitle,
+  platformCount,
+  progress,
+  shelfTitle,
+}: {
+  analyticsSettings: ReturnType<typeof loadAnalyticsSettings>;
+  gameCount: number;
+  onAnalyticsChoose: (isEnabled: boolean) => void;
+  onComplete: () => void;
+  onOpenLibrary: () => void;
+  onOpenQueue: () => void;
+  personalizedQuestShelfTitle: string;
+  platformCount: number;
+  progress: string;
+  shelfTitle: string;
+}) {
+  const analyticsChoice = analyticsSettings.hasSeenAnalyticsNotice
+    ? analyticsSettings.isAnalyticsEnabled
+      ? 'enabled'
+      : 'declined'
+    : null;
+
+  function handleExit(action: 'library' | 'queue') {
+    if (!analyticsSettings.hasSeenAnalyticsNotice) {
+      onAnalyticsChoose(false);
+    }
+    onComplete();
+    if (action === 'library') onOpenLibrary();
+    else onOpenQueue();
+  }
+
+  return (
+    <div className="rounded-2xl border border-mint/30 bg-mint/10 p-5 text-center shadow-glow">
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-mint text-2xl text-ink-950">✓</div>
+      <h3 className="mt-4 text-3xl font-semibold text-white">Your QuestShelf is ready.</h3>
+      <p className="mt-2 text-lg text-mint">{personalizedQuestShelfTitle}</p>
+      {shelfTitle ? <p className="mt-1 text-sm font-semibold text-white">🏆 {shelfTitle}</p> : null}
+      <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-slate-200">
+        <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{gameCount} games imported</span>
+        <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">{platformCount} platforms configured</span>
+        <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">Setup progress: {progress}</span>
+      </div>
+      <div className="mx-auto mt-5 max-w-lg rounded-xl border border-white/10 bg-ink-950/60 p-4 text-left">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Community Alpha</div>
+        <p className="mt-1 text-sm text-slate-300">Help improve QuestShelf by sharing anonymous usage stats — no game titles, notes, or personal data.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            aria-pressed={analyticsChoice === 'enabled'}
+            className={`h-9 rounded-md px-4 text-sm font-semibold ${analyticsChoice === 'enabled' ? 'border border-mint/50 bg-mint/20 text-mint' : 'bg-mint text-ink-950'}`}
+            disabled={analyticsChoice === 'enabled'}
+            onClick={() => onAnalyticsChoose(true)}
+            type="button"
+          >
+            {analyticsChoice === 'enabled' ? 'Analytics enabled ✓' : 'Enable anonymous analytics'}
+          </button>
+          <button
+            aria-pressed={analyticsChoice === 'declined'}
+            className={`h-9 rounded-md border px-4 text-sm ${analyticsChoice === 'declined' ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}
+            disabled={analyticsChoice !== null}
+            onClick={() => onAnalyticsChoose(false)}
+            type="button"
+          >
+            {analyticsChoice === 'declined' ? 'No analytics (change in Settings)' : 'No, thanks'}
+          </button>
+        </div>
+      </div>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        <button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => handleExit('library')} type="button">Start exploring</button>
+        <button className="h-11 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint" onClick={() => handleExit('queue')} type="button">Open Platform Plans</button>
+      </div>
+    </div>
+  );
+}
 function Input({ label, onChange, type = 'text', value }: { label: string; onChange: (value: string) => void; type?: string; value: string }) { return <label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" onChange={(e) => onChange(e.target.value)} type={type} value={value} /></label>; }
 function Status({ text }: { text: string }) { return <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm text-slate-300">{text}</div>; }
 function Actions({ disabled = false, loading = false, onPrimary, onSkip, primary }: { disabled?: boolean; loading?: boolean; onPrimary: () => void; onSkip?: () => void; primary: string }) { return <div className="mt-5 flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 disabled:bg-slate-600" disabled={disabled || loading} onClick={onPrimary} type="button">{loading ? 'Working...' : primary}</button>{onSkip ? <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip</button> : null}</div>; }
