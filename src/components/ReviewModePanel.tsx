@@ -864,6 +864,11 @@ function FocusedReviewCard({
                     onLoad={() => setIsCoverLoaded(true)}
                     src={activeCoverSource}
                   />
+                  {isGeneratedFallbackActive && (
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 backdrop-blur-sm">
+                      No artwork
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="relative h-full w-full">
@@ -874,6 +879,9 @@ function FocusedReviewCard({
                     draggable={false}
                     src={fallbackCoverSource}
                   />
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 backdrop-blur-sm">
+                    No artwork
+                  </div>
                 </div>
               )}
             </div>
@@ -1179,6 +1187,11 @@ function ReviewComplete({
         <p className="mt-3 text-sm text-slate-400">
           You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} from {sourceLabel}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
         </p>
+        {remainingCount > 0 && (
+          <p className="mt-2 text-xs text-slate-500">
+            Quest Queue reviews in focused 20-game sessions to keep decisions quick and manageable. {remainingCount} {remainingCount === 1 ? 'game remains' : 'games remain'} for your next session.
+          </p>
+        )}
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">This Session</div>
@@ -1203,6 +1216,13 @@ function ReviewComplete({
             {actionStats.wishlisted > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.wishlisted} added to Wishlist</span>}
             {actionStats.dropped > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.dropped} dropped</span>}
             {actionStats.ignored > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.ignored} ignored</span>}
+          </div>
+        )}
+        {actionStats.queued > 0 && !noPlatformsWarning && (
+          <div className="mt-4 rounded-xl border border-mint/20 bg-mint/5 p-3 text-center">
+            <p className="text-sm text-slate-300">
+              {actionStats.queued} {actionStats.queued === 1 ? 'game was' : 'games were'} added to Platform Plans — open it to see them and start playing.
+            </p>
           </div>
         )}
         {noPlatformsWarning ? (
