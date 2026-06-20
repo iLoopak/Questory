@@ -77,7 +77,14 @@ export type Game = {
   steamAchievementsLastCheckedAt?: number;
   lastSteamActivityAt?: string;
   lastSteamActivityDeltaMinutes?: number;
-  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
+  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom' | 'psn';
+  psnNpCommunicationId?: string;
+  psnTrophyPercent?: number;
+  psnTrophyBronze?: number;
+  psnTrophySilver?: number;
+  psnTrophyGold?: number;
+  psnTrophyPlatinum?: number;
+  psnTrophySyncedAt?: string;
   externalUrl?: string;
   importedAt?: string;
   updatedAt?: string;
