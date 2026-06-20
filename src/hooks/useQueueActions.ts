@@ -15,6 +15,7 @@ import {
 } from '../lib/platformQueueStorage';
 import {
   formatGameToastMessage,
+  formatToastGameTitle,
   getMoveQueueToastMessage,
   getOpenQueueAction,
   getRemoveQueueToastMessage,
@@ -62,11 +63,12 @@ export function useQueueActions({
   }
 
   function addGameToQueue(game: Game, platform: GamePlatform) {
-    addUndoAction(formatGameToastMessage(t('toast.addedToPlatforms'), game), {
+    const toastMessage = formatMessageTemplate(t('toast.addedToPlatformPlan'), { game: formatToastGameTitle(game.title), platform });
+    addUndoAction(toastMessage, {
       actionType: 'add-to-queue',
       affectedGameIds: [game.id],
       description: formatMessageTemplate(t('app.removeFromPlatformBacklog'), { game: game.title, platform }),
-    }, undefined, { actions: [getUndoAction()] });
+    }, undefined, { actions: [getUndoAction(), getOpenQueueAction()] });
 
     const platformTag = getPlatformTag(platformQueueState, platform);
     if (platformTag && !game.tags.includes(platformTag)) {

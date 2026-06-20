@@ -1084,7 +1084,7 @@ function ReviewSourceEmpty({
   const messages: Record<ReviewSource, { title: string; text: string }> = {
     backlog: {
       title: 'No games waiting for review',
-      text: 'Your Want to Play group is empty. Import or add games to get started.',
+      text: 'Quest Queue reviews your games one at a time so you can decide what to plan, drop, or wishlist. Import games or add them manually to get started.',
     },
     'recent-imports': {
       title: 'No recent imports found',

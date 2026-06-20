@@ -352,7 +352,7 @@ export function QueuePanel({
           {suggestedPlatform ? (
             <>
               <div className="font-semibold text-white">Your library already contains games.</div>
-              <p className="mt-1 text-slate-300">Create your first Platform Plan to organise what you'll play next.</p>
+              <p className="mt-1 text-slate-300">Platform Plans is your active backlog — games you've chosen to play next, organized by platform. Use Quest Queue to triage your Library into plans.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => addSuggestedPlatform(suggestedPlatform)} type="button">
                   ＋ Add {suggestedPlatform}
