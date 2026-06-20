@@ -228,7 +228,7 @@ export function HomePanel({
   }, [actionSheetGame, onOpenLibrary, onOpenQueue, onOpenReviewMode]);
 
   return (
-    <section ref={shellRef} className="qs-home-shell space-y-4 pb-4">
+    <section ref={shellRef} className="qs-home-shell space-y-4 pb-4 pt-2">
       {/* Compact Hero — full width */}
       <section className="qs-home-hero flex items-center gap-3 rounded-xl border border-skyglass/15 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-3 shadow-panel">
         {avatar}
