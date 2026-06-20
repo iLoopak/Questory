@@ -138,6 +138,7 @@ export function HomePanel({
   const reviewRemainingCount = useMemo(() => {
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id) && !reviewModeState.reviewedGames[game.id]).length;
   }, [games, ignoredReviewGameIds, reviewModeState.reviewedGames]);
+  const finishedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Finished').length, [libraryGames]);
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
 
@@ -203,7 +204,17 @@ export function HomePanel({
 
   const greeting = useRef<string | null>(null);
   if (!greeting.current) {
-    greeting.current = pickGreeting(queueEntries.length, continuePlayingGames.length, reviewRemainingCount);
+    greeting.current = pickHeroMessage({
+      activeCount: continuePlayingGames.length,
+      finishedCount,
+      hasAchievements: libraryGames.some((g) => Boolean(g.steamAchievementsTotal)),
+      hasRetro: libraryGames.some((g) => g.externalSource === 'retro-rom'),
+      hasSteam: libraryGames.some((g) => g.externalSource === 'steam' || g.steamAppId != null),
+      librarySize: libraryGames.length,
+      queueCount: queueEntries.length,
+      reviewedCount,
+      reviewRemainingCount,
+    });
   }
 
 
@@ -274,7 +285,7 @@ export function HomePanel({
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
           {shelfTitle ? <div className="text-xs font-semibold text-mint">{shelfTitle}</div> : null}
-          <div className="mt-0.5 truncate text-xs text-slate-500">{greeting.current}</div>
+          <div className="mt-0.5 text-xs leading-snug text-slate-500 whitespace-pre-line">{greeting.current}</div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div className="flex items-center gap-4">
@@ -1514,17 +1525,154 @@ function SyncStatusLine({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{label}</span><span className="text-right text-slate-300">Last sync: {value}</span></div>;
 }
 
-function pickGreeting(queueCount: number, activeCount: number, reviewCount: number): string {
-  const s = (n: number) => (n === 1 ? '' : 's');
-  const options = [
-    queueCount > 0 ? `${queueCount} game${s(queueCount)} in Platform Plans. No pressure.` : null,
-    activeCount > 0 ? `${activeCount} active game${s(activeCount)}. Totally under control.` : null,
-    reviewCount > 0 ? `${reviewCount} game${s(reviewCount)} waiting for a verdict.` : null,
-    'Your Platform Plans are waiting.',
-    'Pick one. Future you will thank you.',
+type HeroMessageContext = {
+  activeCount: number;
+  finishedCount: number;
+  hasAchievements: boolean;
+  hasRetro: boolean;
+  hasSteam: boolean;
+  librarySize: number;
+  queueCount: number;
+  reviewedCount: number;
+  reviewRemainingCount: number;
+};
+
+function pickHeroMessage(ctx: HeroMessageContext): string {
+  const { activeCount, finishedCount, hasAchievements, hasRetro, hasSteam, librarySize, queueCount, reviewedCount, reviewRemainingCount } = ctx;
+  const s = (n: number) => n === 1 ? '' : 's';
+  const n = (v: number) => v.toLocaleString('en-US');
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+  // Category 9: Rare — 5% chance, shown regardless of context
+  const rareMessages = [
+    'Go play something.',
+    'Stop organising.\nStart playing.',
+    'This is your sign.',
+    'Pick a game. Any game.',
+    'Your next favourite game might already be installed.',
+    'Close QuestShelf.\nLaunch a game.',
+    'Seriously.',
+  ];
+  if (Math.random() < 0.05) return pick(rareMessages);
+
+  // Category 8: Dry Humor — 12% chance
+  const dryHumorMessages = [
+    'You bought it.\nEventually you\'ll play it.',
+    'The backlog has achieved sentience.',
+    'Today\'s plan:\navoid opening the Steam sale.',
+    'You cannot finish them all.\nAnd that\'s okay.',
+    'QuestShelf believes in you.\nThe queue is less certain.',
+    'This seemed like a good idea at the time.',
+    'Nothing says optimism like another imported library.',
+    'The shelf grows. The shelf endures.',
+  ];
+  if (Math.random() < 0.12) return pick(dryHumorMessages);
+
+  // Build contextual pool
+  const contextual: string[] = [];
+
+  // Category 1: Queue Awareness
+  if (reviewRemainingCount > 0) {
+    contextual.push('The queue remembers.');
+    contextual.push('One review at a time.');
+    contextual.push('Your future self would appreciate some triage.');
+    if (reviewRemainingCount > 50) {
+      contextual.push(`${n(reviewRemainingCount)} game${s(reviewRemainingCount)} waiting for a verdict.`);
+    }
+    if (reviewRemainingCount > 200 && librarySize > 200) {
+      contextual.push(`Somewhere in those ${n(librarySize)} games is your next favourite.`);
+    }
+    if (reviewedCount > 5 && reviewRemainingCount > 0) {
+      contextual.push(`You reviewed ${n(reviewedCount)} game${s(reviewedCount)}.\n${n(reviewRemainingCount)} still waiting.`);
+    }
+  }
+
+  // Category 2: Playing Momentum
+  if (activeCount > 0) {
+    contextual.push(`${n(activeCount)} adventure${s(activeCount)} already in progress.`);
+    contextual.push('You already know what to play.');
+    contextual.push('Keep the momentum going.');
+    contextual.push(`Your current game${s(activeCount)} ${activeCount === 1 ? 'is' : 'are'} still right there.`);
+    contextual.push('One session is better than no session.');
+    if (activeCount > 1) {
+      contextual.push('The hardest part is choosing.\nYou already did that.');
+    }
+    contextual.push('You are closer to the credits than yesterday.');
+  }
+
+  // Category 3: Platform Plans
+  if (queueCount > 0) {
+    contextual.push('Your next adventure is already waiting.');
+    contextual.push('You made the plan.\nTrust the plan.');
+    contextual.push('Future fun has already been scheduled.');
+    contextual.push('Platform Plans are promises to yourself.');
+    contextual.push('A good backlog is a curated backlog.');
+    if (queueCount > 5) {
+      contextual.push(`${n(queueCount)} game${s(queueCount)} queued.\nLet's see who goes first.`);
+    }
+  }
+
+  // Category 4: Achievement Hunter
+  if (hasAchievements) {
+    contextual.push('There is always one more achievement.');
+    contextual.push('Completion is a journey.');
+    contextual.push('Some percentages deserve respect.');
+    contextual.push('Progress comes in small popups.');
+    contextual.push('That rare achievement will not unlock itself.');
+  }
+
+  // Category 5: Steam Collector
+  if (hasSteam && librarySize > 300) {
+    contextual.push('Your collection is thriving.');
+    contextual.push('Every library tells a story.');
+    contextual.push('At least the covers look nice.');
+    if (librarySize > 500) {
+      contextual.push('Buying games and playing games\nremain separate hobbies.');
+      contextual.push('Most of your games are still a mystery.');
+    }
+    if (librarySize > 1000) {
+      contextual.push(`${n(librarySize)} games imported.\nAmbitious.`);
+      contextual.push('Congratulations.\nYou have enough games until retirement.');
+    }
+  }
+
+  // Category 6: Retro Gamer
+  if (hasRetro) {
+    contextual.push('Some classics age better than others.');
+    contextual.push('Pixels never truly die.');
+    contextual.push('The backlog spans generations.');
+    contextual.push('Retro never left.');
+    contextual.push('Somewhere in your plans is a forgotten masterpiece.');
+    if (librarySize > 100) {
+      contextual.push('A memory card would not survive this collection.');
+    }
+  }
+
+  // Category 7: Progress Milestones
+  if (reviewedCount > 10) {
+    contextual.push(`${n(reviewedCount)} games reviewed. Not bad.`);
+    contextual.push('Progress compounds.');
+    contextual.push('Every review improves your recommendations.');
+  }
+  if (finishedCount > 0) {
+    contextual.push(`${n(finishedCount)} game${s(finishedCount)} finished.\nSomething to be proud of.`);
+    contextual.push('Another game found its place.');
+    contextual.push('A smaller queue is a beautiful thing.');
+  }
+
+  // Static fallback pool
+  const staticMessages = [
     'The list grows. The list is patient.',
+    'Pick one. Future you will thank you.',
     'Progress is progress. Even at 2%.',
     'One game closer. Probably.',
-  ].filter((x): x is string => x !== null);
-  return options[Math.floor(Math.random() * options.length)];
+    'Quest Queue is a lifestyle.',
+    'Your Platform Plans are waiting.',
+    'Your backlog is not getting smaller by itself.',
+    'The queue has been waiting for you.',
+    'Every session counts.',
+  ];
+
+  if (contextual.length > 0) return pick(contextual);
+  return pick(staticMessages);
 }
