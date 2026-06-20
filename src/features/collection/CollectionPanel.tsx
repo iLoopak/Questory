@@ -98,6 +98,7 @@ export type CollectionPanelProps = {
   itadDealSyncState?: ItadDealSyncState;
   onSyncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
   onOpenOnboarding?: () => void;
+  onOpenRetro?: () => void;
 };
 
 export function CollectionPanel({
@@ -143,6 +144,7 @@ export function CollectionPanel({
   itadDealSyncState,
   onSyncItadDeals,
   onOpenOnboarding,
+  onOpenRetro,
   isHltbSyncing = false,
 }: CollectionPanelProps) {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -845,29 +847,49 @@ export function CollectionPanel({
           />
         )
       ) : collectionType === 'library' && !hasActiveFilters ? (
-        <div className="qs-game-list-empty grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-6 text-center">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Your library is empty</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">Import games to get started, or reopen the Setup Assistant to walk through the process.</p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <div className="qs-game-list-empty rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-6">
+          <h3 className="text-lg font-semibold text-white">Your library is empty</h3>
+          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">Add games to get started. Choose the path that fits your collection:</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <button
+              className="rounded-lg border border-skyglass/15 bg-ink-900 px-3 py-3 text-left transition hover:border-mint/30 hover:bg-ink-900/80"
+              onClick={onAddGame}
+              type="button"
+            >
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Steam</div>
+              <div className="mt-1 text-sm font-semibold text-white">Import Steam Library</div>
+              <div className="mt-0.5 text-xs text-slate-400">Import your owned games, playtime, and achievements.</div>
+            </button>
+            {onOpenRetro && (
               <button
-                className="h-9 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-                onClick={onAddGame}
+                className="rounded-lg border border-skyglass/15 bg-ink-900 px-3 py-3 text-left transition hover:border-mint/30 hover:bg-ink-900/80"
+                onClick={onOpenRetro}
                 type="button"
               >
-                Import Games
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">ROMs</div>
+                <div className="mt-1 text-sm font-semibold text-white">Import ROM Folder</div>
+                <div className="mt-0.5 text-xs text-slate-400">Scan a local folder and import retro games in bulk.</div>
               </button>
-              {onOpenOnboarding && (
-                <button
-                  className="h-9 rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
-                  onClick={onOpenOnboarding}
-                  type="button"
-                >
-                  Reopen Setup Assistant
-                </button>
-              )}
-            </div>
+            )}
+            <button
+              className="rounded-lg border border-skyglass/15 bg-ink-900 px-3 py-3 text-left transition hover:border-mint/30 hover:bg-ink-900/80"
+              onClick={onAddGame}
+              type="button"
+            >
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Manual</div>
+              <div className="mt-1 text-sm font-semibold text-white">Add Game Manually</div>
+              <div className="mt-0.5 text-xs text-slate-400">Add any game — console, PC, or handheld — by title.</div>
+            </button>
           </div>
+          {onOpenOnboarding && (
+            <button
+              className="mt-4 h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-400 transition hover:text-slate-200"
+              onClick={onOpenOnboarding}
+              type="button"
+            >
+              Reopen Setup Assistant
+            </button>
+          )}
         </div>
       ) : (
         <GameListEmptyState title={emptyTitle} text={emptyText} />

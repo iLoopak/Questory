@@ -1008,19 +1008,30 @@ function NoNextAdventureGuide({
 
   return (
     <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
-      <h4 className="text-base font-semibold text-white">Plan your next adventure</h4>
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Next step</div>
+      <h4 className="mt-1 text-base font-semibold text-white">Add games to a Platform Plan</h4>
       <p className="mt-1 text-sm text-slate-400">
-        Platform Plans help organise what you want to play on each system. Create a plan for a platform and add games to it.
+        Platform Plans hold the games you have decided to play next, organised by platform. Use Quest Queue to review your library and send games here, or open Platform Plans to add them directly.
       </p>
       {platformChips}
-      <button
-        className="mt-4 min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-        data-home-focus="true"
-        onClick={onOpenQueue}
-        type="button"
-      >
-        Open Platform Plans
-      </button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+          data-home-focus="true"
+          onClick={onOpenReviewMode}
+          type="button"
+        >
+          Open Quest Queue
+        </button>
+        <button
+          className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+          data-home-focus="true"
+          onClick={onOpenQueue}
+          type="button"
+        >
+          Open Platform Plans
+        </button>
+      </div>
     </div>
   );
 }
@@ -1204,7 +1215,7 @@ function EmptyState({
 }
 
 function isBacklogReviewCandidate(game: Game) {
-  return game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped';
+  return game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped' && game.status !== 'Playing';
 }
 
 function getActivityTime(game: Game) {

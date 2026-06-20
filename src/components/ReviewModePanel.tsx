@@ -746,6 +746,14 @@ function FocusedReviewCard({
       return;
     }
 
+    if (target.action.action === 'queue') {
+      // Skip exit animation for queue action — card stays visible while platform picker opens,
+      // matching the button-tap experience exactly.
+      setSwipeState(emptySwipeState);
+      onAction('queue');
+      return;
+    }
+
     const exitX = target.horizontal === 'left' ? -window.innerWidth : window.innerWidth;
     const exitY = target.vertical === 'up' ? -window.innerHeight * 0.45 : window.innerHeight * 0.45;
     setSwipeState({ offsetX: exitX, offsetY: exitY, phase: 'exiting' });
@@ -1290,7 +1298,7 @@ function getPreviousActionStats(currentStats: ReviewActionStats, action: ReviewM
 
 function matchesReviewSource(game: Game, source: ReviewSource) {
   if (source === 'backlog') {
-    return game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped';
+    return game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped' && game.status !== 'Playing';
   }
 
   if (source === 'recent-imports') {
