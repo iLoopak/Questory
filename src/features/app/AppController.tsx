@@ -1017,6 +1017,7 @@ export function AppController() {
               avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" />}
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
+              playActivity={playActivity}
               reviewQueueOrder={reviewModeState.queueOrder}
               reviewModeState={reviewModeState}
               queueState={platformQueueState}

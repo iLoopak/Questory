@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatDealPrice } from './DealCoverBadges';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
+import type { PlayActivityRecord } from '../lib/playActivityStorage';
 import type { ReviewModeState, ReviewSource } from '../lib/reviewModeStorage';
 import type { ItadDealSyncState } from '../config/syncStates';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../types/steam';
@@ -18,6 +19,7 @@ type HomePanelProps = {
   featuredGame?: Game | null;
   games: Game[];
   ignoredReviewGameIds: Set<string>;
+  playActivity?: PlayActivityRecord[];
   reviewQueueOrder: string[];
   reviewModeState: ReviewModeState;
   queueState: PlatformQueueState;
@@ -48,6 +50,7 @@ export function HomePanel({
   featuredGame = null,
   games,
   ignoredReviewGameIds,
+  playActivity = [],
   reviewQueueOrder,
   reviewModeState,
   queueState,
@@ -372,6 +375,7 @@ export function HomePanel({
                     game={game}
                     eyebrow={t('home.currentlyPlaying')}
                     hero={continuePlayingGames.length === 1}
+                    activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
                     onClick={() => setActionSheetGame(game)}
                     queueState={queueState}
                   />
@@ -662,6 +666,7 @@ function GamePosterButton({
   onClick,
   queueState,
   wide = false,
+  activitySignal = null,
 }: {
   game: Game;
   eyebrow: string;
@@ -669,6 +674,7 @@ function GamePosterButton({
   onClick: () => void;
   queueState: PlatformQueueState;
   wide?: boolean;
+  activitySignal?: string | null;
 }) {
   const { t } = useI18n();
   const coverSources = getGameCoverSources(game);
@@ -714,6 +720,11 @@ function GamePosterButton({
           />
           {playtime ? <span className="text-xs text-slate-400">{playtime}</span> : null}
         </div>
+        {activitySignal && (
+          <div className="mt-1.5 text-xs leading-none text-slate-400 drop-shadow">
+            {activitySignal}
+          </div>
+        )}
       </div>
     </button>
   );
@@ -1216,6 +1227,73 @@ function EmptyState({
 
 function isBacklogReviewCandidate(game: Game) {
   return game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped' && game.status !== 'Playing';
+}
+
+// ── Activity signal helpers ───────────────────────────────────────────────────
+
+const SIGNAL_DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseLocalDateStr(dateStr: string): Date {
+  const parts = dateStr.slice(0, 10).split('-').map(Number);
+  return new Date(parts[0] ?? 2000, (parts[1] ?? 1) - 1, parts[2] ?? 1);
+}
+
+function localDayDiff(from: Date, to: Date): number {
+  const fromMs = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+  const toMs = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
+  return Math.floor((toMs - fromMs) / SIGNAL_DAY_MS);
+}
+
+function getGameActivitySignal(
+  gameId: string,
+  activity: PlayActivityRecord[],
+  lastPlayedAt: string | null,
+  now = new Date(),
+): string | null {
+  // Collect unique YYYY-MM-DD dates this game has activity on, newest first
+  const dates = [...new Set(
+    activity.filter((r) => r.gameId === gameId).map((r) => r.date),
+  )].sort((a, b) => b.localeCompare(a));
+
+  if (dates.length > 0) {
+    const mostRecent = parseLocalDateStr(dates[0]);
+    const daysOld = localDayDiff(mostRecent, now);
+
+    // Only surface streaks/signals anchored to today or yesterday
+    if (daysOld <= 1) {
+      let streak = 1;
+      for (let i = 1; i < dates.length; i++) {
+        const prev = parseLocalDateStr(dates[i - 1]);
+        const curr = parseLocalDateStr(dates[i]);
+        if (localDayDiff(curr, prev) === 1) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+
+      if (streak >= 7) return '🔥 Playing all week';
+      if (streak >= 2) return `🔥 ${streak}-day streak`;
+
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (dates[0] === todayStr) return 'Played today';
+      return 'Played yesterday';
+    }
+  }
+
+  // Fall back to game.lastPlayedAt for a rough recency label
+  if (lastPlayedAt) {
+    const parsed = parseLocalDateStr(lastPlayedAt);
+    if (isNaN(parsed.getTime())) return null;
+    const days = localDayDiff(parsed, now);
+    if (days === 0) return 'Played today';
+    if (days === 1) return 'Played yesterday';
+    if (days <= 6) return `Last played ${days} days ago`;
+    if (days <= 14) return 'Last played last week';
+    if (days <= 30) return 'Last played this month';
+  }
+
+  return null;
 }
 
 function getActivityTime(game: Game) {
