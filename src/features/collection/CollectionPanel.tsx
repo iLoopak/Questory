@@ -90,6 +90,7 @@ export type CollectionPanelProps = {
   onOpenDetails: (gameId: string) => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
+  onOpenQueue?: () => void;
   onStartReview: (source: ReviewSource) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncSteamWishlist?: () => void;
@@ -134,6 +135,7 @@ export function CollectionPanel({
   onOpenDetails,
   onRemove,
   onRemoveAndIgnore,
+  onOpenQueue,
   onStartReview,
   onStatusChange,
   onSyncSteamWishlist,
@@ -606,6 +608,7 @@ export function CollectionPanel({
       {collectionType === 'library' ? (
         <LibraryProgressSummary
           nextMilestone={nextMilestone}
+          onOpenQueue={onOpenQueue}
           remainingReviewCount={remainingReviewCount}
           reviewedCount={reviewedLibraryCount}
           reviewedPercent={reviewedPercent}
@@ -1027,12 +1030,14 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
 
 function LibraryProgressSummary({
   nextMilestone,
+  onOpenQueue,
   remainingReviewCount,
   reviewedCount,
   reviewedPercent,
   unlockedMilestones,
 }: {
   nextMilestone?: number;
+  onOpenQueue?: () => void;
   remainingReviewCount: number;
   reviewedCount: number;
   reviewedPercent: number;
@@ -1056,11 +1061,21 @@ function LibraryProgressSummary({
           <div className="mt-1 text-right text-xs text-slate-500">{remainingReviewCount} games still waiting for review</div>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        {unlockedMilestones.slice(-4).map((milestone) => (
-          <span key={milestone} className="rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 font-semibold text-mint">✓ {milestone} Reviewed</span>
-        ))}
-        {nextMilestone ? <span className="rounded-full border border-skyglass/15 bg-ink-950/60 px-2.5 py-1 text-slate-400">Next: {nextMilestone} reviewed</span> : null}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {unlockedMilestones.slice(-4).map((milestone) => (
+            <span key={milestone} className="rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 font-semibold text-mint">✓ {milestone} Reviewed</span>
+          ))}
+          {nextMilestone ? <span className="rounded-full border border-skyglass/15 bg-ink-950/60 px-2.5 py-1 text-slate-400">Next: {nextMilestone} reviewed</span> : null}
+        </div>
+        {remainingReviewCount > 0 && onOpenQueue ? (
+          <button
+            onClick={onOpenQueue}
+            className="h-7 rounded-md border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+          >
+            Continue in Quest Queue →
+          </button>
+        ) : null}
       </div>
     </section>
   );
