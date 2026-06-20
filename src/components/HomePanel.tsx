@@ -139,6 +139,7 @@ export function HomePanel({
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id) && !reviewModeState.reviewedGames[game.id]).length;
   }, [games, ignoredReviewGameIds, reviewModeState.reviewedGames]);
   const finishedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Finished').length, [libraryGames]);
+  const unratedFinishedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Finished' && !g.rating).length, [libraryGames]);
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
 
@@ -373,6 +374,7 @@ export function HomePanel({
             reviewedCount={reviewedCount}
             reviewStats={reviewModeState.stats}
             startedAdventureCount={startedAdventureCount}
+            unratedFinishedCount={unratedFinishedCount}
             nextReviewTarget={nextReviewTarget}
             onOpenReviewMode={() => onOpenReviewMode('backlog')}
           />
@@ -569,6 +571,7 @@ function JourneyProgressCard({
   reviewedCount,
   reviewStats,
   startedAdventureCount,
+  unratedFinishedCount,
   nextReviewTarget,
   onOpenReviewMode,
 }: {
@@ -577,6 +580,7 @@ function JourneyProgressCard({
   reviewedCount: number;
   reviewStats: ReviewStats;
   startedAdventureCount: number;
+  unratedFinishedCount: number;
   nextReviewTarget: number;
   onOpenReviewMode: () => void;
 }) {
@@ -601,6 +605,11 @@ function JourneyProgressCard({
           {statParts.length > 0 ? (
             <div className="mt-2.5 text-xs text-slate-500">
               Quest Queue: {statParts.join(' · ')}
+            </div>
+          ) : null}
+          {unratedFinishedCount > 0 ? (
+            <div className="mt-1.5 text-xs text-slate-600">
+              {unratedFinishedCount} finished {unratedFinishedCount === 1 ? 'game' : 'games'} without a rating
             </div>
           ) : null}
         </div>

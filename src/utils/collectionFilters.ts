@@ -206,6 +206,10 @@ export function matchesQuickFilter(game: Game, quickFilter: QuickFilter): boolea
     return game.favorite === true;
   }
 
+  if (quickFilter === 'Unrated Finished') {
+    return game.status === 'Finished' && !game.rating;
+  }
+
   return game.playtimeHours > 0;
 }
 

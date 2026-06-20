@@ -82,6 +82,7 @@ import { AppGameDetailsView } from './AppGameDetailsView';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
+import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
 
 const appLogo = '/icons/questshelf-icon.png';
 
@@ -261,6 +262,7 @@ export function AppController() {
   }
 
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
+  const [completionRatingGame, setCompletionRatingGame] = useState<Game | null>(null);
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
@@ -304,6 +306,21 @@ export function AppController() {
     setSelectedGameId,
     t,
   });
+
+  function triggerCompletionSheet(gameId: string) {
+    const game = games.find((g) => g.id === gameId);
+    if (game) setCompletionRatingGame(game);
+  }
+
+  function updateGameStatusWithCompletion(gameId: string, status: GameStatus) {
+    updateGameStatus(gameId, status);
+    if (status === 'Finished') triggerCompletionSheet(gameId);
+  }
+
+  function updateGameReviewFieldsWithCompletion(gameId: string, changes: Partial<Game>) {
+    updateGameReviewFields(gameId, changes);
+    if (changes.status === 'Finished') triggerCompletionSheet(gameId);
+  }
 
   const {
     metadataSelectionRequest,
@@ -746,7 +763,7 @@ export function AppController() {
     setSelectedGameId,
     startMetadataWorkflow,
     t,
-    updateGameReviewFields,
+    updateGameReviewFields: updateGameReviewFieldsWithCompletion,
   });
 
   function openQueueFromToast() {
@@ -983,7 +1000,7 @@ export function AppController() {
                 onOpenDetails={openDetailsFromPlayingNow}
                 onPlayToday={logPlayedToday}
                 onRefreshSteamActivity={(gameIds) => { void refreshSteamPlaytime(gameIds, { showToast: false }); }}
-                onStatusChange={updateGameStatus}
+                onStatusChange={updateGameStatusWithCompletion}
                 queue={platformQueueState}
                 queueSummary={queueSummary}
                 shelfNickname={shelfIdentity.shelfName}
@@ -1004,7 +1021,7 @@ export function AppController() {
               onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
               onIgnore={removeAndIgnoreSteamGame}
               onSyncSteamData={syncSteamDataForGame}
-              onStatusChange={updateGameStatus}
+              onStatusChange={updateGameStatusWithCompletion}
               onTrackingChange={updateGameTracking}
               onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
               onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
@@ -1045,7 +1062,7 @@ export function AppController() {
                 updateGameTracking(gameId, { notes, status: target.status, tags: target.tags });
                 addToastNotification({ category: 'success', dedupeKey: `quick-note:${gameId}`, message: 'Note saved.' });
               }}
-              onStatusChange={updateGameStatus}
+              onStatusChange={updateGameStatusWithCompletion}
               onSyncItadDeals={() => {
                 const wishlistIds = games.filter((g) => g.collectionType === 'wishlist').map((g) => g.id);
                 void syncWishlistDeals(wishlistIds);
@@ -1080,7 +1097,7 @@ export function AppController() {
                     onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
-                    onStatusChange={updateGameStatus}
+                    onStatusChange={updateGameStatusWithCompletion}
                     onTrackingChange={updateGameTracking}
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
@@ -1138,7 +1155,7 @@ export function AppController() {
                   onRemoveAndIgnore={removeAndIgnoreSteamGame}
                   onOpenQueue={() => startReviewMode('backlog')}
                   onStartReview={startReviewMode}
-                  onStatusChange={updateGameStatus}
+                  onStatusChange={updateGameStatusWithCompletion}
                   onOpenOnboarding={openOnboarding}
                   onOpenRetro={() => {
                     setActiveNavItem('Settings');
@@ -1164,7 +1181,7 @@ export function AppController() {
                     onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
                     onIgnore={removeAndIgnoreSteamGame}
                     onSyncSteamData={syncSteamDataForGame}
-                    onStatusChange={updateGameStatus}
+                    onStatusChange={updateGameStatusWithCompletion}
                     onTrackingChange={updateGameTracking}
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
@@ -1203,7 +1220,7 @@ export function AppController() {
                   onRemove={removeGame}
                   onRemoveAndIgnore={removeAndIgnoreSteamGame}
                   onStartReview={startReviewMode}
-                  onStatusChange={updateGameStatus}
+                  onStatusChange={updateGameStatusWithCompletion}
                   onSyncSteamWishlist={syncSteamWishlist}
                   onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
                   onSyncItadDeals={syncWishlistDeals}
@@ -1283,7 +1300,7 @@ export function AppController() {
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
               onStartReview={startReviewMode}
-              onStatusChange={updateGameStatus}
+              onStatusChange={updateGameStatusWithCompletion}
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onMoveToLibrary={moveToLibrary}
@@ -1439,6 +1456,17 @@ export function AppController() {
           onAddPlatform={addQueuePlatform}
           onClose={() => setBacklogPickerGame(null)}
           onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
+        />
+      ) : null}
+
+      {completionRatingGame ? (
+        <CompletionRatingSheet
+          game={completionRatingGame}
+          onRate={(rating) => {
+            updateGameReviewFields(completionRatingGame.id, { rating });
+            setCompletionRatingGame(null);
+          }}
+          onSkip={() => setCompletionRatingGame(null)}
         />
       ) : null}
 
