@@ -188,6 +188,9 @@ export function HomePanel({
   const [progressDismissed, setProgressDismissed] = useState(
     () => localStorage.getItem('qs-home-progress-v1') === 'dismissed',
   );
+  const [workflowStripDismissed, setWorkflowStripDismissed] = useState(
+    () => localStorage.getItem('qs-workflow-strip-v1') === 'dismissed',
+  );
 
   const hasEnoughProgress =
     continuePlayingGames.length > 0 &&
@@ -319,6 +322,15 @@ export function HomePanel({
           ) : null}
         </div>
       </section>
+
+      {libraryGames.length > 0 && !workflowStripDismissed && (
+        <WorkflowOrientationStrip
+          onDismiss={() => {
+            localStorage.setItem('qs-workflow-strip-v1', 'dismissed');
+            setWorkflowStripDismissed(true);
+          }}
+        />
+      )}
 
       {showFirstDayPanel && (
         <FirstDayProgressPanel
@@ -611,6 +623,35 @@ function HomeSection({
       </div>
       {children}
     </section>
+  );
+}
+
+function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
+  const stages: Array<[string, string]> = [
+    ['Library', 'All your games.'],
+    ['Quest Queue', 'Decide what to plan, drop, or wishlist.'],
+    ['Platform Plans', 'Games you want to play next.'],
+    ['Playing Now', 'What you're actively playing.'],
+  ];
+  return (
+    <div className="relative rounded-xl border border-skyglass/15 bg-ink-900/50 px-4 py-3">
+      <button
+        aria-label="Dismiss"
+        className="absolute right-3 top-3 text-slate-600 transition hover:text-slate-300"
+        onClick={onDismiss}
+        type="button"
+      >
+        <Icon name="x" size={13} />
+      </button>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">How QuestShelf Works</div>
+      <div className="grid gap-2 pr-4 sm:grid-cols-4">
+        {stages.map(([name, desc]) => (
+          <div className="text-xs text-slate-400" key={name}>
+            <span className="font-semibold text-slate-200">{name}</span> — {desc}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

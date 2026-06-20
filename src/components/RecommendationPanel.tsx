@@ -353,7 +353,19 @@ export function RecommendationPanel({
           />
         )
       ) : (
-        <GameListEmptyState title={t('recommendations.emptyTitle')} text={t('recommendations.emptyText')} />
+        <div className="qs-game-list-empty grid min-h-32 place-items-center rounded-lg border border-dashed border-skyglass/20 bg-ink-950/60 p-4 text-center">
+          <div>
+            <h3 className="text-lg font-semibold text-white">{t('recommendations.emptyTitle')}</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{t('recommendations.emptyText')}</p>
+            <button
+              className="mt-4 rounded-lg border border-mint/30 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20"
+              onClick={() => onStartReview('backlog')}
+              type="button"
+            >
+              Review in Quest Queue →
+            </button>
+          </div>
+        </div>
       )}
     </GameListShell>
   );
