@@ -271,13 +271,27 @@ function NpssoHelpModal({ onClose }: { onClose: () => void }) {
     <ViewportModal ariaLabel="NPSSO token help" placement="center" onClose={onClose}>
       <div className="max-w-md p-4 text-sm text-slate-300">
         <h3 className="text-lg font-semibold text-white">How to get your NPSSO token</h3>
-        <ol className="mt-3 space-y-2 leading-6">
-          <li>1. Open <strong className="text-white">my.playstation.com</strong> in your browser and sign in.</li>
-          <li>2. Open <strong className="text-white">DevTools</strong> (F12 or ⌘⌥I) → Application tab → Cookies.</li>
-          <li>3. Find the cookie named <strong className="text-white">npsso</strong> under <code className="rounded bg-white/10 px-1">account.sonyentertainment.com</code>.</li>
-          <li>4. Copy the cookie value and paste it into the NPSSO Token field above.</li>
+
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-mint">Easiest method</p>
+        <ol className="mt-2 space-y-2 leading-6">
+          <li>1. Sign in to <strong className="text-white">my.playstation.com</strong> in your browser.</li>
+          <li>2. In the same browser, open this URL:
+            <br />
+            <code className="mt-1 block break-all rounded bg-white/10 px-2 py-1 text-xs text-slate-200">
+              https://ca.account.sony.com/api/v1/ssocookie
+            </code>
+          </li>
+          <li>3. The page shows JSON like <code className="rounded bg-white/10 px-1">{`{"npsso":"xxxx..."}`}</code> — copy the value between the quotes.</li>
         </ol>
-        <p className="mt-3 text-xs leading-5 text-slate-500">
+
+        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Alternative — DevTools</p>
+        <ol className="mt-2 space-y-2 leading-6 text-slate-400">
+          <li>1. On <strong className="text-slate-300">my.playstation.com</strong>, open <strong className="text-slate-300">DevTools</strong> (F12 / ⌘⌥I).</li>
+          <li>2. Go to <strong className="text-slate-300">Application</strong> → <strong className="text-slate-300">Cookies</strong> and check all Sony/PlayStation domains listed.</li>
+          <li>3. Find the cookie named <strong className="text-slate-300">npsso</strong> and copy its value.</li>
+        </ol>
+
+        <p className="mt-4 text-xs leading-5 text-slate-500">
           The token is valid for approximately 2 months. After it expires, repeat this process to reconnect.
         </p>
       </div>

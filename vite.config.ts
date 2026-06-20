@@ -1,3 +1,4 @@
+import * as https from 'node:https';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -358,24 +359,48 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
   authorizeUrl.searchParams.set('scope', 'psn:mobile.v2.core psn:clientapp');
   authorizeUrl.searchParams.set('redirect_uri', PSN_REDIRECT_URI);
 
-  const authorizeResponse = await fetch(authorizeUrl.toString(), {
-    redirect: 'manual',
-    headers: {
-      Cookie: `npsso=${npssoToken}`,
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-      Accept: 'text/html,application/xhtml+xml',
-    },
+  // node:https doesn't follow redirects by default, so we get the Location header
+  // directly even when Sony redirects to a custom scheme (com.scee.psxandroid.scearp://)
+  // that fetch/undici can't handle cleanly with redirect:'manual'.
+  const location = await new Promise<string>((resolve, reject) => {
+    const req = https.request(
+      authorizeUrl,
+      {
+        method: 'GET',
+        headers: {
+          Cookie: `npsso=${npssoToken}`,
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+          Accept: 'text/html,application/xhtml+xml',
+        },
+      },
+      (res) => {
+        res.resume(); // drain response body to free the socket
+        const raw = res.headers['location'];
+        resolve(Array.isArray(raw) ? raw[0] : (raw ?? ''));
+      },
+    );
+    req.on('error', reject);
+    req.end();
   });
 
-  const location = authorizeResponse.headers.get('location') ?? '';
-  if (!location.includes('code=')) {
-    throw new Error('NPSSO token is invalid or expired. Get a fresh token from my.playstation.com.');
+  if (!location) {
+    throw new Error('NPSSO token is invalid or expired — Sony did not redirect. Get a fresh token from my.playstation.com.');
   }
 
-  const locationUrl = new URL(location.replace('com.scee.psxandroid.scearp://', 'https://placeholder/'));
-  const code = locationUrl.searchParams.get('code');
+  // Extract code from query params; fall back to regex in case URL shape changes.
+  let code: string | null = null;
+  try {
+    const normalized = location.replace(/^com\.scee\.psxandroid\.scearp:\/\//, 'https://placeholder/');
+    code = new URL(normalized).searchParams.get('code');
+  } catch {
+    // URL parsing failed — try raw regex
+  }
   if (!code) {
-    throw new Error('PSN auth code not found in redirect response.');
+    code = /[?&]code=([^&]+)/.exec(location)?.[1] ?? null;
+  }
+
+  if (!code) {
+    throw new Error(`PSN auth code not found in redirect. Location: ${location.slice(0, 120)}`);
   }
 
   return code;
