@@ -1183,7 +1183,7 @@ function ReviewComplete({
             <div className="text-xs text-slate-400">reviewed</div>
           </div>
           <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Review Queue Remaining</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Remaining</div>
             <div className="mt-1 text-2xl font-semibold text-white">{remainingCount}</div>
             <div className="text-xs text-slate-400">still waiting</div>
           </div>
