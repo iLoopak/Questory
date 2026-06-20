@@ -68,6 +68,13 @@ export function StatsPanel({ games, queueSummary, onOpenDetails }: StatsPanelPro
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <GameListPanel
+                  emptyText="No rated games in this scope yet."
+                  games={stats.topRatedGames}
+                  metric={(game) => '★'.repeat(game.rating ?? 0) + '☆'.repeat(5 - (game.rating ?? 0))}
+                  onOpenDetails={onOpenDetails}
+                  title="Top Rated"
+                />
+                <GameListPanel
                   emptyText={t('stats.noTrackedPlaytime')}
                   games={stats.topPlayedGames}
                   metric={(game) => `${game.playtimeHours}h`}
