@@ -3,7 +3,7 @@ import { formatDealPrice } from './DealCoverBadges';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { PlayActivityRecord } from '../lib/playActivityStorage';
-import type { ReviewModeState, ReviewSource } from '../lib/reviewModeStorage';
+import type { ReviewModeState, ReviewSource, ReviewStats } from '../lib/reviewModeStorage';
 import type { ItadDealSyncState } from '../config/syncStates';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../types/steam';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
@@ -71,7 +71,6 @@ export function HomePanel({
 }: HomePanelProps) {
   const { t } = useI18n();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
-  const [dealSheetGame, setDealSheetGame] = useState<Game | null>(null);
   const [syncSheetOpen, setSyncSheetOpen] = useState(false);
   const queueEntries = queueState.entries;
   const shellRef = useRef<HTMLElement | null>(null);
@@ -134,7 +133,7 @@ export function HomePanel({
       .slice(0, 8);
   }, [games]);
 
-  const reviewedCount = useMemo(() => libraryGames.filter((game) => reviewModeState.reviewedGames[game.id]).length, [libraryGames, reviewModeState.reviewedGames]);
+  const reviewedCount = useMemo(() => Object.keys(reviewModeState.reviewedGames).length, [reviewModeState.reviewedGames]);
   const reviewRemainingCount = useMemo(() => {
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id) && !reviewModeState.reviewedGames[game.id]).length;
   }, [games, ignoredReviewGameIds, reviewModeState.reviewedGames]);
@@ -371,6 +370,7 @@ export function HomePanel({
             importedCount={libraryGames.length}
             platformPlanCount={activePlatformCount}
             reviewedCount={reviewedCount}
+            reviewStats={reviewModeState.stats}
             startedAdventureCount={startedAdventureCount}
             nextReviewTarget={nextReviewTarget}
             onOpenReviewMode={() => onOpenReviewMode('backlog')}
@@ -441,11 +441,7 @@ export function HomePanel({
           {/* Wishlist Deals */}
           <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
             {wishlistDeals.length > 0 ? (
-              <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
-                {wishlistDeals.map((game) => (
-                  <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
-                ))}
-              </div>
+              <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
             ) : wishlistGames.length === 0 ? (
               <EmptyState
                 title="No wishlist yet"
@@ -501,18 +497,6 @@ export function HomePanel({
         </div>
       </div>
 
-      {/* Deal sheet for wishlist deal cards */}
-      {dealSheetGame ? (
-        <WishlistDealActionSheet
-          game={dealSheetGame}
-          onClose={() => setDealSheetGame(null)}
-          onOpenDetails={(game) => {
-            setDealSheetGame(null);
-            onOpenDetails(game);
-          }}
-        />
-      ) : null}
-
       {/* Sync & Maintenance sheet */}
       {syncSheetOpen ? (
         <SyncMaintenanceSheet
@@ -562,6 +546,7 @@ function JourneyProgressCard({
   importedCount,
   platformPlanCount,
   reviewedCount,
+  reviewStats,
   startedAdventureCount,
   nextReviewTarget,
   onOpenReviewMode,
@@ -569,10 +554,18 @@ function JourneyProgressCard({
   importedCount: number;
   platformPlanCount: number;
   reviewedCount: number;
+  reviewStats: ReviewStats;
   startedAdventureCount: number;
   nextReviewTarget: number;
   onOpenReviewMode: () => void;
 }) {
+  const statParts: string[] = [];
+  if (reviewStats.queueCandidates > 0) statParts.push(`${reviewStats.queueCandidates} to plans`);
+  if (reviewStats.playing > 0) statParts.push(`${reviewStats.playing} playing`);
+  if (reviewStats.wishlisted > 0) statParts.push(`${reviewStats.wishlisted} wishlisted`);
+  if (reviewStats.dropped > 0) statParts.push(`${reviewStats.dropped} dropped`);
+  if (reviewStats.ignored > 0) statParts.push(`${reviewStats.ignored} ignored`);
+
   return (
     <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -584,6 +577,11 @@ function JourneyProgressCard({
             <span>✓ Created <strong className="text-white">{platformPlanCount}</strong> Platform Plans</span>
             <span>✓ Started <strong className="text-white">{startedAdventureCount}</strong> adventures</span>
           </div>
+          {statParts.length > 0 ? (
+            <div className="mt-2.5 text-xs text-slate-500">
+              Quest Queue: {statParts.join(' · ')}
+            </div>
+          ) : null}
         </div>
         <button
           className="rounded-xl border border-mint/30 bg-mint/10 px-4 py-3 text-left text-sm text-mint transition hover:bg-mint/20"
@@ -803,58 +801,52 @@ function NextAdventureCard({
   );
 }
 
-function WishlistDealCard({
-  game,
-  onClick,
-  t,
+function DealAlertCard({
+  deals,
+  onViewDeals,
 }: {
-  game: Game;
-  onClick: () => void;
-  t: ReturnType<typeof useI18n>['t'];
+  deals: Game[];
+  onViewDeals: () => void;
 }) {
-  const coverSources = getGameCoverSources(game);
-  const coverSource = coverSources[0];
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
+  const best = deals[0];
+  const isHistoricalLow = best.itadIsHistoricalLow === true;
+  const discount = typeof best.itadDiscountPercent === 'number' ? `-${best.itadDiscountPercent}%` : null;
   const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
+    typeof best.itadCurrentBestPrice === 'number' && best.itadCurrentBestCurrency
+      ? formatDealPrice(best.itadCurrentBestPrice, best.itadCurrentBestCurrency)
       : null;
 
   return (
-    <button
-      className="w-36 shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
-      data-home-focus="true"
-      onClick={onClick}
-      type="button"
-    >
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-ink-800">
-        {coverSource ? (
-          <img alt="" className="h-full w-full object-cover" decoding="async" loading="lazy" src={coverSource} />
-        ) : (
-          <div className="grid h-full place-items-center text-3xl font-bold text-mint/40">
-            {game.title.slice(0, 1).toUpperCase()}
-          </div>
-        )}
-        {discount ? (
-          <div className="absolute left-1.5 top-1.5 rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">
-            {discount}
-          </div>
-        ) : null}
-        {game.itadIsHistoricalLow ? (
-          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-amber-950">
-            <Icon name="trophy" size={9} strokeWidth={2.5} />
-            {t('itad.historicalLow')}
-          </div>
+    <div className="space-y-3">
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-400">
+          {isHistoricalLow ? '🔥 Historical Low Found' : `🔥 ${deals.length} ${deals.length === 1 ? 'game' : 'games'} on sale`}
+        </div>
+        <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-white">{best.title}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {discount ? (
+            <span className="rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{discount}</span>
+          ) : null}
+          {price ? <span className="text-xs font-semibold text-mint">{price}</span> : null}
+          {isHistoricalLow ? <span className="text-xs text-amber-400/80">Lowest price ever</span> : null}
+        </div>
+        {deals.length > 1 ? (
+          <p className="mt-1.5 text-xs text-slate-500">
+            {isHistoricalLow
+              ? `+${deals.length - 1} more ${deals.length - 1 === 1 ? 'game' : 'games'} on sale`
+              : `+${deals.length - 1} more on sale`}
+          </p>
         ) : null}
       </div>
-      <div className="p-2">
-        <p className="line-clamp-2 text-xs font-semibold text-white">{game.title}</p>
-        {price ? <p className="mt-1 text-xs font-semibold text-mint">{price}</p> : null}
-        {game.itadCurrentBestShop ? (
-          <p className="mt-0.5 truncate text-xs text-slate-500">{game.itadCurrentBestShop}</p>
-        ) : null}
-      </div>
-    </button>
+      <button
+        className="w-full rounded-lg border border-mint/30 bg-mint/10 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20"
+        data-home-focus="true"
+        onClick={onViewDeals}
+        type="button"
+      >
+        View Deals
+      </button>
+    </div>
   );
 }
 
@@ -1328,118 +1320,6 @@ function formatRelativeTime(value: string | Date | number | null | undefined, ne
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return new Date(ms).toLocaleDateString();
-}
-
-function WishlistDealActionSheet({
-  game,
-  onClose,
-  onOpenDetails,
-}: {
-  game: Game;
-  onClose: () => void;
-  onOpenDetails: (game: Game) => void;
-}) {
-  const { t } = useI18n();
-  const coverSource = getGameCoverSources(game)[0];
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
-  const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
-      : null;
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Deal for ${game.title}`}
-    >
-      <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}
-      >
-        <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1.5 w-16 rounded-full bg-skyglass/35" />
-        </div>
-        <div className="px-4 pb-2 pt-1">
-          {/* Game header */}
-          <div className="mb-5 flex gap-3.5">
-            <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800 shadow-panel">
-              {coverSource ? (
-                <img alt="" className="h-full w-full object-cover" src={coverSource} />
-              ) : (
-                <div className="grid h-full place-items-center text-xl font-bold text-mint/50">
-                  {game.title.slice(0, 1).toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1 py-0.5">
-              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>
-              {game.itadCurrentBestShop ? (
-                <p className="mt-1 text-sm text-slate-400">{game.itadCurrentBestShop}</p>
-              ) : null}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {discount ? (
-                  <span className="rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{discount}</span>
-                ) : null}
-                {price ? <span className="text-sm font-semibold text-mint">{price}</span> : null}
-                {game.itadIsHistoricalLow ? (
-                  <span className="flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-400">
-                    <Icon name="trophy" size={10} strokeWidth={2.5} />
-                    {t('itad.historicalLow')}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* Primary CTA */}
-          {game.itadCurrentBestUrl ? (
-            <a
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-[0.9375rem] font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
-              href={game.itadCurrentBestUrl}
-              rel="noreferrer"
-              target="_blank"
-              onClick={onClose}
-            >
-              🛒 {t('itad.openDeal')}
-            </a>
-          ) : null}
-
-          {/* Secondary actions */}
-          <div className="mt-3.5 overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60">
-            <button
-              className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10]"
-              onClick={() => { onOpenDetails(game); onClose(); }}
-              type="button"
-            >
-              <Icon name="external-link" size={18} strokeWidth={2} className="shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1 text-sm font-medium text-slate-200">{t('home.openDetails')}</span>
-              <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
-            </button>
-          </div>
-
-          {/* Cancel */}
-          <button
-            className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function SyncMaintenanceSheet({

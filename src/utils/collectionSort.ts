@@ -58,6 +58,10 @@ export function compareGames(firstGame: Game, secondGame: Game, sortBy: LibraryS
     return getHltbSortValue(secondGame, -1) - getHltbSortValue(firstGame, -1) || compareTitle(firstGame, secondGame);
   }
 
+  if (sortBy === 'Favorites First') {
+    return Number(secondGame.favorite) - Number(firstGame.favorite) || compareTitle(firstGame, secondGame);
+  }
+
   return compareTitle(firstGame, secondGame);
 }
 
