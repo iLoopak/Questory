@@ -4,7 +4,7 @@ import { loadLocalJson, savePersistedJson } from './localPersistence';
 const STORAGE_KEY = 'questshelf.psnSettings.v1';
 
 const emptySettings: PsnSettings = {
-  npssoToken: '',
+  cookieString: '',
   accessToken: '',
   refreshToken: '',
   tokenExpiresAt: '',
@@ -29,9 +29,10 @@ export function isPsnTokenValid(settings: PsnSettings): boolean {
 }
 
 function normalizePsnSettings(value: unknown): PsnSettings {
-  const parsed = value && typeof value === 'object' ? (value as Partial<PsnSettings>) : {};
+  const parsed = value && typeof value === 'object' ? (value as Partial<PsnSettings> & { npssoToken?: string }) : {};
   return {
-    npssoToken: typeof parsed.npssoToken === 'string' ? parsed.npssoToken : '',
+    // migrate legacy npssoToken field if present
+    cookieString: typeof parsed.cookieString === 'string' ? parsed.cookieString : (parsed.npssoToken ?? ''),
     accessToken: typeof parsed.accessToken === 'string' ? parsed.accessToken : '',
     refreshToken: typeof parsed.refreshToken === 'string' ? parsed.refreshToken : '',
     tokenExpiresAt: typeof parsed.tokenExpiresAt === 'string' ? parsed.tokenExpiresAt : '',

@@ -331,15 +331,15 @@ async function handlePsnConnectRequest(
   }
 
   const body = await readRequestBody(request);
-  const parsed = parseJson(body) as { npssoToken?: unknown };
-  const npssoToken = typeof parsed.npssoToken === 'string' ? parsed.npssoToken.trim() : '';
+  const parsed = parseJson(body) as { cookieString?: unknown };
+  const cookieString = typeof parsed.cookieString === 'string' ? parsed.cookieString.trim() : '';
 
-  if (!npssoToken) {
-    sendPsnJson(response, 400, { message: 'npssoToken is required.' });
+  if (!cookieString) {
+    sendPsnJson(response, 400, { message: 'cookieString is required.' });
     return;
   }
 
-  const code = await exchangeNpssoForCode(npssoToken);
+  const code = await exchangeForCode(cookieString);
   const tokens = await exchangeCodeForTokens(code);
   const onlineId = await getPsnOnlineId(tokens.access_token).catch(() => '');
 
@@ -351,7 +351,7 @@ async function handlePsnConnectRequest(
   });
 }
 
-async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
+async function exchangeForCode(cookieString: string): Promise<string> {
   // Build query string manually with encodeURIComponent to avoid URLSearchParams
   // encoding colons as %3A and spaces as + — some Sony servers need literal colons
   // and %20 for spaces in scope/redirect_uri values.
@@ -373,7 +373,7 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
       {
         method: 'GET',
         headers: {
-          Cookie: `npsso=${npssoToken}`,
+          Cookie: cookieString,
           'User-Agent': 'Mozilla/5.0 (Linux; Android 11; PlayStation) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.71 Mobile Safari/537.36',
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
@@ -390,7 +390,7 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
   });
 
   if (!location) {
-    throw new Error('NPSSO token is invalid or expired — Sony did not redirect. Get a fresh token from ca.account.sony.com/api/v1/ssocookie.');
+    throw new Error('Sony did not redirect — make sure you are logged into PlayStation and copied the full cookie string from the Network tab.');
   }
 
   // Sony redirects to the custom scheme on both success and failure.
@@ -404,7 +404,7 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
       throw new Error('NPSSO token expired. Log in at my.playstation.com and get a fresh token from ca.account.sony.com/api/v1/ssocookie.');
     }
     if (errorCode === '4150') {
-      throw new Error('PSN rejected the request (4150 invalid_request). Your NPSSO token may be invalid or expired — visit ca.account.sony.com/api/v1/ssocookie in the same browser where you are logged into PlayStation and copy the fresh value.');
+      throw new Error('PSN rejected the request (4150). Copy the full cookie string from DevTools → Network → any request to my.playstation.com → Request Headers → cookie.');
     }
     throw new Error(`PSN auth error ${errorCode}: ${errorDesc || 'Check your NPSSO token and try again.'}`);
   }

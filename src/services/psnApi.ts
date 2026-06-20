@@ -15,7 +15,7 @@ export class PsnApiError extends Error {
 }
 
 export type PsnApiErrorCode =
-  | 'missing-npsso'
+  | 'missing-cookies'
   | 'auth-failed'
   | 'token-expired'
   | 'dev-server-required'
@@ -30,9 +30,9 @@ export type PsnConnectResult = {
   onlineId: string;
 };
 
-export async function connectWithNpsso(npssoToken: string): Promise<PsnConnectResult> {
-  if (!npssoToken.trim()) {
-    throw new PsnApiError('NPSSO token is required.', 'missing-npsso');
+export async function connectWithCookies(cookieString: string): Promise<PsnConnectResult> {
+  if (!cookieString.trim()) {
+    throw new PsnApiError('Cookie string is required.', 'missing-cookies');
   }
 
   let response: Response;
@@ -40,7 +40,7 @@ export async function connectWithNpsso(npssoToken: string): Promise<PsnConnectRe
     response = await fetch('/api/psn/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ npssoToken: npssoToken.trim() }),
+      body: JSON.stringify({ cookieString: cookieString.trim() }),
     });
   } catch {
     throw new PsnApiError(
@@ -60,7 +60,7 @@ export async function connectWithNpsso(npssoToken: string): Promise<PsnConnectRe
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { message?: string };
     throw new PsnApiError(
-      body.message ?? 'PSN authentication failed. Check that your NPSSO token is current.',
+      body.message ?? 'PSN authentication failed. Check your browser cookie string and try again.',
       'auth-failed',
       response.status,
     );

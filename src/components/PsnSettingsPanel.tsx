@@ -3,7 +3,7 @@ import { SettingsSection } from './settings/SettingsSection';
 import { useI18n } from '../i18n';
 import { loadPsnSettings, savePsnSettings, hasPsnAccessToken } from '../lib/psnSettingsStorage';
 import { syncPsnTrophiesForGames, isPsnSyncableGame } from '../lib/psnTrophySync';
-import { connectWithNpsso, PsnApiError } from '../services/psnApi';
+import { connectWithCookies, PsnApiError } from '../services/psnApi';
 import type { PsnSettings, PsnConnectionState, PsnTrophySyncState } from '../types/psn';
 import type { Game } from '../types/game';
 import { ViewportModal } from './ViewportModal';
@@ -39,12 +39,12 @@ export function PsnSettingsPanel({ games, onGamesUpdate }: PsnSettingsPanelProps
   const psnGamesCount = games.filter(isPsnSyncableGame).length;
 
   async function handleConnect() {
-    if (!settings.npssoToken.trim()) return;
+    if (!settings.cookieString.trim()) return;
 
     setConnectionState({ status: 'loading', message: t('psn.connecting') });
 
     try {
-      const result = await connectWithNpsso(settings.npssoToken);
+      const result = await connectWithCookies(settings.cookieString);
       const expiresAt = new Date(Date.now() + result.expiresIn * 1000).toISOString();
 
       setSettings((current) => ({
@@ -153,23 +153,22 @@ export function PsnSettingsPanel({ games, onGamesUpdate }: PsnSettingsPanelProps
 
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            {t('psn.npssoToken')}{' '}
+            {t('psn.cookieString')}{' '}
             <button
               className="ml-2 inline-grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint"
               onClick={() => setIsNpssoHelpOpen(true)}
               type="button"
-              aria-label={t('psn.npssoHelp')}
+              aria-label={t('psn.cookieHelp')}
             >
               ?
             </button>
           </span>
-          <input
-            className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-            value={settings.npssoToken}
-            onChange={(e) => setSettings((s) => ({ ...s, npssoToken: e.target.value }))}
-            placeholder="Paste NPSSO token from my.playstation.com cookies"
+          <textarea
+            className="mt-2 h-24 w-full rounded-md border border-white/10 bg-ink-900 px-3 py-2 font-mono text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+            value={settings.cookieString}
+            onChange={(e) => setSettings((s) => ({ ...s, cookieString: e.target.value }))}
+            placeholder="npsso=abc123...; _abck=xyz...; bm_sz=..."
             spellCheck={false}
-            type="password"
           />
         </label>
 
@@ -178,7 +177,7 @@ export function PsnSettingsPanel({ games, onGamesUpdate }: PsnSettingsPanelProps
         <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
           <button
             className="h-12 w-full rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto"
-            disabled={connectionState.status === 'loading' || !settings.npssoToken.trim()}
+            disabled={connectionState.status === 'loading' || !settings.cookieString.trim()}
             onClick={() => void handleConnect()}
             type="button"
           >
@@ -268,31 +267,47 @@ function SyncStat({ label, value }: { label: string; value: string }) {
 
 function NpssoHelpModal({ onClose }: { onClose: () => void }) {
   return (
-    <ViewportModal ariaLabel="NPSSO token help" placement="center" onClose={onClose}>
+    <ViewportModal ariaLabel="PSN cookie help" placement="center" onClose={onClose}>
       <div className="max-w-md p-4 text-sm text-slate-300">
-        <h3 className="text-lg font-semibold text-white">How to get your NPSSO token</h3>
+        <h3 className="text-lg font-semibold text-white">How to get your PSN cookie string</h3>
+        <p className="mt-2 text-xs leading-5 text-slate-400">
+          Sony requires browser session cookies to authenticate. You need to copy the full cookie string from an active PlayStation session in your browser.
+        </p>
 
-        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-mint">Easiest method</p>
-        <ol className="mt-2 space-y-2 leading-6">
-          <li>1. Sign in to <strong className="text-white">my.playstation.com</strong> in your browser.</li>
-          <li>2. In the same browser, open this URL:
-            <br />
-            <code className="mt-1 block break-all rounded bg-white/10 px-2 py-1 text-xs text-slate-200">
-              https://ca.account.sony.com/api/v1/ssocookie
-            </code>
+        <ol className="mt-4 space-y-3 leading-6">
+          <li>
+            <span className="font-semibold text-white">1.</span> Sign in to{' '}
+            <strong className="text-white">my.playstation.com</strong> in your browser.
           </li>
-          <li>3. The page shows JSON like <code className="rounded bg-white/10 px-1">{`{"npsso":"xxxx..."}`}</code> — copy the value between the quotes.</li>
-        </ol>
-
-        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Alternative — DevTools</p>
-        <ol className="mt-2 space-y-2 leading-6 text-slate-400">
-          <li>1. On <strong className="text-slate-300">my.playstation.com</strong>, open <strong className="text-slate-300">DevTools</strong> (F12 / ⌘⌥I).</li>
-          <li>2. Go to <strong className="text-slate-300">Application</strong> → <strong className="text-slate-300">Cookies</strong> and check all Sony/PlayStation domains listed.</li>
-          <li>3. Find the cookie named <strong className="text-slate-300">npsso</strong> and copy its value.</li>
+          <li>
+            <span className="font-semibold text-white">2.</span> Open{' '}
+            <strong className="text-white">DevTools</strong> (F12 / ⌘⌥I) → go to the{' '}
+            <strong className="text-white">Network</strong> tab.
+          </li>
+          <li>
+            <span className="font-semibold text-white">3.</span> Refresh the page (⌘R / F5).
+          </li>
+          <li>
+            <span className="font-semibold text-white">4.</span> Click any request to{' '}
+            <code className="rounded bg-white/10 px-1">my.playstation.com</code> in the list.
+          </li>
+          <li>
+            <span className="font-semibold text-white">5.</span> In the right panel, open{' '}
+            <strong className="text-white">Request Headers</strong> and find the{' '}
+            <code className="rounded bg-white/10 px-1">cookie</code> header.
+          </li>
+          <li>
+            <span className="font-semibold text-white">6.</span> Right-click the cookie value →{' '}
+            <strong className="text-white">Copy value</strong> (or select all and copy). It will be a long string starting with{' '}
+            <code className="rounded bg-white/10 px-1">npsso=...</code>
+          </li>
+          <li>
+            <span className="font-semibold text-white">7.</span> Paste the entire string into QuestShelf.
+          </li>
         </ol>
 
         <p className="mt-4 text-xs leading-5 text-slate-500">
-          The token is valid for approximately 2 months. After it expires, repeat this process to reconnect.
+          The session cookies expire with your browser session. If authentication stops working, repeat this process.
         </p>
       </div>
     </ViewportModal>

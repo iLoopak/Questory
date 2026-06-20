@@ -1,5 +1,5 @@
 export type PsnSettings = {
-  npssoToken: string;
+  cookieString: string;
   accessToken: string;
   refreshToken: string;
   tokenExpiresAt: string;
