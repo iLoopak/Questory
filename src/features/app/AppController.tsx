@@ -1139,6 +1139,10 @@ export function AppController() {
                   onStartReview={startReviewMode}
                   onStatusChange={updateGameStatus}
                   onOpenOnboarding={openOnboarding}
+                  onOpenRetro={() => {
+                    setActiveNavItem('Settings');
+                    setActiveSettingsCategory('Retro');
+                  }}
                 />
               </div>
             </div>
