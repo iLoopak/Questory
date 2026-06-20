@@ -1,6 +1,7 @@
 import { getPsnTrophyTitles, PsnApiError } from '../services/psnApi';
 import type { PsnTrophyTitle, PsnTrophySyncProgress, PsnTrophySyncSummary } from '../types/psn';
 import type { Game } from '../types/game';
+import { hasProtectedArtwork } from './gameCoverImages';
 
 export type PsnTrophySyncResult = {
   games: Game[];
@@ -58,38 +59,63 @@ export async function syncPsnTrophiesForGames(
 
     summary.matchedCount += 1;
 
-    const hasChanged =
-      game.psnNpCommunicationId !== match.npCommunicationId ||
-      game.psnTrophyPercent !== match.progress ||
-      game.psnTrophyBronze !== match.earnedTrophies.bronze ||
-      game.psnTrophySilver !== match.earnedTrophies.silver ||
-      game.psnTrophyGold !== match.earnedTrophies.gold ||
-      game.psnTrophyPlatinum !== match.earnedTrophies.platinum;
+    const updates = buildGameUpdates(game, match, syncedAt);
+    const hasChanged = Object.keys(updates).some(
+      (key) => game[key as keyof Game] !== updates[key as keyof typeof updates],
+    );
 
     if (!hasChanged) {
       continue;
     }
 
     summary.updatedCount += 1;
-    nextGames = nextGames.map((g) =>
-      g.id === game.id
-        ? {
-            ...g,
-            psnNpCommunicationId: match.npCommunicationId,
-            psnTrophyPercent: match.progress,
-            psnTrophyBronze: match.earnedTrophies.bronze,
-            psnTrophySilver: match.earnedTrophies.silver,
-            psnTrophyGold: match.earnedTrophies.gold,
-            psnTrophyPlatinum: match.earnedTrophies.platinum,
-            psnTrophySyncedAt: syncedAt,
-            updatedAt: syncedAt,
-          }
-        : g,
-    );
+    nextGames = nextGames.map((g) => (g.id === game.id ? { ...g, ...updates } : g));
   }
 
   debugPsnSync('completed', { ...summary, trophyTitleCount: trophyTitles.length });
   return { games: nextGames, summary };
+}
+
+function buildGameUpdates(game: Game, match: PsnTrophyTitle, syncedAt: string): Partial<Game> {
+  const updates: Partial<Game> = {
+    psnNpCommunicationId: match.npCommunicationId,
+    psnTrophyPercent: match.progress,
+    psnTrophyBronze: match.earnedTrophies.bronze,
+    psnTrophySilver: match.earnedTrophies.silver,
+    psnTrophyGold: match.earnedTrophies.gold,
+    psnTrophyPlatinum: match.earnedTrophies.platinum,
+    psnTrophyBronzeTotal: match.definedTrophies.bronze,
+    psnTrophySilverTotal: match.definedTrophies.silver,
+    psnTrophyGoldTotal: match.definedTrophies.gold,
+    psnTrophyPlatinumTotal: match.definedTrophies.platinum,
+    psnTrophySyncedAt: syncedAt,
+    updatedAt: syncedAt,
+  };
+
+  // Use PSN icon as cover art when the game has no better source.
+  // hasProtectedArtwork guards user-uploaded, Steam, and Steam-linked covers.
+  // We also skip if rawg already provided art since rawg > psn in priority.
+  if (
+    match.trophyTitleIconUrl &&
+    !hasProtectedArtwork(game) &&
+    game.artworkSource !== 'rawg'
+  ) {
+    updates.coverImage = match.trophyTitleIconUrl;
+    updates.artworkSource = 'psn';
+    updates.artworkUpdatedAt = syncedAt;
+  }
+
+  // Use last trophy activity as lastPlayedAt when we have no better signal.
+  // Only advance the date — never move it backward.
+  if (match.lastUpdatedDateTime) {
+    const psnDate = new Date(match.lastUpdatedDateTime).getTime();
+    const currentDate = game.lastPlayedAt ? new Date(game.lastPlayedAt).getTime() : 0;
+    if (Number.isFinite(psnDate) && psnDate > currentDate) {
+      updates.lastPlayedAt = match.lastUpdatedDateTime;
+    }
+  }
+
+  return updates;
 }
 
 function findMatchingTrophyTitle(
@@ -135,14 +161,41 @@ export function hasPsnTrophyData(game: Pick<Game, 'psnTrophyPercent' | 'psnNpCom
   return typeof game.psnTrophyPercent === 'number' && Boolean(game.psnNpCommunicationId);
 }
 
-export function formatPsnTrophySummary(game: Pick<Game, 'psnTrophyPercent' | 'psnTrophyBronze' | 'psnTrophySilver' | 'psnTrophyGold' | 'psnTrophyPlatinum'>): string {
-  const parts: string[] = [];
-  if (game.psnTrophyPlatinum) parts.push(`🏆×${game.psnTrophyPlatinum}`);
-  if (game.psnTrophyGold) parts.push(`🥇×${game.psnTrophyGold}`);
-  if (game.psnTrophySilver) parts.push(`🥈×${game.psnTrophySilver}`);
-  if (game.psnTrophyBronze) parts.push(`🥉×${game.psnTrophyBronze}`);
+export function formatPsnTrophySummary(
+  game: Pick<
+    Game,
+    | 'psnTrophyPercent'
+    | 'psnTrophyBronze'
+    | 'psnTrophySilver'
+    | 'psnTrophyGold'
+    | 'psnTrophyPlatinum'
+    | 'psnTrophyBronzeTotal'
+    | 'psnTrophySilverTotal'
+    | 'psnTrophyGoldTotal'
+    | 'psnTrophyPlatinumTotal'
+  >,
+): string {
   const percent = game.psnTrophyPercent ?? 0;
-  return `${percent}%${parts.length ? ' · ' + parts.join(' ') : ''}`;
+  const parts: string[] = [];
+
+  if ((game.psnTrophyPlatinumTotal ?? 0) > 0) {
+    const earned = game.psnTrophyPlatinum ?? 0;
+    parts.push(earned > 0 ? '🏆 ✓' : '🏆 –');
+  }
+
+  const goldEarned = game.psnTrophyGold ?? 0;
+  const goldTotal = game.psnTrophyGoldTotal;
+  parts.push(goldTotal !== undefined ? `🥇 ${goldEarned}/${goldTotal}` : `🥇 ${goldEarned}`);
+
+  const silverEarned = game.psnTrophySilver ?? 0;
+  const silverTotal = game.psnTrophySilverTotal;
+  parts.push(silverTotal !== undefined ? `🥈 ${silverEarned}/${silverTotal}` : `🥈 ${silverEarned}`);
+
+  const bronzeEarned = game.psnTrophyBronze ?? 0;
+  const bronzeTotal = game.psnTrophyBronzeTotal;
+  parts.push(bronzeTotal !== undefined ? `🥉 ${bronzeEarned}/${bronzeTotal}` : `🥉 ${bronzeEarned}`);
+
+  return `${percent}% · ${parts.join(' · ')}`;
 }
 
 function debugPsnSync(message: string, data?: Record<string, unknown>) {
