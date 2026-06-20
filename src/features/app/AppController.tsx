@@ -1018,6 +1018,7 @@ export function AppController() {
               games={games}
               ignoredReviewGameIds={reviewIgnoredGameIds}
               reviewQueueOrder={reviewModeState.queueOrder}
+              reviewModeState={reviewModeState}
               queueState={platformQueueState}
               itadDealSyncState={itadDealSyncState}
               steamAchievementSyncState={steamAchievementSyncState}
@@ -1093,6 +1094,9 @@ export function AppController() {
                   steamAchievementSyncState={steamAchievementSyncState}
                   steamPlaytimeRefreshState={steamPlaytimeRefreshState}
                   games={filteredLibraryGames}
+                  allGames={games}
+                  ignoredReviewGameIds={reviewIgnoredGameIds}
+                  reviewModeState={reviewModeState}
                   platformOptions={platformOptions}
                   tags={tags}
                   platformQueueState={platformQueueState}

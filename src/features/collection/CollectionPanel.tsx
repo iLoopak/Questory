@@ -52,13 +52,16 @@ import type {
   SteamPlaytimeRefreshSummary,
   SteamWishlistSyncState,
 } from '../../types/steam';
-import type { ReviewSource } from '../../lib/reviewModeStorage';
+import type { ReviewModeState, ReviewSource } from '../../lib/reviewModeStorage';
 
 export type CollectionPanelProps = {
   collectionType: GameCollectionType;
   contentScrollRef: RefObject<HTMLElement | null>;
   filters: CollectionFilters;
   games: Game[];
+  allGames?: Game[];
+  ignoredReviewGameIds?: Set<string>;
+  reviewModeState?: ReviewModeState;
   platformOptions: GamePlatform[];
   platformQueueState?: PlatformQueueState;
   steamAchievementSyncState?: SteamAchievementSyncState;
@@ -101,6 +104,9 @@ export function CollectionPanel({
   contentScrollRef,
   filters,
   games,
+  allGames,
+  ignoredReviewGameIds,
+  reviewModeState,
   platformOptions,
   platformQueueState,
   steamAchievementSyncState,
@@ -188,6 +194,13 @@ export function CollectionPanel({
   const hasWishlistDealSyncAction = collectionType === 'wishlist' && Boolean(onSyncItadDeals);
   const isWishlistDealSyncDisabled = isItadDealSyncing || games.length === 0;
   const wishlistDealSyncTitle = games.length === 0 ? t('itad.noWishlistGamesForSync') : undefined;
+  const reviewScopeGames = allGames ?? games;
+  const reviewedLibraryCount = useMemo(() => reviewModeState ? reviewScopeGames.filter((game) => game.collectionType === 'library' && reviewModeState.reviewedGames[game.id]).length : 0, [reviewModeState, reviewScopeGames]);
+  const remainingReviewCount = useMemo(() => reviewScopeGames.filter((game) => game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped' && !reviewModeState?.reviewedGames[game.id] && !ignoredReviewGameIds?.has(game.id)).length, [ignoredReviewGameIds, reviewModeState, reviewScopeGames]);
+  const reviewableLibraryCount = reviewedLibraryCount + remainingReviewCount;
+  const reviewedPercent = reviewableLibraryCount > 0 ? Math.round((reviewedLibraryCount / reviewableLibraryCount) * 100) : 0;
+  const unlockedMilestones = [1, 10, 50, 100, 250, 500, 1000].filter((milestone) => reviewedLibraryCount >= milestone);
+  const nextMilestone = [1, 10, 50, 100, 250, 500, 1000].find((milestone) => reviewedLibraryCount < milestone);
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
@@ -589,6 +602,16 @@ export function CollectionPanel({
         </>
       }
     >
+
+      {collectionType === 'library' ? (
+        <LibraryProgressSummary
+          nextMilestone={nextMilestone}
+          remainingReviewCount={remainingReviewCount}
+          reviewedCount={reviewedLibraryCount}
+          reviewedPercent={reviewedPercent}
+          unlockedMilestones={unlockedMilestones}
+        />
+      ) : null}
 
       {collectionType === 'library' && isCollectionSteamAchievementSyncVisible && steamAchievementSyncState && steamAchievementSyncState.status === 'loading' ? (
         <SteamAchievementSyncNotice syncState={steamAchievementSyncState} />
@@ -998,5 +1021,47 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
         ))}
       </select>
     </label>
+  );
+}
+
+
+function LibraryProgressSummary({
+  nextMilestone,
+  remainingReviewCount,
+  reviewedCount,
+  reviewedPercent,
+  unlockedMilestones,
+}: {
+  nextMilestone?: number;
+  remainingReviewCount: number;
+  reviewedCount: number;
+  reviewedPercent: number;
+  unlockedMilestones: number[];
+}) {
+  return (
+    <section className="mb-3 rounded-xl border border-skyglass/15 bg-ink-900/70 p-3 shadow-panel">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Library Progress</div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-300">
+            <span><strong className="text-white">{reviewedCount}</strong> reviewed</span>
+            <span><strong className="text-white">{remainingReviewCount}</strong> remaining</span>
+            <span><strong className="text-white">{reviewedPercent}%</strong> reviewed</span>
+          </div>
+        </div>
+        <div className="min-w-[11rem] flex-1 sm:max-w-xs">
+          <div className="h-2 overflow-hidden rounded-full bg-white/10" aria-label={`${reviewedPercent}% reviewed`}>
+            <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${reviewedPercent}%` }} />
+          </div>
+          <div className="mt-1 text-right text-xs text-slate-500">{remainingReviewCount} games still waiting for review</div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        {unlockedMilestones.slice(-4).map((milestone) => (
+          <span key={milestone} className="rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 font-semibold text-mint">✓ {milestone} Reviewed</span>
+        ))}
+        {nextMilestone ? <span className="rounded-full border border-skyglass/15 bg-ink-950/60 px-2.5 py-1 text-slate-400">Next: {nextMilestone} reviewed</span> : null}
+      </div>
+    </section>
   );
 }

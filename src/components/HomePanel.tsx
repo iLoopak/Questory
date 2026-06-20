@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatDealPrice } from './DealCoverBadges';
 import { getGameCoverSources } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
-import type { ReviewSource } from '../lib/reviewModeStorage';
+import type { ReviewModeState, ReviewSource } from '../lib/reviewModeStorage';
 import type { ItadDealSyncState } from '../config/syncStates';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../types/steam';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
@@ -19,6 +19,7 @@ type HomePanelProps = {
   games: Game[];
   ignoredReviewGameIds: Set<string>;
   reviewQueueOrder: string[];
+  reviewModeState: ReviewModeState;
   queueState: PlatformQueueState;
   itadDealSyncState?: ItadDealSyncState;
   steamAchievementSyncState?: SteamAchievementSyncState;
@@ -48,6 +49,7 @@ export function HomePanel({
   games,
   ignoredReviewGameIds,
   reviewQueueOrder,
+  reviewModeState,
   queueState,
   itadDealSyncState,
   steamAchievementSyncState,
@@ -129,9 +131,10 @@ export function HomePanel({
       .slice(0, 8);
   }, [games]);
 
+  const reviewedCount = useMemo(() => libraryGames.filter((game) => reviewModeState.reviewedGames[game.id]).length, [libraryGames, reviewModeState.reviewedGames]);
   const reviewRemainingCount = useMemo(() => {
-    return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id)).length;
-  }, [games, ignoredReviewGameIds]);
+    return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id) && !reviewModeState.reviewedGames[game.id]).length;
+  }, [games, ignoredReviewGameIds, reviewModeState.reviewedGames]);
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
 
@@ -168,6 +171,10 @@ export function HomePanel({
     () => new Set(queueState.entries.map((e) => e.targetPlatform)).size,
     [queueState.entries],
   );
+  const startedAdventureCount = continuePlayingGames.length;
+  const reviewedMilestones = [1, 10, 50, 100, 250, 500, 1000];
+  const nextReviewedMilestone = reviewedMilestones.find((milestone) => reviewedCount < milestone);
+  const nextReviewTarget = nextReviewedMilestone ? Math.min(20, nextReviewedMilestone - reviewedCount) : 20;
 
   const topLibraryPlatforms = useMemo<GamePlatform[]>(() => {
     const counts = new Map<string, number>();
@@ -334,6 +341,15 @@ export function HomePanel({
       <div className="lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4">
         {/* Left: main content */}
         <div className="space-y-4">
+          <JourneyProgressCard
+            importedCount={libraryGames.length}
+            platformPlanCount={activePlatformCount}
+            reviewedCount={reviewedCount}
+            startedAdventureCount={startedAdventureCount}
+            nextReviewTarget={nextReviewTarget}
+            onOpenReviewMode={() => onOpenReviewMode('backlog')}
+          />
+
           {/* Continue Playing */}
           <HomeSection title={t('home.continuePlaying')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
@@ -511,6 +527,47 @@ export function HomePanel({
           }}
         />
       ) : null}
+    </section>
+  );
+}
+
+function JourneyProgressCard({
+  importedCount,
+  platformPlanCount,
+  reviewedCount,
+  startedAdventureCount,
+  nextReviewTarget,
+  onOpenReviewMode,
+}: {
+  importedCount: number;
+  platformPlanCount: number;
+  reviewedCount: number;
+  startedAdventureCount: number;
+  nextReviewTarget: number;
+  onOpenReviewMode: () => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Your QuestShelf Journey</div>
+          <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+            <span>✓ Imported <strong className="text-white">{importedCount}</strong> games</span>
+            <span>✓ Reviewed <strong className="text-white">{reviewedCount}</strong> games</span>
+            <span>✓ Created <strong className="text-white">{platformPlanCount}</strong> Platform Plans</span>
+            <span>✓ Started <strong className="text-white">{startedAdventureCount}</strong> adventures</span>
+          </div>
+        </div>
+        <button
+          className="rounded-xl border border-mint/30 bg-mint/10 px-4 py-3 text-left text-sm text-mint transition hover:bg-mint/20"
+          data-home-focus="true"
+          onClick={onOpenReviewMode}
+          type="button"
+        >
+          <div className="text-xs font-semibold uppercase tracking-[0.14em]">Next milestone</div>
+          <div className="mt-1 font-semibold text-white">Review {nextReviewTarget} more games</div>
+        </button>
+      </div>
     </section>
   );
 }
