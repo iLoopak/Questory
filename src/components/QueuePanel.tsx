@@ -360,15 +360,23 @@ export function QueuePanel({
                 <button className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20" onClick={() => setIsPlatformModalOpen(true)} type="button">
                   Choose a different platform
                 </button>
+                <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-300 transition hover:border-mint/30 hover:text-mint" onClick={onStartReview} type="button">
+                  Open Quest Queue →
+                </button>
               </div>
             </>
           ) : (
             <>
               <div className="font-semibold text-white">{t('queue.noPlatformsYet')}</div>
               <p className="mt-1 text-slate-300">{t('queue.noPlatformsCreateHelp')}</p>
-              <button className="mt-3 h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => setIsPlatformModalOpen(true)} type="button">
-                ＋ {t('queue.addPlatform')}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="h-9 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={() => setIsPlatformModalOpen(true)} type="button">
+                  ＋ {t('queue.addPlatform')}
+                </button>
+                <button className="h-9 rounded-md border border-skyglass/15 px-3 text-sm text-slate-300 transition hover:border-mint/30 hover:text-mint" onClick={onStartReview} type="button">
+                  Open Quest Queue →
+                </button>
+              </div>
             </>
           )}
         </div>

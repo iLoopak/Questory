@@ -83,12 +83,13 @@ export function OnboardingChecklist({
   const steps = useMemo<WizardStep[]>(() => [
     { id: 'steam-connect', title: t('onboarding.stepSteamTitle'), summary: t('onboarding.stepSteamSummary'), isConfigured: () => steamImported || Boolean(loadSteamSettings().steamId64.trim() && loadSteamSettings().apiKey.trim()) },
     { id: 'make-it-yours', title: t('onboarding.stepPersonalizeTitle'), summary: t('onboarding.stepPersonalizeSummary'), isConfigured: () => completedItemIds.has('make-it-yours') },
+    { id: 'how-it-works', title: t('onboarding.stepHowItWorksTitle'), summary: t('onboarding.stepHowItWorksSummary'), isConfigured: () => completedItemIds.has('how-it-works') },
     { id: 'ready', title: t('onboarding.stepFinishTitle'), summary: t('onboarding.stepFinishSummary'), isConfigured: () => completedItemIds.has('ready') },
   ], [completedItemIds, steamImported, t]);
 
   useEffect(() => {
     steps.forEach((step) => {
-      if (step.id !== 'make-it-yours' && step.id !== 'ready' && step.isConfigured() && !completedItemIds.has(step.id)) {
+      if (step.id !== 'make-it-yours' && step.id !== 'how-it-works' && step.id !== 'ready' && step.isConfigured() && !completedItemIds.has(step.id)) {
         onComplete(step.id);
       }
     });
@@ -148,7 +149,7 @@ export function OnboardingChecklist({
           </div>
         </div>
 
-        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-3">
+        <ol className="qs-setup-steps mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, index) => {
             const isDone = completedItemIds.has(step.id);
             const isSkipped = skippedItemIds.has(step.id);
@@ -180,6 +181,7 @@ export function OnboardingChecklist({
           <div key={activeStepIndex} className="qs-setup-step-body">
             {activeStep.id === 'steam-connect' ? <SteamStep games={games} onComplete={() => onComplete('steam-connect')} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
+            {activeStep.id === 'how-it-works' ? <HowItWorksStep onComplete={() => { onComplete('how-it-works'); goNext(); }} onSkip={skipStep} /> : null}
             {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
           </div>
         </div>
@@ -292,6 +294,29 @@ function BackupStep({ onComplete, onOpenSettings }: { onComplete: () => void; on
   return <div><Status text={status} /><Actions primary="Export backup" onPrimary={() => { void exportBackup(); }} /><button className="mt-3 h-10 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onOpenSettings} type="button">Open backup settings</button></div>;
 }
 
+
+function HowItWorksStep({ onComplete, onSkip }: { onComplete: () => void; onSkip: () => void }) {
+  const stages: Array<[string, string]> = [
+    ['Library', 'All your games — imported from Steam, added manually, or scanned from ROMs.'],
+    ['Quest Queue', 'Review games one at a time and decide what deserves your attention.'],
+    ['Platform Plans', 'Organize the games you want to play next, sorted by platform.'],
+    ['Playing Now', 'Track the games you are actively playing.'],
+  ];
+  return (
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {stages.map(([name, desc], i) => (
+          <div className="rounded-lg border border-skyglass/15 bg-ink-900 p-4" key={name}>
+            <div className="mb-2 text-xs font-semibold tabular-nums text-slate-600">0{i + 1}</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{name}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-400">{desc}</p>
+          </div>
+        ))}
+      </div>
+      <Actions primary="Got it" onPrimary={onComplete} onSkip={onSkip} />
+    </div>
+  );
+}
 
 function PersonalizeStep({ accentColorPreference, appTemplatePreference, gameCount, games, libraryOwnerNickname, onAccentColorChange, onAppTemplatePreferenceChange, onComplete, onSkip, onLibraryOwnerNicknameChange, onShelfIdentityChange, personalizedQuestShelfTitle, platformCount, shelfIdentity, steamAvatarUrl, steamPersonaName }: { accentColorPreference: AccentColorPreference; appTemplatePreference: AppTemplatePreference; gameCount: number; games: Game[]; libraryOwnerNickname: string; onAccentColorChange: (color: AccentColorPreference) => void; onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void; onComplete: () => void; onSkip: () => void; onLibraryOwnerNicknameChange: (nickname: string) => void; onShelfIdentityChange: (identity: ShelfIdentitySettings) => void; personalizedQuestShelfTitle: string; platformCount: number; shelfIdentity: ShelfIdentitySettings; steamAvatarUrl: string; steamPersonaName: string }) {
   const selectedAccentColor = accentColorPreference ?? defaultAccentColor;
