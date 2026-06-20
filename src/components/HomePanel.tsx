@@ -162,6 +162,32 @@ export function HomePanel({
   const hasSyncActions = (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
   const isAnySyncing = isSteamSyncing || itadDealSyncState?.status === 'loading';
 
+  const wishlistGames = useMemo(() => games.filter((g) => g.collectionType === 'wishlist'), [games]);
+
+  const activePlatformCount = useMemo(
+    () => new Set(queueState.entries.map((e) => e.targetPlatform)).size,
+    [queueState.entries],
+  );
+
+  const topLibraryPlatforms = useMemo<GamePlatform[]>(() => {
+    const counts = new Map<string, number>();
+    libraryGames.forEach((g) => counts.set(g.platform, (counts.get(g.platform) ?? 0) + 1));
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([p]) => p as GamePlatform);
+  }, [libraryGames]);
+
+  const [progressDismissed, setProgressDismissed] = useState(
+    () => localStorage.getItem('qs-home-progress-v1') === 'dismissed',
+  );
+
+  const hasEnoughProgress =
+    continuePlayingGames.length > 0 &&
+    activePlatformCount > 0 &&
+    queueEntries.length + continuePlayingGames.length >= 5;
+  const showFirstDayPanel = libraryGames.length > 0 && !progressDismissed && !hasEnoughProgress;
+
   const greeting = useRef<string | null>(null);
   if (!greeting.current) {
     greeting.current = pickGreeting(queueEntries.length, continuePlayingGames.length, reviewRemainingCount);
@@ -287,6 +313,23 @@ export function HomePanel({
         </div>
       </section>
 
+      {showFirstDayPanel && (
+        <FirstDayProgressPanel
+          libraryCount={libraryGames.length}
+          queuedCount={queueEntries.length}
+          playingCount={continuePlayingGames.length}
+          platformCount={activePlatformCount}
+          reviewRemainingCount={reviewRemainingCount}
+          onOpenLibrary={onOpenLibrary}
+          onOpenReviewMode={() => onOpenReviewMode('backlog')}
+          onOpenQueue={onOpenQueue}
+          onDismiss={() => {
+            localStorage.setItem('qs-home-progress-v1', 'dismissed');
+            setProgressDismissed(true);
+          }}
+        />
+      )}
+
       {/* Two-column layout on desktop — no overflow on either column, window scroll only */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4">
         {/* Left: main content */}
@@ -306,6 +349,12 @@ export function HomePanel({
                   />
                 ))}
               </div>
+            ) : libraryGames.length > 0 ? (
+              <NoActiveGamesGuide
+                libraryGamesCount={libraryGames.length}
+                onOpenLibrary={onOpenLibrary}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+              />
             ) : (
               <OnboardingSteps
                 onOpenLibrary={onOpenLibrary}
@@ -332,11 +381,12 @@ export function HomePanel({
                 ))}
               </div>
             ) : (
-              <EmptyState
-                title={t('home.noPlatformPlan')}
-                text={t('home.noKeepPlayingText')}
-                actionLabel={t('review.title')}
-                onAction={() => onOpenReviewMode('backlog')}
+              <NoNextAdventureGuide
+                hasLibraryGames={libraryGames.length > 0}
+                hasProcessedGames={queueEntries.length > 0 || continuePlayingGames.length > 0}
+                topPlatforms={topLibraryPlatforms}
+                onOpenQueue={onOpenQueue}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
               />
             )}
           </HomeSection>
@@ -353,12 +403,19 @@ export function HomePanel({
                   <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
                 ))}
               </div>
-            ) : (
+            ) : wishlistGames.length === 0 ? (
               <EmptyState
-                title={t('home.noWishlistDeals')}
-                text={t('home.noWishlistDealsText')}
+                title="No wishlist yet"
+                text="Save games to your Wishlist to track deals when they go on sale."
                 actionLabel={t('home.openWishlist')}
                 onAction={onOpenWishlist}
+              />
+            ) : (
+              <WishlistNoDealsState
+                wishlistCount={wishlistGames.length}
+                canSync={!!onSyncItadDeals}
+                onOpenWishlist={onOpenWishlist}
+                onSyncDeals={onSyncItadDeals}
               />
             )}
           </HomeSection>
@@ -391,6 +448,11 @@ export function HomePanel({
             >
               {t('home.reviewNextGame')}
             </button>
+            {reviewRemainingCount > 10 && (
+              <p className="mt-2 text-xs text-slate-600">
+                Reviewing more games improves recommendations in the Recommendations tab.
+              </p>
+            )}
           </section>
 
         </div>
@@ -723,6 +785,290 @@ function OnboardingSteps({
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+function NoActiveGamesGuide({
+  libraryGamesCount,
+  onOpenLibrary,
+  onOpenReviewMode,
+}: {
+  libraryGamesCount: number;
+  onOpenLibrary: () => void;
+  onOpenReviewMode: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
+      <h4 className="text-base font-semibold text-white">No active adventures yet</h4>
+      <p className="mt-1 text-sm text-slate-400">
+        Mark a game as Playing Now to track your current progress.{' '}
+        {libraryGamesCount > 0 && (
+          <span>You have {libraryGamesCount} {libraryGamesCount === 1 ? 'game' : 'games'} in your library waiting.</span>
+        )}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+          data-home-focus="true"
+          onClick={onOpenLibrary}
+          type="button"
+        >
+          Open Library
+        </button>
+        <button
+          className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+          data-home-focus="true"
+          onClick={onOpenReviewMode}
+          type="button"
+        >
+          Open Quest Queue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NoNextAdventureGuide({
+  hasLibraryGames,
+  hasProcessedGames,
+  topPlatforms,
+  onOpenQueue,
+  onOpenReviewMode,
+}: {
+  hasLibraryGames: boolean;
+  hasProcessedGames: boolean;
+  topPlatforms: GamePlatform[];
+  onOpenQueue: () => void;
+  onOpenReviewMode: () => void;
+}) {
+  const platformChips = topPlatforms.length > 0 ? (
+    <div className="mt-3">
+      <p className="text-xs text-slate-500">Platforms in your library:</p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {topPlatforms.map((p) => (
+          <span key={p} className="rounded-full border border-skyglass/15 bg-ink-950/60 px-2 py-0.5 text-xs text-slate-300">
+            {p}
+          </span>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  if (!hasLibraryGames) {
+    return (
+      <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4 text-center">
+        <h4 className="text-base font-semibold text-white">No Platform Plan Yet</h4>
+        <p className="mt-1 text-sm text-slate-400">Import games first, then create Platform Plans to organise your backlog.</p>
+        <button
+          className="mt-4 min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+          data-home-focus="true"
+          onClick={onOpenQueue}
+          type="button"
+        >
+          Open Platform Plans
+        </button>
+      </div>
+    );
+  }
+
+  if (!hasProcessedGames) {
+    return (
+      <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Next step</div>
+        <h4 className="mt-1 text-base font-semibold text-white">Review your library first</h4>
+        <p className="mt-1 text-sm text-slate-400">
+          Platform Plans organise what you want to play on each system. Use Quest Queue to review your library and send games here.
+        </p>
+        {platformChips}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            className="min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            data-home-focus="true"
+            onClick={onOpenReviewMode}
+            type="button"
+          >
+            Open Quest Queue
+          </button>
+          <button
+            className="min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+            data-home-focus="true"
+            onClick={onOpenQueue}
+            type="button"
+          >
+            Open Platform Plans
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
+      <h4 className="text-base font-semibold text-white">Plan your next adventure</h4>
+      <p className="mt-1 text-sm text-slate-400">
+        Platform Plans help organise what you want to play on each system. Create a plan for a platform and add games to it.
+      </p>
+      {platformChips}
+      <button
+        className="mt-4 min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+        data-home-focus="true"
+        onClick={onOpenQueue}
+        type="button"
+      >
+        Open Platform Plans
+      </button>
+    </div>
+  );
+}
+
+function WishlistNoDealsState({
+  wishlistCount,
+  canSync,
+  onOpenWishlist,
+  onSyncDeals,
+}: {
+  wishlistCount: number;
+  canSync: boolean;
+  onOpenWishlist: () => void;
+  onSyncDeals?: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4 text-center">
+      <h4 className="text-base font-semibold text-white">No active deals</h4>
+      <p className="mt-1 text-sm text-slate-400">
+        {wishlistCount} wishlisted {wishlistCount === 1 ? 'game' : 'games'} — none are currently on sale.
+        {canSync && ' Sync to check current prices.'}
+      </p>
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        {canSync && onSyncDeals && (
+          <button
+            className="min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            data-home-focus="true"
+            onClick={onSyncDeals}
+            type="button"
+          >
+            Sync Deals
+          </button>
+        )}
+        <button
+          className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition ${canSync ? 'border border-mint/30 bg-mint/10 text-mint hover:bg-mint/20' : 'bg-mint text-ink-950 hover:bg-mint/90'}`}
+          data-home-focus="true"
+          onClick={onOpenWishlist}
+          type="button"
+        >
+          Open Wishlist
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FirstDayProgressPanel({
+  libraryCount,
+  queuedCount,
+  playingCount,
+  platformCount,
+  reviewRemainingCount,
+  onOpenLibrary,
+  onOpenReviewMode,
+  onOpenQueue,
+  onDismiss,
+}: {
+  libraryCount: number;
+  queuedCount: number;
+  playingCount: number;
+  platformCount: number;
+  reviewRemainingCount: number;
+  onOpenLibrary: () => void;
+  onOpenReviewMode: () => void;
+  onOpenQueue: () => void;
+  onDismiss: () => void;
+}) {
+  const milestones: Array<{ done: boolean; text: string; action?: () => void; actionLabel?: string }> = [
+    {
+      done: libraryCount > 0,
+      text: libraryCount > 0
+        ? `Imported ${libraryCount} ${libraryCount === 1 ? 'game' : 'games'}`
+        : 'Import your games',
+      action: libraryCount === 0 ? onOpenLibrary : undefined,
+      actionLabel: 'Open Library',
+    },
+    {
+      done: queuedCount > 0 || playingCount > 0,
+      text:
+        queuedCount > 0
+          ? `Organised ${queuedCount} ${queuedCount === 1 ? 'game' : 'games'} into Platform Plans`
+          : reviewRemainingCount > 0
+          ? `${reviewRemainingCount} ${reviewRemainingCount === 1 ? 'game' : 'games'} ready to review`
+          : 'Review games in Quest Queue',
+      action: queuedCount === 0 && playingCount === 0 ? onOpenReviewMode : undefined,
+      actionLabel: 'Open Quest Queue',
+    },
+    {
+      done: platformCount > 0,
+      text:
+        platformCount > 0
+          ? `${platformCount} Platform ${platformCount === 1 ? 'Plan' : 'Plans'} created`
+          : 'Create your first Platform Plan',
+      action: platformCount === 0 ? onOpenQueue : undefined,
+      actionLabel: 'Open Platform Plans',
+    },
+    {
+      done: playingCount > 0,
+      text:
+        playingCount > 0
+          ? `${playingCount} ${playingCount === 1 ? 'adventure' : 'adventures'} in progress`
+          : 'Mark your first Playing Now game',
+      action: playingCount === 0 ? onOpenLibrary : undefined,
+      actionLabel: 'Open Library',
+    },
+  ];
+
+  const completedCount = milestones.filter((m) => m.done).length;
+
+  return (
+    <div className="relative rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+      <button
+        aria-label="Dismiss progress panel"
+        className="absolute right-3 top-3 text-slate-600 transition hover:text-slate-300"
+        onClick={onDismiss}
+        type="button"
+      >
+        <Icon name="x" size={14} />
+      </button>
+      <div className="flex items-center gap-2 pr-6">
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Your Progress</div>
+        <span className="rounded-full bg-mint/15 px-2 py-0.5 text-xs font-bold text-mint">
+          {completedCount} / {milestones.length}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {milestones.map((m, i) => (
+          <div key={i} className={`flex items-start gap-2.5 rounded-lg p-2.5 ${m.done ? 'bg-mint/5' : 'bg-ink-950/40'}`}>
+            <div
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+                m.done ? 'bg-mint text-ink-950' : 'border border-skyglass/30 text-slate-600'
+              }`}
+            >
+              {m.done ? '✓' : i + 1}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-xs font-semibold ${m.done ? 'text-slate-300' : 'text-white'}`}>{m.text}</p>
+              {m.action && m.actionLabel && (
+                <button
+                  className="mt-0.5 text-xs font-semibold text-mint transition hover:opacity-75"
+                  data-home-focus="true"
+                  onClick={m.action}
+                  type="button"
+                >
+                  {m.actionLabel} →
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
