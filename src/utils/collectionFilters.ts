@@ -202,6 +202,10 @@ export function matchesQuickFilter(game: Game, quickFilter: QuickFilter): boolea
     return !hasHltbData(game);
   }
 
+  if (quickFilter === 'Favorites') {
+    return game.favorite === true;
+  }
+
   return game.playtimeHours > 0;
 }
 
