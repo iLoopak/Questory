@@ -85,12 +85,12 @@ type SwipeVerticalDirection = 'up' | 'down';
 type SwipeQuadrant = `${SwipeHorizontalDirection}-${SwipeVerticalDirection}`;
 
 const actionDescriptions: Partial<Record<ReviewModeAction, string>> = {
-  queue: 'Platform-specific backlog',
-  playing: 'Mark as currently playing',
-  ignore: 'Hide from reviews',
-  dropped: 'Mark as abandoned',
-  wishlist: 'Save for later',
-  finished: 'Mark as complete',
+  queue: 'Save for future play on a specific platform',
+  playing: 'Currently part of your active rotation',
+  ignore: 'Hide from future review queues',
+  dropped: 'Stopped playing, not continuing',
+  wishlist: 'Interested, but not ready to commit',
+  finished: 'Completed or considered complete',
 };
 
 const decisionActions = [...negativeActions, ...positiveActions];
@@ -207,13 +207,20 @@ export function ReviewModePanel({
     return sourceGames.filter((game) => !processedGameIds.has(game.id));
   }, [processedGameIds, sourceGames]);
 
+  const sourceCounts = useMemo(() => {
+    const counts = new Map<ReviewSource, number>();
+    for (const s of reviewSourceOptions) {
+      counts.set(s, games.filter((g) => matchesReviewSource(g, s)).length);
+    }
+    return counts;
+  }, [games]);
+
   const activeGame = reviewQueue[0] ?? null;
   const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = reviewableGames.filter((game) => reviewedGameIds.has(game.id)).length;
   const remainingCount = reviewQueue.length;
   const totalCount = completedCount + remainingCount;
-  const progressLabel = totalCount === 0 ? '0 / 0' : `${completedCount} / ${totalCount}`;
 
   useEffect(() => {
     setProcessedGameIds(new Set());
@@ -436,10 +443,11 @@ export function ReviewModePanel({
     <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
       <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
         <div
-          aria-label={`Quest Queue progress ${progressLabel}`}
-          className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-sm font-bold text-mint shadow-panel backdrop-blur-md"
+          aria-label={`Quest Queue: ${completedCount} of ${totalCount} games reviewed`}
+          className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-center shadow-panel backdrop-blur-md"
         >
-          {progressLabel}
+          <div className="text-sm font-bold text-mint leading-none">{totalCount === 0 ? '—' : `${completedCount} of ${totalCount}`}</div>
+          {totalCount > 0 && <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-mint/50 leading-none">reviewed</div>}
         </div>
         <div className="relative">
           <button
@@ -463,7 +471,7 @@ export function ReviewModePanel({
 
               <div className="mt-3 grid gap-3">
                 <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400" htmlFor="review-source">
-                  {t('toolbar.source')}
+                  Review Group
                   <select
                     className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
                     id="review-source"
@@ -472,7 +480,7 @@ export function ReviewModePanel({
                   >
                     {reviewSourceOptions.map((option) => (
                       <option key={option} value={option}>
-                        {getReviewSourceLabel(option)}
+                        {getReviewSourceLabel(option)} ({sourceCounts.get(option) ?? 0})
                       </option>
                     ))}
                   </select>
@@ -505,7 +513,7 @@ export function ReviewModePanel({
                     onClick={onRestoreIgnored}
                     type="button"
                   >
-                    Restore ignored
+                    Show hidden games
                   </button>
                 ) : null}
               </div>
@@ -525,8 +533,13 @@ export function ReviewModePanel({
             >
               <Icon name="x" size={14} />
             </button>
-            <p className="pr-6 font-semibold text-mint">What is Quest Queue?</p>
-            <p className="mt-1 pr-6 text-slate-400">Review games one by one and send them to Platform Plans, Playing Now, Wishlist, or other destinations. Quest Queue is for decision-making — Platform Plans is for planning.</p>
+            <p className="pr-6 font-semibold text-mint">Not sure where to start?</p>
+            <div className="mt-2 space-y-1 pr-6 text-slate-400">
+              <p><span className="font-semibold text-slate-300">Platform Plans</span> — games you intend to play on a specific platform soon.</p>
+              <p><span className="font-semibold text-slate-300">Playing Now</span> — games you're actively playing right now.</p>
+              <p><span className="font-semibold text-slate-300">Wishlist</span> — interesting games you're not ready to commit to.</p>
+              <p><span className="font-semibold text-slate-300">Drop / Ignore</span> — skip games you're not interested in.</p>
+            </div>
           </div>
         )}
         <div className="qs-scroll-panel p-2 sm:p-3">
@@ -548,6 +561,8 @@ export function ReviewModePanel({
               queueState={queueState}
               isRefreshingMetadata={isRefreshingCurrentGame}
             />
+          ) : totalCount === 0 ? (
+            <ReviewSourceEmpty source={source} onSourceChange={onSourceChange} />
           ) : (
             <ReviewComplete
               actionStats={actionStats}
@@ -1035,6 +1050,70 @@ function getSwipeTarget(offsetX: number, offsetY: number) {
   };
 }
 
+function ReviewSourceEmpty({
+  source,
+  onSourceChange,
+}: {
+  source: ReviewSource;
+  onSourceChange: (source: ReviewSource) => void;
+}) {
+  const messages: Record<ReviewSource, { title: string; text: string }> = {
+    backlog: {
+      title: 'No games waiting for review',
+      text: 'Your Want to Play group is empty. Import or add games to get started.',
+    },
+    'recent-imports': {
+      title: 'No recent imports found',
+      text: 'Import games from Steam or add them manually to see them here.',
+    },
+    'missing-metadata': {
+      title: 'All games have covers and details',
+      text: 'No games are currently missing covers or metadata.',
+    },
+    manual: {
+      title: 'No manually added games',
+      text: 'Games added manually outside of Steam or Retro will appear here.',
+    },
+    steam: {
+      title: 'No Steam games found',
+      text: 'Connect Steam and import your library to see games here.',
+    },
+    retro: {
+      title: 'No retro games found',
+      text: 'Import your retro ROM collection to see games here.',
+    },
+    'never-played': {
+      title: "You've launched every game in this group",
+      text: 'All your library games have some recorded play time.',
+    },
+    wishlist: {
+      title: 'Your wishlist is empty',
+      text: 'Add games to your Wishlist to review them here.',
+    },
+  };
+
+  const { title, text } = messages[source] ?? messages.backlog;
+
+  return (
+    <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
+      <div className="max-w-sm">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nothing here</div>
+        <h3 className="mt-2 text-xl font-semibold text-white">{title}</h3>
+        <p className="mt-2 text-sm text-slate-400">{text}</p>
+        {source !== 'backlog' && (
+          <button
+            className="mt-5 min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
+            onClick={() => onSourceChange('backlog')}
+            type="button"
+          >
+            Switch to Want to Play
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ReviewComplete({
   actionStats,
   queuePlatforms,
@@ -1060,8 +1139,10 @@ function ReviewComplete({
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('review.complete')}</div>
-        <h3 className="mt-2 text-3xl font-semibold text-white">{sourceLabel} is clear</h3>
-        <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer platform decisions. Analytics stay in Stats.</p>
+        <h3 className="mt-2 text-3xl font-semibold text-white">Great work!</h3>
+        <p className="mt-3 text-sm text-slate-400">
+          You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
+        </p>
         {hasStats && (
           <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
             {actionStats.queued > 0 && <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">{actionStats.queued} added to Platform Plans</span>}
@@ -1099,7 +1180,7 @@ function ReviewComplete({
             onClick={onReviewAnother}
             type="button"
           >
-            Process another batch
+            Review another group
           </button>
           <button
             className="min-h-12 rounded-xl border border-skyglass/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"

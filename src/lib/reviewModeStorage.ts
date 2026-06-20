@@ -72,13 +72,13 @@ export function createReviewStats(): ReviewStats {
 
 export function getReviewSourceLabel(source: ReviewSource) {
   const labels: Record<ReviewSource, string> = {
-    backlog: 'Backlog',
-    'missing-metadata': 'Missing metadata',
-    manual: 'Manual games',
-    'never-played': 'Never played',
-    'recent-imports': 'Imported recently',
-    retro: 'Retro games',
-    steam: 'Steam games',
+    backlog: 'Want to Play',
+    'missing-metadata': 'Missing Covers & Details',
+    manual: 'Manually Added',
+    'never-played': 'Never Launched',
+    'recent-imports': 'Recently Imported',
+    retro: 'Retro Collection',
+    steam: 'Steam Games',
     wishlist: 'Wishlist',
   };
 
