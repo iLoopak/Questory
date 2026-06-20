@@ -212,7 +212,7 @@ export function OnboardingChecklist({
 
 function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImported, onSteamProfileNameChange }: { games: Game[]; onComplete: () => void; onImportGames: (games: Game[]) => void; onSkip: () => void; onSteamLibraryImported?: () => void; onSteamProfileNameChange?: (profileName: string) => void }) {
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
-  const [status, setStatus] = useState('Enter your Steam API key and SteamID64, then import your library.');
+  const [status, setStatus] = useState('Enter your credentials below, then click Import to bring in your library.');
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => saveSteamSettings(settings), [settings]);
   async function importLibrary() {
@@ -229,6 +229,10 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
   }
   return (
     <div>
+      <div className="mb-5 rounded-lg border border-skyglass/15 bg-ink-950/60 p-4">
+        <p className="text-sm font-semibold text-white">Import your Steam library in minutes.</p>
+        <p className="mt-1 text-sm text-slate-400">QuestShelf reads your Steam profile to import games, playtime, and achievements. Your Steam account is never modified — QuestShelf is read-only.</p>
+      </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <div>
           <label className="block">

@@ -387,6 +387,7 @@ export function SettingsView({
                 onOpenOnboarding={onOpenOnboarding}
                 onRestartOnboarding={onRestartOnboarding}
               />
+              <HintsSettingsPanel />
             </div>
           ) : null}
         </div>
@@ -546,6 +547,42 @@ function OnboardingSettingsPanel({
             Restart setup
           </button>
         </>
+      )}
+    />
+  );
+}
+
+const hintStorageKeys = [
+  'qs-review-hint-v1',
+  'qs-queue-hint-v1',
+  'qs-workflow-strip-v1',
+  'qs-home-progress-v1',
+] as const;
+
+function HintsSettingsPanel() {
+  const [restored, setRestored] = useState(false);
+
+  function resetHints() {
+    hintStorageKeys.forEach((key) => localStorage.removeItem(key));
+    setRestored(true);
+  }
+
+  return (
+    <SettingsSection
+      title="Hints & Guidance"
+      description="Restore educational hints and orientation panels that you previously dismissed."
+      actions={(
+        restored ? (
+          <span className="text-sm text-mint">Hints restored — reload to see them.</span>
+        ) : (
+          <button
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={resetHints}
+            type="button"
+          >
+            Show Hints Again
+          </button>
+        )
       )}
     />
   );

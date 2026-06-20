@@ -962,7 +962,7 @@ function NoNextAdventureGuide({
     return (
       <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4 text-center">
         <h4 className="text-base font-semibold text-white">No Platform Plan Yet</h4>
-        <p className="mt-1 text-sm text-slate-400">Import games first, then create Platform Plans to organise your backlog.</p>
+        <p className="mt-1 text-sm text-slate-400">Import games first, then create Platform Plans to organise your library.</p>
         <button
           className="mt-4 min-h-10 rounded-lg bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
           data-home-focus="true"
@@ -1428,12 +1428,12 @@ function SyncStatusLine({ label, value }: { label: string; value: string }) {
 function pickGreeting(queueCount: number, activeCount: number, reviewCount: number): string {
   const s = (n: number) => (n === 1 ? '' : 's');
   const options = [
-    queueCount > 0 ? `${queueCount} game${s(queueCount)} in Queue. No pressure.` : null,
+    queueCount > 0 ? `${queueCount} game${s(queueCount)} in Platform Plans. No pressure.` : null,
     activeCount > 0 ? `${activeCount} active game${s(activeCount)}. Totally under control.` : null,
     reviewCount > 0 ? `${reviewCount} game${s(reviewCount)} waiting for a verdict.` : null,
-    'Your backlog called. It misses you.',
+    'Your Platform Plans are waiting.',
     'Pick one. Future you will thank you.',
-    'The queue grows. The queue is patient.',
+    'The list grows. The list is patient.',
     'Progress is progress. Even at 2%.',
     'One game closer. Probably.',
   ].filter((x): x is string => x !== null);
