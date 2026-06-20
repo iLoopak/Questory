@@ -1132,6 +1132,7 @@ export function AppController() {
                   onRemoveAndIgnore={removeAndIgnoreSteamGame}
                   onStartReview={startReviewMode}
                   onStatusChange={updateGameStatus}
+                  onOpenOnboarding={openOnboarding}
                 />
               </div>
             </div>
