@@ -923,6 +923,7 @@ export function AppController() {
                     : 'text-slate-300 hover:bg-mint/10 hover:text-white hover:shadow-glow'
                 }`}
                 onClick={() => selectNavigationItem(item)}
+                title={getNavDescription(item)}
                 type="button"
               >
                 {t(navItemLabelKeys[item])}

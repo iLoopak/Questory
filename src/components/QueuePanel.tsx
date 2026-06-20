@@ -78,6 +78,7 @@ export function QueuePanel({
   const [selectedGameId, setSelectedGameId] = useState('');
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All'>('All');
+  const [showQueueHint, setShowQueueHint] = useState(() => localStorage.getItem('qs-queue-hint-v1') !== 'dismissed');
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
@@ -187,6 +188,11 @@ export function QueuePanel({
 
     onAddGameToQueue(game, selectedPlatform);
     setSelectedGameId('');
+  }
+
+  function dismissQueueHint() {
+    localStorage.setItem('qs-queue-hint-v1', 'dismissed');
+    setShowQueueHint(false);
   }
 
   return (
@@ -306,6 +312,21 @@ export function QueuePanel({
         }
       />
       <p className="-mt-1 mb-2 px-1 text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
+
+      {showQueueHint && (
+        <div className="relative mb-3 rounded-xl border border-mint/20 bg-mint/5 p-3 text-xs">
+          <button
+            aria-label="Dismiss hint"
+            className="absolute right-2 top-2 text-slate-500 transition hover:text-slate-300"
+            onClick={dismissQueueHint}
+            type="button"
+          >
+            <Icon name="x" size={14} />
+          </button>
+          <p className="pr-6 font-semibold text-mint">What are Platform Plans?</p>
+          <p className="mt-1 pr-6 text-slate-400">Platform Plans organise the games you've chosen to play on each platform. Use Quest Queue to decide which games belong here — think of Quest Queue as decision-making and Platform Plans as planning.</p>
+        </div>
+      )}
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="rounded-lg border border-dashed border-mint/30 bg-mint/10 p-5 text-sm text-slate-200">

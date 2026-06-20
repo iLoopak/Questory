@@ -84,6 +84,15 @@ type SwipeHorizontalDirection = 'left' | 'right';
 type SwipeVerticalDirection = 'up' | 'down';
 type SwipeQuadrant = `${SwipeHorizontalDirection}-${SwipeVerticalDirection}`;
 
+const actionDescriptions: Partial<Record<ReviewModeAction, string>> = {
+  queue: 'Platform-specific backlog',
+  playing: 'Mark as currently playing',
+  ignore: 'Hide from reviews',
+  dropped: 'Mark as abandoned',
+  wishlist: 'Save for later',
+  finished: 'Mark as complete',
+};
+
 const decisionActions = [...negativeActions, ...positiveActions];
 const decisionActionTypes = new Set<ReviewModeAction>(decisionActions.map((action) => action.action));
 const firstPositiveActionIndex = negativeActions.length;
@@ -150,6 +159,7 @@ export function ReviewModePanel({
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [retainedUtilityGameIds, setRetainedUtilityGameIds] = useState<Set<string>>(() => new Set());
+  const [showReviewHint, setShowReviewHint] = useState(() => localStorage.getItem('qs-review-hint-v1') !== 'dismissed');
   const queueButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const reviewedGameIds = useMemo(() => new Set(Object.keys(reviewModeState.reviewedGames)), [reviewModeState.reviewedGames]);
@@ -417,6 +427,10 @@ export function ReviewModePanel({
     setIsQueuePickerOpen(false);
   }
 
+  function dismissReviewHint() {
+    localStorage.setItem('qs-review-hint-v1', 'dismissed');
+    setShowReviewHint(false);
+  }
 
   return (
     <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
@@ -501,6 +515,20 @@ export function ReviewModePanel({
       </div>
 
       <div className="flex flex-col">
+        {showReviewHint && (
+          <div className="relative mx-2 mt-12 mb-1 rounded-xl border border-mint/20 bg-mint/5 p-3 text-xs">
+            <button
+              aria-label="Dismiss hint"
+              className="absolute right-2 top-2 text-slate-500 transition hover:text-slate-300"
+              onClick={dismissReviewHint}
+              type="button"
+            >
+              <Icon name="x" size={14} />
+            </button>
+            <p className="pr-6 font-semibold text-mint">What is Quest Queue?</p>
+            <p className="mt-1 pr-6 text-slate-400">Review games one by one and send them to Platform Plans, Playing Now, Wishlist, or other destinations. Quest Queue is for decision-making — Platform Plans is for planning.</p>
+          </div>
+        )}
         <div className="qs-scroll-panel p-2 sm:p-3">
           {activeGame ? (
             <FocusedReviewCard
@@ -728,6 +756,9 @@ function FocusedReviewCard({
                   <Icon className="select-none" name={action.icon} />
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
+                {actionDescriptions[action.action] && !hasGamepad && (
+                  <span className="mt-0.5 block text-[9px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
+                )}
                 {hasGamepad && action.hint && (
                   <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
@@ -916,6 +947,9 @@ function FocusedReviewCard({
                   <Icon className="select-none" name={action.icon} />
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
+                {actionDescriptions[action.action] && !hasGamepad && (
+                  <span className="mt-0.5 block text-[9px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
+                )}
                 {hasGamepad && action.hint && (
                   <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
@@ -1030,9 +1064,9 @@ function ReviewComplete({
         <p className="mt-3 text-sm text-slate-400">Processed {reviewedCount} games into clearer platform decisions. Analytics stay in Stats.</p>
         {hasStats && (
           <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
-            {actionStats.queued > 0 && <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">{actionStats.queued} queued</span>}
-            {actionStats.playing > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.playing} playing</span>}
-            {actionStats.wishlisted > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.wishlisted} wishlisted</span>}
+            {actionStats.queued > 0 && <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">{actionStats.queued} added to Platform Plans</span>}
+            {actionStats.playing > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.playing} marked Playing Now</span>}
+            {actionStats.wishlisted > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.wishlisted} added to Wishlist</span>}
             {actionStats.dropped > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.dropped} dropped</span>}
             {actionStats.ignored > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.ignored} ignored</span>}
           </div>
