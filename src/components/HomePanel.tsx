@@ -248,7 +248,7 @@ export function HomePanel({
               aria-label="Open Quest Queue"
               className="cursor-pointer rounded text-right transition hover:opacity-75 focus:outline-none focus:ring-1 focus:ring-mint/40"
               data-home-focus="true"
-              onClick={() => onOpenQueue()}
+              onClick={() => onOpenReviewMode('backlog')}
               type="button"
             >
               <div className="text-xl font-bold text-white">{reviewRemainingCount}</div>
@@ -691,6 +691,15 @@ function OnboardingSteps({
     <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
       <p className="mb-4 text-sm font-semibold text-white">{t('home.getStarted')}</p>
       <p className="mb-4 text-xs text-slate-400">{t('home.getStartedSubtitle')}</p>
+      <div className="mb-4 flex flex-wrap items-center gap-1 text-[10px] font-semibold text-slate-500">
+        <span className="rounded bg-ink-900 px-2 py-0.5 text-slate-300">Library</span>
+        <span className="text-slate-600">→</span>
+        <span className="rounded bg-ink-900 px-2 py-0.5 text-mint/80">Quest Queue</span>
+        <span className="text-slate-600">→</span>
+        <span className="rounded bg-ink-900 px-2 py-0.5 text-slate-300">Platform Plans</span>
+        <span className="text-slate-600">→</span>
+        <span className="rounded bg-ink-900 px-2 py-0.5 text-slate-300">Playing Now</span>
+      </div>
       <ol className="space-y-3">
         {steps.map((step, index) => (
           <li key={step.label} className="flex items-start gap-3">
