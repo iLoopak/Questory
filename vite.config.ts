@@ -352,12 +352,17 @@ async function handlePsnConnectRequest(
 }
 
 async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
-  const authorizeUrl = new URL('https://ca.account.sony.com/api/authz/v3/oauth/authorize');
-  authorizeUrl.searchParams.set('access_type', 'offline');
-  authorizeUrl.searchParams.set('client_id', PSN_CLIENT_ID);
-  authorizeUrl.searchParams.set('response_type', 'code');
-  authorizeUrl.searchParams.set('scope', 'psn:mobile.v2.core psn:clientapp');
-  authorizeUrl.searchParams.set('redirect_uri', PSN_REDIRECT_URI);
+  // Build query string manually with encodeURIComponent to avoid URLSearchParams
+  // encoding colons as %3A and spaces as + — some Sony servers need literal colons
+  // and %20 for spaces in scope/redirect_uri values.
+  const authorizeUrl = new URL(
+    'https://ca.account.sony.com/api/authz/v3/oauth/authorize' +
+    '?access_type=offline' +
+    `&client_id=${PSN_CLIENT_ID}` +
+    `&redirect_uri=${encodeURIComponent(PSN_REDIRECT_URI)}` +
+    '&response_type=code' +
+    '&scope=psn%3Amobile.v2.core%20psn%3Aclientapp',
+  );
 
   // node:https doesn't follow redirects by default, so we get the Location header
   // directly even when Sony redirects to a custom scheme (com.scee.psxandroid.scearp://)
@@ -369,8 +374,9 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
         method: 'GET',
         headers: {
           Cookie: `npsso=${npssoToken}`,
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-          Accept: 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 11; PlayStation) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.71 Mobile Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
         },
       },
       (res) => {
@@ -384,7 +390,23 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
   });
 
   if (!location) {
-    throw new Error('NPSSO token is invalid or expired — Sony did not redirect. Get a fresh token from my.playstation.com.');
+    throw new Error('NPSSO token is invalid or expired — Sony did not redirect. Get a fresh token from ca.account.sony.com/api/v1/ssocookie.');
+  }
+
+  // Sony redirects to the custom scheme on both success and failure.
+  // On failure the location contains error= instead of code=.
+  if (location.includes('error=')) {
+    const qs = location.split('?')[1] ?? '';
+    const errorParams = new URLSearchParams(qs);
+    const errorCode = errorParams.get('error_code') ?? errorParams.get('error') ?? 'unknown';
+    const errorDesc = decodeURIComponent(errorParams.get('error_description') ?? '').replace(/\+/g, ' ');
+    if (errorCode === '4165' || location.includes('authentication_required')) {
+      throw new Error('NPSSO token expired. Log in at my.playstation.com and get a fresh token from ca.account.sony.com/api/v1/ssocookie.');
+    }
+    if (errorCode === '4150') {
+      throw new Error('PSN rejected the request (4150 invalid_request). Your NPSSO token may be invalid or expired — visit ca.account.sony.com/api/v1/ssocookie in the same browser where you are logged into PlayStation and copy the fresh value.');
+    }
+    throw new Error(`PSN auth error ${errorCode}: ${errorDesc || 'Check your NPSSO token and try again.'}`);
   }
 
   // Extract code from query params; fall back to regex in case URL shape changes.
@@ -400,7 +422,7 @@ async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
   }
 
   if (!code) {
-    throw new Error(`PSN auth code not found in redirect. Location: ${location.slice(0, 120)}`);
+    throw new Error(`PSN auth code not found in redirect. Location: ${location.slice(0, 200)}`);
   }
 
   return code;
