@@ -634,6 +634,10 @@ export function AppController() {
     return createdGames;
   }
 
+  function updateGamesFromPsnTrophySync(updatedGames: Game[]) {
+    setGames(updatedGames);
+  }
+
   function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
     const summary = importSteamWishlistHtmlItems(...args);
     if (summary.addedCount > 0) {
@@ -1401,6 +1405,7 @@ export function AppController() {
               onLanguageChange={setLanguage}
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
+              onPsnGamesUpdate={updateGamesFromPsnTrophySync}
             />
           ) : (
             <PlaceholderPanel title={activeNavItem} />

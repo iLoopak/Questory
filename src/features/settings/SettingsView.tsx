@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { DataManagementPanel } from '../../components/DataManagementPanel';
 import { HltbSettingsPanel } from '../../components/HltbSettingsPanel';
 import { IsThereAnyDealSettingsPanel } from '../../components/IsThereAnyDealSettingsPanel';
+import { PsnSettingsPanel } from '../../components/PsnSettingsPanel';
 import { RawgSettingsPanel } from '../../components/RawgSettingsPanel';
 import { RetroImportPanel } from '../../components/RetroImportPanel';
 import { SteamSettingsPanel } from '../../components/SteamSettingsPanel';
@@ -106,6 +107,7 @@ export type SettingsViewProps = {
   onSteamProfileNameChange: (profileName: string) => void;
   onUnignoreSteamGame: (steamAppId: number) => void;
   onViewRetroImportedGames: (gameIds: string[]) => void;
+  onPsnGamesUpdate: (games: Game[]) => void;
 };
 
 export function SettingsView({
@@ -186,6 +188,7 @@ export function SettingsView({
   onSteamProfileNameChange,
   onUnignoreSteamGame,
   onViewRetroImportedGames,
+  onPsnGamesUpdate,
 }: SettingsViewProps) {
   const [isCategoryListOpen, setIsCategoryListOpen] = useState(false);
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
@@ -258,6 +261,7 @@ export function SettingsView({
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
               <IsThereAnyDealSettingsPanel />
               <HltbSettingsPanel />
+              <PsnSettingsPanel games={games} onGamesUpdate={onPsnGamesUpdate} />
               <SteamSettingsPanel
                 games={games}
                 ignoredSteamGames={ignoredSteamGames}

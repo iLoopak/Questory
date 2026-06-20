@@ -37,7 +37,7 @@ export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
 export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
-export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
+export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'psn' | 'imported' | 'generated-fallback';
 
 export type RomFileReference = {
   extension?: string;
@@ -77,7 +77,18 @@ export type Game = {
   steamAchievementsLastCheckedAt?: number;
   lastSteamActivityAt?: string;
   lastSteamActivityDeltaMinutes?: number;
-  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
+  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom' | 'psn';
+  psnNpCommunicationId?: string;
+  psnTrophyPercent?: number;
+  psnTrophyBronze?: number;
+  psnTrophySilver?: number;
+  psnTrophyGold?: number;
+  psnTrophyPlatinum?: number;
+  psnTrophyBronzeTotal?: number;
+  psnTrophySilverTotal?: number;
+  psnTrophyGoldTotal?: number;
+  psnTrophyPlatinumTotal?: number;
+  psnTrophySyncedAt?: string;
   externalUrl?: string;
   importedAt?: string;
   updatedAt?: string;
