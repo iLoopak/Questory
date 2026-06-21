@@ -1081,7 +1081,7 @@ export function AppController() {
               }}
             />
           ) : activeNavItem === 'Library' ? (
-            <div className="relative">
+            <div className="relative h-full">
               {selectedGame && (
                 <div className="absolute inset-0 z-10">
                   <AppGameDetailsView
@@ -1165,7 +1165,7 @@ export function AppController() {
               </div>
             </div>
           ) : activeNavItem === 'Wishlist' ? (
-            <div className="relative">
+            <div className="relative h-full">
               {selectedGame && (
                 <div className="absolute inset-0 z-10">
                   <AppGameDetailsView

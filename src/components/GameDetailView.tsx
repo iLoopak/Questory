@@ -196,7 +196,7 @@ const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
   ];
 
   return (
-    <section className="min-h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
+    <section className="h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
       <div className="flex h-full min-h-0 flex-col">
         <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
