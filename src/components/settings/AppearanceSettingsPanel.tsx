@@ -5,7 +5,6 @@ import {
   type AppLanguage,
 } from "../../i18n";
 import { getRuntimeEnvironment } from "../../lib/capacitorEnvironment";
-import { type ControllerLayoutPreference } from "../../lib/controllerLayoutPreferences";
 import {
   defaultAccentColor,
   defaultGradientOrientation,
@@ -26,9 +25,6 @@ import {
 import { SettingsSection } from "./SettingsSection";
 
 export function AppearanceSettingsPanel({
-  controllerLayoutPreference,
-  isControllerDebugEnabled,
-  isLandscapeLockEnabled,
   resolvedTheme,
   runtimeEnvironment,
   themePreference,
@@ -40,9 +36,6 @@ export function AppearanceSettingsPanel({
   neonButtonGradientMidpointPreference,
   neonButtonStylePreference,
   language,
-  onControllerDebugChange,
-  onControllerLayoutChange,
-  onLandscapeLockChange,
   onThemePreferenceChange,
   onAppTemplatePreferenceChange,
   onAccentColorChange,
@@ -53,9 +46,6 @@ export function AppearanceSettingsPanel({
   onNeonButtonStyleChange,
   onLanguageChange,
 }: {
-  controllerLayoutPreference: ControllerLayoutPreference;
-  isControllerDebugEnabled: boolean;
-  isLandscapeLockEnabled: boolean;
   resolvedTheme: ResolvedTheme;
   runtimeEnvironment: ReturnType<typeof getRuntimeEnvironment>;
   themePreference: ThemePreference;
@@ -67,9 +57,6 @@ export function AppearanceSettingsPanel({
   neonButtonGradientMidpointPreference: number;
   neonButtonStylePreference: NeonButtonStylePreference;
   language: AppLanguage;
-  onControllerDebugChange: (isEnabled: boolean) => void;
-  onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
-  onLandscapeLockChange: (isEnabled: boolean) => void;
   onThemePreferenceChange: (preference: ThemePreference) => void;
   onAppTemplatePreferenceChange: (preference: AppTemplatePreference) => void;
   onAccentColorChange: (color: AccentColorPreference) => void;
@@ -697,61 +684,6 @@ export function AppearanceSettingsPanel({
           </span>
         </div>
       ) : null}
-
-      <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
-        <input
-          checked={isLandscapeLockEnabled}
-          className="mt-1 h-5 w-5 accent-mint"
-          onChange={(event) => onLandscapeLockChange(event.target.checked)}
-          type="checkbox"
-        />
-        <span>
-          <span className="block font-semibold text-white">
-            {t("settings.preferLandscape")}
-          </span>
-        </span>
-      </label>
-
-      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
-        <label className="block">
-          <span className="block font-semibold text-white">
-            {t("settings.controllerLayout")}
-          </span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">
-            {t("settings.controllerLayoutHelp")}
-          </span>
-          <select
-            className="mt-3 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
-            value={controllerLayoutPreference}
-            onChange={(event) =>
-              onControllerLayoutChange(
-                event.target.value as ControllerLayoutPreference
-              )
-            }
-          >
-            <option value="auto">{t("settings.controllerAuto")}</option>
-            <option value="xbox">Xbox</option>
-            <option value="nintendo">{t("settings.controllerNintendo")}</option>
-          </select>
-        </label>
-      </div>
-
-      <label className="mt-3 flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
-        <input
-          checked={isControllerDebugEnabled}
-          className="mt-1 h-5 w-5 accent-mint"
-          onChange={(event) => onControllerDebugChange(event.target.checked)}
-          type="checkbox"
-        />
-        <span>
-          <span className="block font-semibold text-white">
-            {t("settings.controllerDebug")}
-          </span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">
-            {t("settings.controllerDebugHelp")}
-          </span>
-        </span>
-      </label>
     </SettingsSection>
   );
 }

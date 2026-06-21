@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { normalizeSteamGridDbApiKey, testSteamGridDbConnection } from '../lib/steamGridDbArtwork';
 import { loadSteamGridDbSettings, saveSteamGridDbSettings } from '../lib/steamGridDbSettingsStorage';
 import type { Game } from '../types/game';
@@ -20,18 +20,23 @@ const testGame = {
 } satisfies Game;
 
 export function SteamGridDbSettingsPanel() {
-  const [savedSettings, setSavedSettings] = useState<SteamGridDbSettings>(() => loadSteamGridDbSettings());
-  const [draftApiKey, setDraftApiKey] = useState(() => savedSettings.apiKey);
-  const [connectionStatus, setConnectionStatus] = useState<SteamGridDbConnectionStatus>(() => (savedSettings.apiKey.trim() ? 'configured' : 'missing'));
-  const [message, setMessage] = useState('SteamGridDB is optional. Add an API key to use local artwork enrichment without a server environment key.');
-  const hasSavedApiKey = savedSettings.apiKey.trim().length > 0;
+  const [apiKey, setApiKey] = useState<string>(() => loadSteamGridDbSettings().apiKey);
+  const [connectionStatus, setConnectionStatus] = useState<SteamGridDbConnectionStatus>(() => (apiKey.trim() ? 'configured' : 'missing'));
+  const [message, setMessage] = useState('');
+  const hasApiKey = apiKey.trim().length > 0;
+
+  useEffect(() => {
+    const normalized = normalizeSteamGridDbApiKey(apiKey);
+    saveSteamGridDbSettings({ apiKey: normalized });
+    setConnectionStatus(normalized ? 'configured' : 'missing');
+  }, [apiKey]);
 
   const statusLabel = useMemo(() => {
     if (connectionStatus === 'success') return 'Connection OK';
     if (connectionStatus === 'error') return 'Failed';
-    if (hasSavedApiKey) return 'Configured';
+    if (hasApiKey) return 'Configured';
     return 'Missing';
-  }, [connectionStatus, hasSavedApiKey]);
+  }, [connectionStatus, hasApiKey]);
 
   const testStatusLabel: Record<string, string> = {
     success: 'success',
@@ -45,48 +50,31 @@ export function SteamGridDbSettingsPanel() {
     'network-error': 'network error',
   };
 
-  const statusClassName = connectionStatus === 'success' || (connectionStatus === 'configured' && hasSavedApiKey)
+  const statusClassName = connectionStatus === 'success' || (connectionStatus === 'configured' && hasApiKey)
     ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
     : connectionStatus === 'error'
       ? 'border-rose-400/30 bg-rose-400/10 text-rose-200'
       : 'border-amber-300/30 bg-amber-300/10 text-amber-100';
 
-  function saveSettings() {
-    const nextSettings = { apiKey: normalizeSteamGridDbApiKey(draftApiKey) };
-    saveSteamGridDbSettings(nextSettings);
-    setSavedSettings(nextSettings);
-    setDraftApiKey(nextSettings.apiKey);
-    setConnectionStatus(nextSettings.apiKey ? 'configured' : 'missing');
-    setMessage(nextSettings.apiKey ? 'SteamGridDB API key saved locally on this device.' : 'SteamGridDB API key is missing. Artwork enrichment will rely on a server/dev environment key if available.');
-  }
-
   function clearSettings() {
-    const nextSettings = { apiKey: '' };
-    saveSteamGridDbSettings(nextSettings);
-    setSavedSettings(nextSettings);
-    setDraftApiKey('');
+    setApiKey('');
     setConnectionStatus('missing');
-    setMessage('SteamGridDB API key cleared. Artwork enrichment is disabled unless a server/dev environment key is configured.');
+    setMessage('SteamGridDB API key cleared.');
   }
 
   async function testConnection() {
-    const testApiKey = normalizeSteamGridDbApiKey(draftApiKey);
-    const isTestingDraftKey = testApiKey.length > 0;
+    const testApiKey = normalizeSteamGridDbApiKey(apiKey);
 
     setConnectionStatus('configured');
-    setMessage(isTestingDraftKey
-      ? 'Testing SteamGridDB connection with the current API key field. Save is still required to store it.'
-      : 'Testing SteamGridDB connection using saved settings or the server/dev environment key.');
+    setMessage('Testing SteamGridDB connection…');
 
     const result = await testSteamGridDbConnection(testGame, {
-      apiKey: isTestingDraftKey ? testApiKey : undefined,
+      apiKey: testApiKey.length > 0 ? testApiKey : undefined,
       skipCache: true,
     });
     if (result.status === 'success') {
       setConnectionStatus('success');
-      setMessage(isTestingDraftKey
-        ? 'SteamGridDB returned artwork successfully for the current API key field. Click Save to store this key locally.'
-        : 'SteamGridDB returned artwork successfully using saved settings or the server/dev environment key.');
+      setMessage('SteamGridDB returned artwork successfully.');
       return;
     }
 
@@ -103,16 +91,16 @@ export function SteamGridDbSettingsPanel() {
         <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${statusClassName}`}>
           {statusLabel}
         </span>
-        <span className="text-xs text-slate-500">Stored locally using the same persistence path as other API-key integrations.</span>
+        <span className="text-xs text-slate-500">Key saved automatically as you type.</span>
       </div>
 
-      <label className="mt-4 block">
+      <label className="block">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">API key</span>
         <div className="mt-2 flex gap-2">
           <input
             className="h-11 min-w-0 flex-1 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-            value={draftApiKey}
-            onChange={(event) => setDraftApiKey(event.target.value)}
+            value={apiKey}
+            onChange={(event) => { setApiKey(event.target.value); setMessage(''); }}
             placeholder="Paste SteamGridDB API key"
             spellCheck={false}
             type="password"
@@ -120,13 +108,12 @@ export function SteamGridDbSettingsPanel() {
         </div>
       </label>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={saveSettings} type="button">Save</button>
+      <div className="flex flex-wrap gap-2">
         <button className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-200 transition hover:bg-rose-500/10 hover:text-white" onClick={clearSettings} type="button">Clear</button>
         <button className="h-10 rounded-md border border-mint/30 px-4 text-sm font-semibold text-mint transition hover:bg-mint/10" onClick={testConnection} type="button">Test connection</button>
       </div>
 
-      <p className="mt-3 text-sm text-slate-400">{message}</p>
+      {message ? <p className="text-sm text-slate-400">{message}</p> : null}
     </SettingsSection>
   );
 }

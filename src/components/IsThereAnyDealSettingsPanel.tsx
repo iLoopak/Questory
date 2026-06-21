@@ -7,13 +7,26 @@ import type { IsThereAnyDealSettings } from '../types/itad';
 export function IsThereAnyDealSettingsPanel() {
   const { t } = useI18n();
   const [settings, setSettings] = useState<IsThereAnyDealSettings>(() => loadIsThereAnyDealSettings());
+  const isConfigured = settings.apiKey.trim().length > 0;
 
   useEffect(() => {
     saveIsThereAnyDealSettings(settings);
   }, [settings]);
 
   return (
-    <SettingsSection title={t('itad.title')} description={t('itad.settingsHelp')}>
+    <SettingsSection
+      title={t('itad.title')}
+      description={t('itad.settingsHelp')}
+      meta={(
+        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+          isConfigured
+            ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+            : 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+        }`}>
+          {isConfigured ? 'Configured' : 'Missing'}
+        </span>
+      )}
+    >
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('integrations.apiKey')}</span>
         <input

@@ -8,6 +8,7 @@ import { SteamGridDbSettingsPanel } from '../../components/SteamGridDbSettingsPa
 import { SteamSettingsPanel } from '../../components/SteamSettingsPanel';
 import { AboutSettingsPanel } from '../../components/settings/AboutSettingsPanel';
 import { AppearanceSettingsPanel } from '../../components/settings/AppearanceSettingsPanel';
+import { ControlsSettingsPanel } from '../../components/settings/ControlsSettingsPanel';
 import { NavigationVisibilitySettingsPanel } from '../../components/settings/NavigationVisibilitySettingsPanel';
 import { PersonalizationSettingsPanel } from '../../components/settings/PersonalizationSettingsPanel';
 import { QueuePlatformsSettingsPanel } from '../../components/settings/PlatformsSettingsPanel';
@@ -338,6 +339,11 @@ export function SettingsView({
                 onShelfIdentityChange={onShelfIdentityChange}
                 onSteamAvatarImported={onSteamAvatarImported}
               />
+              <NavigationVisibilitySettingsPanel
+                navigationVisibility={navigationVisibility}
+                onNavigationVisibilityChange={onNavigationVisibilityChange}
+                t={t}
+              />
             </div>
           ) : null}
 
@@ -347,15 +353,7 @@ export function SettingsView({
 
           {activeCategory === 'Appearance' ? (
             <div className="space-y-4">
-              <NavigationVisibilitySettingsPanel
-                navigationVisibility={navigationVisibility}
-                onNavigationVisibilityChange={onNavigationVisibilityChange}
-                t={t}
-              />
               <AppearanceSettingsPanel
-                controllerLayoutPreference={controllerLayoutPreference}
-                isControllerDebugEnabled={isControllerDebugEnabled}
-                isLandscapeLockEnabled={isLandscapeLockEnabled}
                 resolvedTheme={resolvedTheme}
                 runtimeEnvironment={runtimeEnvironment}
                 themePreference={themePreference}
@@ -367,9 +365,6 @@ export function SettingsView({
                 neonButtonGradientMidpointPreference={neonButtonGradientMidpointPreference}
                 neonButtonStylePreference={neonButtonStylePreference}
                 language={language}
-                onControllerDebugChange={onControllerDebugChange}
-                onControllerLayoutChange={onControllerLayoutChange}
-                onLandscapeLockChange={onLandscapeLockChange}
                 onThemePreferenceChange={onThemePreferenceChange}
                 onAppTemplatePreferenceChange={onAppTemplatePreferenceChange}
                 onAccentColorChange={onAccentColorChange}
@@ -381,6 +376,19 @@ export function SettingsView({
                 onLanguageChange={onLanguageChange}
               />
             </div>
+          ) : null}
+
+          {activeCategory === 'Controls' ? (
+            <ControlsSettingsPanel
+              controllerLayoutPreference={controllerLayoutPreference}
+              isControllerDebugEnabled={isControllerDebugEnabled}
+              isLandscapeLockEnabled={isLandscapeLockEnabled}
+              language={language}
+              runtimeEnvironment={runtimeEnvironment}
+              onControllerDebugChange={onControllerDebugChange}
+              onControllerLayoutChange={onControllerLayoutChange}
+              onLandscapeLockChange={onLandscapeLockChange}
+            />
           ) : null}
 
           {activeCategory === 'About' ? (
@@ -488,6 +496,19 @@ function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
     return (
       <svg {...commonProps} aria-hidden="true">
         <path d="M12 3a9 9 0 1 0 9 9 4.5 4.5 0 0 1-9-9z" />
+      </svg>
+    );
+  }
+
+  if (category === 'Controls') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <rect x="2" y="8" width="20" height="8" rx="3" />
+        <path d="M8 12h.01" />
+        <path d="M12 10v4" />
+        <path d="M10 12h4" />
+        <circle cx="16" cy="12" r="1" />
+        <circle cx="18" cy="10.5" r="0.5" />
       </svg>
     );
   }
