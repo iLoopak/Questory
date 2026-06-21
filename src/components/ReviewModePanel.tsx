@@ -242,6 +242,13 @@ export function ReviewModePanel({
   const fullRemainingCount = Math.max(0, baseSourceGames.length - completedCount);
 
   useEffect(() => {
+    if (activeGame && hasGamepad) {
+      queueButtonRef.current?.focus({ preventScroll: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGame?.id]);
+
+  useEffect(() => {
     setProcessedGameIds(new Set());
     setSessionGameIds(baseSourceGames.slice(0, reviewSessionBatchSize).map((game) => game.id));
     setReviewHistory([]);
@@ -354,7 +361,7 @@ export function ReviewModePanel({
         return;
       }
 
-      // L2/R2 gamepads are normalized to bracket keys so L1/R1 can stay global tab controls.
+      // Bracket shortcuts for keyboard-only users (controller uses pagePrev/pageNext action events).
       if (event.key === ']') {
         event.preventDefault();
         performAction(activeGame, 'skip');
@@ -927,9 +934,9 @@ function FocusedReviewCard({
 
         {hasGamepad ? (
           <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-            <span>{t('review.previous')}</span>
+            <span>L2 {t('review.previous')}</span>
             <span>•</span>
-            <span>{t('review.next')}</span>
+            <span>R2 {t('review.next')}</span>
             <span>•</span>
             <span>{t('review.dpadFocus')}</span>
             <span>•</span>
