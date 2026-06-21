@@ -26,8 +26,7 @@ import {
 import type { Game, GamePlatform } from '../types/game';
 
 export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
-import { getGameCoverSources } from '../lib/gameCoverImages';
-import { getPreferredArtworkSources } from '../lib/steamGridDbArtwork';
+import { getPreferredArtworkSources } from '../lib/gameCoverImages';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformBadge } from './PlatformBadge';
@@ -1129,7 +1128,7 @@ function QueueGameRow({
 }
 
 function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'tiny' }) {
-  const coverSources = useMemo(() => [...getPreferredArtworkSources(game, 'portrait'), ...getGameCoverSources(game)], [game]);
+  const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];

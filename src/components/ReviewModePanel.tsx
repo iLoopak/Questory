@@ -651,6 +651,7 @@ function FocusedReviewCard({
   const { t } = useI18n();
   const coverSources = getGameCoverSources(game);
   const fallbackCoverSource = getGeneratedFallbackCover(game);
+  const heroBgUrl = game.heroImage?.trim() || game.wideCoverImage?.trim() || game.backgroundImage?.trim() || null;
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [swipeState, setSwipeState] = useState<SwipeState>(emptySwipeState);
@@ -830,6 +831,18 @@ function FocusedReviewCard({
           style={swipeStyle}
         >
           <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
+            {heroBgUrl ? (
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+                <img
+                  alt=""
+                  className="h-full w-full object-cover opacity-[0.18] blur-md"
+                  decoding="async"
+                  draggable={false}
+                  loading="lazy"
+                  src={heroBgUrl}
+                />
+              </div>
+            ) : null}
             {isSwipeEngaged && activeSwipeAction ? (
               <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
                 {getReviewActionLabel(activeSwipeAction, t)}

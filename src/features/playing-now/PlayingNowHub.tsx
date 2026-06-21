@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Icon, type IconName } from '../../components/Icon';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
-import { getGameCoverSources } from '../../lib/gameCoverImages';
-import { getPreferredArtworkSources } from '../../lib/steamGridDbArtwork';
+import { getPreferredArtworkSources, getPreferredLogoUrl } from '../../lib/gameCoverImages';
 import { useI18n, type TFunction } from '../../i18n';
 import { getPlatformAccentColor, type PlatformQueueState, type PlatformQueueSummary } from '../../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../../types/game';
@@ -171,7 +170,7 @@ function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
 }
 
 function PlayingNowCover({ game }: { game: Game }) {
-  const coverSources = useMemo(() => [...getPreferredArtworkSources(game, 'landscape'), ...getGameCoverSources(game)], [game]);
+  const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
@@ -211,12 +210,37 @@ function PlayingNowCover({ game }: { game: Game }) {
 function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange, platformAccentColor, queueState, t }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; platformAccentColor?: string; queueState?: PlatformQueueState; t: TFunction }) {
   const statusBadge = getPlayingNowStatusBadge(context, t);
   const platformStyle = getPlayingNowPlatformStyle(platformAccentColor);
+  const logoUrl = getPreferredLogoUrl(game);
+  const heroBgUrl = game.heroImage?.trim() || game.wideCoverImage?.trim() || game.backgroundImage?.trim() || null;
 
   return (
     <article className="playing-now-card relative flex h-full min-w-0 gap-2.5 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20" style={platformStyle}>
+      {heroBgUrl ? (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <img
+            alt=""
+            className="h-full w-full scale-105 object-cover opacity-[0.15] blur-sm"
+            decoding="async"
+            loading="lazy"
+            src={heroBgUrl}
+          />
+          <div className="absolute inset-0 bg-ink-950/50" />
+        </div>
+      ) : null}
       <PlayingNowCover game={game} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="min-w-0">
+          {logoUrl ? (
+            <img
+              alt=""
+              aria-hidden="true"
+              className="mb-1 block max-h-7 max-w-[110px] object-contain object-left drop-shadow"
+              decoding="async"
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              src={logoUrl}
+            />
+          ) : null}
           <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
           <PlatformBadge accentColor={platformAccentColor} className="mt-1 max-w-full rounded-full px-2 py-0.5 text-[0.62rem] font-semibold" platform={game.platform} queueState={queueState} />
         </div>

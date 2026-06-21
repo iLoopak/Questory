@@ -1,7 +1,6 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
-import { getGameCoverSources } from '../lib/gameCoverImages';
-import { getPreferredArtworkSources } from '../lib/steamGridDbArtwork';
+import { getPreferredArtworkSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameActionMenu } from './GameActionMenu';
@@ -49,9 +48,7 @@ function GameCardComponent({
   suppressWantToPlayStatus = false,
 }: GameCardProps) {
   const { t } = useI18n();
-  const coverSources = useMemo(() => {
-    return [...getPreferredArtworkSources(game, 'portrait'), ...getGameCoverSources(game, { includeGeneratedFallback: false })];
-  }, [game]);
+  const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
