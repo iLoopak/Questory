@@ -5,13 +5,18 @@ import { loadSteamGridDbSettings } from './steamGridDbSettingsStorage';
 
 export type SteamGridDbArtwork = Partial<Pick<Game, 'coverImage' | 'wideCoverImage' | 'heroImage' | 'logoImage' | 'iconImage' | 'artworkSource' | 'artworkUpdatedAt' | 'artworkSourceMetadata'>>;
 
+type FetchSteamGridDbArtworkOptions = {
+  apiKey?: string;
+  skipCache?: boolean;
+};
+
 const CACHE_KEY_PREFIX = 'qs-sgdb-artwork:';
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export async function fetchSteamGridDbArtworkForGame(game: Game): Promise<SteamGridDbArtwork | null> {
+export async function fetchSteamGridDbArtworkForGame(game: Game, options: FetchSteamGridDbArtworkOptions = {}): Promise<SteamGridDbArtwork | null> {
   const title = getMetadataSearchTitle(game);
   const cacheKey = getCacheKey(game, title);
-  const cached = readCachedArtwork(cacheKey);
+  const cached = options.skipCache ? null : readCachedArtwork(cacheKey);
   if (cached) return cached;
 
   const params = new URLSearchParams();
@@ -19,9 +24,9 @@ export async function fetchSteamGridDbArtworkForGame(game: Game): Promise<SteamG
   if (title) params.set('title', title);
   if (!params.toString()) return null;
 
-  const savedApiKey = loadSteamGridDbSettings().apiKey.trim();
-  const init: RequestInit | undefined = savedApiKey
-    ? { headers: { 'X-QuestShelf-SteamGridDb-Key': savedApiKey } }
+  const apiKey = options.apiKey?.trim() || loadSteamGridDbSettings().apiKey.trim();
+  const init: RequestInit | undefined = apiKey
+    ? { headers: { 'X-QuestShelf-SteamGridDb-Key': apiKey } }
     : undefined;
 
   let response: Response;

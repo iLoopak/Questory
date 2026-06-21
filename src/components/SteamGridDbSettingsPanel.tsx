@@ -58,18 +58,30 @@ export function SteamGridDbSettingsPanel() {
   }
 
   async function testConnection() {
-    setConnectionStatus('configured');
-    setMessage('Testing SteamGridDB connection...');
+    const testApiKey = draftApiKey.trim();
+    const isTestingDraftKey = testApiKey.length > 0;
 
-    const artwork = await fetchSteamGridDbArtworkForGame(testGame);
+    setConnectionStatus('configured');
+    setMessage(isTestingDraftKey
+      ? 'Testing SteamGridDB connection with the current API key field. Save is still required to store it.'
+      : 'Testing SteamGridDB connection using saved settings or the server/dev environment key.');
+
+    const artwork = await fetchSteamGridDbArtworkForGame(testGame, {
+      apiKey: isTestingDraftKey ? testApiKey : undefined,
+      skipCache: true,
+    });
     if (artwork) {
       setConnectionStatus('success');
-      setMessage('SteamGridDB returned artwork successfully.');
+      setMessage(isTestingDraftKey
+        ? 'SteamGridDB returned artwork successfully for the current API key field. Click Save to store this key locally.'
+        : 'SteamGridDB returned artwork successfully using saved settings or the server/dev environment key.');
       return;
     }
 
     setConnectionStatus('error');
-    setMessage('SteamGridDB connection failed or no API key is available. Check the saved key or server/dev environment key.');
+    setMessage(isTestingDraftKey
+      ? 'SteamGridDB connection failed for the current API key field. Check the key and try again before saving.'
+      : 'SteamGridDB connection failed or no API key is available. Add a key, save one, or configure a server/dev environment key.');
   }
 
   return (
