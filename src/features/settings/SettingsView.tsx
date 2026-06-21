@@ -4,6 +4,7 @@ import { HltbSettingsPanel } from '../../components/HltbSettingsPanel';
 import { IsThereAnyDealSettingsPanel } from '../../components/IsThereAnyDealSettingsPanel';
 import { RawgSettingsPanel } from '../../components/RawgSettingsPanel';
 import { RetroImportPanel } from '../../components/RetroImportPanel';
+import { SteamGridDbSettingsPanel } from '../../components/SteamGridDbSettingsPanel';
 import { SteamSettingsPanel } from '../../components/SteamSettingsPanel';
 import { AboutSettingsPanel } from '../../components/settings/AboutSettingsPanel';
 import { AppearanceSettingsPanel } from '../../components/settings/AppearanceSettingsPanel';
@@ -257,6 +258,7 @@ export function SettingsView({
             <div className="space-y-4">
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
               <IsThereAnyDealSettingsPanel />
+              <SteamGridDbSettingsPanel />
               <HltbSettingsPanel />
               <SteamSettingsPanel
                 games={games}

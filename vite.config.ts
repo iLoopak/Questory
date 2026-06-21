@@ -290,7 +290,7 @@ function steamGridDbDevEndpointPlugin(): Plugin {
 }
 
 async function handleSteamGridDbArtworkRequest(
-  request: { method?: string; url?: string; headers?: { host?: string } },
+  request: { method?: string; url?: string; headers?: { host?: string; 'x-questshelf-steamgriddb-key'?: string | string[] } },
   response: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void },
 ) {
   if (request.method !== 'GET') {
@@ -298,7 +298,7 @@ async function handleSteamGridDbArtworkRequest(
     return;
   }
 
-  const apiKey = (process.env.STEAMGRIDDB_API_KEY || process.env.VITE_STEAMGRIDDB_API_KEY || '').trim();
+  const apiKey = getSteamGridDbRequestApiKey(request);
   if (!apiKey) {
     sendHltbJson(response, 503, { message: 'SteamGridDB API key is not configured.' });
     return;
@@ -339,6 +339,12 @@ async function handleSteamGridDbArtworkRequest(
   };
   steamGridDbCache.set(cacheKey, { cachedAt: Date.now(), body });
   sendHltbJson(response, 200, body);
+}
+
+function getSteamGridDbRequestApiKey(request: { headers?: { 'x-questshelf-steamgriddb-key'?: string | string[] } }) {
+  const headerValue = request.headers?.['x-questshelf-steamgriddb-key'];
+  const savedApiKey = (Array.isArray(headerValue) ? headerValue[0] : headerValue)?.trim();
+  return savedApiKey || (process.env.STEAMGRIDDB_API_KEY || process.env.VITE_STEAMGRIDDB_API_KEY || '').trim();
 }
 
 async function getSteamGridDbGameIdBySteamAppId(apiKey: string, steamAppId: string) {
