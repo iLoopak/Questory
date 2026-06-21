@@ -3455,6 +3455,11 @@ body.qs-controller-active .qs-compact-card:focus-within {
   z-index: 1;
 }
 
+.playing-now-card > .playing-now-hero-bg {
+  position: absolute;
+  z-index: 0;
+}
+
 .playing-now-play-button {
   background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 78%, var(--qs-accent-primary));
   color: var(--accent-contrast);

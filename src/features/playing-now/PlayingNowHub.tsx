@@ -216,7 +216,7 @@ function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusCha
   return (
     <article className="playing-now-card relative flex h-full min-w-0 gap-2.5 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20" style={platformStyle}>
       {heroBgUrl ? (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div aria-hidden="true" className="playing-now-hero-bg pointer-events-none absolute inset-0">
           <img
             alt=""
             className="h-full w-full scale-105 object-cover opacity-[0.15] blur-sm"
