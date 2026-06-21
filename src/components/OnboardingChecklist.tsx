@@ -263,8 +263,8 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
           </label>
           <p className="mt-1.5 text-xs leading-5 text-slate-400">
             Your unique Steam account identifier. Find it at{' '}
-            <a className="text-mint underline hover:text-mint/80" href="https://steamidfinder.com" rel="noreferrer" target="_blank">
-              steamidfinder.com
+            <a className="text-mint underline hover:text-mint/80" href="https://steamid.io" rel="noreferrer" target="_blank">
+              steamid.io
             </a>
             .
           </p>
