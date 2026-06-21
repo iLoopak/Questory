@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { fetchSteamGridDbArtworkForGame } from '../lib/steamGridDbArtwork';
+import { normalizeSteamGridDbApiKey, testSteamGridDbConnection } from '../lib/steamGridDbArtwork';
 import { loadSteamGridDbSettings, saveSteamGridDbSettings } from '../lib/steamGridDbSettingsStorage';
 import type { Game } from '../types/game';
 import type { SteamGridDbConnectionStatus, SteamGridDbSettings } from '../types/steamGridDb';
@@ -22,7 +22,6 @@ const testGame = {
 export function SteamGridDbSettingsPanel() {
   const [savedSettings, setSavedSettings] = useState<SteamGridDbSettings>(() => loadSteamGridDbSettings());
   const [draftApiKey, setDraftApiKey] = useState(() => savedSettings.apiKey);
-  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<SteamGridDbConnectionStatus>(() => (savedSettings.apiKey.trim() ? 'configured' : 'missing'));
   const [message, setMessage] = useState('SteamGridDB is optional. Add an API key to use local artwork enrichment without a server environment key.');
   const hasSavedApiKey = savedSettings.apiKey.trim().length > 0;
@@ -34,6 +33,18 @@ export function SteamGridDbSettingsPanel() {
     return 'Missing';
   }, [connectionStatus, hasSavedApiKey]);
 
+  const testStatusLabel: Record<string, string> = {
+    success: 'success',
+    'missing-key': 'missing key',
+    'invalid-key': 'invalid key',
+    'rate-limited': 'rate limited',
+    'no-game-match': 'no game match',
+    'no-artwork': 'no artwork',
+    'endpoint-unavailable': 'endpoint unavailable',
+    'provider-error': 'provider error',
+    'network-error': 'network error',
+  };
+
   const statusClassName = connectionStatus === 'success' || (connectionStatus === 'configured' && hasSavedApiKey)
     ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
     : connectionStatus === 'error'
@@ -41,9 +52,10 @@ export function SteamGridDbSettingsPanel() {
       : 'border-amber-300/30 bg-amber-300/10 text-amber-100';
 
   function saveSettings() {
-    const nextSettings = { apiKey: draftApiKey.trim() };
+    const nextSettings = { apiKey: normalizeSteamGridDbApiKey(draftApiKey) };
     saveSteamGridDbSettings(nextSettings);
     setSavedSettings(nextSettings);
+    setDraftApiKey(nextSettings.apiKey);
     setConnectionStatus(nextSettings.apiKey ? 'configured' : 'missing');
     setMessage(nextSettings.apiKey ? 'SteamGridDB API key saved locally on this device.' : 'SteamGridDB API key is missing. Artwork enrichment will rely on a server/dev environment key if available.');
   }
@@ -58,7 +70,7 @@ export function SteamGridDbSettingsPanel() {
   }
 
   async function testConnection() {
-    const testApiKey = draftApiKey.trim();
+    const testApiKey = normalizeSteamGridDbApiKey(draftApiKey);
     const isTestingDraftKey = testApiKey.length > 0;
 
     setConnectionStatus('configured');
@@ -66,11 +78,11 @@ export function SteamGridDbSettingsPanel() {
       ? 'Testing SteamGridDB connection with the current API key field. Save is still required to store it.'
       : 'Testing SteamGridDB connection using saved settings or the server/dev environment key.');
 
-    const artwork = await fetchSteamGridDbArtworkForGame(testGame, {
+    const result = await testSteamGridDbConnection(testGame, {
       apiKey: isTestingDraftKey ? testApiKey : undefined,
       skipCache: true,
     });
-    if (artwork) {
+    if (result.status === 'success') {
       setConnectionStatus('success');
       setMessage(isTestingDraftKey
         ? 'SteamGridDB returned artwork successfully for the current API key field. Click Save to store this key locally.'
@@ -79,9 +91,7 @@ export function SteamGridDbSettingsPanel() {
     }
 
     setConnectionStatus('error');
-    setMessage(isTestingDraftKey
-      ? 'SteamGridDB connection failed for the current API key field. Check the key and try again before saving.'
-      : 'SteamGridDB connection failed or no API key is available. Add a key, save one, or configure a server/dev environment key.');
+    setMessage(`SteamGridDB test failed (${testStatusLabel[result.status] ?? result.status}): ${result.message}`);
   }
 
   return (
@@ -105,15 +115,8 @@ export function SteamGridDbSettingsPanel() {
             onChange={(event) => setDraftApiKey(event.target.value)}
             placeholder="Paste SteamGridDB API key"
             spellCheck={false}
-            type={isApiKeyVisible ? 'text' : 'password'}
+            type="password"
           />
-          <button
-            className="h-11 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-            onClick={() => setIsApiKeyVisible((currentValue) => !currentValue)}
-            type="button"
-          >
-            {isApiKeyVisible ? 'Hide' : 'Show'}
-          </button>
         </div>
       </label>
 
