@@ -62,6 +62,7 @@ export function GameDetailView({
   const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+  const [heroBgSourceIndex, setHeroBgSourceIndex] = useState(0);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
@@ -75,6 +76,16 @@ export function GameDetailView({
 
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
 
+  const heroBgSources = useMemo(() => {
+    const candidates = [
+      game.heroImage?.trim(),
+      game.wideCoverImage?.trim(),
+      game.backgroundImage?.trim(),
+      !isMissingOrGeneratedCover(game.coverImage) ? game.coverImage?.trim() : null,
+    ].filter((s): s is string => Boolean(s));
+    return [...new Set(candidates)];
+  }, [game.heroImage, game.wideCoverImage, game.backgroundImage, game.coverImage]);
+
   useLayoutEffect(() => {
     detailScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [game.id]);
@@ -82,13 +93,15 @@ export function GameDetailView({
   useEffect(() => {
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
+    setHeroBgSourceIndex(0);
     setTagText(game.tags.join(', '));
     setEditDraft(createEditDraft(game));
     setIsEditing(false);
     setEditError('');
-  }, [coverSources, game.id, game.tags]);
+  }, [coverSources, heroBgSources, game.id, game.tags]);
 
   const activeCoverSource = coverSources[coverSourceIndex];
+  const activeHeroBgSource = heroBgSources[heroBgSourceIndex] ?? null;
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
   const canApplyRawgCover = canUseRawgImageAsCover(game);
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
@@ -211,9 +224,16 @@ export function GameDetailView({
         <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
             <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
-              {(game.heroImage || game.wideCoverImage || game.backgroundImage || (!isArtworkMissing && game.coverImage)) ? (
+              {activeHeroBgSource ? (
                 <div className="absolute inset-0 opacity-20 blur-sm" aria-hidden="true">
-                  <img className="h-full w-full object-cover" src={game.heroImage ?? game.wideCoverImage ?? game.backgroundImage ?? game.coverImage ?? ''} alt="" />
+                  <img
+                    alt=""
+                    className="h-full w-full object-cover"
+                    decoding="async"
+                    loading="lazy"
+                    onError={() => setHeroBgSourceIndex((i) => i + 1)}
+                    src={activeHeroBgSource}
+                  />
                 </div>
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/95 to-ink-900/75" aria-hidden="true" />
@@ -260,7 +280,15 @@ export function GameDetailView({
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
                     {logoUrl ? (
-                      <img alt="" aria-hidden="true" className="mt-2 max-h-12 max-w-[180px] object-contain drop-shadow" src={logoUrl} />
+                      <img
+                        alt=""
+                        aria-hidden="true"
+                        className="mt-2 max-h-12 max-w-[180px] object-contain drop-shadow"
+                        decoding="async"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        src={logoUrl}
+                      />
                     ) : null}
                     <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
                       <h2 className="min-w-0 flex-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
