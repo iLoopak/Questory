@@ -3,6 +3,7 @@ import { Icon, type IconName } from '../../components/Icon';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { getGameCoverSources } from '../../lib/gameCoverImages';
+import { getPreferredArtworkSources } from '../../lib/steamGridDbArtwork';
 import { useI18n, type TFunction } from '../../i18n';
 import { getPlatformAccentColor, type PlatformQueueState, type PlatformQueueSummary } from '../../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../../types/game';
@@ -170,7 +171,7 @@ function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
 }
 
 function PlayingNowCover({ game }: { game: Game }) {
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
+  const coverSources = useMemo(() => [...getPreferredArtworkSources(game, 'landscape'), ...getGameCoverSources(game)], [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];

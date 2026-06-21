@@ -4,6 +4,7 @@ import type { NavItem } from '../config/navigation';
 import { mergeRawgMetadataIntoGame } from '../lib/metadataMerge';
 import { formatGameToastMessage, getLinkRawgGameAction, type NotificationDraft } from '../lib/notifications';
 import { refreshRawgMetadataForGame } from '../lib/rawgMetadataEnrichment';
+import { fetchSteamGridDbArtworkForGame, mergeSteamGridDbArtworkIntoGame } from '../lib/steamGridDbArtwork';
 import { RawgApiError } from '../services/rawgApi';
 import type { Game } from '../types/game';
 import type { RawgMetadata } from '../types/rawg';
@@ -83,7 +84,7 @@ export function useMetadataArtworkActions({
     );
   }
 
-  function updateGameArtwork(gameId: string, changes: Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) {
+  function updateGameArtwork(gameId: string, changes: Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'artworkSourceMetadata' | 'coverImage' | 'wideCoverImage' | 'heroImage' | 'logoImage' | 'iconImage'>>) {
     setGames((currentGames) =>
       currentGames.map((game) =>
         game.id === gameId
@@ -128,6 +129,15 @@ export function useMetadataArtworkActions({
       const result = await refreshRawgMetadataForGame(targetGame);
 
       if (result.status === 'no-match') {
+        if (isArtworkRefresh) {
+          const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
+          const enrichedGame = mergeSteamGridDbArtworkIntoGame(targetGame, sgdbArtwork);
+          if (enrichedGame !== targetGame) {
+            setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(enrichedGame) : game)));
+            addToastNotification({ category: 'success', dedupeKey: toastKey, message: formatGameToastMessage(t('toast.artworkUpdated'), targetGame) });
+            return 'updated';
+          }
+        }
         addToastNotification({
           actions: [getLinkRawgGameAction(targetGame.id, mode)],
           category: 'info',
@@ -137,10 +147,13 @@ export function useMetadataArtworkActions({
         return 'no-match';
       }
 
-      updateGameMetadata(targetGame.id, result.metadata);
+      const sgdbArtwork = isArtworkRefresh ? await fetchSteamGridDbArtworkForGame(targetGame) : null;
+      let nextGame = mergeRawgMetadataIntoGame(targetGame, result.metadata);
+      nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
+      setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord({ ...nextGame, metadataSkippedAt: undefined, metadataManualManagedAt: undefined }) : game)));
       markOnboardingItemComplete('metadata-enriched');
 
-      const foundArtwork = Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim());
+      const foundArtwork = Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim() || sgdbArtwork);
       addToastNotification({
         category: foundArtwork || !isArtworkRefresh ? 'success' : 'info',
         dedupeKey: toastKey,
@@ -154,6 +167,15 @@ export function useMetadataArtworkActions({
 
       return foundArtwork || !isArtworkRefresh ? 'updated' : 'no-match';
     } catch (error) {
+      if (isArtworkRefresh) {
+        const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
+        const enrichedGame = mergeSteamGridDbArtworkIntoGame(targetGame, sgdbArtwork);
+        if (enrichedGame !== targetGame) {
+          setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(enrichedGame) : game)));
+          addToastNotification({ category: 'success', dedupeKey: toastKey, message: formatGameToastMessage(t('toast.artworkUpdated'), targetGame) });
+          return 'updated';
+        }
+      }
       const message = error instanceof RawgApiError
         ? error.message
         : t('app.metadataRefreshFailed');

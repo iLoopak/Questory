@@ -5,6 +5,7 @@ import { getSteamArtworkUrls } from './steamArtwork';
 export const artworkSourcePriority = [
   'user',
   'steam',
+  'steamgriddb',
   'rawg',
   'imported',
   'generated-fallback',
@@ -27,6 +28,18 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
 
   if (currentCover && currentSource === 'user') {
     candidates.push({ source: 'user', url: currentCover });
+  }
+
+  if (currentCover && currentSource === 'steamgriddb') {
+    candidates.push({ source: 'steamgriddb', url: currentCover });
+  }
+
+  if (game.wideCoverImage) {
+    candidates.push({ source: 'steamgriddb', url: game.wideCoverImage });
+  }
+
+  if (game.heroImage) {
+    candidates.push({ source: 'steamgriddb', url: game.heroImage });
   }
 
   if (typeof game.steamAppId === 'number') {
@@ -120,6 +133,10 @@ export function getStoredArtworkSource(game: Game): ArtworkSource | undefined {
 
   if (!coverImage || isMissingOrGeneratedCover(coverImage)) {
     return undefined;
+  }
+
+  if (coverImage.includes('steamgriddb.com') || coverImage.includes('cdn2.steamgriddb.com')) {
+    return 'steamgriddb';
   }
 
   if (coverImage.includes('steamstatic.com') || coverImage.includes('/steam/apps/')) {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatDealPrice } from './DealCoverBadges';
 import { getGameCoverSources } from '../lib/gameCoverImages';
+import { getPreferredArtworkSources } from '../lib/steamGridDbArtwork';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { PlayActivityRecord } from '../lib/playActivityStorage';
 import type { ReviewModeState, ReviewSource, ReviewStats } from '../lib/reviewModeStorage';
@@ -715,7 +716,7 @@ function GamePosterButton({
   activitySignal?: string | null;
 }) {
   const { t } = useI18n();
-  const coverSources = getGameCoverSources(game);
+  const coverSources = [...getPreferredArtworkSources(game, 'landscape'), ...getGameCoverSources(game)];
   const coverSource = coverSources[0];
   const minHeightClass = hero ? 'min-h-72' : 'min-h-56';
   const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
@@ -783,7 +784,7 @@ function NextAdventureCard({
   onOpenPlan: () => void;
   t: ReturnType<typeof useI18n>['t'];
 }) {
-  const coverSource = getGameCoverSources(game)[0];
+  const coverSource = getPreferredArtworkSources(game, 'landscape')[0] ?? getGameCoverSources(game)[0];
 
   return (
     <button
@@ -888,7 +889,7 @@ function WishlistDealCard({
   onClick: () => void;
   t: ReturnType<typeof useI18n>['t'];
 }) {
-  const coverSources = getGameCoverSources(game);
+  const coverSources = [...getPreferredArtworkSources(game, 'landscape'), ...getGameCoverSources(game)];
   const coverSource = coverSources[0];
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
@@ -944,7 +945,7 @@ function WishlistDealActionSheet({
   onOpenDetails: (game: Game) => void;
 }) {
   const { t } = useI18n();
-  const coverSource = getGameCoverSources(game)[0];
+  const coverSource = getPreferredArtworkSources(game, 'landscape')[0] ?? getGameCoverSources(game)[0];
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
     typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
