@@ -4,6 +4,7 @@ export const settingsCategories = [
   'Platforms',
   'Retro',
   'Appearance',
+  'Controls',
   'Personalization',
   'Data & Backup',
   'About',
@@ -41,14 +42,19 @@ export const settingsCategoryMeta: Record<SettingsCategory, SettingsCategoryMeta
     shortDescription: 'ROM import and platforms',
   },
   Appearance: {
-    description: 'Adjust handheld presentation, landscape preference, theme, language, and UI behavior.',
+    description: 'Adjust theme, accent colors, template, and display language.',
     label: 'Appearance',
-    shortDescription: 'Theme and UI feel',
+    shortDescription: 'Theme, colors, language',
+  },
+  Controls: {
+    description: 'Configure controller button layout, input debug overlay, and Android landscape lock.',
+    label: 'Controls',
+    shortDescription: 'Controller and input',
   },
   Personalization: {
-    description: 'Set the shelf name and avatar shown across QuestShelf.',
+    description: 'Set your shelf name, avatar, and choose which navigation items are visible.',
     label: 'Personalization',
-    shortDescription: 'Shelf identity',
+    shortDescription: 'Shelf identity and nav',
   },
   'Data & Backup': {
     description: 'Export, restore, import, reset, and sync QuestShelf data without a backend.',

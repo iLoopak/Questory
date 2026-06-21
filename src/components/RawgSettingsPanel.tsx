@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ViewportModal } from './ViewportModal';
 import { loadRawgSettings, saveRawgSettings } from '../lib/rawgSettingsStorage';
+import { searchGameByName, RawgApiError } from '../services/rawgApi';
 import type { RawgSettings } from '../types/rawg';
 import { useI18n } from '../i18n';
-import { SettingsSection } from './settings/SettingsSection';
+import { SettingsSection, SettingsStatusBlock } from './settings/SettingsSection';
 
 type RawgSettingsPanelProps = {
   onRawgApiKeyConfigured?: () => void;
@@ -15,10 +16,34 @@ export function RawgSettingsPanel({
   const { t } = useI18n();
   const [settings, setSettings] = useState<RawgSettings>(() => loadRawgSettings());
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testMessage, setTestMessage] = useState('');
 
   useEffect(() => {
     saveRawgSettings(settings);
   }, [settings]);
+
+  async function testApiKey() {
+    if (!settings.apiKey.trim()) {
+      setTestStatus('error');
+      setTestMessage('Add a RAWG API key before testing.');
+      return;
+    }
+    setTestStatus('testing');
+    setTestMessage('');
+    try {
+      await searchGameByName('Portal');
+      setTestStatus('success');
+      setTestMessage('RAWG connection successful — API key is valid.');
+    } catch (err) {
+      setTestStatus('error');
+      if (err instanceof RawgApiError) {
+        setTestMessage(err.message);
+      } else {
+        setTestMessage('RAWG request failed. Check network access and try again.');
+      }
+    }
+  }
 
   return (
     <SettingsSection
@@ -32,7 +57,7 @@ export function RawgSettingsPanel({
           value={settings.apiKey}
           onChange={(event) => {
             setSettings({ apiKey: event.target.value });
-
+            setTestStatus('idle');
             if (event.target.value.trim()) {
               onRawgApiKeyConfigured?.();
             }
@@ -42,6 +67,22 @@ export function RawgSettingsPanel({
           type="password"
         />
       </label>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="h-9 rounded-md border border-mint/30 px-3 text-sm font-semibold text-mint transition hover:bg-mint/10 disabled:opacity-50"
+          disabled={testStatus === 'testing'}
+          onClick={testApiKey}
+          type="button"
+        >
+          {testStatus === 'testing' ? 'Testing…' : 'Test API key'}
+        </button>
+      </div>
+      {testStatus === 'success' ? (
+        <SettingsStatusBlock tone="success">{testMessage}</SettingsStatusBlock>
+      ) : null}
+      {testStatus === 'error' ? (
+        <SettingsStatusBlock tone="error">{testMessage}</SettingsStatusBlock>
+      ) : null}
       {isHelpOpen ? (
         <ViewportModal ariaLabel={t('integrations.rawgHelp')} placement="center" onClose={() => setIsHelpOpen(false)}>
           <div className="max-w-md p-4 text-sm text-slate-300">
