@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatDealPrice } from './DealCoverBadges';
-import { getGameCoverSources, getPreferredArtworkSources } from '../lib/gameCoverImages';
+import { getPreferredArtworkSources, getPreferredLogoUrl } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { PlayActivityRecord } from '../lib/playActivityStorage';
 import type { ReviewModeState, ReviewSource, ReviewStats } from '../lib/reviewModeStorage';
@@ -717,6 +717,7 @@ function GamePosterButton({
   const { t } = useI18n();
   const coverSources = getPreferredArtworkSources(game, 'landscape');
   const coverSource = coverSources[0];
+  const logoUrl = getPreferredLogoUrl(game);
   const minHeightClass = hero ? 'min-h-72' : 'min-h-56';
   const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
 
@@ -747,6 +748,17 @@ function GamePosterButton({
         <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint">
           {eyebrow}
         </span>
+        {logoUrl ? (
+          <img
+            alt=""
+            aria-hidden="true"
+            className={`mb-2 block object-contain object-left drop-shadow ${hero ? 'max-h-14 max-w-[180px]' : 'max-h-10 max-w-[150px]'}`}
+            decoding="async"
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            src={logoUrl}
+          />
+        ) : null}
         <span className={`line-clamp-2 font-semibold leading-tight text-white drop-shadow ${hero ? 'text-2xl' : 'text-xl'}`}>
           {game.title}
         </span>
@@ -783,7 +795,7 @@ function NextAdventureCard({
   onOpenPlan: () => void;
   t: ReturnType<typeof useI18n>['t'];
 }) {
-  const coverSource = getPreferredArtworkSources(game, 'landscape')[0] ?? getGameCoverSources(game)[0];
+  const coverSource = getPreferredArtworkSources(game, 'background')[0];
 
   return (
     <button
@@ -888,7 +900,7 @@ function WishlistDealCard({
   onClick: () => void;
   t: ReturnType<typeof useI18n>['t'];
 }) {
-  const coverSources = [...getPreferredArtworkSources(game, 'landscape'), ...getGameCoverSources(game)];
+  const coverSources = getPreferredArtworkSources(game, 'portrait');
   const coverSource = coverSources[0];
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
@@ -944,7 +956,7 @@ function WishlistDealActionSheet({
   onOpenDetails: (game: Game) => void;
 }) {
   const { t } = useI18n();
-  const coverSource = getPreferredArtworkSources(game, 'landscape')[0] ?? getGameCoverSources(game)[0];
+  const coverSource = getPreferredArtworkSources(game, 'portrait')[0];
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
     typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency

@@ -13,7 +13,7 @@ export const artworkSourcePriority = [
 
 export type ArtworkSource = (typeof artworkSourcePriority)[number];
 
-export type ArtworkUsage = 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon';
+export type ArtworkUsage = 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon' | 'background' | 'micro';
 
 const generatedPlaceholderMarkers = ['placeholder', 'placehold.co', 'data:image/svg+xml'];
 const generatedFallbackMarker = 'data:image/svg+xml';
@@ -28,6 +28,11 @@ export function getPreferredArtworkSources(game: Game, usage: ArtworkUsage): str
     return game.logoImage?.trim() ? [game.logoImage.trim()] : [];
   }
 
+  // micro: portrait priority without generated SVG fallback — for sub-50px slots where the fallback is unreadable
+  if (usage === 'micro') {
+    return getGameCoverSources(game, { includeGeneratedFallback: false });
+  }
+
   const standard = getGameCoverSources(game);
 
   if (usage === 'portrait' || getStoredArtworkSource(game) === 'user') {
@@ -39,7 +44,8 @@ export function getPreferredArtworkSources(game: Game, usage: ArtworkUsage): str
   if (usage === 'landscape') {
     if (game.wideCoverImage?.trim()) usagePriority.push(game.wideCoverImage.trim());
     if (game.heroImage?.trim()) usagePriority.push(game.heroImage.trim());
-  } else if (usage === 'hero') {
+  } else if (usage === 'hero' || usage === 'background') {
+    // background shares hero field order; callers distinguish ambient backdrop vs focal art
     if (game.heroImage?.trim()) usagePriority.push(game.heroImage.trim());
     if (game.wideCoverImage?.trim()) usagePriority.push(game.wideCoverImage.trim());
     if (game.backgroundImage?.trim()) usagePriority.push(game.backgroundImage.trim());

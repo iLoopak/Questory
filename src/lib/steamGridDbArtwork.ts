@@ -209,16 +209,6 @@ export function mergeSteamGridDbArtworkIntoGame(game: Game, artwork: SteamGridDb
   return next;
 }
 
-export function getPreferredArtworkSources(game: Game, usage: 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon' = 'portrait') {
-  const urls: Array<string | undefined | null> = [];
-  if (usage === 'portrait') urls.push(game.coverImage, game.wideCoverImage, game.heroImage);
-  if (usage === 'landscape') urls.push(game.wideCoverImage, game.heroImage, game.coverImage);
-  if (usage === 'hero') urls.push(game.heroImage, game.wideCoverImage, game.backgroundImage ?? '', game.coverImage);
-  if (usage === 'logo') urls.push(game.logoImage, game.iconImage, game.coverImage);
-  if (usage === 'icon') urls.push(game.iconImage, game.logoImage, game.coverImage);
-  return Array.from(new Set(urls.map((url) => url?.trim()).filter(Boolean) as string[]));
-}
-
 function shouldApplyVariant(currentUrl: string | undefined | null, coverSource: string | undefined) {
   return !currentUrl?.trim() || coverSource === 'steamgriddb';
 }
