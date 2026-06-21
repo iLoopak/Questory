@@ -13,6 +13,7 @@ import {
   deviceOnlyStorageKeys,
   integrationBackupStorageKeys,
 } from './storageRegistry';
+import { normalizeSteamGridDbSettings } from './steamGridDbSettingsStorage';
 import { normalizeSteamSettings } from './steamSettingsStorage';
 import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
 import { normalizeAppPersonalizationSettings } from './appPersonalization';
@@ -327,6 +328,7 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
       return Array.isArray(value);
     case 'questshelf.rawgMetadataCache.v1':
     case 'questshelf.rawgSettings.v1':
+    case 'questshelf.steamGridDbSettings.v1':
     case 'questshelf.steamSettings.v1':
     case 'questshelf.isThereAnyDealSettings.v1':
     case 'questshelf.libraryFilters.v1':
@@ -356,6 +358,8 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
       return normalizeRawgMetadataCache(value);
     case 'questshelf.rawgSettings.v1':
       return normalizeRawgSettings(value);
+    case 'questshelf.steamGridDbSettings.v1':
+      return normalizeSteamGridDbSettings(value);
     case 'questshelf.steamSettings.v1':
       return normalizeSteamSettings(value);
     case 'questshelf.isThereAnyDealSettings.v1':
@@ -390,6 +394,7 @@ function getBackupSectionDisplayName(key: string): string {
     'questshelf.steamIgnoredGames.v1': 'ignored Steam games',
     'questshelf.rawgMetadataCache.v1': 'RAWG metadata cache',
     'questshelf.rawgSettings.v1': 'RAWG settings',
+    'questshelf.steamGridDbSettings.v1': 'SteamGridDB settings',
     'questshelf.steamSettings.v1': 'Steam settings',
     'questshelf.isThereAnyDealSettings.v1': 'IsThereAnyDeal settings',
     'questshelf.libraryFilters.v1': 'library filters',

@@ -1,6 +1,7 @@
 import { isMissingOrGeneratedCover, getStoredArtworkSource } from './gameCoverImages';
 import { getMetadataSearchTitle } from './rawgMetadataEnrichment';
 import type { Game } from '../types/game';
+import { loadSteamGridDbSettings } from './steamGridDbSettingsStorage';
 
 export type SteamGridDbArtwork = Partial<Pick<Game, 'coverImage' | 'wideCoverImage' | 'heroImage' | 'logoImage' | 'iconImage' | 'artworkSource' | 'artworkUpdatedAt' | 'artworkSourceMetadata'>>;
 
@@ -18,9 +19,14 @@ export async function fetchSteamGridDbArtworkForGame(game: Game): Promise<SteamG
   if (title) params.set('title', title);
   if (!params.toString()) return null;
 
+  const savedApiKey = loadSteamGridDbSettings().apiKey.trim();
+  const init: RequestInit | undefined = savedApiKey
+    ? { headers: { 'X-QuestShelf-SteamGridDb-Key': savedApiKey } }
+    : undefined;
+
   let response: Response;
   try {
-    response = await fetch(`/api/steamgriddb/artwork?${params.toString()}`);
+    response = await fetch(`/api/steamgriddb/artwork?${params.toString()}`, init);
   } catch {
     return null;
   }
