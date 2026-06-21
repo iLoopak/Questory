@@ -59,6 +59,15 @@ export default defineConfig({
     hltbDevEndpointPlugin(),
     steamGridDbDevEndpointPlugin(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api/steam-store': {
