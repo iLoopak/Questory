@@ -10,6 +10,20 @@ type FetchSteamGridDbArtworkOptions = {
   skipCache?: boolean;
 };
 
+export type SteamGridDbArtworkCandidate = { url: string; width?: number; height?: number };
+export type SteamGridDbArtworkCandidates = {
+  gameId?: number;
+  cover: SteamGridDbArtworkCandidate[];
+  wideCover: SteamGridDbArtworkCandidate[];
+  hero: SteamGridDbArtworkCandidate[];
+  logo: SteamGridDbArtworkCandidate[];
+  icon: SteamGridDbArtworkCandidate[];
+};
+
+export type SteamGridDbArtworkCandidatesResult =
+  | { status: 'ok'; candidates: SteamGridDbArtworkCandidates }
+  | { status: 'no-key' | 'no-match' | 'error' };
+
 export type SteamGridDbTestStatus =
   | 'success'
   | 'missing-key'
@@ -68,6 +82,55 @@ export async function fetchSteamGridDbArtworkForGame(game: Game, options: FetchS
   return artwork;
 }
 
+
+export async function fetchSteamGridDbArtworkCandidates(game: Game): Promise<SteamGridDbArtworkCandidatesResult> {
+  const title = getMetadataSearchTitle(game);
+  const params = new URLSearchParams();
+  if (typeof game.steamAppId === 'number') params.set('steamAppId', String(game.steamAppId));
+  if (title) params.set('title', title);
+  if (!params.toString()) return { status: 'no-match' };
+  params.set('mode', 'candidates');
+
+  const apiKey = normalizeSteamGridDbApiKey(loadSteamGridDbSettings().apiKey);
+  const init: RequestInit | undefined = apiKey
+    ? { headers: { 'X-QuestShelf-SteamGridDb-Key': apiKey } }
+    : undefined;
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/steamgriddb/artwork?${params.toString()}`, init);
+  } catch {
+    return { status: 'error' };
+  }
+
+  if (response.status === 503) return { status: 'no-key' };
+  if (response.status === 404) return { status: 'no-match' };
+  if (response.status === 501 || !response.ok) return { status: 'error' };
+
+  let body: SteamGridDbArtworkCandidates;
+  try {
+    body = (await response.json()) as SteamGridDbArtworkCandidates;
+  } catch {
+    return { status: 'error' };
+  }
+
+  const candidates: SteamGridDbArtworkCandidates = {
+    gameId: typeof body.gameId === 'number' ? body.gameId : undefined,
+    cover: sanitizeCandidates(body.cover),
+    wideCover: sanitizeCandidates(body.wideCover),
+    hero: sanitizeCandidates(body.hero),
+    logo: sanitizeCandidates(body.logo),
+    icon: sanitizeCandidates(body.icon),
+  };
+  return { status: 'ok', candidates };
+}
+
+function sanitizeCandidates(list: unknown): SteamGridDbArtworkCandidate[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item): item is { url: string } => Boolean(item?.url && typeof item.url === 'string' && /^https?:\/\//i.test(item.url)))
+    .map((item) => ({ url: item.url, width: typeof item.width === 'number' ? item.width : undefined, height: typeof item.height === 'number' ? item.height : undefined }));
+}
 
 export async function testSteamGridDbConnection(game: Game, options: FetchSteamGridDbArtworkOptions = {}): Promise<SteamGridDbTestResult> {
   const title = getMetadataSearchTitle(game);
