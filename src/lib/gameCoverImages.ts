@@ -6,7 +6,6 @@ export const artworkSourcePriority = [
   'user',
   'steam',
   'rawg',
-  'psn',
   'imported',
   'generated-fallback',
 ] as const;
@@ -45,10 +44,6 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
 
   if (currentCover && currentSource === 'rawg' && currentCover !== game.backgroundImage) {
     candidates.push({ source: 'rawg', url: currentCover });
-  }
-
-  if (currentCover && currentSource === 'psn') {
-    candidates.push({ source: 'psn', url: currentCover });
   }
 
   if (currentCover && currentSource === 'imported') {
