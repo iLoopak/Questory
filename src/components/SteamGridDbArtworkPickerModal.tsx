@@ -7,7 +7,7 @@ import {
   type SteamGridDbArtworkCandidates,
 } from '../lib/steamGridDbArtwork';
 import type { Game } from '../types/game';
-import { useI18n } from '../i18n';
+import { useI18n, type TFunction } from '../i18n';
 import { Icon } from './Icon';
 
 type PickerTab = 'cover' | 'wideCover' | 'hero' | 'logo' | 'icon';
@@ -15,7 +15,7 @@ type PickerStatus = 'loading' | 'ready' | 'error' | 'no-key' | 'no-match';
 
 type TabConfig = {
   id: PickerTab;
-  labelKey: string;
+  labelKey: Parameters<TFunction>[0];
   gameField: keyof Pick<Game, 'coverImage' | 'wideCoverImage' | 'heroImage' | 'logoImage' | 'iconImage'>;
   aspect: string;
   cols: string;
