@@ -6,7 +6,6 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
-import { formatPsnTrophySummary, hasPsnTrophyData } from '../lib/psnTrophySync';
 import { translateOption, useI18n, type TFunction } from '../i18n';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
@@ -95,8 +94,7 @@ export function GameDetailView({
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
-  const psnTrophySummary = hasPsnTrophyData(game) ? formatPsnTrophySummary(game) : null;
-  const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
+const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
   const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
     ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
@@ -268,8 +266,7 @@ export function GameDetailView({
                     <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
                     {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} /> : null}
-                    {psnTrophySummary ? <HeroStat label="PSN Trophies" value={psnTrophySummary} /> : null}
-                    {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+{hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                   </div>
                 </div>
               </div>

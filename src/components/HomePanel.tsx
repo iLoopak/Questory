@@ -34,9 +34,7 @@ type HomePanelProps = {
   onPlayToday: (game: Game) => void;
   onQuickNote: (gameId: string, note: string) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
-  isPsnTrophySyncing?: boolean;
   onSyncItadDeals?: () => void;
-  onSyncPsnTrophies?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
 };
@@ -67,9 +65,7 @@ export function HomePanel({
   onPlayToday,
   onQuickNote,
   onStatusChange,
-  isPsnTrophySyncing = false,
   onSyncItadDeals,
-  onSyncPsnTrophies,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
 }: HomePanelProps) {
@@ -146,12 +142,6 @@ export function HomePanel({
   const unratedFinishedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Finished' && !g.rating).length, [libraryGames]);
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
-  const hasPsnGames = useMemo(() => games.some((g) => g.collectionType === 'library' && (g.platform === 'PS4' || g.platform === 'PS5')), [games]);
-  const lastPsnTrophySyncAt = useMemo(() => {
-    const times = games.filter((g) => g.psnTrophySyncedAt).map((g) => g.psnTrophySyncedAt as string);
-    return times.length > 0 ? times.reduce((a, b) => (a > b ? a : b)) : null;
-  }, [games]);
-
   const lastPlaytimeSyncAt = useMemo(() => {
     const times = games
       .filter((g) => g.steamAppId != null && g.lastSteamActivityAt)
@@ -176,7 +166,7 @@ export function HomePanel({
   const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
   const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
   const isSteamSyncing = isSteamAchievementSyncing || isSteamPlaytimeSyncing;
-  const hasSyncActions = (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals || (hasPsnGames && !!onSyncPsnTrophies);
+  const hasSyncActions = (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
   const isAnySyncing = isSteamSyncing || itadDealSyncState?.status === 'loading';
 
   const wishlistGames = useMemo(() => games.filter((g) => g.collectionType === 'wishlist'), [games]);
@@ -532,19 +522,15 @@ export function HomePanel({
       {/* Sync & Maintenance sheet */}
       {syncSheetOpen ? (
         <SyncMaintenanceSheet
-          hasPsnGames={hasPsnGames}
           hasSteamGames={hasSteamGames}
-          isPsnTrophySyncing={isPsnTrophySyncing}
           isSteamAchievementSyncing={isSteamAchievementSyncing}
           isSteamPlaytimeSyncing={isSteamPlaytimeSyncing}
           itadDealSyncState={itadDealSyncState}
           lastAchievementSyncAt={lastAchievementSyncAt}
           lastItadSyncAt={lastItadSyncAt}
           lastPlaytimeSyncAt={lastPlaytimeSyncAt}
-          lastPsnTrophySyncAt={lastPsnTrophySyncAt}
           onClose={() => setSyncSheetOpen(false)}
           onSyncItadDeals={onSyncItadDeals}
-          onSyncPsnTrophies={onSyncPsnTrophies}
           onSyncSteamAchievements={onSyncSteamAchievements}
           onSyncSteamPlaytime={onSyncSteamPlaytime}
         />
@@ -1528,35 +1514,27 @@ function formatRelativeTime(value: string | Date | number | null | undefined, ne
 }
 
 function SyncMaintenanceSheet({
-  hasPsnGames,
   hasSteamGames,
-  isPsnTrophySyncing,
   isSteamAchievementSyncing,
   isSteamPlaytimeSyncing,
   itadDealSyncState,
   lastAchievementSyncAt,
   lastItadSyncAt,
   lastPlaytimeSyncAt,
-  lastPsnTrophySyncAt,
   onClose,
   onSyncItadDeals,
-  onSyncPsnTrophies,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
 }: {
-  hasPsnGames: boolean;
   hasSteamGames: boolean;
-  isPsnTrophySyncing: boolean;
   isSteamAchievementSyncing: boolean;
   isSteamPlaytimeSyncing: boolean;
   itadDealSyncState?: ItadDealSyncState;
   lastAchievementSyncAt: Date | null;
   lastItadSyncAt: string | null;
   lastPlaytimeSyncAt: Date | null;
-  lastPsnTrophySyncAt: string | null;
   onClose: () => void;
   onSyncItadDeals?: () => void;
-  onSyncPsnTrophies?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
 }) {
@@ -1588,17 +1566,11 @@ function SyncMaintenanceSheet({
             {onSyncItadDeals ? (
               <SyncSheetButton icon="shopping-bag" label="Sync ITAD Deals" syncingLabel="Syncing ITAD deals…" isSyncing={isItadSyncing} lastSyncAt={lastItadSyncAt} onClick={onSyncItadDeals} neverLabel={t('home.neverSynced')} />
             ) : null}
-            {hasPsnGames && onSyncPsnTrophies ? (
-              <SyncSheetButton icon="trophy" label="Sync PSN Trophies" syncingLabel="Syncing PSN trophies…" isSyncing={isPsnTrophySyncing} lastSyncAt={lastPsnTrophySyncAt} onClick={onSyncPsnTrophies} neverLabel={t('home.neverSynced')} />
-            ) : null}
           </div>
           <div className="mt-3 rounded-2xl border border-skyglass/10 bg-ink-900/35 p-4 text-xs text-slate-400">
             <SyncStatusLine label="Achievement Sync" value={lastAchievementSyncAt ? formatRelativeTime(lastAchievementSyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
             <SyncStatusLine label="Playtime Sync" value={lastPlaytimeSyncAt ? formatRelativeTime(lastPlaytimeSyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
             <SyncStatusLine label="ITAD Sync" value={lastItadSyncAt ? formatRelativeTime(lastItadSyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
-            {hasPsnGames ? (
-              <SyncStatusLine label="PSN Trophy Sync" value={lastPsnTrophySyncAt ? formatRelativeTime(lastPsnTrophySyncAt, t('home.neverSynced')) : t('home.neverSynced')} />
-            ) : null}
           </div>
           <button className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300" onClick={onClose} type="button">Cancel</button>
         </div>

@@ -1,4 +1,3 @@
-import * as https from 'node:https';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -58,7 +57,6 @@ export default defineConfig({
       },
     }),
     hltbDevEndpointPlugin(),
-    psnConnectPlugin(),
   ],
   server: {
     proxy: {
@@ -98,18 +96,6 @@ export default defineConfig({
           });
         },
         rewrite: (path) => path.replace(/^\/api\/itad/, ''),
-      },
-      '/api/psn-trophy': {
-        target: 'https://m.np.playstation.com',
-        changeOrigin: true,
-        secure: true,
-        configure: (proxy) => {
-          proxy.on('error', (error) => {
-            const logger = Reflect.get(globalThis, 'console') as { error?: (...args: unknown[]) => void } | undefined;
-            logger?.error?.('[QuestShelf PSN trophy proxy]', error.message);
-          });
-        },
-        rewrite: (path) => path.replace(/^\/api\/psn-trophy/, ''),
       },
     },
   },
@@ -273,22 +259,6 @@ function classifyHltbDevEndpointError(error: unknown): { message: string; reason
   return { message: `HowLongToBeat provider failed: ${message}`, reason: 'temporary', status: 500 };
 }
 
-function getString(value: unknown) {
-  if (typeof value === 'string' && value.trim()) {
-    return value.trim();
-  }
-
-  if (typeof value === 'number') {
-    return value.toString();
-  }
-
-  return undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function logHltbDevEndpoint(label: string, details?: unknown) {
   const logger = Reflect.get(globalThis, 'console') as { debug?: (...args: unknown[]) => void; warn?: (...args: unknown[]) => void } | undefined;
   if (label === 'provider failure reason') {
@@ -296,161 +266,4 @@ function logHltbDevEndpoint(label: string, details?: unknown) {
     return;
   }
   logger?.debug?.(`[hltb] ${label}`, details ?? '');
-}
-
-// Dev/server-only PSN auth bridge. The browser sends the NPSSO token here;
-// the server performs the OAuth redirect exchange (which requires following a
-// custom-scheme redirect — something browsers cannot do) and returns the tokens.
-function psnConnectPlugin(): Plugin {
-  return {
-    name: 'questshelf-psn-connect',
-    configureServer(server) {
-      server.middlewares.use('/api/psn/connect', (request, response) => {
-        void handlePsnConnectRequest(request, response).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : 'PSN connect failed.';
-          sendPsnJson(response, 500, { message });
-        });
-      });
-    },
-  };
-}
-
-const PSN_CLIENT_ID = '09515159-7237-4370-9b4a-3806334d89ca';
-// Base64 of clientId:clientSecret — these are the public PSN mobile app credentials
-// used by psn-api and multiple open-source PSN tools.
-const PSN_BASIC_AUTH = 'Basic MDk1MTUxNTktNzIzNy00MzcwLTliNGEtMzgwNjMzNGQ4OWNhOnVjWkVQNEMzQzBVM1VOdFJnNVdBNVkyVjI=';
-const PSN_REDIRECT_URI = 'com.scee.psxandroid.scearp://redirect';
-
-async function handlePsnConnectRequest(
-  request: { method?: string; on: (event: string, listener: (chunk?: unknown) => void) => void },
-  response: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void },
-) {
-  if (request.method !== 'POST') {
-    sendPsnJson(response, 405, { message: 'PSN connect only accepts POST.' });
-    return;
-  }
-
-  const body = await readRequestBody(request);
-  const parsed = parseJson(body) as { npssoToken?: unknown };
-  const npssoToken = typeof parsed.npssoToken === 'string' ? parsed.npssoToken.trim() : '';
-
-  if (!npssoToken) {
-    sendPsnJson(response, 400, { message: 'npssoToken is required.' });
-    return;
-  }
-
-  const code = await exchangeNpssoForCode(npssoToken);
-  const tokens = await exchangeCodeForTokens(code);
-  const onlineId = await getPsnOnlineId(tokens.access_token).catch(() => '');
-
-  sendPsnJson(response, 200, {
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    expiresIn: tokens.expires_in,
-    onlineId,
-  });
-}
-
-async function exchangeNpssoForCode(npssoToken: string): Promise<string> {
-  const authorizeUrl = new URL('https://ca.account.sony.com/api/authz/v3/oauth/authorize');
-  authorizeUrl.searchParams.set('access_type', 'offline');
-  authorizeUrl.searchParams.set('client_id', PSN_CLIENT_ID);
-  authorizeUrl.searchParams.set('response_type', 'code');
-  authorizeUrl.searchParams.set('scope', 'psn:mobile.v2.core psn:clientapp');
-  authorizeUrl.searchParams.set('redirect_uri', PSN_REDIRECT_URI);
-
-  // node:https doesn't follow redirects by default, so we get the Location header
-  // directly even when Sony redirects to a custom scheme (com.scee.psxandroid.scearp://)
-  // that fetch/undici can't handle cleanly with redirect:'manual'.
-  const location = await new Promise<string>((resolve, reject) => {
-    const req = https.request(
-      authorizeUrl,
-      {
-        method: 'GET',
-        headers: {
-          Cookie: `npsso=${npssoToken}`,
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-          Accept: 'text/html,application/xhtml+xml',
-        },
-      },
-      (res) => {
-        res.resume(); // drain response body to free the socket
-        const raw = res.headers['location'];
-        resolve(Array.isArray(raw) ? raw[0] : (raw ?? ''));
-      },
-    );
-    req.on('error', reject);
-    req.end();
-  });
-
-  if (!location) {
-    throw new Error('NPSSO token is invalid or expired — Sony did not redirect. Get a fresh token from my.playstation.com.');
-  }
-
-  // Extract code from query params; fall back to regex in case URL shape changes.
-  let code: string | null = null;
-  try {
-    const normalized = location.replace(/^com\.scee\.psxandroid\.scearp:\/\//, 'https://placeholder/');
-    code = new URL(normalized).searchParams.get('code');
-  } catch {
-    // URL parsing failed — try raw regex
-  }
-  if (!code) {
-    code = /[?&]code=([^&]+)/.exec(location)?.[1] ?? null;
-  }
-
-  if (!code) {
-    throw new Error(`PSN auth code not found in redirect. Location: ${location.slice(0, 120)}`);
-  }
-
-  return code;
-}
-
-async function exchangeCodeForTokens(code: string): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
-  const tokenResponse = await fetch('https://ca.account.sony.com/api/authz/v3/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: PSN_BASIC_AUTH,
-    },
-    body: new URLSearchParams({
-      code,
-      redirect_uri: PSN_REDIRECT_URI,
-      grant_type: 'authorization_code',
-      token_format: 'jwt',
-    }).toString(),
-  });
-
-  if (!tokenResponse.ok) {
-    throw new Error(`PSN token exchange failed with HTTP ${tokenResponse.status}.`);
-  }
-
-  return tokenResponse.json() as Promise<{ access_token: string; refresh_token: string; expires_in: number }>;
-}
-
-async function getPsnOnlineId(accessToken: string): Promise<string> {
-  const profileResponse = await fetch('https://us-prof.np.community.playstation.net/userProfile/v1/users/me/profile2?fields=onlineId', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!profileResponse.ok) return '';
-
-  const data = await profileResponse.json() as { profile?: { onlineId?: string } };
-  return data?.profile?.onlineId ?? '';
-}
-
-function sendPsnJson(response: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void }, status: number, body: unknown) {
-  response.statusCode = status;
-  response.setHeader('content-type', 'application/json; charset=utf-8');
-  response.setHeader('access-control-allow-origin', '*');
-  response.end(JSON.stringify(body));
-}
-
-function parseJson(body: string): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(body) as unknown;
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
 }

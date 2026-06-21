@@ -5,7 +5,6 @@ export type QuestShelfStorageKey =
   | 'questshelf.isThereAnyDealSettings.v1'
   | 'questshelf.steamIgnoredGames.v1'
   | 'questshelf.steamSettings.v1'
-  | 'questshelf.psnSettings.v1'
   | 'questshelf.libraryFilters.v1'
   | 'questshelf.wishlistFilters.v1'
   | 'questshelf.onboarding.v1'
@@ -125,13 +124,6 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Steam API key, SteamID64, and optional wishlist URL.',
     scope: 'integration',
     schema: 'SteamSettings.',
-  },
-  {
-    backup: 'never',
-    key: 'questshelf.psnSettings.v1',
-    purpose: 'PSN NPSSO token and OAuth access/refresh tokens.',
-    scope: 'integration',
-    schema: 'PsnSettings.',
   },
   {
     backup: 'never',
