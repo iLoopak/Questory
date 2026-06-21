@@ -272,6 +272,11 @@ function logHltbDevEndpoint(label: string, details?: unknown) {
 
 type SteamGridDbImage = { url?: string; width?: number; height?: number; nsfw?: boolean; humor?: boolean; style?: string; score?: number; type?: string; mime?: string };
 type SteamGridDbResponse = { data?: unknown };
+type SteamGridDbProviderStatus = {
+  status: 'success' | 'no-artwork' | 'invalid-key' | 'rate-limited' | 'endpoint-unavailable' | 'provider-error' | 'network-error';
+  httpStatus?: number;
+  message?: string;
+};
 
 const steamGridDbCache = new Map<string, { cachedAt: number; body: unknown }>();
 const STEAMGRIDDB_CACHE_MS = 24 * 60 * 60 * 1000;
@@ -282,7 +287,20 @@ function steamGridDbDevEndpointPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use('/api/steamgriddb/artwork', (request, response) => {
         void handleSteamGridDbArtworkRequest(request, response).catch((error: unknown) => {
-          sendHltbJson(response, 502, { message: error instanceof Error ? error.message : 'SteamGridDB request failed.' });
+          const providerStatus = classifySteamGridDbProviderStatus(error);
+          const statusCode = providerStatus.status === 'invalid-key'
+            ? 401
+            : providerStatus.status === 'rate-limited'
+              ? 429
+              : providerStatus.status === 'endpoint-unavailable'
+                ? 503
+                : providerStatus.status === 'network-error'
+                  ? 502
+                  : 502;
+          sendHltbJson(response, statusCode, {
+            status: providerStatus.status,
+            message: providerStatus.message ?? 'SteamGridDB request failed.',
+          });
         });
       });
     },
@@ -299,14 +317,16 @@ async function handleSteamGridDbArtworkRequest(
   }
 
   const apiKey = getSteamGridDbRequestApiKey(request);
-  if (!apiKey) {
-    sendHltbJson(response, 503, { message: 'SteamGridDB API key is not configured.' });
-    return;
-  }
-
   const requestUrl = new URL(request.url ?? '', `http://${request.headers?.host ?? 'localhost'}`);
   const steamAppId = requestUrl.searchParams.get('steamAppId')?.trim();
   const title = requestUrl.searchParams.get('title')?.trim();
+  const lookup = steamAppId ? 'steam-app-id' : 'title';
+  logSteamGridDbDevEndpoint('artwork request', { hasApiKey: Boolean(apiKey), lookup });
+  if (!apiKey) {
+    sendHltbJson(response, 503, { status: 'missing-key', message: 'SteamGridDB API key is not configured.' });
+    return;
+  }
+
   const cacheKey = `${steamAppId ?? ''}:${title ?? ''}`.toLowerCase();
   const cached = steamGridDbCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < STEAMGRIDDB_CACHE_MS) {
@@ -314,64 +334,123 @@ async function handleSteamGridDbArtworkRequest(
     return;
   }
 
-  const gameId = steamAppId ? await getSteamGridDbGameIdBySteamAppId(apiKey, steamAppId) : title ? await getSteamGridDbGameIdByTitle(apiKey, title) : null;
+  const gameId = steamAppId ? await getSteamGridDbGameIdBySteamAppId(apiKey, steamAppId, lookup) : title ? await getSteamGridDbGameIdByTitle(apiKey, title, lookup) : null;
   if (!gameId) {
-    sendHltbJson(response, 404, { message: 'No SteamGridDB match found.' });
+    sendHltbJson(response, 404, { status: 'no-game-match', message: 'No SteamGridDB match found.' });
     return;
   }
 
   const [portraitGrids, landscapeGrids, heroes, logos, icons] = await Promise.all([
-    requestSteamGridDbImages(apiKey, `/grids/game/${gameId}`, { dimensions: '600x900,342x482' }),
-    requestSteamGridDbImages(apiKey, `/grids/game/${gameId}`, { dimensions: '920x430,460x215,1920x620' }),
-    requestSteamGridDbImages(apiKey, `/heroes/game/${gameId}`, { dimensions: '1920x620' }),
-    requestSteamGridDbImages(apiKey, `/logos/game/${gameId}`),
-    requestSteamGridDbImages(apiKey, `/icons/game/${gameId}`),
+    requestSteamGridDbImagesSafely(apiKey, `/grids/game/${gameId}`, lookup, { dimensions: '600x900,342x482' }),
+    requestSteamGridDbImagesSafely(apiKey, `/grids/game/${gameId}`, lookup, { dimensions: '920x430,460x215,1920x620' }),
+    requestSteamGridDbImagesSafely(apiKey, `/heroes/game/${gameId}`, lookup, { dimensions: '1920x620' }),
+    requestSteamGridDbImagesSafely(apiKey, `/logos/game/${gameId}`, lookup),
+    requestSteamGridDbImagesSafely(apiKey, `/icons/game/${gameId}`, lookup),
   ]);
 
   const body = {
-    coverImage: pickSteamGridDbImage(portraitGrids, 'portrait'),
-    wideCoverImage: pickSteamGridDbImage(landscapeGrids, 'landscape'),
-    heroImage: pickSteamGridDbImage(heroes, 'hero'),
-    logoImage: pickSteamGridDbImage(logos, 'logo'),
-    iconImage: pickSteamGridDbImage(icons, 'icon'),
+    coverImage: pickSteamGridDbImage(portraitGrids.images, 'portrait'),
+    wideCoverImage: pickSteamGridDbImage(landscapeGrids.images, 'landscape'),
+    heroImage: pickSteamGridDbImage(heroes.images, 'hero'),
+    logoImage: pickSteamGridDbImage(logos.images, 'logo'),
+    iconImage: pickSteamGridDbImage(icons.images, 'icon'),
     artworkSource: 'steamgriddb',
-    artworkSourceMetadata: { steamGridDb: { gameId, lookup: steamAppId ? 'steam-app-id' : 'title', refreshedAt: new Date().toISOString() } },
+    artworkSourceMetadata: { steamGridDb: { gameId, lookup, refreshedAt: new Date().toISOString() } },
+    providerStatus: {
+      portrait: portraitGrids.providerStatus,
+      landscape: landscapeGrids.providerStatus,
+      hero: heroes.providerStatus,
+      logo: logos.providerStatus,
+      icon: icons.providerStatus,
+    },
   };
+  const hasArtwork = [body.coverImage, body.wideCoverImage, body.heroImage, body.logoImage, body.iconImage].some(Boolean);
+  if (!hasArtwork) {
+    sendHltbJson(response, 404, { ...body, status: 'no-artwork', message: 'SteamGridDB found the game but did not return usable artwork.' });
+    return;
+  }
   steamGridDbCache.set(cacheKey, { cachedAt: Date.now(), body });
   sendHltbJson(response, 200, body);
 }
 
 function getSteamGridDbRequestApiKey(request: { headers?: { 'x-questshelf-steamgriddb-key'?: string | string[] } }) {
   const headerValue = request.headers?.['x-questshelf-steamgriddb-key'];
-  const savedApiKey = (Array.isArray(headerValue) ? headerValue[0] : headerValue)?.trim();
-  return savedApiKey || (process.env.STEAMGRIDDB_API_KEY || process.env.VITE_STEAMGRIDDB_API_KEY || '').trim();
+  const savedApiKey = normalizeSteamGridDbDevApiKey(Array.isArray(headerValue) ? headerValue[0] : headerValue);
+  return savedApiKey || normalizeSteamGridDbDevApiKey(process.env.STEAMGRIDDB_API_KEY || process.env.VITE_STEAMGRIDDB_API_KEY);
 }
 
-async function getSteamGridDbGameIdBySteamAppId(apiKey: string, steamAppId: string) {
-  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, `/games/steam/${encodeURIComponent(steamAppId)}`);
+async function getSteamGridDbGameIdBySteamAppId(apiKey: string, steamAppId: string, lookup: string) {
+  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, `/games/steam/${encodeURIComponent(steamAppId)}`, {}, lookup);
   const data = response.data as { id?: number } | undefined;
   return typeof data?.id === 'number' ? data.id : null;
 }
 
-async function getSteamGridDbGameIdByTitle(apiKey: string, title: string) {
-  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, '/search/autocomplete/' + encodeURIComponent(title));
+async function getSteamGridDbGameIdByTitle(apiKey: string, title: string, lookup: string) {
+  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, '/search/autocomplete/' + encodeURIComponent(title), {}, lookup);
   const first = Array.isArray(response.data) ? (response.data[0] as { id?: number } | undefined) : undefined;
   return typeof first?.id === 'number' ? first.id : null;
 }
 
-async function requestSteamGridDbImages(apiKey: string, path: string, params: Record<string, string> = {}) {
-  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, path, { types: 'static', ...params });
+async function requestSteamGridDbImagesSafely(apiKey: string, path: string, lookup: string, params: Record<string, string> = {}) {
+  try {
+    const images = await requestSteamGridDbImages(apiKey, path, params, lookup);
+    return { images, providerStatus: { status: images.length ? 'success' : 'no-artwork' } satisfies SteamGridDbProviderStatus };
+  } catch (error: unknown) {
+    const providerStatus = classifySteamGridDbProviderStatus(error);
+    logSteamGridDbDevEndpoint('category failure', { lookup, path, providerStatus });
+    return { images: [], providerStatus };
+  }
+}
+
+async function requestSteamGridDbImages(apiKey: string, path: string, params: Record<string, string> = {}, lookup = 'unknown') {
+  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, path, { types: 'static', ...params }, lookup);
   return Array.isArray(response.data) ? (response.data as SteamGridDbImage[]) : [];
 }
 
-async function requestSteamGridDb<T>(apiKey: string, path: string, params: Record<string, string> = {}): Promise<T> {
+async function requestSteamGridDb<T>(apiKey: string, path: string, params: Record<string, string> = {}, lookup = 'unknown'): Promise<T> {
   const url = new URL(`https://www.steamgriddb.com/api/v2${path}`);
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } });
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } });
+  } catch (error: unknown) {
+    logSteamGridDbDevEndpoint('provider network failure', { lookup, path, message: error instanceof Error ? error.message : 'unknown network error' });
+    throw Object.assign(new Error('SteamGridDB network request failed.'), { providerStatus: 'network-error' });
+  }
+  logSteamGridDbDevEndpoint('provider response', { lookup, path, status: response.status });
   if (response.status === 404) return { data: [] } as T;
-  if (response.status === 429) throw new Error('SteamGridDB rate limit reached.');
-  if (!response.ok) throw new Error(`SteamGridDB returned ${response.status}.`);
+  if (response.status === 401 || response.status === 403) throw Object.assign(new Error('SteamGridDB rejected the API key.'), { providerStatus: 'invalid-key', httpStatus: response.status });
+  if (response.status === 429) throw Object.assign(new Error('SteamGridDB rate limit reached.'), { providerStatus: 'rate-limited', httpStatus: response.status });
+  if (response.status >= 500) throw Object.assign(new Error(`SteamGridDB returned ${response.status}.`), { providerStatus: 'endpoint-unavailable', httpStatus: response.status });
+  if (!response.ok) throw Object.assign(new Error(`SteamGridDB returned ${response.status}.`), { providerStatus: 'provider-error', httpStatus: response.status });
   return (await response.json()) as T;
+}
+
+function normalizeSteamGridDbDevApiKey(value: string | undefined) {
+  return (value ?? '').trim().replace(/^Bearer\s+/i, '').trim();
+}
+
+function classifySteamGridDbProviderStatus(error: unknown): SteamGridDbProviderStatus {
+  const maybeStatus = error && typeof error === 'object' ? error as { providerStatus?: unknown; httpStatus?: unknown; message?: unknown } : {};
+  const status = typeof maybeStatus.providerStatus === 'string' ? maybeStatus.providerStatus : 'provider-error';
+  return {
+    status: isSteamGridDbProviderStatus(status) ? status : 'provider-error',
+    httpStatus: typeof maybeStatus.httpStatus === 'number' ? maybeStatus.httpStatus : undefined,
+    message: typeof maybeStatus.message === 'string' ? maybeStatus.message : undefined,
+  };
+}
+
+function isSteamGridDbProviderStatus(status: string): status is SteamGridDbProviderStatus['status'] {
+  return ['success', 'no-artwork', 'invalid-key', 'rate-limited', 'endpoint-unavailable', 'provider-error', 'network-error'].includes(status);
+}
+
+function logSteamGridDbDevEndpoint(label: string, details?: unknown) {
+  const logger = Reflect.get(globalThis, 'console') as { debug?: (...args: unknown[]) => void; warn?: (...args: unknown[]) => void } | undefined;
+  if (/failure/i.test(label)) {
+    logger?.warn?.(`[steamgriddb] ${label}`, details ?? '');
+    return;
+  }
+  logger?.debug?.(`[steamgriddb] ${label}`, details ?? '');
 }
 
 function pickSteamGridDbImage(images: SteamGridDbImage[], usage: 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon') {

@@ -10,6 +10,22 @@ type FetchSteamGridDbArtworkOptions = {
   skipCache?: boolean;
 };
 
+export type SteamGridDbTestStatus =
+  | 'success'
+  | 'missing-key'
+  | 'invalid-key'
+  | 'rate-limited'
+  | 'no-game-match'
+  | 'no-artwork'
+  | 'endpoint-unavailable'
+  | 'provider-error'
+  | 'network-error';
+
+export type SteamGridDbTestResult = {
+  status: SteamGridDbTestStatus;
+  message: string;
+};
+
 const CACHE_KEY_PREFIX = 'qs-sgdb-artwork:';
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -24,7 +40,7 @@ export async function fetchSteamGridDbArtworkForGame(game: Game, options: FetchS
   if (title) params.set('title', title);
   if (!params.toString()) return null;
 
-  const apiKey = options.apiKey?.trim() || loadSteamGridDbSettings().apiKey.trim();
+  const apiKey = normalizeSteamGridDbApiKey(options.apiKey) || normalizeSteamGridDbApiKey(loadSteamGridDbSettings().apiKey);
   const init: RequestInit | undefined = apiKey
     ? { headers: { 'X-QuestShelf-SteamGridDb-Key': apiKey } }
     : undefined;
@@ -50,6 +66,41 @@ export async function fetchSteamGridDbArtworkForGame(game: Game, options: FetchS
   if (!artwork) return null;
   writeCachedArtwork(cacheKey, artwork);
   return artwork;
+}
+
+
+export async function testSteamGridDbConnection(game: Game, options: FetchSteamGridDbArtworkOptions = {}): Promise<SteamGridDbTestResult> {
+  const title = getMetadataSearchTitle(game);
+  const params = new URLSearchParams();
+  if (typeof game.steamAppId === 'number') params.set('steamAppId', String(game.steamAppId));
+  if (title) params.set('title', title);
+  if (!params.toString()) {
+    return { status: 'no-game-match', message: 'No game title or Steam app ID is available for the SteamGridDB test lookup.' };
+  }
+
+  const apiKey = normalizeSteamGridDbApiKey(options.apiKey) || normalizeSteamGridDbApiKey(loadSteamGridDbSettings().apiKey);
+  const init: RequestInit | undefined = apiKey
+    ? { headers: { 'X-QuestShelf-SteamGridDb-Key': apiKey } }
+    : undefined;
+
+  try {
+    const response = await fetch(`/api/steamgriddb/artwork?${params.toString()}&test=1`, init);
+    const body = await readSteamGridDbTestBody(response);
+    if (response.ok) {
+      const artwork = sanitizeArtworkResponse(body as SteamGridDbArtwork);
+      if (artwork) return { status: 'success', message: 'SteamGridDB returned artwork successfully.' };
+      return { status: 'no-artwork', message: 'SteamGridDB responded successfully but did not return usable artwork for the test game.' };
+    }
+    const status = getSteamGridDbTestStatus(response.status, body);
+    return { status, message: getSteamGridDbTestMessage(status, body) };
+  } catch {
+    return { status: 'network-error', message: 'SteamGridDB test could not reach the local dev endpoint or network.' };
+  }
+}
+
+export function normalizeSteamGridDbApiKey(value: string | undefined | null) {
+  const trimmed = (value ?? '').trim();
+  return trimmed.replace(/^Bearer\s+/i, '').trim();
 }
 
 export function mergeSteamGridDbArtworkIntoGame(game: Game, artwork: SteamGridDbArtwork | null): Game {
@@ -136,4 +187,43 @@ function readCachedArtwork(cacheKey: string) {
 
 function writeCachedArtwork(cacheKey: string, artwork: SteamGridDbArtwork) {
   try { localStorage.setItem(cacheKey, JSON.stringify({ cachedAt: new Date().toISOString(), artwork })); } catch { /* ignore */ }
+}
+
+
+async function readSteamGridDbTestBody(response: Response): Promise<Record<string, unknown>> {
+  try {
+    const body = (await response.json()) as unknown;
+    return body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function getSteamGridDbTestStatus(statusCode: number, body: Record<string, unknown>): SteamGridDbTestStatus {
+  const status = typeof body.status === 'string' ? body.status : typeof body.reason === 'string' ? body.reason : '';
+  if (isSteamGridDbTestStatus(status)) return status;
+  if (statusCode === 401 || statusCode === 403) return 'invalid-key';
+  if (statusCode === 404) return 'no-game-match';
+  if (statusCode === 429) return 'rate-limited';
+  if (statusCode === 501 || statusCode === 503) return 'endpoint-unavailable';
+  return 'provider-error';
+}
+
+function isSteamGridDbTestStatus(value: string): value is SteamGridDbTestStatus {
+  return ['success', 'missing-key', 'invalid-key', 'rate-limited', 'no-game-match', 'no-artwork', 'endpoint-unavailable', 'provider-error', 'network-error'].includes(value);
+}
+
+function getSteamGridDbTestMessage(status: SteamGridDbTestStatus, body: Record<string, unknown>) {
+  const providerMessage = typeof body.message === 'string' ? body.message : '';
+  if (providerMessage) return providerMessage;
+  switch (status) {
+    case 'missing-key': return 'SteamGridDB API key is missing. Add a key or configure a dev/server environment key.';
+    case 'invalid-key': return 'SteamGridDB rejected the API key. Check the key and try again.';
+    case 'rate-limited': return 'SteamGridDB rate-limited the request. Wait and try again later.';
+    case 'no-game-match': return 'SteamGridDB could not find the test game.';
+    case 'no-artwork': return 'SteamGridDB found the test game but did not return artwork.';
+    case 'endpoint-unavailable': return 'The local SteamGridDB dev endpoint is unavailable.';
+    case 'network-error': return 'SteamGridDB test failed because of a network or dev endpoint error.';
+    default: return 'SteamGridDB provider returned an unexpected error.';
+  }
 }
