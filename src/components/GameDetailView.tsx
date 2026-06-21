@@ -225,10 +225,10 @@ export function GameDetailView({
           <div className="space-y-3 sm:space-y-4">
             <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
               {activeHeroBgSource ? (
-                <div className="absolute inset-0 opacity-20 blur-sm" aria-hidden="true">
+                <div className="absolute inset-0" aria-hidden="true">
                   <img
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover opacity-50"
                     decoding="async"
                     loading="lazy"
                     onError={() => setHeroBgSourceIndex((i) => i + 1)}
@@ -236,7 +236,10 @@ export function GameDetailView({
                   />
                 </div>
               ) : null}
-              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/95 to-ink-900/75" aria-hidden="true" />
+              {/* Left-to-right veil: fully dark left (cover + text), fades to ~55% right to let hero show */}
+              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/90 to-ink-950/55" aria-hidden="true" />
+              {/* Bottom vignette: keeps stat cards readable */}
+              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/75 to-transparent" aria-hidden="true" />
 
               <div className="relative grid gap-4 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center xl:grid-cols-[150px_minmax(0,1fr)] xl:p-5">
                 <div className="mx-auto w-32 overflow-hidden rounded-xl border border-white/10 bg-ink-800 shadow-panel sm:mx-0 sm:w-full">
@@ -290,16 +293,7 @@ export function GameDetailView({
                         src={logoUrl}
                       />
                     ) : null}
-                    <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
-                      <h2 className="min-w-0 flex-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
-                      {canEditGame ? (
-                        <button className="min-h-10 rounded-xl border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-bold text-mint transition hover:bg-mint/20" onClick={() => setIsEditing(true)} type="button">
-                          <span className="flex items-center gap-2"><Icon name="pencil" /> Edit</span>
-                        </button>
-                      ) : isSteamLibraryGame ? (
-                        <button className="min-h-10 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-slate-500" disabled title="Steam imported games are managed from Steam data." type="button">Edit</button>
-                      ) : null}
-                    </div>
+                    <h2 className="mt-1 min-w-0 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:max-w-4xl">
@@ -337,6 +331,7 @@ export function GameDetailView({
               {isOverflowOpen ? (
                 <GameDetailOverflowMenu
                   anchorRef={overflowButtonRef}
+                  canEditGame={canEditGame}
                   canFindArtwork={canFindArtwork}
                   currentItadPrice={currentItadPrice}
                   game={game}
@@ -347,6 +342,7 @@ export function GameDetailView({
                   menuId={overflowMenuId}
                   onChangeArtwork={() => setIsArtworkPickerOpen(true)}
                   onClose={() => setIsOverflowOpen(false)}
+                  onEdit={() => setIsEditing(true)}
                   onFindArtwork={onFindArtwork}
                   onIgnore={onIgnore}
                   onStatusChange={onStatusChange}
@@ -698,6 +694,7 @@ function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
 
 type GameDetailOverflowMenuProps = {
   anchorRef: RefObject<HTMLButtonElement | null>;
+  canEditGame: boolean;
   canFindArtwork: boolean;
   currentItadPrice?: string;
   game: Game;
@@ -708,6 +705,7 @@ type GameDetailOverflowMenuProps = {
   menuId: string;
   onChangeArtwork: () => void;
   onClose: () => void;
+  onEdit: () => void;
   onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>;
   onIgnore?: (game: Game) => void;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
@@ -717,6 +715,7 @@ type GameDetailOverflowMenuProps = {
 
 function GameDetailOverflowMenu({
   anchorRef,
+  canEditGame,
   canFindArtwork,
   currentItadPrice,
   game,
@@ -727,6 +726,7 @@ function GameDetailOverflowMenu({
   menuId,
   onChangeArtwork,
   onClose,
+  onEdit,
   onFindArtwork,
   onIgnore,
   onStatusChange,
@@ -779,6 +779,14 @@ function GameDetailOverflowMenu({
   );
 
   const toolItems: OverflowItem[] = [];
+
+  if (canEditGame) {
+    toolItems.push({
+      icon: 'pencil',
+      label: 'Edit',
+      onClick: () => closeAndRun(onEdit),
+    });
+  }
 
   if (isSteamLibraryGame) {
     toolItems.push({
