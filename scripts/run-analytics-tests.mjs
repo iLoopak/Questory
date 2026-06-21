@@ -6,10 +6,8 @@ import { pathToFileURL } from 'node:url';
 const outdir = resolve('.tmp/analytics-tests');
 await rm(outdir, { recursive: true, force: true });
 await mkdir(outdir, { recursive: true });
-const outfile = resolve(outdir, 'analytics.test.mjs');
-await build({
-  entryPoints: ['scripts/analytics.test.ts'],
-  outfile,
+
+const sharedConfig = {
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -20,5 +18,19 @@ await build({
   },
   external: ['node:assert/strict', 'node:test'],
   logLevel: 'silent',
-});
-await import(pathToFileURL(outfile).href);
+};
+
+const testFiles = [
+  { entry: 'scripts/analytics.test.ts', out: 'analytics.test.mjs' },
+  { entry: 'scripts/retroTitleResolver.test.ts', out: 'retroTitleResolver.test.mjs' },
+];
+
+await Promise.all(
+  testFiles.map(({ entry, out }) =>
+    build({ ...sharedConfig, entryPoints: [entry], outfile: resolve(outdir, out) }),
+  ),
+);
+
+for (const { out } of testFiles) {
+  await import(pathToFileURL(resolve(outdir, out)).href);
+}
