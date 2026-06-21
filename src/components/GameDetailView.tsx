@@ -13,6 +13,7 @@ import { formatDealPrice } from './DealCoverBadges';
 import { buildHltbSearchUrl, formatHltbBadge, getHltbGameSearchTitle, hasHltbData } from '../lib/hltb';
 import type { RawgSearchResult } from '../types/rawg';
 import { RawgLinkDialog } from './RawgLinkDialog';
+import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
 import { Icon, type IconName } from './Icon';
 
 type GameDetailViewProps = {
@@ -67,6 +68,7 @@ export function GameDetailView({
   const [editError, setEditError] = useState('');
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isRawgLinkOpen, setIsRawgLinkOpen] = useState(false);
+  const [isArtworkPickerOpen, setIsArtworkPickerOpen] = useState(false);
   const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
@@ -112,6 +114,15 @@ export function GameDetailView({
       notes: changes.notes ?? game.notes,
       status: changes.status ?? game.status,
       tags: changes.tags ?? game.tags,
+    });
+  }
+
+  function saveArtworkFromPicker(changes: Partial<Game>) {
+    onGameEdit?.(game.id, {
+      notes: game.notes,
+      status: game.status,
+      tags: game.tags,
+      ...changes,
     });
   }
 
@@ -306,6 +317,7 @@ export function GameDetailView({
                   isSteamDataSyncing={isSteamDataSyncing}
                   isSteamLibraryGame={isSteamLibraryGame}
                   menuId={overflowMenuId}
+                  onChangeArtwork={() => setIsArtworkPickerOpen(true)}
                   onClose={() => setIsOverflowOpen(false)}
                   onFindArtwork={onFindArtwork}
                   onIgnore={onIgnore}
@@ -318,6 +330,10 @@ export function GameDetailView({
 
             {isRawgLinkOpen ? (
               <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
+            ) : null}
+
+            {isArtworkPickerOpen ? (
+              <SteamGridDbArtworkPickerModal game={game} onClose={() => setIsArtworkPickerOpen(false)} onSave={saveArtworkFromPicker} />
             ) : null}
 
             {isEditing ? (
@@ -662,6 +678,7 @@ type GameDetailOverflowMenuProps = {
   isSteamDataSyncing: boolean;
   isSteamLibraryGame: boolean;
   menuId: string;
+  onChangeArtwork: () => void;
   onClose: () => void;
   onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>;
   onIgnore?: (game: Game) => void;
@@ -680,6 +697,7 @@ function GameDetailOverflowMenu({
   isSteamDataSyncing,
   isSteamLibraryGame,
   menuId,
+  onChangeArtwork,
   onClose,
   onFindArtwork,
   onIgnore,
@@ -755,6 +773,12 @@ function GameDetailOverflowMenu({
       onClick: () => closeAndRun(() => { void onFindArtwork?.(game); }),
     });
   }
+
+  toolItems.push({
+    icon: 'image-frame',
+    label: t('artwork.changeArtwork'),
+    onClick: () => closeAndRun(onChangeArtwork),
+  });
 
   if (game.itadCurrentBestUrl) {
     toolItems.push({

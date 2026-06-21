@@ -279,6 +279,7 @@ type SteamGridDbProviderStatus = {
 };
 
 const steamGridDbCache = new Map<string, { cachedAt: number; body: unknown }>();
+const steamGridDbCandidatesCache = new Map<string, { cachedAt: number; body: unknown }>();
 const STEAMGRIDDB_CACHE_MS = 24 * 60 * 60 * 1000;
 
 function steamGridDbDevEndpointPlugin(): Plugin {
@@ -327,11 +328,21 @@ async function handleSteamGridDbArtworkRequest(
     return;
   }
 
+  const mode = requestUrl.searchParams.get('mode');
   const cacheKey = `${steamAppId ?? ''}:${title ?? ''}`.toLowerCase();
-  const cached = steamGridDbCache.get(cacheKey);
-  if (cached && Date.now() - cached.cachedAt < STEAMGRIDDB_CACHE_MS) {
-    sendHltbJson(response, 200, cached.body);
-    return;
+  if (mode === 'candidates') {
+    const candidatesCacheKey = `candidates:${cacheKey}`;
+    const cachedCandidates = steamGridDbCandidatesCache.get(candidatesCacheKey);
+    if (cachedCandidates && Date.now() - cachedCandidates.cachedAt < STEAMGRIDDB_CACHE_MS) {
+      sendHltbJson(response, 200, cachedCandidates.body);
+      return;
+    }
+  } else {
+    const cached = steamGridDbCache.get(cacheKey);
+    if (cached && Date.now() - cached.cachedAt < STEAMGRIDDB_CACHE_MS) {
+      sendHltbJson(response, 200, cached.body);
+      return;
+    }
   }
 
   const gameId = steamAppId ? await getSteamGridDbGameIdBySteamAppId(apiKey, steamAppId, lookup) : title ? await getSteamGridDbGameIdByTitle(apiKey, title, lookup) : null;
@@ -347,6 +358,26 @@ async function handleSteamGridDbArtworkRequest(
     requestSteamGridDbImagesSafely(apiKey, `/logos/game/${gameId}`, lookup),
     requestSteamGridDbImagesSafely(apiKey, `/icons/game/${gameId}`, lookup),
   ]);
+
+  if (mode === 'candidates') {
+    const candidatesBody = {
+      gameId,
+      cover: formatSteamGridDbCandidates(portraitGrids.images),
+      wideCover: formatSteamGridDbCandidates(landscapeGrids.images),
+      hero: formatSteamGridDbCandidates(heroes.images),
+      logo: formatSteamGridDbCandidates(logos.images),
+      icon: formatSteamGridDbCandidates(icons.images),
+    };
+    const hasAnyCandidates = Object.values(candidatesBody).some((v) => Array.isArray(v) && v.length > 0);
+    if (!hasAnyCandidates) {
+      sendHltbJson(response, 404, { status: 'no-artwork', message: 'SteamGridDB found the game but did not return usable artwork.' });
+      return;
+    }
+    const candidatesCacheKey = `candidates:${cacheKey}`;
+    steamGridDbCandidatesCache.set(candidatesCacheKey, { cachedAt: Date.now(), body: candidatesBody });
+    sendHltbJson(response, 200, candidatesBody);
+    return;
+  }
 
   const body = {
     coverImage: pickSteamGridDbImage(portraitGrids.images, 'portrait'),
@@ -451,6 +482,14 @@ function logSteamGridDbDevEndpoint(label: string, details?: unknown) {
     return;
   }
   logger?.debug?.(`[steamgriddb] ${label}`, details ?? '');
+}
+
+function formatSteamGridDbCandidates(images: SteamGridDbImage[], limit = 24): Array<{ url: string; width?: number; height?: number }> {
+  return images
+    .filter((image) => image.url && /^https?:\/\//i.test(image.url) && !image.nsfw && !image.humor && (image.type === 'static' || image.mime !== 'image/gif'))
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, limit)
+    .map(({ url, width, height }) => ({ url: url!, width, height }));
 }
 
 function pickSteamGridDbImage(images: SteamGridDbImage[], usage: 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon') {
