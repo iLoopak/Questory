@@ -128,7 +128,7 @@ export async function fetchSteamGridDbArtworkCandidates(game: Game): Promise<Ste
 function sanitizeCandidates(list: unknown): SteamGridDbArtworkCandidate[] {
   if (!Array.isArray(list)) return [];
   return list
-    .filter((item): item is { url: string } => Boolean(item?.url && typeof item.url === 'string' && /^https?:\/\//i.test(item.url)))
+    .filter((item): item is { url: string; width?: number; height?: number } => Boolean(item?.url && typeof item.url === 'string' && /^https?:\/\//i.test(item.url)))
     .map((item) => ({ url: item.url, width: typeof item.width === 'number' ? item.width : undefined, height: typeof item.height === 'number' ? item.height : undefined }));
 }
 
