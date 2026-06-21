@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
-import { getPreferredArtworkSources } from '../lib/steamGridDbArtwork';
+import { canUseRawgImageAsCover, getGameCoverSources, getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
@@ -95,7 +94,8 @@ export function GameDetailView({
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
-const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
+  const logoUrl = getPreferredLogoUrl(game);
+  const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
   const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
     ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
@@ -202,9 +202,9 @@ const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
         <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
             <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
-              {game.backgroundImage ? (
+              {(game.heroImage || game.wideCoverImage || game.backgroundImage) ? (
                 <div className="absolute inset-0 opacity-20 blur-sm" aria-hidden="true">
-                  <img className="h-full w-full object-cover" src={game.backgroundImage} alt="" />
+                  <img className="h-full w-full object-cover" src={game.heroImage ?? game.wideCoverImage ?? game.backgroundImage ?? ''} alt="" />
                 </div>
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/95 to-ink-900/75" aria-hidden="true" />
@@ -250,6 +250,9 @@ const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
                   </button>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
+                    {logoUrl ? (
+                      <img alt="" aria-hidden="true" className="mt-2 max-h-12 max-w-[180px] object-contain drop-shadow" src={logoUrl} />
+                    ) : null}
                     <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
                       <h2 className="min-w-0 flex-1 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
                       {canEditGame ? (

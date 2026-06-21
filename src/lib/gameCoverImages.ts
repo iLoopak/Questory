@@ -13,12 +13,48 @@ export const artworkSourcePriority = [
 
 export type ArtworkSource = (typeof artworkSourcePriority)[number];
 
+export type ArtworkUsage = 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon';
+
 const generatedPlaceholderMarkers = ['placeholder', 'placehold.co', 'data:image/svg+xml'];
 const generatedFallbackMarker = 'data:image/svg+xml';
 const generatedFallbackCoverCache = new Map<string, string>();
 
 export function getGameCoverSources(game: Game, options: { includeGeneratedFallback?: boolean } = {}) {
   return getArtworkCandidates(game, options).map((candidate) => candidate.url);
+}
+
+export function getPreferredArtworkSources(game: Game, usage: ArtworkUsage): string[] {
+  if (usage === 'logo') {
+    return game.logoImage?.trim() ? [game.logoImage.trim()] : [];
+  }
+
+  const standard = getGameCoverSources(game);
+
+  if (usage === 'portrait' || getStoredArtworkSource(game) === 'user') {
+    return standard;
+  }
+
+  const usagePriority: string[] = [];
+
+  if (usage === 'landscape') {
+    if (game.wideCoverImage?.trim()) usagePriority.push(game.wideCoverImage.trim());
+    if (game.heroImage?.trim()) usagePriority.push(game.heroImage.trim());
+  } else if (usage === 'hero') {
+    if (game.heroImage?.trim()) usagePriority.push(game.heroImage.trim());
+    if (game.wideCoverImage?.trim()) usagePriority.push(game.wideCoverImage.trim());
+    if (game.backgroundImage?.trim()) usagePriority.push(game.backgroundImage.trim());
+  } else if (usage === 'icon') {
+    if (game.iconImage?.trim()) usagePriority.push(game.iconImage.trim());
+  }
+
+  if (usagePriority.length === 0) return standard;
+
+  const usageSet = new Set(usagePriority);
+  return [...usagePriority, ...standard.filter((url) => !usageSet.has(url))];
+}
+
+export function getPreferredLogoUrl(game: Game): string | null {
+  return game.logoImage?.trim() || null;
 }
 
 export function getArtworkCandidates(game: Game, options: { includeGeneratedFallback?: boolean } = {}): Array<{ source: ArtworkSource; url: string }> {
@@ -32,14 +68,6 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
 
   if (currentCover && currentSource === 'steamgriddb') {
     candidates.push({ source: 'steamgriddb', url: currentCover });
-  }
-
-  if (game.wideCoverImage) {
-    candidates.push({ source: 'steamgriddb', url: game.wideCoverImage });
-  }
-
-  if (game.heroImage) {
-    candidates.push({ source: 'steamgriddb', url: game.heroImage });
   }
 
   if (typeof game.steamAppId === 'number') {
@@ -61,6 +89,17 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
 
   if (currentCover && currentSource === 'imported') {
     candidates.push({ source: 'imported', url: currentCover });
+  }
+
+  // Additional SteamGridDB artwork variants — used as portrait fallbacks
+  if (game.wideCoverImage?.trim()) {
+    candidates.push({ source: 'steamgriddb', url: game.wideCoverImage });
+  }
+  if (game.heroImage?.trim()) {
+    candidates.push({ source: 'steamgriddb', url: game.heroImage });
+  }
+  if (game.iconImage?.trim()) {
+    candidates.push({ source: 'steamgriddb', url: game.iconImage });
   }
 
   if (options.includeGeneratedFallback !== false) {
@@ -141,6 +180,10 @@ export function getStoredArtworkSource(game: Game): ArtworkSource | undefined {
 
   if (coverImage.includes('steamstatic.com') || coverImage.includes('/steam/apps/')) {
     return 'steam';
+  }
+
+  if (coverImage.includes('steamgriddb.com')) {
+    return 'steamgriddb';
   }
 
   if (game.backgroundImage && coverImage === game.backgroundImage) {

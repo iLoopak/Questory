@@ -536,6 +536,8 @@ function useStableCollectionCoverSources(game: Game) {
       game.artworkSource,
       game.backgroundImage,
       game.coverImage,
+      game.wideCoverImage,
+      game.heroImage,
       game.externalSource,
       game.steamAppId,
     ],

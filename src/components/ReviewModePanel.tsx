@@ -663,7 +663,7 @@ function FocusedReviewCard({
     setIsCoverLoaded(false);
     setSwipeState(emptySwipeState);
     swipeStartRef.current = null;
-  }, [game.id, game.coverImage, game.backgroundImage, game.steamAppId, game.title, game.platform]);
+  }, [game.id, game.coverImage, game.wideCoverImage, game.heroImage, game.backgroundImage, game.steamAppId, game.title, game.platform]);
 
   const swipeTarget = getSwipeTarget(swipeState.offsetX, swipeState.offsetY);
   const swipeDirection = swipeTarget?.horizontal ?? getSwipeHorizontalDirection(swipeState.offsetX);
