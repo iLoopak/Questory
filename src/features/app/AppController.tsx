@@ -119,6 +119,8 @@ export function AppController() {
     accentThemeStyle,
     appTemplatePreference,
     controllerLayoutPreference,
+    controllerProfileId,
+    detectedProfileId,
     isControllerDebugEnabled,
     isLandscapeLockEnabled,
     language,
@@ -132,6 +134,7 @@ export function AppController() {
     setGradientOrientationPreference,
     setAppTemplatePreference,
     setControllerLayoutPreference,
+    setControllerProfileId,
     setIsControllerDebugEnabled,
     setIsLandscapeLockEnabled,
     setLanguage,
@@ -1335,6 +1338,8 @@ export function AppController() {
               steamAvatarUrl={steamAvatarUrl}
               steamPersonaName={steamProfileName}
               controllerLayoutPreference={controllerLayoutPreference}
+              controllerProfileId={controllerProfileId}
+              detectedProfileId={detectedProfileId}
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               isOnboardingOpen={isOnboardingOpen}
@@ -1369,6 +1374,7 @@ export function AppController() {
               onImportRetroGames={handleRetroImportGames}
               onControllerDebugChange={setIsControllerDebugEnabled}
               onControllerLayoutChange={setControllerLayoutPreference}
+              onControllerProfileChange={setControllerProfileId}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
               onNavigationVisibilityChange={setNavigationVisibility}
               onOnboardingAction={handleOnboardingAction}
