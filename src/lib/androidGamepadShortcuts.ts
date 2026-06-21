@@ -1,10 +1,8 @@
 import { loadControllerLayoutPreference, resolveControllerLayout, type ControllerLayoutPreference } from './controllerLayoutPreferences';
+import { detectProfileFromGamepadId, resolveProfile, controllerProfileDetectedEvent, type ControllerProfile } from './controllerProfiles';
+import { loadControllerSettings, controllerSettingsChangedEvent, type ControllerSettings } from './controllerSettingsStorage';
 
 const gamepadPollIntervalMs = 80;
-const axisRepeatInitialMs = 240;
-const axisRepeatMs = 150;
-const axisThreshold = 0.55;
-const triggerAxisThreshold = 0.65;
 const debugStorageKey = 'questshelf.controllerDebug.v1';
 export const controllerConnectionChangeEvent = 'questshelf:controller-connection-change';
 const focusableSelector = [
@@ -77,6 +75,9 @@ export function configureAndroidGamepadShortcuts() {
   let debugOverlay: HTMLDivElement | null = null;
   let isDebugEnabled = loadControllerDebugEnabled();
   let controllerLayoutPreference = loadControllerLayoutPreference();
+  let controllerSettings = loadControllerSettings();
+  let detectedProfileId = detectProfileFromGamepadId(getPrimaryGamepad()?.id ?? '');
+  let activeProfile: ControllerProfile = resolveProfile(controllerSettings.profileId, detectedProfileId);
 
   const removeFocusGuard = installFocusGuard();
   updateControllerActive(hasConnectedGamepad());
@@ -84,6 +85,7 @@ export function configureAndroidGamepadShortcuts() {
   window.addEventListener('gamepaddisconnected', handleGamepadConnectionChange);
   window.addEventListener('questshelf:controller-debug-change', handleDebugChange);
   window.addEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
+  window.addEventListener(controllerSettingsChangedEvent, handleControllerSettingsChange as EventListener);
   window.addEventListener('keydown', handleKeyboardFallback, true);
 
   const intervalId = window.setInterval(() => {
@@ -99,11 +101,11 @@ export function configureAndroidGamepadShortcuts() {
     updateControllerActive(true);
     ensureFocus();
 
-    const nextState = getButtonState(gamepad);
+    const nextState = getButtonState(gamepad, activeProfile);
     const pressedButtons = buttonIndexMap
       .filter(([, index]) => Boolean(gamepad.buttons[index]?.pressed))
       .map(([name]) => name);
-    const axisDirection = getAxisDirection(gamepad);
+    const axisDirection = getAxisDirection(gamepad, activeProfile.defaultDeadzone);
 
     handlePressedButton('D-pad Up', nextState, lastState, () => moveFocus('up'));
     handlePressedButton('D-pad Down', nextState, lastState, () => moveFocus('down'));
@@ -157,7 +159,7 @@ export function configureAndroidGamepadShortcuts() {
       return;
     }
 
-    const delay = axisRepeatState.lastFiredAt === axisRepeatState.startedAt ? axisRepeatInitialMs : axisRepeatMs;
+    const delay = axisRepeatState.lastFiredAt === axisRepeatState.startedAt ? activeProfile.stickRepeatInitialMs : activeProfile.stickRepeatMs;
     if (now - axisRepeatState.lastFiredAt >= delay) {
       axisRepeatState = { ...axisRepeatState, lastFiredAt: now };
       moveFocus(direction);
@@ -166,6 +168,22 @@ export function configureAndroidGamepadShortcuts() {
 
   function handleGamepadConnectionChange() {
     updateControllerActive(hasConnectedGamepad());
+    const gamepad = getPrimaryGamepad();
+    if (gamepad) {
+      detectedProfileId = detectProfileFromGamepadId(gamepad.id);
+      activeProfile = resolveProfile(controllerSettings.profileId, detectedProfileId);
+      window.dispatchEvent(
+        new CustomEvent<string | null>(controllerProfileDetectedEvent, { detail: detectedProfileId }),
+      );
+    } else {
+      detectedProfileId = null;
+      activeProfile = resolveProfile(controllerSettings.profileId, null);
+    }
+  }
+
+  function handleControllerSettingsChange(event: CustomEvent<ControllerSettings>) {
+    controllerSettings = event.detail;
+    activeProfile = resolveProfile(controllerSettings.profileId, detectedProfileId);
   }
 
   function handleDebugChange(event: Event) {
@@ -208,6 +226,7 @@ export function configureAndroidGamepadShortcuts() {
     window.removeEventListener('gamepaddisconnected', handleGamepadConnectionChange);
     window.removeEventListener('questshelf:controller-debug-change', handleDebugChange);
     window.removeEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
+    window.removeEventListener(controllerSettingsChangedEvent, handleControllerSettingsChange as EventListener);
     window.removeEventListener('keydown', handleKeyboardFallback, true);
     removeFocusGuard();
     debugOverlay?.remove();
@@ -243,13 +262,20 @@ function getPrimaryGamepad() {
   return Array.from(navigator.getGamepads()).find((gamepad) => gamepad?.connected) ?? null;
 }
 
-function getButtonState(gamepad: Gamepad) {
+function getButtonState(gamepad: Gamepad, profile: ControllerProfile) {
   const state = Object.fromEntries(buttonIndexMap.map(([name, index]) => [name, Boolean(gamepad.buttons[index]?.pressed)])) as ButtonState;
 
-  if (gamepad.mapping !== 'standard') {
-    // Some Android/Retroid pads expose analog triggers as axes instead of standard buttons 6/7.
-    state.L2 ||= (gamepad.axes[2] ?? 0) > triggerAxisThreshold;
-    state.R2 ||= (gamepad.axes[5] ?? 0) > triggerAxisThreshold;
+  // Some controllers (Retroid, generic Android) expose triggers as axis values rather than standard button indices.
+  const triggerThreshold = Math.min(profile.defaultDeadzone + 0.1, 0.9);
+  if (profile.triggerLeftAxis !== null) {
+    state.L2 ||= (gamepad.axes[profile.triggerLeftAxis] ?? 0) > triggerThreshold;
+  } else if (gamepad.mapping !== 'standard') {
+    state.L2 ||= (gamepad.axes[2] ?? 0) > triggerThreshold;
+  }
+  if (profile.triggerRightAxis !== null) {
+    state.R2 ||= (gamepad.axes[profile.triggerRightAxis] ?? 0) > triggerThreshold;
+  } else if (gamepad.mapping !== 'standard') {
+    state.R2 ||= (gamepad.axes[5] ?? 0) > triggerThreshold;
   }
 
   return state;
@@ -261,11 +287,11 @@ function handlePressedButton(name: GamepadButtonName, nextState: ButtonState, la
   }
 }
 
-function getAxisDirection(gamepad: Gamepad): Direction | null {
+function getAxisDirection(gamepad: Gamepad, deadzone: number): Direction | null {
   const horizontalAxis = gamepad.axes[0] ?? 0;
   const verticalAxis = gamepad.axes[1] ?? 0;
 
-  if (Math.abs(horizontalAxis) < axisThreshold && Math.abs(verticalAxis) < axisThreshold) {
+  if (Math.abs(horizontalAxis) < deadzone && Math.abs(verticalAxis) < deadzone) {
     return null;
   }
 

@@ -18,6 +18,7 @@ import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } fr
 import { createTranslator, translateSettingsCategory, useI18n, type AppLanguage } from '../../i18n';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import type { ControllerLayoutPreference } from '../../lib/controllerLayoutPreferences';
+import { type ControllerProfileId } from '../../lib/controllerProfiles';
 import { getQuestShelfAchievements } from '../../lib/questShelfAchievements';
 import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibilityPreferences';
 import { onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
@@ -45,6 +46,8 @@ export type SettingsViewProps = {
   steamAvatarUrl: string;
   steamPersonaName: string;
   controllerLayoutPreference: ControllerLayoutPreference;
+  controllerProfileId: ControllerProfileId;
+  detectedProfileId: ControllerProfileId | null;
   isControllerDebugEnabled: boolean;
   isLandscapeLockEnabled: boolean;
   isOnboardingComplete: boolean;
@@ -79,6 +82,7 @@ export type SettingsViewProps = {
   onImportRetroGames: (games: Game[]) => Game[];
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
+  onControllerProfileChange: (profileId: ControllerProfileId) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
   onOnboardingAction: (itemId: OnboardingItemId, action?: 'primary' | 'secondary') => void;
@@ -125,6 +129,8 @@ export function SettingsView({
   steamAvatarUrl,
   steamPersonaName,
   controllerLayoutPreference,
+  controllerProfileId,
+  detectedProfileId,
   isControllerDebugEnabled,
   isLandscapeLockEnabled,
   isOnboardingComplete,
@@ -159,6 +165,7 @@ export function SettingsView({
   onImportRetroGames,
   onControllerDebugChange,
   onControllerLayoutChange,
+  onControllerProfileChange,
   onLandscapeLockChange,
   onNavigationVisibilityChange,
   onOnboardingAction,
@@ -381,12 +388,15 @@ export function SettingsView({
           {activeCategory === 'Controls' ? (
             <ControlsSettingsPanel
               controllerLayoutPreference={controllerLayoutPreference}
+              controllerProfileId={controllerProfileId}
+              detectedProfileId={detectedProfileId}
               isControllerDebugEnabled={isControllerDebugEnabled}
               isLandscapeLockEnabled={isLandscapeLockEnabled}
               language={language}
               runtimeEnvironment={runtimeEnvironment}
               onControllerDebugChange={onControllerDebugChange}
               onControllerLayoutChange={onControllerLayoutChange}
+              onControllerProfileChange={onControllerProfileChange}
               onLandscapeLockChange={onLandscapeLockChange}
             />
           ) : null}
