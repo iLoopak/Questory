@@ -57,6 +57,7 @@ export default defineConfig({
       },
     }),
     hltbDevEndpointPlugin(),
+    steamGridDbDevEndpointPlugin(),
   ],
   server: {
     proxy: {
@@ -266,4 +267,117 @@ function logHltbDevEndpoint(label: string, details?: unknown) {
     return;
   }
   logger?.debug?.(`[hltb] ${label}`, details ?? '');
+}
+
+
+type SteamGridDbImage = { url?: string; width?: number; height?: number; nsfw?: boolean; humor?: boolean; style?: string; score?: number; type?: string; mime?: string };
+type SteamGridDbResponse = { data?: unknown };
+
+const steamGridDbCache = new Map<string, { cachedAt: number; body: unknown }>();
+const STEAMGRIDDB_CACHE_MS = 24 * 60 * 60 * 1000;
+
+function steamGridDbDevEndpointPlugin(): Plugin {
+  return {
+    name: 'questshelf-steamgriddb-dev-endpoint',
+    configureServer(server) {
+      server.middlewares.use('/api/steamgriddb/artwork', (request, response) => {
+        void handleSteamGridDbArtworkRequest(request, response).catch((error: unknown) => {
+          sendHltbJson(response, 502, { message: error instanceof Error ? error.message : 'SteamGridDB request failed.' });
+        });
+      });
+    },
+  };
+}
+
+async function handleSteamGridDbArtworkRequest(
+  request: { method?: string; url?: string; headers?: { host?: string } },
+  response: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void },
+) {
+  if (request.method !== 'GET') {
+    sendHltbJson(response, 405, { message: 'SteamGridDB artwork endpoint only supports GET.' });
+    return;
+  }
+
+  const apiKey = (process.env.STEAMGRIDDB_API_KEY || process.env.VITE_STEAMGRIDDB_API_KEY || '').trim();
+  if (!apiKey) {
+    sendHltbJson(response, 503, { message: 'SteamGridDB API key is not configured.' });
+    return;
+  }
+
+  const requestUrl = new URL(request.url ?? '', `http://${request.headers?.host ?? 'localhost'}`);
+  const steamAppId = requestUrl.searchParams.get('steamAppId')?.trim();
+  const title = requestUrl.searchParams.get('title')?.trim();
+  const cacheKey = `${steamAppId ?? ''}:${title ?? ''}`.toLowerCase();
+  const cached = steamGridDbCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < STEAMGRIDDB_CACHE_MS) {
+    sendHltbJson(response, 200, cached.body);
+    return;
+  }
+
+  const gameId = steamAppId ? await getSteamGridDbGameIdBySteamAppId(apiKey, steamAppId) : title ? await getSteamGridDbGameIdByTitle(apiKey, title) : null;
+  if (!gameId) {
+    sendHltbJson(response, 404, { message: 'No SteamGridDB match found.' });
+    return;
+  }
+
+  const [portraitGrids, landscapeGrids, heroes, logos, icons] = await Promise.all([
+    requestSteamGridDbImages(apiKey, `/grids/game/${gameId}`, { dimensions: '600x900,342x482' }),
+    requestSteamGridDbImages(apiKey, `/grids/game/${gameId}`, { dimensions: '920x430,460x215,1920x620' }),
+    requestSteamGridDbImages(apiKey, `/heroes/game/${gameId}`, { dimensions: '1920x620' }),
+    requestSteamGridDbImages(apiKey, `/logos/game/${gameId}`),
+    requestSteamGridDbImages(apiKey, `/icons/game/${gameId}`),
+  ]);
+
+  const body = {
+    coverImage: pickSteamGridDbImage(portraitGrids, 'portrait'),
+    wideCoverImage: pickSteamGridDbImage(landscapeGrids, 'landscape'),
+    heroImage: pickSteamGridDbImage(heroes, 'hero'),
+    logoImage: pickSteamGridDbImage(logos, 'logo'),
+    iconImage: pickSteamGridDbImage(icons, 'icon'),
+    artworkSource: 'steamgriddb',
+    artworkSourceMetadata: { steamGridDb: { gameId, lookup: steamAppId ? 'steam-app-id' : 'title', refreshedAt: new Date().toISOString() } },
+  };
+  steamGridDbCache.set(cacheKey, { cachedAt: Date.now(), body });
+  sendHltbJson(response, 200, body);
+}
+
+async function getSteamGridDbGameIdBySteamAppId(apiKey: string, steamAppId: string) {
+  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, `/games/steam/${encodeURIComponent(steamAppId)}`);
+  const data = response.data as { id?: number } | undefined;
+  return typeof data?.id === 'number' ? data.id : null;
+}
+
+async function getSteamGridDbGameIdByTitle(apiKey: string, title: string) {
+  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, '/search/autocomplete/' + encodeURIComponent(title));
+  const first = Array.isArray(response.data) ? (response.data[0] as { id?: number } | undefined) : undefined;
+  return typeof first?.id === 'number' ? first.id : null;
+}
+
+async function requestSteamGridDbImages(apiKey: string, path: string, params: Record<string, string> = {}) {
+  const response = await requestSteamGridDb<SteamGridDbResponse>(apiKey, path, { types: 'static', ...params });
+  return Array.isArray(response.data) ? (response.data as SteamGridDbImage[]) : [];
+}
+
+async function requestSteamGridDb<T>(apiKey: string, path: string, params: Record<string, string> = {}): Promise<T> {
+  const url = new URL(`https://www.steamgriddb.com/api/v2${path}`);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } });
+  if (response.status === 404) return { data: [] } as T;
+  if (response.status === 429) throw new Error('SteamGridDB rate limit reached.');
+  if (!response.ok) throw new Error(`SteamGridDB returned ${response.status}.`);
+  return (await response.json()) as T;
+}
+
+function pickSteamGridDbImage(images: SteamGridDbImage[], usage: 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon') {
+  const filtered = images.filter((image) => image.url && !image.nsfw && !image.humor && (image.type === 'static' || image.mime !== 'image/gif'));
+  const scored = filtered.sort((a, b) => getSteamGridDbImageScore(b, usage) - getSteamGridDbImageScore(a, usage));
+  return scored[0]?.url;
+}
+
+function getSteamGridDbImageScore(image: SteamGridDbImage, usage: 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon') {
+  const width = image.width || 0;
+  const height = image.height || 1;
+  const ratio = width / height;
+  const target = usage === 'portrait' ? 2 / 3 : usage === 'hero' ? 1920 / 620 : usage === 'icon' || usage === 'logo' ? 1 : 920 / 430;
+  return (image.score ?? 0) + Math.min(width, 1920) / 1000 - Math.abs(ratio - target) * 3;
 }

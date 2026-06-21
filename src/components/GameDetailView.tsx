@@ -4,6 +4,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from '
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover, getGameCoverSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
+import { getPreferredArtworkSources } from '../lib/steamGridDbArtwork';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
@@ -72,7 +73,7 @@ export function GameDetailView({
   const overflowMenuId = useId();
 
   const coverSources = useMemo(() => {
-    return getGameCoverSources(game);
+    return [...getPreferredArtworkSources(game, 'hero'), ...getGameCoverSources(game)];
   }, [game]);
 
   useLayoutEffect(() => {

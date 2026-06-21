@@ -37,7 +37,7 @@ export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
 export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
-export type ArtworkSource = 'user' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
+export type ArtworkSource = 'user' | 'steam' | 'steamgriddb' | 'rawg' | 'imported' | 'generated-fallback';
 
 export type RomFileReference = {
   extension?: string;
@@ -56,7 +56,18 @@ export type Game = {
   platform: GamePlatform;
   status: GameStatus;
   coverImage: string;
+  wideCoverImage?: string;
+  heroImage?: string;
+  logoImage?: string;
+  iconImage?: string;
   artworkSource?: ArtworkSource;
+  artworkSourceMetadata?: {
+    steamGridDb?: {
+      gameId?: number;
+      lookup?: 'steam-app-id' | 'title';
+      refreshedAt?: string;
+    };
+  };
   artworkUpdatedAt?: string;
   playtimeHours: number;
   playtimeCacheHours?: number;
