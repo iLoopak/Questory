@@ -17,7 +17,6 @@ import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from '../../compo
 import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } from '../../config/settings';
 import { createTranslator, translateSettingsCategory, useI18n, type AppLanguage } from '../../i18n';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
-import type { ControllerLayoutPreference } from '../../lib/controllerLayoutPreferences';
 import { type ControllerProfileId } from '../../lib/controllerProfiles';
 import { getQuestShelfAchievements } from '../../lib/questShelfAchievements';
 import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibilityPreferences';
@@ -45,7 +44,6 @@ export type SettingsViewProps = {
   activeAchievementTitle: string;
   steamAvatarUrl: string;
   steamPersonaName: string;
-  controllerLayoutPreference: ControllerLayoutPreference;
   controllerProfileId: ControllerProfileId;
   detectedProfileId: ControllerProfileId | null;
   isControllerDebugEnabled: boolean;
@@ -81,7 +79,6 @@ export type SettingsViewProps = {
   onImportGames: (games: Game[]) => void;
   onImportRetroGames: (games: Game[]) => Game[];
   onControllerDebugChange: (isEnabled: boolean) => void;
-  onControllerLayoutChange: (preference: ControllerLayoutPreference) => void;
   onControllerProfileChange: (profileId: ControllerProfileId) => void;
   onLandscapeLockChange: (isEnabled: boolean) => void;
   onNavigationVisibilityChange: (preferences: NavigationVisibilityPreferences) => void;
@@ -128,7 +125,6 @@ export function SettingsView({
   activeAchievementTitle,
   steamAvatarUrl,
   steamPersonaName,
-  controllerLayoutPreference,
   controllerProfileId,
   detectedProfileId,
   isControllerDebugEnabled,
@@ -164,7 +160,6 @@ export function SettingsView({
   onImportGames,
   onImportRetroGames,
   onControllerDebugChange,
-  onControllerLayoutChange,
   onControllerProfileChange,
   onLandscapeLockChange,
   onNavigationVisibilityChange,
@@ -387,7 +382,6 @@ export function SettingsView({
 
           {activeCategory === 'Controls' ? (
             <ControlsSettingsPanel
-              controllerLayoutPreference={controllerLayoutPreference}
               controllerProfileId={controllerProfileId}
               detectedProfileId={detectedProfileId}
               isControllerDebugEnabled={isControllerDebugEnabled}
@@ -395,7 +389,6 @@ export function SettingsView({
               language={language}
               runtimeEnvironment={runtimeEnvironment}
               onControllerDebugChange={onControllerDebugChange}
-              onControllerLayoutChange={onControllerLayoutChange}
               onControllerProfileChange={onControllerProfileChange}
               onLandscapeLockChange={onLandscapeLockChange}
             />

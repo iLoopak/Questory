@@ -146,6 +146,20 @@ const profileCatalogue: Record<Exclude<ControllerProfileId, 'auto'>, ControllerP
   },
 };
 
+export type ControllerButtonLabels = {
+  primary: string;
+  cancel: string;
+  leftFace: string;
+  topFace: string;
+};
+
+export function getControllerButtonLabels(convention: ConfirmCancelConvention): ControllerButtonLabels {
+  if (convention === 'nintendo') {
+    return { primary: 'A', cancel: 'B', leftFace: 'Y', topFace: 'X' };
+  }
+  return { primary: 'A', cancel: 'B', leftFace: 'X', topFace: 'Y' };
+}
+
 export const controllerProfileDetectedEvent = 'questshelf:controller-profile-detected';
 
 export function getProfile(id: Exclude<ControllerProfileId, 'auto'>): ControllerProfile {

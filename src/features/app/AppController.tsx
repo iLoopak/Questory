@@ -119,7 +119,7 @@ export function AppController() {
     accentColorPreference,
     accentThemeStyle,
     appTemplatePreference,
-    controllerLayoutPreference,
+    confirmCancelConvention,
     controllerProfileId,
     detectedProfileId,
     isControllerDebugEnabled,
@@ -134,7 +134,6 @@ export function AppController() {
     setAccentColorPreference,
     setGradientOrientationPreference,
     setAppTemplatePreference,
-    setControllerLayoutPreference,
     setControllerProfileId,
     setIsControllerDebugEnabled,
     setIsLandscapeLockEnabled,
@@ -1245,7 +1244,7 @@ export function AppController() {
               queueState={platformQueueState}
               refreshingMetadataGameIds={refreshingMetadataGameIds}
               reviewModeState={reviewModeState}
-              controllerLayout={controllerLayoutPreference}
+              confirmCancelConvention={confirmCancelConvention}
               source={activeReviewSource}
               onAction={handleReviewAction}
               onAddPlatform={addQueuePlatform}
@@ -1322,7 +1321,6 @@ export function AppController() {
               activeAchievementTitle={computedShelfTitle}
               steamAvatarUrl={steamAvatarUrl}
               steamPersonaName={steamProfileName}
-              controllerLayoutPreference={controllerLayoutPreference}
               controllerProfileId={controllerProfileId}
               detectedProfileId={detectedProfileId}
               isControllerDebugEnabled={isControllerDebugEnabled}
@@ -1358,7 +1356,6 @@ export function AppController() {
               onImportGames={importSteamGames}
               onImportRetroGames={handleRetroImportGames}
               onControllerDebugChange={setIsControllerDebugEnabled}
-              onControllerLayoutChange={setControllerLayoutPreference}
               onControllerProfileChange={setControllerProfileId}
               onLandscapeLockChange={setIsLandscapeLockEnabled}
               onNavigationVisibilityChange={setNavigationVisibility}
