@@ -250,6 +250,9 @@ export function SettingsView({
               </div>
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</h2>
+                {activeCategoryMeta.description ? (
+                  <p className="mt-1 text-sm leading-5 text-slate-400">{activeCategoryMeta.description}</p>
+                ) : null}
               </div>
             </div>
           </header>
@@ -430,6 +433,9 @@ function SettingsCategoryButton({
       </span>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold">{translateSettingsCategory(meta.label, t)}</span>
+        {meta.shortDescription ? (
+          <span className="mt-0.5 block truncate text-xs text-slate-500">{meta.shortDescription}</span>
+        ) : null}
       </span>
     </button>
   );
