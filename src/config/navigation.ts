@@ -2,7 +2,7 @@ import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
 export const navItems = ['Home', 'Library', 'Review Mode', 'Queue', 'Wishlist'] as const;
-export const moreNavItems = ['Recommendation', 'Stats', 'Artwork'] as const;
+export const moreNavItems = ['Recommendation', 'Stats', 'Artwork', 'Quest Runner'] as const;
 export const alwaysVisibleNavItems = ['Home', 'Library'] as const;
 
 export type TopNavItem = (typeof navItems)[number];
@@ -13,6 +13,7 @@ export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Par
   Home: 'nav.home',
   Library: 'nav.library',
   Queue: 'nav.queue',
+  'Quest Runner': 'nav.questRunner',
   Recommendation: 'nav.recommendations',
   'Review Mode': 'nav.reviewMode',
   Settings: 'nav.settings',
@@ -62,6 +63,10 @@ export function getNavDescription(activeNavItem: NavItem) {
 
   if (activeNavItem === 'Stats') {
     return 'Local overview of backlog, progress, and playtime.';
+  }
+
+  if (activeNavItem === 'Quest Runner') {
+    return 'A small runner game hidden in QuestShelf. Jump over backlog stacks.';
   }
 
   return 'Local library and wishlist data stays on this device.';

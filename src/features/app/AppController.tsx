@@ -17,6 +17,7 @@ import { QueuePanel } from '../../components/QueuePanel';
 import { RecommendationPanel } from '../../components/RecommendationPanel';
 import { ReviewModePanel } from '../../components/ReviewModePanel';
 import { StatsPanel } from '../../components/StatsPanel';
+import { QuestRunnerGame } from '../../components/QuestRunnerGame';
 import {
   getNavDescription,
   moreNavItems,
@@ -963,7 +964,7 @@ export function AppController() {
                       type="button"
                     >
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
-                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Recommendation' ? 'sparkles' : 'image-frame'} size={15} strokeWidth={2.2} />
+                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Recommendation' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : 'image-frame'} size={15} strokeWidth={2.2} />
                       </span>
                       <span className="whitespace-nowrap">{t(navItemLabelKeys[item])}</span>
                     </button>
@@ -1306,6 +1307,10 @@ export function AppController() {
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
             />
+          ) : activeNavItem === 'Quest Runner' ? (
+            <div className="px-4 py-4">
+              <QuestRunnerGame />
+            </div>
           ) : activeNavItem === 'Settings' ? (
             <SettingsView
               activeCategory={activeSettingsCategory}
