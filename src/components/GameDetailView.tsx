@@ -228,7 +228,7 @@ export function GameDetailView({
                 <div className="absolute inset-0" aria-hidden="true">
                   <img
                     alt=""
-                    className="h-full w-full object-cover opacity-50"
+                    className="h-full w-full object-cover opacity-[0.85]"
                     decoding="async"
                     loading="lazy"
                     onError={() => setHeroBgSourceIndex((i) => i + 1)}
@@ -236,10 +236,10 @@ export function GameDetailView({
                   />
                 </div>
               ) : null}
-              {/* Left-to-right veil: fully dark left (cover + text), fades to ~55% right to let hero show */}
-              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/90 to-ink-950/55" aria-hidden="true" />
-              {/* Bottom vignette: keeps stat cards readable */}
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/75 to-transparent" aria-hidden="true" />
+              {/* Left-to-right veil: solid over cover/title area, fades to ~25% on far right so hero is clearly visible */}
+              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/75 to-ink-950/25" aria-hidden="true" />
+              {/* Bottom vignette: light darkening only where stat cards sit */}
+              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/50 to-transparent" aria-hidden="true" />
 
               <div className="relative grid gap-4 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center xl:grid-cols-[150px_minmax(0,1fr)] xl:p-5">
                 <div className="mx-auto w-32 overflow-hidden rounded-xl border border-white/10 bg-ink-800 shadow-panel sm:mx-0 sm:w-full">
