@@ -29,6 +29,7 @@ import {
 } from '../lib/syncFolderStorage';
 import { useI18n } from '../i18n';
 import { SettingsSection, SettingsStatusBlock } from './settings/SettingsSection';
+import { ViewportModal } from './ViewportModal';
 import { downloadRawQuestShelfLocalData, exportQuestShelfBackupFile } from '../lib/backupExport';
 
 function formatMessageTemplate(template: string, values: Record<string, string | number>) {
@@ -57,6 +58,8 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   const [syncSettings, setSyncSettings] = useState<SyncFolderSettings>(() =>
     typeof window === 'undefined' ? defaultSyncFolderSettings : loadSyncFolderSettings(),
   );
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const autoBackupTimeoutRef = useRef<number | null>(null);
   const autoBackupSignalRef = useRef(autoBackupSignal);
   const supportsFileSystemAccess = useMemo(
@@ -258,48 +261,29 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
     );
   }
 
-  function restoreBackup() {
+  function requestRestore() {
     if (!selectedBackup) {
       showMessage(t('data.chooseBackupFirst'), 'error');
       return;
     }
+    setIsRestoreModalOpen(true);
+  }
 
-    const summary = getQuestShelfBackupSummary(selectedBackup);
-    const confirmation = window.prompt(
-      [
-        formatMessageTemplate(t('data.confirmBackupImport'), { mode: importMode === 'merge' ? t('data.merge') : t('data.replace') }),
-        `${t('data.exported')}: ${formatDateTime(summary.exportedAt)}`,
-        `${t('data.schema')}: ${summary.schemaVersion}`,
-        `${t('data.libraryGames')}: ${summary.gameCount}`,
-        `${t('data.wishlistItems')}: ${summary.wishlistCount}`,
-        formatMessageTemplate(t('data.typeToContinue'), { command: importMode === 'merge' ? 'MERGE' : 'REPLACE' }),
-      ].join('\n'),
-    );
-
-    if (confirmation !== (importMode === 'merge' ? 'MERGE' : 'REPLACE')) {
-      showMessage(t('data.importCancelled'));
-      return;
-    }
-
-    if (importMode === 'merge') {
+  function confirmRestore(mode: 'merge' | 'replace') {
+    setIsRestoreModalOpen(false);
+    if (!selectedBackup) return;
+    if (mode === 'merge') {
       mergeQuestShelfBackup(selectedBackup);
     } else {
       restoreQuestShelfBackup(selectedBackup);
     }
-
     showMessage(t('data.backupImported'), 'success');
     onBackupImported?.();
     window.setTimeout(() => window.location.reload(), 600);
   }
 
-  async function resetLocalData() {
-    const confirmation = window.prompt('Type RESET to remove all local QuestShelf data from this device.');
-
-    if (confirmation !== 'RESET') {
-      showMessage('Reset cancelled. Local data was not changed.');
-      return;
-    }
-
+  async function confirmReset() {
+    setIsResetModalOpen(false);
     await resetQuestShelfLocalData();
     if (supportsFileSystemAccess) {
       await clearBackupFileHandle();
@@ -318,31 +302,15 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       title={t('data.title')}
       description={t('data.subtitle')}
       actions={(
-        <>
-          <button
-            className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-            onClick={() => void downloadBackup()}
-            type="button"
-          >
-            {t('data.exportBackup')}
-          </button>
-          <button
-            className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20"
-            onClick={() => void resetLocalData()}
-            type="button"
-          >
-            {t('data.resetLocal')}
-          </button>
-        </>
+        <button
+          className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+          onClick={() => void downloadBackup()}
+          type="button"
+        >
+          {t('data.exportBackup')}
+        </button>
       )}
-      status={(
-        <>
-          <SettingsStatusBlock tone={messageTone}>{message}</SettingsStatusBlock>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            Reset removes only known QuestShelf local data from this device. It does not touch data from other apps.
-          </p>
-        </>
-      )}
+      status={<SettingsStatusBlock tone={messageTone}>{message}</SettingsStatusBlock>}
     >
 
       <StorageRecoveryPanel
@@ -390,7 +358,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
           <button
             className="mt-3 h-10 w-full rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
             disabled={!selectedBackup}
-            onClick={restoreBackup}
+            onClick={requestRestore}
             type="button"
           >
             {importMode === 'merge' ? t('data.mergeBackup') : t('data.replaceBackup')}
@@ -503,7 +471,142 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
         )}
       </section>
 
+      <section className="mt-4 rounded-lg border border-red-400/30 bg-red-500/5 p-4">
+        <h3 className="text-base font-semibold text-red-300">Danger Zone</h3>
+        <p className="mt-1 text-sm leading-5 text-slate-400">
+          These actions permanently remove local QuestShelf data.
+        </p>
+        <div className="mt-4 flex flex-wrap items-start gap-4 border-t border-red-400/20 pt-4">
+          <div>
+            <button
+              className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20"
+              onClick={() => setIsResetModalOpen(true)}
+              type="button"
+            >
+              {t('data.resetLocal')}
+            </button>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Removes all games, settings, and preferences from this device.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {isResetModalOpen ? (
+        <ResetConfirmModal
+          onConfirm={() => void confirmReset()}
+          onClose={() => setIsResetModalOpen(false)}
+        />
+      ) : null}
+
+      {isRestoreModalOpen && selectedBackupSummary ? (
+        <RestoreConfirmModal
+          summary={selectedBackupSummary}
+          onMerge={() => confirmRestore('merge')}
+          onReplace={() => confirmRestore('replace')}
+          onClose={() => setIsRestoreModalOpen(false)}
+        />
+      ) : null}
+
     </SettingsSection>
+  );
+}
+
+function ResetConfirmModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
+  const [inputValue, setInputValue] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isConfirmed = inputValue === 'RESET';
+
+  return (
+    <ViewportModal ariaLabel="Confirm data reset" placement="center" onClose={onClose} initialFocusRef={inputRef}>
+      <div className="p-5">
+        <h3 className="text-lg font-semibold text-white">Reset local data</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          This will permanently remove all local QuestShelf data from this device. Type{' '}
+          <span className="font-mono font-bold text-red-300">RESET</span> to confirm.
+        </p>
+        <input
+          ref={inputRef}
+          aria-label="Type RESET to confirm"
+          autoComplete="off"
+          className="mt-4 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-red-400"
+          placeholder="RESET"
+          spellCheck={false}
+          type="text"
+          value={inputValue}
+          onChange={(event) => setInputValue(event.target.value)}
+        />
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="h-10 rounded-md border border-red-400/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!isConfirmed}
+            onClick={onConfirm}
+            type="button"
+          >
+            Reset local data
+          </button>
+        </div>
+      </div>
+    </ViewportModal>
+  );
+}
+
+function RestoreConfirmModal({
+  summary,
+  onMerge,
+  onReplace,
+  onClose,
+}: {
+  summary: QuestShelfBackupSummary;
+  onMerge: () => void;
+  onReplace: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ViewportModal ariaLabel="Restore backup" placement="center" onClose={onClose}>
+      <div className="p-5">
+        <h3 className="text-lg font-semibold text-white">Restore backup</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Choose how imported data should be applied.
+        </p>
+        <div className="mt-3 grid gap-1.5 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-400">
+          <div><span className="text-slate-500">Exported:</span> <span className="text-slate-200">{formatDateTime(summary.exportedAt)}</span></div>
+          <div><span className="text-slate-500">Schema:</span> <span className="text-slate-200">{summary.schemaVersion}</span></div>
+          <div><span className="text-slate-500">Library games:</span> <span className="text-slate-200">{summary.gameCount}</span></div>
+          <div><span className="text-slate-500">Wishlist items:</span> <span className="text-slate-200">{summary.wishlistCount}</span></div>
+        </div>
+        <div className="mt-4 grid gap-2">
+          <button
+            className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            onClick={onMerge}
+            type="button"
+          >
+            Merge existing data
+          </button>
+          <button
+            className="h-11 rounded-md border border-red-400/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
+            onClick={onReplace}
+            type="button"
+          >
+            Replace existing data
+          </button>
+          <button
+            className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </ViewportModal>
   );
 }
 

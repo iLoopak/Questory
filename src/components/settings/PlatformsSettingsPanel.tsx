@@ -1,4 +1,5 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { ViewportModal } from "../ViewportModal";
 import { PlatformIdentityFields } from "../PlatformIdentityFields";
 import { useI18n } from "../../i18n";
 import {
@@ -269,7 +270,7 @@ export function QueuePlatformsSettingsPanel({
             }
             type="button"
           >
-            Enable multiple
+            Enable all
           </button>
           <button
             className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10"
@@ -278,7 +279,7 @@ export function QueuePlatformsSettingsPanel({
             }
             type="button"
           >
-            Disable multiple
+            Disable all
           </button>
           <button
             className="h-9 rounded-md border border-white/10 px-3 text-sm text-slate-200 hover:bg-white/10"
@@ -294,7 +295,7 @@ export function QueuePlatformsSettingsPanel({
             }
             type="button"
           >
-            Reorder multiple A-Z
+            Sort all A-Z
           </button>
         </div>
       </div>
@@ -338,19 +339,14 @@ function QueuePlatformManagementRow({
   onToggle: (isEnabled: boolean) => void;
 }) {
   const { t } = useI18n();
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const accentStyle = {
     "--platform-accent": accentColor,
     borderColor: accentColor,
   } as CSSProperties;
 
-  function renamePlatform() {
-    const nextPlatform = window.prompt(t("settings.rename"), platform);
-    if (nextPlatform?.trim()) {
-      onRename(nextPlatform.trim() as GamePlatform);
-    }
-  }
-
   return (
+    <>
     <div
       className="grid gap-2 rounded-md border bg-ink-900/70 p-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start"
       style={accentStyle}
@@ -422,7 +418,7 @@ function QueuePlatformManagementRow({
         </button>
         <button
           className="h-8 rounded-md border border-white/10 px-2 text-xs text-slate-200 hover:bg-white/10"
-          onClick={renamePlatform}
+          onClick={() => setIsRenameModalOpen(true)}
           type="button"
         >
           {t("settings.rename")}
@@ -444,5 +440,70 @@ function QueuePlatformManagementRow({
         </button>
       </div>
     </div>
+
+    {isRenameModalOpen ? (
+      <PlatformRenameModal
+        platform={platform}
+        onRename={(nextPlatform) => { setIsRenameModalOpen(false); onRename(nextPlatform); }}
+        onClose={() => setIsRenameModalOpen(false)}
+      />
+    ) : null}
+    </>
+  );
+}
+
+function PlatformRenameModal({
+  platform,
+  onRename,
+  onClose,
+}: {
+  platform: GamePlatform;
+  onRename: (nextPlatform: GamePlatform) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(platform);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const canRename = value.trim().length > 0 && value.trim() !== platform;
+
+  function handleConfirm() {
+    if (canRename) onRename(value.trim() as GamePlatform);
+  }
+
+  return (
+    <ViewportModal ariaLabel="Rename platform" placement="center" onClose={onClose} initialFocusRef={inputRef}>
+      <div className="p-5">
+        <h3 className="text-lg font-semibold text-white">Rename platform</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          Enter a new name for <span className="font-semibold text-white">{platform}</span>.
+        </p>
+        <input
+          ref={inputRef}
+          aria-label="Platform name"
+          className="mt-4 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+          spellCheck={false}
+          type="text"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') handleConfirm(); }}
+        />
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+            disabled={!canRename}
+            onClick={handleConfirm}
+            type="button"
+          >
+            Rename
+          </button>
+        </div>
+      </div>
+    </ViewportModal>
   );
 }

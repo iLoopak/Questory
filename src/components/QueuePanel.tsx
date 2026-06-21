@@ -833,16 +833,10 @@ function PlatformQueueColumn({
     });
   }, [platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
 
-  function renamePlatform() {
-    const nextName = window.prompt(t('queue.renamePlatform'), platform);
-    if (!nextName?.trim()) {
-      return;
-    }
-
-    onRenamePlatform(platform, nextName.trim() as GamePlatform);
-  }
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
 
   return (
+    <>
     <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'shadow-glow' : hasGames ? '' : 'border-skyglass/10 opacity-80'}`}>
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
@@ -876,7 +870,7 @@ function PlatformQueueColumn({
               </label>
               <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
               <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
-              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { renamePlatform(); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
+              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
               <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
               <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
             </>
@@ -939,6 +933,72 @@ function PlatformQueueColumn({
         )}
       </div>
     </section>
+
+    {isRenameModalOpen ? (
+      <QueuePlatformRenameModal
+        platform={platform}
+        onRename={(nextPlatform) => { setIsRenameModalOpen(false); onRenamePlatform(platform, nextPlatform); }}
+        onClose={() => setIsRenameModalOpen(false)}
+      />
+    ) : null}
+    </>
+  );
+}
+
+function QueuePlatformRenameModal({
+  platform,
+  onRename,
+  onClose,
+}: {
+  platform: GamePlatform;
+  onRename: (nextPlatform: GamePlatform) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(platform);
+  const { t } = useI18n();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const canRename = value.trim().length > 0 && value.trim() !== platform;
+
+  function handleConfirm() {
+    if (canRename) onRename(value.trim() as GamePlatform);
+  }
+
+  return (
+    <ViewportModal ariaLabel={t('queue.renamePlatform')} placement="center" onClose={onClose} initialFocusRef={inputRef}>
+      <div className="p-5">
+        <h3 className="text-lg font-semibold text-white">{t('queue.renamePlatform')}</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          Enter a new name for <span className="font-semibold text-white">{platform}</span>.
+        </p>
+        <input
+          ref={inputRef}
+          aria-label="Platform name"
+          className="mt-4 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+          spellCheck={false}
+          type="text"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') handleConfirm(); }}
+        />
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+            disabled={!canRename}
+            onClick={handleConfirm}
+            type="button"
+          >
+            {t('settings.rename')}
+          </button>
+        </div>
+      </div>
+    </ViewportModal>
   );
 }
 
