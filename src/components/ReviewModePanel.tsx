@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
+import { getControllerButtonLabels, type ConfirmCancelConvention } from '../lib/controllerProfiles';
 import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources, getGeneratedFallbackCover } from '../lib/gameCoverImages';
@@ -38,7 +38,7 @@ export type ReviewModeActionContext = {
 };
 
 type ReviewModePanelProps = {
-  controllerLayout: ControllerLayoutPreference;
+  confirmCancelConvention: ConfirmCancelConvention;
   games: Game[];
   ignoredGameIds: Set<string>;
   queuePlatforms: GamePlatform[];
@@ -133,7 +133,7 @@ const emptyReviewActionStats: ReviewActionStats = {
 };
 
 export function ReviewModePanel({
-  controllerLayout,
+  confirmCancelConvention,
   games,
   ignoredGameIds,
   queuePlatforms,
@@ -150,7 +150,7 @@ export function ReviewModePanel({
 }: ReviewModePanelProps) {
   const { t } = useI18n();
   const hasGamepad = useGamepadDetection();
-  const buttonLabels = getControllerButtonLabels(controllerLayout);
+  const buttonLabels = getControllerButtonLabels(confirmCancelConvention);
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
   const [sessionGameIds, setSessionGameIds] = useState<string[]>([]);
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);

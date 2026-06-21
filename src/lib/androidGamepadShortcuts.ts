@@ -1,4 +1,3 @@
-import { loadControllerLayoutPreference, resolveControllerLayout, type ControllerLayoutPreference } from './controllerLayoutPreferences';
 import { detectProfileFromGamepadId, resolveProfile, controllerProfileDetectedEvent, type ControllerProfile } from './controllerProfiles';
 import { loadControllerSettings, controllerSettingsChangedEvent, type ControllerSettings } from './controllerSettingsStorage';
 import { dispatchControllerAction } from './controllerActions';
@@ -75,7 +74,6 @@ export function configureAndroidGamepadShortcuts() {
   let latestDebugState: ControllerDebugState = createEmptyDebugState();
   let debugOverlay: HTMLDivElement | null = null;
   let isDebugEnabled = loadControllerDebugEnabled();
-  let controllerLayoutPreference = loadControllerLayoutPreference();
   let controllerSettings = loadControllerSettings();
   let detectedProfileId = detectProfileFromGamepadId(getPrimaryGamepad()?.id ?? '');
   let activeProfile: ControllerProfile = resolveProfile(controllerSettings.profileId, detectedProfileId);
@@ -85,7 +83,6 @@ export function configureAndroidGamepadShortcuts() {
   window.addEventListener('gamepadconnected', handleGamepadConnectionChange);
   window.addEventListener('gamepaddisconnected', handleGamepadConnectionChange);
   window.addEventListener('questshelf:controller-debug-change', handleDebugChange);
-  window.addEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
   window.addEventListener(controllerSettingsChangedEvent, handleControllerSettingsChange as EventListener);
   window.addEventListener('keydown', handleKeyboardFallback, true);
 
@@ -114,8 +111,7 @@ export function configureAndroidGamepadShortcuts() {
     handlePressedButton('D-pad Right', nextState, lastState, () => moveFocus('right'));
     handleAxisNavigation(axisDirection);
 
-    const resolvedLayout = resolveControllerLayout(controllerLayoutPreference);
-    if (resolvedLayout === 'nintendo') {
+    if (activeProfile.confirmCancelConvention === 'nintendo') {
       handlePressedButton('A', nextState, lastState, () => dispatchKeyboard('Escape'));
       handlePressedButton('B', nextState, lastState, () => activatePrimaryButton());
       handlePressedButton('X', nextState, lastState, () => dispatchKeyboard('x'));
@@ -192,10 +188,6 @@ export function configureAndroidGamepadShortcuts() {
     renderDebugOverlay();
   }
 
-  function handleControllerLayoutChange(event: CustomEvent<ControllerLayoutPreference>) {
-    controllerLayoutPreference = event.detail;
-  }
-
   function renderDebugOverlay() {
     if (!isDebugEnabled) {
       debugOverlay?.remove();
@@ -226,7 +218,6 @@ export function configureAndroidGamepadShortcuts() {
     window.removeEventListener('gamepadconnected', handleGamepadConnectionChange);
     window.removeEventListener('gamepaddisconnected', handleGamepadConnectionChange);
     window.removeEventListener('questshelf:controller-debug-change', handleDebugChange);
-    window.removeEventListener('questshelf:controller-layout-change', handleControllerLayoutChange as EventListener);
     window.removeEventListener(controllerSettingsChangedEvent, handleControllerSettingsChange as EventListener);
     window.removeEventListener('keydown', handleKeyboardFallback, true);
     removeFocusGuard();
