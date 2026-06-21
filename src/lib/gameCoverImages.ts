@@ -91,15 +91,12 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
     candidates.push({ source: 'imported', url: currentCover });
   }
 
-  // Additional SteamGridDB artwork variants — used as portrait fallbacks
+  // SteamGridDB wide/hero variants as portrait fallbacks (iconImage excluded — wrong aspect ratio)
   if (game.wideCoverImage?.trim()) {
     candidates.push({ source: 'steamgriddb', url: game.wideCoverImage });
   }
   if (game.heroImage?.trim()) {
     candidates.push({ source: 'steamgriddb', url: game.heroImage });
-  }
-  if (game.iconImage?.trim()) {
-    candidates.push({ source: 'steamgriddb', url: game.iconImage });
   }
 
   if (options.includeGeneratedFallback !== false) {
