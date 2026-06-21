@@ -31,11 +31,7 @@ function isEditableElement(element: EventTarget | null) {
 }
 
 function isModalCloseKey(event: KeyboardEvent | globalThis.KeyboardEvent) {
-  if (event.key === 'Escape' || event.key === 'GamepadB') {
-    return true;
-  }
-
-  return event.key.toLowerCase() === 'b' && !isEditableElement(event.target);
+  return event.key === 'Escape';
 }
 
 function getFocusableElements(container: HTMLElement | null) {

@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { getControllerButtonLabels, type ControllerLayoutPreference } from '../lib/controllerLayoutPreferences';
+import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources, getGeneratedFallbackCover } from '../lib/gameCoverImages';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
@@ -265,7 +266,7 @@ export function ReviewModePanel({
       }
 
       if (isReviewOptionsOpen) {
-        if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
+        if (event.key === 'Escape') {
           event.preventDefault();
           setIsReviewOptionsOpen(false);
         }
@@ -277,14 +278,14 @@ export function ReviewModePanel({
       }
 
       if (isQueuePickerOpen) {
-        if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
+        if (event.key === 'Escape') {
           event.preventDefault();
           setIsQueuePickerOpen(false);
         }
         return;
       }
 
-      if (isNoteOpen && (event.key === 'Escape' || event.key.toLowerCase() === 'b')) {
+      if (isNoteOpen && event.key === 'Escape') {
         event.preventDefault();
         setIsNoteOpen(false);
         return;
@@ -335,7 +336,7 @@ export function ReviewModePanel({
         return;
       }
 
-      if (event.key === 'Escape' || event.key.toLowerCase() === 'b') {
+      if (event.key === 'Escape') {
         event.preventDefault();
         performAction(activeGame, 'skip');
         return;
@@ -370,6 +371,16 @@ export function ReviewModePanel({
 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
+
+  const canReceiveControllerActions = !!activeGame && !isReviewOptionsOpen && !isQueuePickerOpen && !isNoteOpen;
+
+  useControllerAction('pageNext', () => {
+    if (activeGame) performAction(activeGame, 'skip');
+  }, { enabled: canReceiveControllerActions });
+
+  useControllerAction('pagePrev', () => {
+    showPreviousGame();
+  }, { enabled: canReceiveControllerActions });
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
     onAction(game, action, note, targetPlatform, { queueGameIds: sessionGameIds });

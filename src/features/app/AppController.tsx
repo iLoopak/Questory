@@ -83,6 +83,7 @@ import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
+import { useControllerAction } from '../../lib/controllerActions';
 
 const appLogo = '/icons/questshelf-icon.png';
 
@@ -527,50 +528,34 @@ export function AppController() {
     return lastRetroImportedGames.some((game) => !visibleImportedGameIds.has(game.id));
   }, [lastRetroImportedGames, libraryFilters]);
 
-  useEffect(() => {
-    function handleControllerNavigation(event: KeyboardEvent) {
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
+  useControllerAction('openMenu', () => {
+    setActiveUtilityView(null);
+    setPlayingNowReturnContext(null);
+    setActiveNavItem('Settings');
+    setSelectedGameId(null);
+  });
 
-      if (event.key === 'm') {
-        event.preventDefault();
-        setActiveUtilityView(null);
-        setPlayingNowReturnContext(null);
-        setActiveNavItem('Settings');
-        setSelectedGameId(null);
-        return;
-      }
+  useControllerAction('pageUp', () => {
+    if (document.documentElement.classList.contains('qs-modal-open')) return;
+    setActiveNavItem((currentItem) => {
+      const currentIndex = visibleNavItems.includes(currentItem as TopNavItem)
+        ? visibleNavItems.indexOf(currentItem as TopNavItem)
+        : 0;
+      return visibleNavItems[(currentIndex - 1 + visibleNavItems.length) % visibleNavItems.length];
+    });
+    setSelectedGameId(null);
+  });
 
-      if (event.key !== 'PageUp' && event.key !== 'PageDown') {
-        return;
-      }
-
-      if (document.documentElement.classList.contains('qs-modal-open')) {
-        event.preventDefault();
-        return;
-      }
-
-      event.preventDefault();
-      setActiveNavItem((currentItem) => {
-        const currentIndex = visibleNavItems.includes(currentItem as TopNavItem)
-          ? visibleNavItems.indexOf(currentItem as TopNavItem)
-          : 0;
-        const direction = event.key === 'PageDown' ? 1 : -1;
-        return visibleNavItems[(currentIndex + direction + visibleNavItems.length) % visibleNavItems.length];
-      });
-      setSelectedGameId(null);
-    }
-
-    window.addEventListener('keydown', handleControllerNavigation);
-
-    return () => window.removeEventListener('keydown', handleControllerNavigation);
-  }, [visibleNavItems]);
+  useControllerAction('pageDown', () => {
+    if (document.documentElement.classList.contains('qs-modal-open')) return;
+    setActiveNavItem((currentItem) => {
+      const currentIndex = visibleNavItems.includes(currentItem as TopNavItem)
+        ? visibleNavItems.indexOf(currentItem as TopNavItem)
+        : 0;
+      return visibleNavItems[(currentIndex + 1) % visibleNavItems.length];
+    });
+    setSelectedGameId(null);
+  });
 
   function importGames(importedGames: Game[]) {
     let createdGames: Game[] = [];
