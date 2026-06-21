@@ -150,6 +150,10 @@ export function useMetadataArtworkActions({
       const sgdbArtwork = isArtworkRefresh ? await fetchSteamGridDbArtworkForGame(targetGame) : null;
       let nextGame = mergeRawgMetadataIntoGame(targetGame, result.metadata);
       nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
+      // Persist the winning retro search title so future lookups skip candidate iteration
+      if (result.winningSearchTitle && result.winningSearchTitle !== targetGame.metadataSearchTitle && result.winningSearchTitle !== targetGame.title) {
+        nextGame = { ...nextGame, metadataSearchTitle: result.winningSearchTitle };
+      }
       setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord({ ...nextGame, metadataSkippedAt: undefined, metadataManualManagedAt: undefined }) : game)));
       markOnboardingItemComplete('metadata-enriched');
 

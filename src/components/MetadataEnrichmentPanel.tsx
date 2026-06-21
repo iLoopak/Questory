@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { getCachedRawgMetadata, saveRawgMetadataCacheEntry } from '../lib/rawgMetadataCache';
-import { getMetadataSearchTitle, searchRawgWithFallback } from '../lib/rawgMetadataEnrichment';
+import { getMetadataSearchTitle, getRetroMetadataSearchCandidates, searchRawgWithCandidates, searchRawgWithFallback } from '../lib/rawgMetadataEnrichment';
 import { getRawgMetadataWithCoverFallback } from '../lib/gameCoverImages';
 import {
   getHighConfidenceThreshold,
@@ -165,8 +165,14 @@ export function MetadataEnrichmentPanel({
       return 'enriched';
     }
 
+    const retroCandidates = getRetroMetadataSearchCandidates(game);
+    const resolvedTitle = retroCandidates?.[0] ?? searchTitle;
+
     try {
-      const matches = rankRawgMatches({ ...game, title: searchTitle }, await searchRawgWithFallback(searchTitle));
+      const rawResults = retroCandidates && retroCandidates.length > 1
+        ? await searchRawgWithCandidates(retroCandidates)
+        : await searchRawgWithFallback(searchTitle);
+      const matches = rankRawgMatches({ ...game, title: resolvedTitle }, rawResults);
       const bestMatch = matches[0];
 
       if (bestMatch && isHighConfidenceMatch(bestMatch)) {
