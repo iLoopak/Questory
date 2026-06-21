@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { canUseRawgImageAsCover, getGameCoverSources, getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
+import { canUseRawgImageAsCover, getGameCoverSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
@@ -71,9 +71,7 @@ export function GameDetailView({
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
 
-  const coverSources = useMemo(() => {
-    return [...getPreferredArtworkSources(game, 'hero'), ...getGameCoverSources(game)];
-  }, [game]);
+  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
 
   useLayoutEffect(() => {
     detailScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
@@ -202,9 +200,9 @@ export function GameDetailView({
         <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
             <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
-              {(game.heroImage || game.wideCoverImage || game.backgroundImage) ? (
+              {(game.heroImage || game.wideCoverImage || game.backgroundImage || (!isArtworkMissing && game.coverImage)) ? (
                 <div className="absolute inset-0 opacity-20 blur-sm" aria-hidden="true">
-                  <img className="h-full w-full object-cover" src={game.heroImage ?? game.wideCoverImage ?? game.backgroundImage ?? ''} alt="" />
+                  <img className="h-full w-full object-cover" src={game.heroImage ?? game.wideCoverImage ?? game.backgroundImage ?? game.coverImage ?? ''} alt="" />
                 </div>
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/95 to-ink-900/75" aria-hidden="true" />
