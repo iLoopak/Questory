@@ -1,6 +1,7 @@
 import { loadControllerLayoutPreference, resolveControllerLayout, type ControllerLayoutPreference } from './controllerLayoutPreferences';
 import { detectProfileFromGamepadId, resolveProfile, controllerProfileDetectedEvent, type ControllerProfile } from './controllerProfiles';
 import { loadControllerSettings, controllerSettingsChangedEvent, type ControllerSettings } from './controllerSettingsStorage';
+import { dispatchControllerAction } from './controllerActions';
 
 const gamepadPollIntervalMs = 80;
 const debugStorageKey = 'questshelf.controllerDebug.v1';
@@ -126,12 +127,12 @@ export function configureAndroidGamepadShortcuts() {
       handlePressedButton('Y', nextState, lastState, () => dispatchKeyboard('y'));
     }
     // Shoulder buttons remain global tab navigation across Retroid, Android gamepads, and browser Gamepad API.
-    handlePressedButton('L1', nextState, lastState, () => dispatchKeyboard('PageUp'));
-    handlePressedButton('R1', nextState, lastState, () => dispatchKeyboard('PageDown'));
+    handlePressedButton('L1', nextState, lastState, () => dispatchControllerAction('pageUp'));
+    handlePressedButton('R1', nextState, lastState, () => dispatchControllerAction('pageDown'));
     // Triggers are reserved for in-screen paging, including Quest Queue previous/next game controls.
-    handlePressedButton('L2', nextState, lastState, () => dispatchKeyboard('['));
-    handlePressedButton('R2', nextState, lastState, () => dispatchKeyboard(']'));
-    handlePressedButton('Start', nextState, lastState, () => dispatchKeyboard('m'));
+    handlePressedButton('L2', nextState, lastState, () => dispatchControllerAction('pagePrev'));
+    handlePressedButton('R2', nextState, lastState, () => dispatchControllerAction('pageNext'));
+    handlePressedButton('Start', nextState, lastState, () => dispatchControllerAction('openMenu'));
 
     latestDebugState = {
       axes: gamepad.axes.map((axis) => Number(axis.toFixed(2))),

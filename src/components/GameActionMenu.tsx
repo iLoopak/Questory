@@ -213,11 +213,11 @@ function GameActionMenuOverlay({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' || event.key === 'BrowserBack' || event.key === 'GamepadB') {
+      if (event.key === 'Escape' || event.key === 'BrowserBack') {
         event.preventDefault();
         event.stopPropagation();
         // Escape is a deliberate keyboard dismiss — restore focus to the trigger.
-        // BrowserBack / GamepadB are hardware back-navigation gestures and behave
+        // BrowserBack is a hardware back-navigation gesture and behaves
         // like a touch close: focus must NOT be restored.
         if (event.key === 'Escape') {
           closedViaKeyboardRef.current = true;
