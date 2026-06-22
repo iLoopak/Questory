@@ -1068,7 +1068,7 @@ export function AppController() {
                 <Icon name="chevrons-right" size={13} className="rotate-90" strokeWidth={2.4} />
               </button>
               {isMoreMenuOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl" role="menu">
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl max-h-[calc(100dvh-env(safe-area-inset-top,0px)-4rem)] overflow-y-auto overscroll-contain" role="menu">
                   {moreNavItems.map((item) => (
                     <button
                       key={item}
