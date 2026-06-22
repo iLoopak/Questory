@@ -129,7 +129,7 @@ export function useReviewModeActions({
         description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
       });
       recordReviewDecision('skipped');
-      moveQuestQueueGameToEnd(game.id, context);
+      moveQuestQueueGameToEnd(game.id);
       return;
     }
 
