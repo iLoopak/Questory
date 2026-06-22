@@ -707,7 +707,6 @@ function GamePosterButton({
   hero = false,
   onClick,
   queueState,
-  wide = false,
   activitySignal = null,
 }: {
   game: Game;
@@ -715,70 +714,88 @@ function GamePosterButton({
   hero?: boolean;
   onClick: () => void;
   queueState: PlatformQueueState;
-  wide?: boolean;
   activitySignal?: string | null;
 }) {
   const { t } = useI18n();
-  const coverSources = getPreferredArtworkSources(game, 'landscape');
-  const coverSource = coverSources[0];
+  const coverSource = getPreferredArtworkSources(game, 'portrait')[0] ?? null;
+  const ambientSource = getPreferredArtworkSources(game, 'landscape')[0] ?? null;
   const logoUrl = getPreferredLogoUrl(game);
-  const minHeightClass = hero ? 'min-h-72' : 'min-h-56';
   const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
 
   return (
     <button
-      className={`group relative overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950 text-left shadow-panel transition hover:border-mint/40 hover:shadow-glow ${minHeightClass} ${wide ? 'w-full' : ''}`}
+      className="group relative flex w-full gap-3 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950 p-3 text-left shadow-panel transition hover:border-mint/40 hover:shadow-glow"
       data-home-focus="true"
       onClick={onClick}
       type="button"
     >
-      <div className="absolute inset-0">
+      {/* Ambient background — landscape/hero art at low opacity for depth */}
+      {ambientSource ? (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <img
+            alt=""
+            className="h-full w-full scale-105 object-cover opacity-[0.12] blur-sm"
+            decoding="async"
+            loading="lazy"
+            src={ambientSource}
+          />
+          <div className="absolute inset-0 bg-ink-950/60" />
+        </div>
+      ) : null}
+
+      {/* Portrait cover */}
+      <span className={`relative shrink-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-800 ${hero ? 'h-24 w-16' : 'h-20 w-[3.25rem]'}`}>
         {coverSource ? (
           <img
             alt=""
-            className="h-full w-full object-cover opacity-90 transition duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover"
             decoding="async"
             loading="lazy"
             src={coverSource}
           />
         ) : (
-          <div className="grid h-full place-items-center bg-ink-800 text-6xl font-semibold text-mint/60">
+          <span className="grid h-full w-full place-items-center text-lg font-semibold text-mint/60">
             {game.title.slice(0, 1).toUpperCase()}
-          </div>
+          </span>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/50 to-transparent" />
-      </div>
-      <div className={`relative flex flex-col justify-end p-3 ${minHeightClass}`}>
-        <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
-          {eyebrow}
-        </span>
-        {logoUrl ? (
-          <img
-            alt=""
-            aria-hidden="true"
-            className={`mb-2 block object-contain object-left drop-shadow ${hero ? 'max-h-14 max-w-[180px]' : 'max-h-10 max-w-[150px]'}`}
-            decoding="async"
-            loading="lazy"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            src={logoUrl}
-          />
-        ) : null}
-        <span className={`line-clamp-2 font-semibold leading-tight text-white drop-shadow ${hero ? 'text-2xl' : 'text-xl'}`}>
-          {game.title}
-        </span>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <PlatformBadge
-            className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold"
-            platform={getGamePlatformLabel(game, queueState)}
-            queueState={queueState}
-          />
-          {playtime ? <span className="text-xs text-slate-400">{playtime}</span> : null}
+      </span>
+
+      {/* Text + metadata */}
+      <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-2">
+        <div className="min-w-0">
+          <span className="mb-1.5 inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
+            {eyebrow}
+          </span>
+          {logoUrl ? (
+            <img
+              alt=""
+              aria-hidden="true"
+              className="mb-1 block max-h-6 max-w-[110px] object-contain object-left drop-shadow"
+              decoding="async"
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              src={logoUrl}
+            />
+          ) : null}
+          <span className={`line-clamp-2 block font-semibold leading-tight text-white drop-shadow ${hero ? 'text-base' : 'text-sm'}`}>
+            {game.title}
+          </span>
         </div>
-        {activitySignal && (
-          <div className="mt-1.5 text-xs leading-none text-slate-400 drop-shadow">
-            {activitySignal}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <PlatformBadge
+              className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold"
+              platform={getGamePlatformLabel(game, queueState)}
+              queueState={queueState}
+            />
+            {playtime ? <span className="text-xs text-slate-400">{playtime}</span> : null}
           </div>
-        )}
+          {activitySignal ? (
+            <div className="mt-1 text-xs leading-none text-slate-400">
+              {activitySignal}
+            </div>
+          ) : null}
+        </div>
       </div>
     </button>
   );
