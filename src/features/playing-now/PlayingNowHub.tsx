@@ -34,6 +34,7 @@ type PlayingNowContext = {
 
 export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDetails, onPlayToday, onRefreshSteamActivity, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
   const { language } = useI18n();
+  const [openMenuGameId, setOpenMenuGameId] = useState<string | null>(null);
   const today = formatLocalDate(new Date());
   const greetingSeedRef = useRef(`${Date.now()}-${Math.random()}`);
   const previousGreetingSubtextRef = useRef(readLastPlayingNowGreetingSubtext());
@@ -132,9 +133,11 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
                         key={game.id}
                         context={activityByGame.get(game.id) ?? getEmptyPlayingNowContext(game, today)}
                         game={game}
+                        isMenuOpen={openMenuGameId === game.id}
                         onOpenDetails={onOpenDetails}
                         onPlayToday={onPlayToday}
                         onStatusChange={onStatusChange}
+                        onToggleMenu={() => setOpenMenuGameId((prev) => (prev === game.id ? null : game.id))}
                         platformAccentColor={platformAccentColor}
                         queueState={queue ?? undefined}
                         t={t}
@@ -147,6 +150,9 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
             </div>
           )}
         </div>
+      {openMenuGameId ? (
+        <div aria-hidden="true" className="fixed inset-0 z-40" onClick={() => setOpenMenuGameId(null)} />
+      ) : null}
       </section>
   );
 }
@@ -207,16 +213,16 @@ function PlayingNowCover({ game }: { game: Game }) {
   );
 }
 
-function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusChange, platformAccentColor, queueState, t }: { context: PlayingNowContext; game: Game; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; platformAccentColor?: string; queueState?: PlatformQueueState; t: TFunction }) {
+function PlayingNowCard({ context, game, isMenuOpen, onOpenDetails, onPlayToday, onStatusChange, onToggleMenu, platformAccentColor, queueState, t }: { context: PlayingNowContext; game: Game; isMenuOpen: boolean; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; onToggleMenu: () => void; platformAccentColor?: string; queueState?: PlatformQueueState; t: TFunction }) {
   const statusBadge = getPlayingNowStatusBadge(context, t);
   const platformStyle = getPlayingNowPlatformStyle(platformAccentColor);
   const logoUrl = getPreferredLogoUrl(game);
   const heroBgUrl = game.heroImage?.trim() || game.wideCoverImage?.trim() || game.backgroundImage?.trim() || null;
 
   return (
-    <article className="playing-now-card relative flex h-full min-w-0 gap-2.5 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20" style={platformStyle}>
+    <article className="playing-now-card relative flex h-full min-w-0 gap-2.5 rounded-xl border border-skyglass/15 bg-ink-950/70 p-2.5 shadow-lg shadow-black/20" style={platformStyle}>
       {heroBgUrl ? (
-        <div aria-hidden="true" className="playing-now-hero-bg pointer-events-none absolute inset-0">
+        <div aria-hidden="true" className="playing-now-hero-bg pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
           <img
             alt=""
             className="h-full w-full scale-105 object-cover opacity-[0.15] blur-sm"
@@ -247,22 +253,30 @@ function PlayingNowCard({ context, game, onOpenDetails, onPlayToday, onStatusCha
         <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
         <div className="mt-auto flex items-center gap-2 pt-3">
           <button className="playing-now-play-button min-h-8 flex-1 max-w-[15rem] rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
-          <details className="group relative shrink-0">
-            <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-skyglass/15 text-slate-200 transition hover:bg-mint/10 hover:text-white" aria-label={t('action.moreActions')}>
+          <div className="relative shrink-0">
+            <button
+              aria-expanded={isMenuOpen}
+              aria-label={t('action.moreActions')}
+              className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-skyglass/15 text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
+              onClick={(e) => { e.stopPropagation(); onToggleMenu(); }}
+              type="button"
+            >
               <Icon name="more-horizontal" size={16} strokeWidth={2.2} />
-            </summary>
-            <div className="absolute right-0 top-full z-40 mt-2 w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl">
-              <div className="mb-2 grid grid-cols-3 gap-1 border-b border-skyglass/10 pb-2 text-center text-[0.65rem]">
-                <Metric label={t('playingNow.last')} value={context.lastPlayedDate ?? t('playingNow.never')} />
-                <Metric label={t('playingNow.days7')} value={String(context.playedDaysLast7)} />
-                <Metric label={t('playingNow.days30')} value={String(context.playedDaysLast30)} />
+            </button>
+            {isMenuOpen ? (
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                <div className="mb-2 grid grid-cols-3 gap-1 border-b border-skyglass/10 pb-2 text-center text-[0.65rem]">
+                  <Metric label={t('playingNow.last')} value={context.lastPlayedDate ?? t('playingNow.never')} />
+                  <Metric label={t('playingNow.days7')} value={String(context.playedDaysLast7)} />
+                  <Metric label={t('playingNow.days30')} value={String(context.playedDaysLast30)} />
+                </div>
+                <OverflowAction icon="check-circle" label={t('action.finished')} onClick={() => onStatusChange(game.id, 'Finished')} />
+                <OverflowAction icon="x" label={t('status.paused')} onClick={() => onStatusChange(game.id, 'Paused')} />
+                <OverflowAction icon="archive" label={t('queue.removeFromPlaying')} onClick={() => onStatusChange(game.id, 'Want to play')} />
+                <OverflowAction icon="panel-top-open" label={t('playingNow.openDetail')} onClick={() => onOpenDetails(game.id)} />
               </div>
-              <OverflowAction icon="check-circle" label={t('action.finished')} onClick={() => onStatusChange(game.id, 'Finished')} />
-              <OverflowAction icon="x" label={t('status.paused')} onClick={() => onStatusChange(game.id, 'Paused')} />
-              <OverflowAction icon="archive" label={t('queue.removeFromPlaying')} onClick={() => onStatusChange(game.id, 'Want to play')} />
-              <OverflowAction icon="panel-top-open" label={t('playingNow.openDetail')} onClick={() => onOpenDetails(game.id)} />
-            </div>
-          </details>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>
