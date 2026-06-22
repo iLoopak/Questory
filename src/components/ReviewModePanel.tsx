@@ -11,7 +11,7 @@ import {
 import { getControllerButtonLabels, type ConfirmCancelConvention } from '../lib/controllerProfiles';
 import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
-import { getGameCoverSources, getGeneratedFallbackCover } from '../lib/gameCoverImages';
+import { getGameCoverSources, getGeneratedFallbackCover, hasFallbackArtwork } from '../lib/gameCoverImages';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -240,6 +240,13 @@ export function ReviewModePanel({
   const totalCount = sessionGameIds.length;
   const lifetimeReviewedCount = Object.keys(reviewModeState.reviewedGames).length + completedCount;
   const fullRemainingCount = Math.max(0, baseSourceGames.length - completedCount);
+  const processedGames = useMemo(() =>
+    sessionGameIds
+      .filter((id) => processedGameIds.has(id))
+      .map((id) => games.find((g) => g.id === id))
+      .filter((g): g is Game => g !== undefined),
+    [sessionGameIds, processedGameIds, games],
+  );
 
   useEffect(() => {
     if (activeGame && hasGamepad) {
@@ -601,6 +608,7 @@ export function ReviewModePanel({
           ) : (
             <ReviewComplete
               actionStats={actionStats}
+              processedGames={processedGames}
               queuePlatforms={queuePlatforms}
               reviewedCount={completedCount}
               lifetimeReviewedCount={lifetimeReviewedCount}
@@ -1187,6 +1195,7 @@ function ReviewSourceEmpty({
 
 function ReviewComplete({
   actionStats,
+  processedGames,
   queuePlatforms,
   reviewedCount,
   lifetimeReviewedCount,
@@ -1197,6 +1206,7 @@ function ReviewComplete({
   onReviewAnother,
 }: {
   actionStats: ReviewActionStats;
+  processedGames: Game[];
   queuePlatforms: GamePlatform[];
   reviewedCount: number;
   lifetimeReviewedCount: number;
@@ -1223,6 +1233,7 @@ function ReviewComplete({
             Quest Queue reviews in focused 20-game sessions to keep decisions quick and manageable. {remainingCount} {remainingCount === 1 ? 'game remains' : 'games remain'} for your next session.
           </p>
         )}
+        <BatchCelebrationCovers games={processedGames} />
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
             <div className="qs-label-caps text-accent">This Session</div>
@@ -1295,6 +1306,55 @@ function ReviewComplete({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const TILE_ROTATIONS = [-8, -3, 5, -1, 7, -5, 2, -6, -9, 4, -2, 6];
+const TILE_FLOAT_VARIANTS = ['a', 'b', 'c', 'a', 'c', 'b', 'a', 'c', 'b', 'a', 'c', 'b'] as const;
+const TILE_DURATIONS = [2.6, 3.0, 2.4, 2.8, 2.5, 2.9, 2.7, 2.6, 3.1, 2.5, 2.8, 2.7];
+const TILE_DELAYS = [0, 0.3, 0.15, 0.55, 0.4, 0.7, 0.2, 0.5, 0.1, 0.6, 0.35, 0.45];
+const MAX_TILES = 8;
+
+function BatchCelebrationCovers({ games }: { games: Game[] }) {
+  const tiles = useMemo(() => {
+    const withArt = games.filter((g) => !hasFallbackArtwork(g));
+    const withFallback = games.filter((g) => hasFallbackArtwork(g));
+    return [...withArt, ...withFallback].slice(0, MAX_TILES);
+  }, [games]);
+
+  if (tiles.length === 0) return null;
+
+  return (
+    <div aria-hidden="true" className="mt-5 flex items-end justify-center gap-1.5 overflow-hidden" style={{ height: '5.5rem' }}>
+      {tiles.map((game, index) => {
+        const src = getGameCoverSources(game)[0] ?? null;
+        const rotation = TILE_ROTATIONS[index] ?? 0;
+        const variant = TILE_FLOAT_VARIANTS[index] ?? 'a';
+        const duration = TILE_DURATIONS[index] ?? 2.7;
+        const delay = TILE_DELAYS[index] ?? 0;
+
+        return (
+          <span
+            key={game.id}
+            className="qs-batch-cover-tile relative block h-16 w-11 shrink-0 overflow-hidden rounded-md border border-white/10 bg-ink-800 shadow-md"
+            style={{
+              '--tile-rotate': `${rotation}deg`,
+              animationName: `qs-float-${variant}`,
+              animationDuration: `${duration}s`,
+              animationDelay: `${delay}s`,
+              animationTimingFunction: 'ease-in-out',
+              animationIterationCount: 'infinite',
+              animationDirection: 'alternate',
+              animationFillMode: 'both',
+            } as CSSProperties}
+          >
+            {src ? (
+              <img alt="" className="h-full w-full object-cover" decoding="async" loading="eager" src={src} />
+            ) : null}
+          </span>
+        );
+      })}
     </div>
   );
 }
