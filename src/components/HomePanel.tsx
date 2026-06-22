@@ -387,7 +387,7 @@ export function HomePanel({
                   <GamePosterButton
                     key={game.id}
                     game={game}
-                    eyebrow={t('home.currentlyPlaying')}
+
                     hero={continuePlayingGames.length === 1}
                     activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
                     onClick={() => setActionSheetGame(game)}
@@ -710,7 +710,7 @@ function GamePosterButton({
   activitySignal = null,
 }: {
   game: Game;
-  eyebrow: string;
+  eyebrow?: string;
   hero?: boolean;
   onClick: () => void;
   queueState: PlatformQueueState;
@@ -763,9 +763,11 @@ function GamePosterButton({
       {/* Text + metadata */}
       <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-2">
         <div className="min-w-0">
-          <span className="mb-1.5 inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
-            {eyebrow}
-          </span>
+          {eyebrow ? (
+            <span className="mb-1.5 inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
+              {eyebrow}
+            </span>
+          ) : null}
           {logoUrl ? (
             <img
               alt=""
