@@ -999,6 +999,7 @@ const en = {
   'dailyQuest.hint1Label': 'Hint 1 · Platform',
   'dailyQuest.hint2Label': 'Hint 2 · Genre',
   'dailyQuest.hint3Label': 'Hint 3 · Title',
+  'dailyQuest.bestStreak': 'Best streak',
   'dailyQuest.close': 'Close',
 } as const;
 
@@ -1990,6 +1991,7 @@ const cs: Dictionary = {
   'dailyQuest.hint1Label': 'Nápověda 1 · Platforma',
   'dailyQuest.hint2Label': 'Nápověda 2 · Žánr',
   'dailyQuest.hint3Label': 'Nápověda 3 · Název',
+  'dailyQuest.bestStreak': 'Nejdelší serie',
   'dailyQuest.close': 'Zavřít',
 };
 

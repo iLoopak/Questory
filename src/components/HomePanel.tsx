@@ -379,9 +379,6 @@ export function HomePanel({
             onOpenReviewMode={() => onOpenReviewMode('backlog')}
           />
 
-          {/* Daily Quest */}
-          {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
-
           {/* Continue Playing */}
           <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
@@ -472,6 +469,9 @@ export function HomePanel({
               />
             )}
           </HomeSection>
+
+          {/* Daily Quest */}
+          {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
 
           {/* Quest Queue Remaining */}
           <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">

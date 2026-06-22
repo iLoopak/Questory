@@ -138,16 +138,46 @@ export function computeWeeklyStats(sessions: DailyQuestSession[], today: string)
   const totalTime = solvedArr.reduce((acc, s) => acc + (s.result?.remainingTime ?? 0), 0);
   const avgRemainingTime = solved > 0 ? Math.round(totalTime / solved) : 0;
 
-  // Current streak: consecutive days solved, ending today (or yesterday if today not played)
-  let streak = 0;
+  // Current streak: consecutive days solved, ending today
+  let currentStreak = 0;
   const solvedDates = new Set(sessions.filter((s) => s.result?.solved).map((s) => s.date));
   let cursor = today;
   while (solvedDates.has(cursor)) {
-    streak++;
+    currentStreak++;
     const d = new Date(cursor + 'T12:00:00');
     d.setDate(d.getDate() - 1);
     cursor = d.toISOString().slice(0, 10);
   }
 
-  return { weekStart, played, solved, totalScore, avgScore, avgRemainingTime, currentStreak: streak };
+  // Best streak: longest consecutive run across all history
+  const bestStreak = computeBestStreak(sessions);
+
+  return { weekStart, played, solved, totalScore, avgScore, avgRemainingTime, currentStreak, bestStreak };
+}
+
+function computeBestStreak(sessions: DailyQuestSession[]): number {
+  const solvedDates = sessions
+    .filter((s) => s.result?.solved)
+    .map((s) => s.date)
+    .sort(); // ISO strings sort chronologically
+
+  if (solvedDates.length === 0) return 0;
+
+  let best = 1;
+  let current = 1;
+
+  for (let i = 1; i < solvedDates.length; i++) {
+    const prev = new Date(solvedDates[i - 1] + 'T12:00:00');
+    const curr = new Date(solvedDates[i] + 'T12:00:00');
+    const diff = Math.round((curr.getTime() - prev.getTime()) / 86400000);
+    if (diff === 1) {
+      current++;
+      if (current > best) best = current;
+    } else if (diff > 1) {
+      current = 1;
+    }
+    // diff === 0 = duplicate date, skip
+  }
+
+  return best;
 }

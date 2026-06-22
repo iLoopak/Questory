@@ -14,10 +14,11 @@ export function WeeklySummary({ stats, t }: WeeklySummaryProps) {
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
         {t('dailyQuest.weeklyStats')}
       </div>
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-4 gap-2 text-center">
         <Stat label={t('dailyQuest.solved')} value={`${stats.solved}/${stats.played}`} />
         <Stat label={t('dailyQuest.avgScore')} value={stats.avgScore > 0 ? String(stats.avgScore) : '—'} />
         <Stat label={t('dailyQuest.streak')} value={stats.currentStreak > 0 ? `${stats.currentStreak}🔥` : '0'} />
+        <Stat label={t('dailyQuest.bestStreak')} value={stats.bestStreak > 0 ? String(stats.bestStreak) : '0'} />
       </div>
     </div>
   );
