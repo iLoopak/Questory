@@ -1935,7 +1935,7 @@ function AppStartupScreen() {
         <div className="flex items-center gap-3">
           <QuestShelfLogo className="h-12 w-12 rounded-lg border border-mint/30" fallbackClassName="text-sm" />
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">QuestShelf</div>
+            <div className="text-sm font-semibold uppercase tracking-[0.16em] text-mint">QuestShelf</div>
             <h1 className="mt-1 text-2xl font-semibold text-white">{createTranslator(loadLanguagePreference())('common.loadingLibrary')}</h1>
           </div>
         </div>

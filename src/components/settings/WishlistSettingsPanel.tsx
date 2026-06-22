@@ -561,7 +561,7 @@ function normalizeSteamWishlistUrl(value: string) {
 function SyncStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-2">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">
+      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
         {label}
       </div>
       <div className="mt-1 text-lg font-semibold text-white">{value}</div>

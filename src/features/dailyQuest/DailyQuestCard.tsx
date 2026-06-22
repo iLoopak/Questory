@@ -113,7 +113,7 @@ function ReadyBody({
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <p className="text-xs leading-snug text-slate-400">{t('dailyQuest.cardHint')}</p>
         <button
-          className="min-h-9 w-full rounded-xl bg-mint px-3 text-xs font-semibold text-ink-950 transition hover:bg-mint/90 focus:outline-none focus:ring-2 focus:ring-mint/40"
+          className="min-h-9 w-full rounded-xl bg-mint px-3 text-sm font-semibold text-ink-950 transition hover:bg-mint/90 focus:outline-none focus:ring-2 focus:ring-mint/40"
           data-home-focus="true"
           onClick={onPlay}
           type="button"

@@ -883,7 +883,7 @@ function PlatformQueueColumn({
           <div className="qs-platform-playing-panel w-full min-w-0 rounded-xl border p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.18em]">{playingNowLabel}</h4>
+                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.16em]">{playingNowLabel}</h4>
                 <p className="qs-platform-playing-meta mt-1 text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} · {platform}</p>
               </div>
               <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">{t('queue.activeList')}</span>

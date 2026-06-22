@@ -291,7 +291,7 @@ export function HomePanel({
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <div className="text-xl font-bold text-white">{continuePlayingGames.length}</div>
+              <div className="text-xl font-bold tabular-nums text-white">{continuePlayingGames.length}</div>
               <div className="text-xs text-slate-400">{t('home.heroActiveGames')}</div>
             </div>
             <div className="h-8 w-px bg-skyglass/20" />
@@ -302,7 +302,7 @@ export function HomePanel({
               onClick={() => onOpenReviewMode('backlog')}
               type="button"
             >
-              <div className="text-xl font-bold text-white">{reviewRemainingCount}</div>
+              <div className="text-xl font-bold tabular-nums text-white">{reviewRemainingCount}</div>
               <div className="text-xs text-slate-400">{t('home.heroQueueCount')}</div>
             </button>
             {hasSyncActions ? (
@@ -482,7 +482,7 @@ export function HomePanel({
               type="button"
               aria-label="Open Quest Queue"
             >
-              <div className="text-3xl font-semibold text-white">{reviewRemainingCount}</div>
+              <div className="text-3xl font-semibold tabular-nums text-white">{reviewRemainingCount}</div>
             </button>
             <p className="mt-1 text-sm text-slate-300">
               {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
@@ -658,7 +658,7 @@ function HomeSection({
         </div>
         {actionLabel && onAction ? (
           <button
-            className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+            className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
             data-home-focus="true"
             onClick={onAction}
             type="button"
@@ -749,7 +749,7 @@ function GamePosterButton({
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/50 to-transparent" />
       </div>
       <div className={`relative flex flex-col justify-end p-3 ${minHeightClass}`}>
-        <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-mint">
+        <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
           {eyebrow}
         </span>
         {logoUrl ? (
@@ -864,7 +864,7 @@ function DealAlertCard({
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-400">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-400">
           {isHistoricalLow ? '🔥 Historical Low Found' : `🔥 ${deals.length} ${deals.length === 1 ? 'game' : 'games'} on sale`}
         </div>
         <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-white">{best.title}</p>
@@ -1023,7 +1023,7 @@ function WishlistDealActionSheet({
 
           {game.itadCurrentBestUrl ? (
             <a
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-[0.9375rem] font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
+              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-base font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
               href={game.itadCurrentBestUrl}
               rel="noreferrer"
               target="_blank"
@@ -1199,7 +1199,7 @@ function NoNextAdventureGuide({
   if (!hasProcessedGames) {
     return (
       <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
-        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Next step</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Next step</div>
         <h4 className="mt-1 text-base font-semibold text-white">Review your library first</h4>
         <p className="mt-1 text-sm text-slate-400">
           Platform Plans organise what you want to play on each system. Use Quest Queue to review your library and send games here.
@@ -1229,7 +1229,7 @@ function NoNextAdventureGuide({
 
   return (
     <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
-      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Next step</div>
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Next step</div>
       <h4 className="mt-1 text-base font-semibold text-white">Add games to a Platform Plan</h4>
       <p className="mt-1 text-sm text-slate-400">
         Platform Plans hold the games you have decided to play next, organised by platform. Use Quest Queue to review your library and send games here, or open Platform Plans to add them directly.
@@ -1373,7 +1373,7 @@ function FirstDayProgressPanel({
         <Icon name="x" size={14} />
       </button>
       <div className="flex items-center gap-2 pr-6">
-        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Your Progress</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Your Progress</div>
         <span className="rounded-full bg-mint/15 px-2 py-0.5 text-xs font-bold text-mint">
           {completedCount} / {milestones.length}
         </span>
@@ -1382,7 +1382,7 @@ function FirstDayProgressPanel({
         {milestones.map((m, i) => (
           <div key={i} className={`flex items-start gap-2.5 rounded-lg p-2.5 ${m.done ? 'bg-mint/5' : 'bg-ink-950/40'}`}>
             <div
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                 m.done ? 'bg-mint text-ink-950' : 'border border-skyglass/30 text-slate-600'
               }`}
             >

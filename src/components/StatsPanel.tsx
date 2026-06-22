@@ -281,7 +281,7 @@ function BreakdownPanel({ items, label, secondaryLabel, title }: BreakdownPanelP
             <div key={item.label}>
               <div className="mb-1 flex items-center justify-between gap-3 text-sm">
                 <span className="min-w-0 truncate text-slate-200">{item.label}</span>
-                <span className="shrink-0 text-slate-400">
+                <span className="shrink-0 tabular-nums text-slate-400">
                   {item.count} {label}
                   {secondaryLabel && typeof item.hours === 'number' ? ` / ${item.hours} ${secondaryLabel}` : ''}
                 </span>
@@ -414,7 +414,7 @@ type MetricCardProps = {
 function MetricCard({ compact = false, label, value }: MetricCardProps) {
   return (
     <div className={`rounded-lg border border-skyglass/15 bg-ink-950/80 ${compact ? 'p-3' : 'p-4'} qs-inset-highlight`}>
-      <div className={`${compact ? 'text-xl' : 'text-2xl'} font-semibold text-white`}>{value}</div>
+      <div className={`${compact ? 'text-xl' : 'text-2xl'} font-semibold tabular-nums text-white`}>{value}</div>
       <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
     </div>
   );
@@ -429,7 +429,7 @@ type ProgressCardProps = {
 function ProgressCard({ label, percent, value }: ProgressCardProps) {
   return (
     <div className="rounded-lg border border-mint/20 bg-mint/10 p-4">
-      <div className="text-2xl font-semibold text-mint">{value}</div>
+      <div className="text-2xl font-semibold tabular-nums text-mint">{value}</div>
       <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">{label}</div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-ink-950">
         <div className="h-full rounded-full bg-mint shadow-glow" style={{ width: `${percent}%` }} />

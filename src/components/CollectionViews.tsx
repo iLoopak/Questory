@@ -831,7 +831,7 @@ const CompactGameRow = memo(function CompactGameRow({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             {highlightLabel ? (
-              <span className="rounded-full border border-amber-300/40 bg-amber-300 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-950">
+              <span className="rounded-full border border-amber-300/40 bg-amber-300 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.14em] text-ink-950">
                 {highlightLabel}
               </span>
             ) : null}
@@ -986,7 +986,7 @@ function MissingCover({ title }: { title: string }) {
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-md border border-mint/20 bg-ink-900 text-lg font-semibold text-mint shadow-glow">
           {title.slice(0, 1).toUpperCase()}
         </span>
-        <span className="mt-2 block text-[0.65rem] font-medium uppercase tracking-[0.14em] text-slate-500">{t('collection.noCover')}</span>
+        <span className="mt-2 block text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{t('collection.noCover')}</span>
       </span>
     </span>
   );

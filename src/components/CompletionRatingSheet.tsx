@@ -69,7 +69,7 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
 
           <div className="mt-5 space-y-2.5">
             <button
-              className={`w-full rounded-2xl py-3.5 text-[0.9375rem] font-bold transition ${
+              className={`w-full rounded-2xl py-3.5 text-base font-bold transition ${
                 selected > 0
                   ? 'bg-mint text-ink-950 hover:bg-mint/90 active:scale-[0.98]'
                   : 'cursor-not-allowed bg-ink-800 text-slate-500'

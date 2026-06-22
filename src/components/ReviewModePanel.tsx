@@ -482,7 +482,7 @@ export function ReviewModePanel({
           className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-center shadow-panel backdrop-blur-md"
         >
           <div className="text-sm font-bold text-mint leading-none">{totalCount === 0 ? '—' : `${completedCount} of ${totalCount}`}</div>
-          {totalCount > 0 && <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-mint/50 leading-none">reviewed</div>}
+          {totalCount > 0 && <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-mint/50 leading-none">reviewed</div>}
         </div>
         <div className="relative">
           <button
@@ -499,13 +499,13 @@ export function ReviewModePanel({
             <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-2xl border border-skyglass/15 bg-ink-950/95 p-3 text-left shadow-panel backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-bold text-white">{t('review.options')}</h2>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                   {sourceLabel}
                 </span>
               </div>
 
               <div className="mt-3 grid gap-3">
-                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400" htmlFor="review-source">
+                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400" htmlFor="review-source">
                   Review Group
                   <select
                     className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
@@ -521,7 +521,7 @@ export function ReviewModePanel({
                   </select>
                 </label>
 
-                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400" htmlFor="review-platform">
+                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400" htmlFor="review-platform">
                   Platform filter
                   <select
                     className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
@@ -538,7 +538,7 @@ export function ReviewModePanel({
                 </label>
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{t('review.batchOptions')}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.batchOptions')}</div>
                   <p className="mt-1 text-xs text-slate-400">{t('review.switchHelp')}</p>
                 </div>
 
@@ -823,10 +823,10 @@ function FocusedReviewCard({
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
                 {actionDescriptions[action.action] && !hasGamepad && (
-                  <span className="mt-0.5 block text-[9px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
+                  <span className="mt-0.5 block text-[10px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
                 )}
                 {hasGamepad && action.hint && (
-                  <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                  <span className="mt-1 block text-[10px] font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                   </span>
                 )}
@@ -896,7 +896,7 @@ function FocusedReviewCard({
                     src={activeCoverSource}
                   />
                   {isGeneratedFallbackActive && (
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 backdrop-blur-sm">
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 backdrop-blur-sm">
                       No artwork
                     </div>
                   )}
@@ -910,7 +910,7 @@ function FocusedReviewCard({
                     draggable={false}
                     src={fallbackCoverSource}
                   />
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 backdrop-blur-sm">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 backdrop-blur-sm">
                     No artwork
                   </div>
                 </div>
@@ -921,7 +921,7 @@ function FocusedReviewCard({
           <div className="mt-3 text-center w-full px-2">
             <div className="flex items-center justify-center gap-2">
               <PlatformBadge
-                className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]"
+                className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-widest"
                 platform={game.platform}
                 queueState={queueState}
               />
@@ -933,7 +933,7 @@ function FocusedReviewCard({
         </div>
 
         {hasGamepad ? (
-          <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+          <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
             <span>L2 {t('review.previous')}</span>
             <span>•</span>
             <span>R2 {t('review.next')}</span>
@@ -1034,10 +1034,10 @@ function FocusedReviewCard({
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
                 {actionDescriptions[action.action] && !hasGamepad && (
-                  <span className="mt-0.5 block text-[9px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
+                  <span className="mt-0.5 block text-[10px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
                 )}
                 {hasGamepad && action.hint && (
-                  <span className="mt-1 block text-[9.5px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                  <span className="mt-1 block text-[10px] font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                   </span>
                 )}

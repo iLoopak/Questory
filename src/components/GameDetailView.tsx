@@ -656,7 +656,7 @@ function EditSelect({ label, onChange, options, value }: { label: string; onChan
 function HeroStat({ accent, label, value }: { accent?: boolean; label: string; value: string }) {
   return (
     <div className={`rounded-xl border px-3 py-2 ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'}`}>
-      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
     </div>
   );
@@ -994,7 +994,7 @@ function MetadataAccordion({ children, summary, title }: MetadataAccordionProps)
           <span className="block font-semibold text-slate-200">{title}</span>
           <span className="block truncate text-xs text-slate-500">{summary}</span>
         </span>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
           Read-only
         </span>
       </summary>

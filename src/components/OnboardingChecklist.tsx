@@ -174,7 +174,7 @@ export function OnboardingChecklist({
               <h3 className="text-2xl font-semibold text-white">{activeStep.title}</h3>
               <p className="mt-1 text-sm text-slate-400">{activeStep.summary}</p>
             </div>
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${stepComplete ? 'border-mint/40 bg-mint/10 text-mint' : stepSkipped ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${stepComplete ? 'border-mint/40 bg-mint/10 text-mint' : stepSkipped ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}>
               {stepComplete ? t('onboarding.completed') : stepSkipped ? t('onboarding.skipped') : t('onboarding.openStatus')}
             </span>
           </div>

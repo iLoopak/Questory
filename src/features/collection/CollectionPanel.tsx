@@ -856,7 +856,7 @@ export function CollectionPanel({
               onClick={onAddGame}
               type="button"
             >
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Steam</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Steam</div>
               <div className="mt-1 text-sm font-semibold text-white">Import Steam Library</div>
               <div className="mt-0.5 text-xs text-slate-400">Import your owned games, playtime, and achievements.</div>
             </button>
@@ -866,7 +866,7 @@ export function CollectionPanel({
                 onClick={onOpenRetro}
                 type="button"
               >
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">ROMs</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">ROMs</div>
                 <div className="mt-1 text-sm font-semibold text-white">Import ROM Folder</div>
                 <div className="mt-0.5 text-xs text-slate-400">Scan a local folder and import retro games in bulk.</div>
               </button>
@@ -876,7 +876,7 @@ export function CollectionPanel({
               onClick={onAddGame}
               type="button"
             >
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-mint">Manual</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Manual</div>
               <div className="mt-1 text-sm font-semibold text-white">Add Game Manually</div>
               <div className="mt-0.5 text-xs text-slate-400">Add any game — console, PC, or handheld — by title.</div>
             </button>
@@ -905,7 +905,7 @@ function NoticeStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-current/20 bg-black/15 px-2 py-2">
       <div className="text-base font-semibold text-white">{value}</div>
-      <div className="mt-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] opacity-75">{label}</div>
+      <div className="mt-0.5 text-xs font-semibold uppercase tracking-[0.14em] opacity-75">{label}</div>
     </div>
   );
 }
@@ -927,7 +927,7 @@ function SteamAchievementSyncNotice({ syncState }: { syncState: SteamAchievement
       <div>{syncState.message}</div>
       {syncState.status === 'loading' ? (
         <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
+          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.14em]">
             <span>{t('app.progress')}</span>
             <span>{syncState.progress.completed}/{syncState.progress.total}</span>
           </div>
@@ -966,7 +966,7 @@ function SteamPlaytimeRefreshNotice({ refreshState }: { refreshState: SteamPlayt
       <div>{refreshState.message}</div>
       {refreshState.status === 'loading' ? (
         <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
+          <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.14em]">
             <span>{t('app.progress')}</span>
             <span>{refreshState.progress.completed}/{refreshState.progress.total}</span>
           </div>
@@ -1033,7 +1033,7 @@ function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
 
   return (
     <label className="block">
-      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
       <select
         className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
         value={value}

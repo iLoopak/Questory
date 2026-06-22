@@ -24,7 +24,7 @@ export function DealCoverBadges({ game, isInteractive = true, variant = 'grid' }
     ? 'absolute inset-x-1 bottom-1 z-10 flex max-w-[calc(100%-0.5rem)] flex-col items-start gap-0.5'
     : 'absolute bottom-3 right-3 z-10 flex max-w-[58%] flex-col items-end gap-1.5 sm:max-w-[52%]';
   const badgeClass = isCompact
-    ? 'max-w-full truncate rounded-full border border-white/20 bg-ink-950/88 px-1.5 py-0.5 text-[0.55rem] font-extrabold leading-none text-white shadow-panel backdrop-blur-md'
+    ? 'max-w-full truncate rounded-full border border-white/20 bg-ink-950/88 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow-panel backdrop-blur-md'
     : 'max-w-full truncate rounded-full border border-white/20 bg-ink-950/88 px-2.5 py-1 text-xs font-extrabold leading-none text-white shadow-panel backdrop-blur-md';
   const priceBadgeClass = `${badgeClass} border-mint/35 bg-mint/20 text-mint`;
   const discountBadgeClass = `${badgeClass} border-amber-300/45 bg-amber-300/95 text-ink-950`;
