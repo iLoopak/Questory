@@ -337,7 +337,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
 
         <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-3">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <span className="qs-label-caps text-muted">
               {t('data.backupJson')}
             </span>
             <input
@@ -613,7 +613,7 @@ function RestoreConfirmModal({
 function BackupSummaryStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="qs-label-caps text-muted">{label}</div>
       <div className="mt-1 truncate text-sm text-white">{value}</div>
     </div>
   );

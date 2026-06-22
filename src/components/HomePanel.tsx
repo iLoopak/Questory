@@ -475,7 +475,7 @@ export function HomePanel({
 
           {/* Quest Queue Remaining */}
           <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('home.reviewRemaining')}</div>
+            <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
             <button
               className="mt-2 cursor-pointer text-left transition hover:opacity-75 focus:outline-none"
               onClick={() => onOpenReviewMode('backlog')}
@@ -598,7 +598,7 @@ function JourneyProgressCard({
     <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Your QuestShelf Journey</div>
+          <div className="text-xs font-semibold uppercase tracking-spread text-mint">Your QuestShelf Journey</div>
           <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
             <span>✓ Imported <strong className="text-white">{importedCount}</strong> games</span>
             <span>✓ Reviewed <strong className="text-white">{reviewedCount}</strong> games</span>
@@ -622,7 +622,7 @@ function JourneyProgressCard({
           onClick={onOpenReviewMode}
           type="button"
         >
-          <div className="text-xs font-semibold uppercase tracking-[0.14em]">Next milestone</div>
+          <div className="qs-label-caps">Next milestone</div>
           <div className="mt-1 font-semibold text-white">Review {nextReviewTarget} more games</div>
         </button>
       </div>
@@ -658,7 +658,7 @@ function HomeSection({
         </div>
         {actionLabel && onAction ? (
           <button
-            className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+            className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 qs-label-caps text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
             data-home-focus="true"
             onClick={onAction}
             type="button"
@@ -689,7 +689,7 @@ function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
       >
         <Icon name="x" size={13} />
       </button>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">How QuestShelf Works</div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-spread text-slate-500">How QuestShelf Works</div>
       <div className="grid gap-2 pr-4 sm:grid-cols-4">
         {stages.map(([name, desc]) => (
           <div className="text-xs text-slate-400" key={name}>
@@ -749,7 +749,7 @@ function GamePosterButton({
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/50 to-transparent" />
       </div>
       <div className={`relative flex flex-col justify-end p-3 ${minHeightClass}`}>
-        <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
+        <span className="mb-2 w-fit rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
           {eyebrow}
         </span>
         {logoUrl ? (
@@ -864,7 +864,7 @@ function DealAlertCard({
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-400">
+        <div className="qs-label-caps text-amber-400">
           {isHistoricalLow ? '🔥 Historical Low Found' : `🔥 ${deals.length} ${deals.length === 1 ? 'game' : 'games'} on sale`}
         </div>
         <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-white">{best.title}</p>
@@ -1077,7 +1077,7 @@ function OnboardingSteps({
     <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
       <p className="mb-4 text-sm font-semibold text-white">{t('home.getStarted')}</p>
       <p className="mb-4 text-xs text-slate-400">{t('home.getStartedSubtitle')}</p>
-      <div className="mb-4 flex flex-wrap items-center gap-1 text-[10px] font-semibold text-slate-500">
+      <div className="mb-4 flex flex-wrap items-center gap-1 text-2xs font-semibold text-slate-500">
         <span className="rounded bg-ink-900 px-2 py-0.5 text-slate-300">Library</span>
         <span className="text-slate-600">→</span>
         <span className="rounded bg-ink-900 px-2 py-0.5 text-mint/80">Quest Queue</span>
@@ -1199,7 +1199,7 @@ function NoNextAdventureGuide({
   if (!hasProcessedGames) {
     return (
       <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Next step</div>
+        <div className="qs-label-caps text-accent">Next step</div>
         <h4 className="mt-1 text-base font-semibold text-white">Review your library first</h4>
         <p className="mt-1 text-sm text-slate-400">
           Platform Plans organise what you want to play on each system. Use Quest Queue to review your library and send games here.
@@ -1229,7 +1229,7 @@ function NoNextAdventureGuide({
 
   return (
     <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4">
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Next step</div>
+      <div className="qs-label-caps text-accent">Next step</div>
       <h4 className="mt-1 text-base font-semibold text-white">Add games to a Platform Plan</h4>
       <p className="mt-1 text-sm text-slate-400">
         Platform Plans hold the games you have decided to play next, organised by platform. Use Quest Queue to review your library and send games here, or open Platform Plans to add them directly.
@@ -1373,7 +1373,7 @@ function FirstDayProgressPanel({
         <Icon name="x" size={14} />
       </button>
       <div className="flex items-center gap-2 pr-6">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">Your Progress</div>
+        <div className="qs-label-caps text-accent">Your Progress</div>
         <span className="rounded-full bg-mint/15 px-2 py-0.5 text-xs font-bold text-mint">
           {completedCount} / {milestones.length}
         </span>
@@ -1382,7 +1382,7 @@ function FirstDayProgressPanel({
         {milestones.map((m, i) => (
           <div key={i} className={`flex items-start gap-2.5 rounded-lg p-2.5 ${m.done ? 'bg-mint/5' : 'bg-ink-950/40'}`}>
             <div
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-2xs font-bold ${
                 m.done ? 'bg-mint text-ink-950' : 'border border-skyglass/30 text-slate-600'
               }`}
             >

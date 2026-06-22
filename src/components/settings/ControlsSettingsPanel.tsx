@@ -42,7 +42,7 @@ export function ControlsSettingsPanel({
         description="Select your controller type to get correct button hints, confirm/cancel layout, and input tuning for your hardware."
         meta={
           detectedLabel ? (
-            <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
+            <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 qs-label-caps text-accent">
               Detected: {detectedLabel}
             </span>
           ) : null

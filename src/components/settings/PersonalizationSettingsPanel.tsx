@@ -167,7 +167,7 @@ export function PersonalizationSettingsPanel({
     >
       <div className="space-y-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.shelfName')}</span>
+          <span className="qs-label-caps text-muted">{t('personalization.shelfName')}</span>
           <input
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
             maxLength={maxShelfNameLength}
@@ -181,7 +181,7 @@ export function PersonalizationSettingsPanel({
         </label>
 
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.shelfAvatar')}</div>
+          <div className="qs-label-caps text-muted">{t('personalization.shelfAvatar')}</div>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label={t('personalization.shelfAvatar')}>
             {avatarOptions.map((option) => {
               const isSelected = shelfIdentity.avatarSelection === option.value;
@@ -253,7 +253,7 @@ export function PersonalizationSettingsPanel({
               <Icon name="check-circle" size={18} strokeWidth={2.2} />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.featuredGame')}</div>
+              <div className="qs-label-caps text-muted">{t('personalization.featuredGame')}</div>
               <p className="mt-1 text-sm text-slate-400">{t('personalization.featuredGameHelp')}</p>
             </div>
           </div>
@@ -280,7 +280,7 @@ export function PersonalizationSettingsPanel({
           </div>
           {shelfIdentity.featuredGameMode === 'manual' ? (
             <label className="mt-3 block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.manualFeaturedGame')}</span>
+              <span className="qs-label-caps text-muted">{t('personalization.manualFeaturedGame')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setManualGameSearch(event.target.value)}
@@ -309,7 +309,7 @@ export function PersonalizationSettingsPanel({
         <div>
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('personalization.activeBadge')}</div>
+              <div className="qs-label-caps text-muted">{t('personalization.activeBadge')}</div>
               <p className="mt-1 text-sm text-slate-400">{t('personalization.activeBadgeHelp')}</p>
             </div>
             <button
@@ -354,7 +354,7 @@ export function PersonalizationSettingsPanel({
         </div>
 
         <div className="qs-achievement-preview">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em]">{t('personalization.preview')}</div>
+          <div className="qs-label-caps">{t('personalization.preview')}</div>
           <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
             <ShelfAvatar {...shelfIdentity} isActive steamAvatarUrl={steamAvatarUrl} sizeClassName="h-10 w-10" />
             <span>{personalizedQuestShelfTitle}{activeAchievementTitle ? <span className="qs-achievement-inline-badge ml-1"> · {activeAchievement ? <Icon name={activeAchievement.icon} /> : null}{activeAchievementTitle}</span> : null}</span>

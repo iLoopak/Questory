@@ -415,7 +415,7 @@ function MetricCard({ compact = false, label, value }: MetricCardProps) {
   return (
     <div className={`rounded-lg border border-skyglass/15 bg-ink-950/80 ${compact ? 'p-3' : 'p-4'} qs-inset-highlight`}>
       <div className={`${compact ? 'text-xl' : 'text-2xl'} font-semibold tabular-nums text-white`}>{value}</div>
-      <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
     </div>
   );
 }
@@ -430,7 +430,7 @@ function ProgressCard({ label, percent, value }: ProgressCardProps) {
   return (
     <div className="rounded-lg border border-mint/20 bg-mint/10 p-4">
       <div className="text-2xl font-semibold tabular-nums text-mint">{value}</div>
-      <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">{label}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-caps text-slate-400">{label}</div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-ink-950">
         <div className="h-full rounded-full bg-mint shadow-glow" style={{ width: `${percent}%` }} />
       </div>

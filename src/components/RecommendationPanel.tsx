@@ -241,7 +241,7 @@ export function RecommendationPanel({
               </div>
 
               <div className="mt-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('recommendations.mood')}</div>
+                <div className="qs-label-caps text-muted">{t('recommendations.mood')}</div>
                 <div className="mt-2 flex gap-1 overflow-x-auto rounded-md border border-white/10 bg-ink-900 p-1">
                   {moodOptions.map((option) => (
                     <button

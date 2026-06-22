@@ -482,7 +482,7 @@ export function ReviewModePanel({
           className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-center shadow-panel backdrop-blur-md"
         >
           <div className="text-sm font-bold text-mint leading-none">{totalCount === 0 ? '—' : `${completedCount} of ${totalCount}`}</div>
-          {totalCount > 0 && <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-mint/50 leading-none">reviewed</div>}
+          {totalCount > 0 && <div className="mt-0.5 text-2xs font-semibold uppercase tracking-widest text-mint/50 leading-none">reviewed</div>}
         </div>
         <div className="relative">
           <button
@@ -499,13 +499,13 @@ export function ReviewModePanel({
             <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-2xl border border-skyglass/15 bg-ink-950/95 p-3 text-left shadow-panel backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-bold text-white">{t('review.options')}</h2>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 qs-label-caps text-slate-400">
                   {sourceLabel}
                 </span>
               </div>
 
               <div className="mt-3 grid gap-3">
-                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400" htmlFor="review-source">
+                <label className="grid gap-1 qs-label-caps text-slate-400" htmlFor="review-source">
                   Review Group
                   <select
                     className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
@@ -521,7 +521,7 @@ export function ReviewModePanel({
                   </select>
                 </label>
 
-                <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400" htmlFor="review-platform">
+                <label className="grid gap-1 qs-label-caps text-slate-400" htmlFor="review-platform">
                   Platform filter
                   <select
                     className="h-10 rounded-md border border-skyglass/15 bg-ink-900 px-2 text-sm normal-case tracking-normal text-white outline-none transition focus:border-mint"
@@ -538,7 +538,7 @@ export function ReviewModePanel({
                 </label>
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('review.batchOptions')}</div>
+                  <div className="qs-label-caps text-muted">{t('review.batchOptions')}</div>
                   <p className="mt-1 text-xs text-slate-400">{t('review.switchHelp')}</p>
                 </div>
 
@@ -823,10 +823,10 @@ function FocusedReviewCard({
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
                 {actionDescriptions[action.action] && !hasGamepad && (
-                  <span className="mt-0.5 block text-[10px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
+                  <span className="mt-0.5 block text-2xs leading-none opacity-50">{actionDescriptions[action.action]}</span>
                 )}
                 {hasGamepad && action.hint && (
-                  <span className="mt-1 block text-[10px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                  <span className="mt-1 block text-2xs font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                   </span>
                 )}
@@ -896,7 +896,7 @@ function FocusedReviewCard({
                     src={activeCoverSource}
                   />
                   {isGeneratedFallbackActive && (
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 backdrop-blur-sm">
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-caps text-slate-400 backdrop-blur-sm">
                       No artwork
                     </div>
                   )}
@@ -910,7 +910,7 @@ function FocusedReviewCard({
                     draggable={false}
                     src={fallbackCoverSource}
                   />
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 backdrop-blur-sm">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-ink-950/70 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-caps text-slate-400 backdrop-blur-sm">
                     No artwork
                   </div>
                 </div>
@@ -933,7 +933,7 @@ function FocusedReviewCard({
         </div>
 
         {hasGamepad ? (
-          <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+          <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 qs-label-caps text-slate-400">
             <span>L2 {t('review.previous')}</span>
             <span>•</span>
             <span>R2 {t('review.next')}</span>
@@ -993,7 +993,7 @@ function FocusedReviewCard({
         {isNoteOpen ? (
           <div className="mt-3 w-full rounded-xl border border-mint/20 bg-ink-950/80 p-3">
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{t('review.quickNote')}</span>
+              <span className="qs-label-caps text-slate-400">{t('review.quickNote')}</span>
               <textarea
                 className="mt-2 min-h-24 w-full rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => onNoteDraftChange(event.target.value)}
@@ -1034,10 +1034,10 @@ function FocusedReviewCard({
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{getReviewActionLabel(action, t)}</span>
                 </div>
                 {actionDescriptions[action.action] && !hasGamepad && (
-                  <span className="mt-0.5 block text-[10px] leading-none opacity-50">{actionDescriptions[action.action]}</span>
+                  <span className="mt-0.5 block text-2xs leading-none opacity-50">{actionDescriptions[action.action]}</span>
                 )}
                 {hasGamepad && action.hint && (
-                  <span className="mt-1 block text-[10px] font-bold tracking-widest opacity-50 uppercase leading-none">
+                  <span className="mt-1 block text-2xs font-bold tracking-widest opacity-50 uppercase leading-none">
                     {action.hint in buttonLabels ? buttonLabels[action.hint as keyof typeof buttonLabels] : action.hint}
                   </span>
                 )}
@@ -1168,7 +1168,7 @@ function ReviewSourceEmpty({
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-sm">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nothing here</div>
+        <div className="text-xs font-semibold uppercase tracking-spread text-slate-500">Nothing here</div>
         <h3 className="mt-2 text-xl font-semibold text-white">{title}</h3>
         <p className="mt-2 text-sm text-slate-400">{text}</p>
         {source !== 'backlog' && (
@@ -1213,7 +1213,7 @@ function ReviewComplete({
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-3xl">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Quest Queue Session Complete</div>
+        <div className="text-xs font-semibold uppercase tracking-spread text-mint">Quest Queue Session Complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">Great work!</h3>
         <p className="mt-3 text-sm text-slate-400">
           You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} from {sourceLabel}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
@@ -1225,17 +1225,17 @@ function ReviewComplete({
         )}
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">This Session</div>
+            <div className="qs-label-caps text-accent">This Session</div>
             <div className="mt-1 text-2xl font-semibold text-white">{reviewedCount}</div>
             <div className="text-xs text-slate-400">reviewed</div>
           </div>
           <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Lifetime</div>
+            <div className="qs-label-caps text-muted">Lifetime</div>
             <div className="mt-1 text-2xl font-semibold text-white">{lifetimeReviewedCount}</div>
             <div className="text-xs text-slate-400">reviewed</div>
           </div>
           <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Remaining</div>
+            <div className="qs-label-caps text-muted">Remaining</div>
             <div className="mt-1 text-2xl font-semibold text-white">{remainingCount}</div>
             <div className="text-xs text-slate-400">still waiting</div>
           </div>

@@ -268,7 +268,7 @@ export function GameDetailView({
                           <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
                             {game.title.slice(0, 1).toUpperCase()}
                           </div>
-                          <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{t('common.noCover')}</div>
+                          <div className="mt-3 text-xs font-medium uppercase tracking-caps text-slate-500">{t('common.noCover')}</div>
                         </div>
                       </div>
                     )}
@@ -281,7 +281,7 @@ export function GameDetailView({
                     <span>{t('detail.back')}</span>
                   </button>
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.dashboard')}</div>
+                    <div className="text-xs font-semibold uppercase tracking-spread text-slate-500">{t('detail.dashboard')}</div>
                     {logoUrl ? (
                       <img
                         alt=""
@@ -367,7 +367,7 @@ export function GameDetailView({
             <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.tags')}</span>
+                  <span className="qs-label-caps text-accent">{t('detail.tags')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={tagText}
@@ -391,7 +391,7 @@ export function GameDetailView({
                 </label>
 
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.myNotes')}</span>
+                  <span className="qs-label-caps text-accent">{t('detail.myNotes')}</span>
                   <textarea
                     className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
                     value={game.notes}
@@ -403,7 +403,7 @@ export function GameDetailView({
 
               <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('detail.activity')}</div>
+                  <div className="qs-label-caps text-accent">{t('detail.activity')}</div>
                   {isSteamLibraryGame ? <p className="mt-1 text-xs text-slate-500">{t('detail.steamActivityHelp')}</p> : null}
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
@@ -417,7 +417,7 @@ export function GameDetailView({
             </DetailSection>
 
             <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
-              <div className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t('detail.importedMetadata')}</div>
+              <div className="px-1 text-xs font-semibold uppercase tracking-spread text-slate-500">{t('detail.importedMetadata')}</div>
 
               {game.collectionType === 'wishlist' ? (
                 <MetadataAccordion title={t('detail.wishlistPlanning')} summary={t('detail.wishlistPlanningSummary')}>
@@ -632,7 +632,7 @@ function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindAr
       </div>
       <EditText label="Tags" value={draft.tags} onChange={(value) => onUpdate('tags', value)} />
       <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Notes</span>
+        <span className="qs-label-caps text-slate-400">Notes</span>
         <textarea className="mt-2 min-h-28 w-full rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm text-white outline-none focus:border-mint" value={draft.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
       </label>
       {isRetroGame(game) ? <ReadOnlyField label="Original ROM path" value={game.romPath ?? game.romFiles?.[0]?.path ?? 'n/a'} /> : null}
@@ -646,17 +646,17 @@ function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindAr
 }
 
 function EditText({ inputMode, label, onChange, value }: { inputMode?: 'decimal'; label: string; onChange: (value: string) => void; value: string }) {
-  return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span><input className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} type="text" /></label>;
+  return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><input className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} type="text" /></label>;
 }
 
 function EditSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: readonly string[]; value: string }) {
-  return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+  return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
 function HeroStat({ accent, label, value }: { accent?: boolean; label: string; value: string }) {
   return (
     <div className={`rounded-xl border px-3 py-2 ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'}`}>
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="qs-label-caps text-muted">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
     </div>
   );
@@ -959,7 +959,7 @@ function DetailSection({ children, description, kicker, title }: DetailSectionPr
     <section className="rounded-2xl border border-mint/20 bg-ink-800 p-4 shadow-panel">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          {kicker ? <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{kicker}</div> : null}
+          {kicker ? <div className="qs-label-caps text-accent">{kicker}</div> : null}
           <h3 className={kicker ? 'mt-1 text-lg font-semibold text-white' : 'text-lg font-semibold text-white'}>{title}</h3>
           {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
         </div>
@@ -972,7 +972,7 @@ function DetailSection({ children, description, kicker, title }: DetailSectionPr
 function PersonalStatField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-mint/20 bg-ink-950/80 px-3 py-2 shadow-inner shadow-mint/5">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-mint">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-caps text-mint">{label}</div>
       <div className="mt-1 truncate text-sm font-semibold text-white">{value}</div>
     </div>
   );
@@ -994,7 +994,7 @@ function MetadataAccordion({ children, summary, title }: MetadataAccordionProps)
           <span className="block font-semibold text-slate-200">{title}</span>
           <span className="block truncate text-xs text-slate-500">{summary}</span>
         </span>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 qs-label-caps text-muted">
           Read-only
         </span>
       </summary>
@@ -1011,7 +1011,7 @@ type ReadOnlyFieldProps = {
 function ReadOnlyField({ label, value }: ReadOnlyFieldProps) {
   return (
     <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
       <div className="mt-1 truncate text-sm text-slate-300">{value}</div>
     </div>
   );
@@ -1025,7 +1025,7 @@ type ReadOnlyLinkProps = {
 function ReadOnlyLink({ label, value }: ReadOnlyLinkProps) {
   return (
     <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2 sm:col-span-2 lg:col-span-3">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
       {value ? (
         <a className="mt-1 block truncate text-sm text-mint transition hover:text-white" href={value} rel="noreferrer" target="_blank">
           {value}
@@ -1050,7 +1050,7 @@ function ChipGroup({ accent, label, values }: ChipGroupProps) {
 
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
       <div className="mt-2 flex flex-wrap gap-2">
         {values.map((value) => (
           <span

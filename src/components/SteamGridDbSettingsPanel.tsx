@@ -88,14 +88,14 @@ export function SteamGridDbSettingsPanel() {
       description="Artwork provider for portrait covers, wide covers, heroes, logos, and icons."
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${statusClassName}`}>
+        <span className={`inline-flex rounded-full border px-3 py-1 qs-label-caps ${statusClassName}`}>
           {statusLabel}
         </span>
         <span className="text-xs text-slate-500">Key saved automatically as you type.</span>
       </div>
 
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">API key</span>
+        <span className="qs-label-caps text-muted">API key</span>
         <div className="mt-2 flex gap-2">
           <input
             className="h-11 min-w-0 flex-1 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"

@@ -168,7 +168,7 @@ export function SteamWishlistHtmlImportModal({
       <div className="border-b border-skyglass/15 bg-ink-950/90 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="mb-2 inline-flex rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 text-xs font-bold uppercase tracking-[0.14em] text-mint">
+            <div className="mb-2 inline-flex rounded-full border border-mint/30 bg-mint/10 px-2.5 py-1 text-xs font-bold uppercase tracking-caps text-mint">
               {t("wishlist.recommendedManualImport")}
             </div>
             <h3 className="text-lg font-semibold text-white">
@@ -450,7 +450,7 @@ export function WishlistSettingsPanel({
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
           <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
-            <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-mint">
+            <h4 className="text-sm font-semibold uppercase tracking-caps text-mint">
               {t("wishlist.settingsSteamImportStepsTitle")}
             </h4>
             <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
@@ -465,7 +465,7 @@ export function WishlistSettingsPanel({
           </div>
 
           <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
-            <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-mint">
+            <h4 className="text-sm font-semibold uppercase tracking-caps text-mint">
               {t("wishlist.bookmarkletSafetyTitle")}
             </h4>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-300">
@@ -561,7 +561,7 @@ function normalizeSteamWishlistUrl(value: string) {
 function SyncStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-skyglass/15 bg-ink-950/80 p-2">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+      <div className="text-[11px] uppercase tracking-caps text-slate-500">
         {label}
       </div>
       <div className="mt-1 text-lg font-semibold text-white">{value}</div>
