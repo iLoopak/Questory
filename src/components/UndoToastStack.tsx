@@ -149,11 +149,11 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
             }}
           >
             <div className="flex min-w-0 items-start gap-2">
-              <span className="qs-toast-message min-w-0 flex-1 text-sm font-semibold leading-5 text-white sm:text-[0.95rem]">
+              <span className="qs-toast-message min-w-0 flex-1 text-sm font-semibold leading-5 text-white">
                 {action.message}
               </span>
               {action.repeatCount && action.repeatCount > 1 ? (
-                <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.65rem] font-bold text-slate-300">
+                <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-xs font-bold text-slate-300">
                   ×{action.repeatCount}
                 </span>
               ) : null}

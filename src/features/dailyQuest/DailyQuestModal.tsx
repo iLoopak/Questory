@@ -262,7 +262,7 @@ function ResultPanel({
       {/* Status */}
       <div className={`flex items-center gap-2 rounded-xl px-4 py-3 ${gameOver === 'solved' ? 'bg-green-950/40' : 'bg-red-950/30'}`}>
         <span className="text-xl" aria-hidden="true">{gameOver === 'solved' ? '✅' : '⏱️'}</span>
-        <div>
+        <div className="min-w-0">
           <div className={`text-sm font-bold ${gameOver === 'solved' ? 'text-green-300' : 'text-red-300'}`}>
             {gameOver === 'solved' ? t('dailyQuest.correctTitle') : t('dailyQuest.failedTitle')}
           </div>

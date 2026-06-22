@@ -88,7 +88,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-8 text-slate-100" aria-labelledby="playing-now-title">
         <header className="qs-glass flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-mint">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-mint">
               <Icon name="play-circle" size={14} strokeWidth={2.2} />
               <span>{t('playingNow.title')}</span>
             </div>
@@ -248,9 +248,9 @@ function PlayingNowCard({ context, game, isMenuOpen, onOpenDetails, onPlayToday,
             />
           ) : null}
           <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
-          <PlatformBadge accentColor={platformAccentColor} className="mt-1 max-w-full rounded-full px-2 py-0.5 text-[0.62rem] font-semibold" platform={game.platform} queueState={queueState} />
+          <PlatformBadge accentColor={platformAccentColor} className="mt-1 max-w-full rounded-full px-2 py-0.5 text-xs font-semibold" platform={game.platform} queueState={queueState} />
         </div>
-        <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
+        <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
         <div className="mt-auto flex items-center gap-2 pt-3">
           <button className="playing-now-play-button min-h-8 flex-1 max-w-[15rem] rounded-md bg-mint px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-glow transition hover:brightness-110" onClick={() => onPlayToday(game)} type="button">{t('playingNow.playToday')}</button>
           <div className="relative shrink-0">
@@ -265,7 +265,7 @@ function PlayingNowCard({ context, game, isMenuOpen, onOpenDetails, onPlayToday,
             </button>
             {isMenuOpen ? (
               <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-mint/25 bg-ink-950/95 p-2 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl">
-                <div className="mb-2 grid grid-cols-3 gap-1 border-b border-skyglass/10 pb-2 text-center text-[0.65rem]">
+                <div className="mb-2 grid grid-cols-3 gap-1 border-b border-skyglass/10 pb-2 text-center text-xs">
                   <Metric label={t('playingNow.last')} value={context.lastPlayedDate ?? t('playingNow.never')} />
                   <Metric label={t('playingNow.days7')} value={String(context.playedDaysLast7)} />
                   <Metric label={t('playingNow.days30')} value={String(context.playedDaysLast30)} />
@@ -311,7 +311,7 @@ function OverflowAction({ icon, label, onClick }: { icon: IconName; label: strin
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0"><div className="uppercase tracking-[0.12em] text-slate-500">{label}</div><div className="truncate font-semibold text-slate-200" title={value}>{value}</div></div>;
+  return <div className="min-w-0"><div className="uppercase tracking-[0.14em] text-slate-500">{label}</div><div className="truncate font-semibold text-slate-200" title={value}>{value}</div></div>;
 }
 
 function isVisiblePlayingSteamGame(game: Game) {

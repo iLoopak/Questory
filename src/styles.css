@@ -617,7 +617,7 @@ img {
   background: rgb(var(--ink-950-rgb) / 0.74);
   font-size: clamp(0.9rem, 3vw, 1.35rem);
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   opacity: var(--qs-swipe-progress, 0);
   text-transform: uppercase;
   transform: rotate(-8deg) scale(calc(0.92 + (var(--qs-swipe-progress, 0) * 0.08)));

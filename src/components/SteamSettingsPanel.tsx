@@ -536,7 +536,7 @@ function SteamPlaytimeRefreshCard({ librarySteamGameCount, refreshState, onRefre
           <div>{refreshState.message}</div>
           {isLoading ? (
             <div className="mt-3">
-              <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.12em]">
+              <div className="mb-1 flex justify-between text-xs font-semibold uppercase tracking-[0.14em]">
                 <span>{t('app.progress')}</span>
                 <span>{refreshState.progress.completed}/{refreshState.progress.total}</span>
               </div>

@@ -74,7 +74,7 @@ export function ShelfProfilePopover({
             <Icon name="gamepad-2" size={16} strokeWidth={2.2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{t('playingNow.title')}</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('playingNow.title')}</span>
             <span className="block truncate text-sm font-semibold text-slate-100" title={playingNowGame?.title ?? t('shelfProfile.openPlayingNowHub')}>{playingNowGame?.title ?? t('shelfProfile.openPlayingNowHub')}</span>
           </span>
           <span className="rounded-full border border-mint/25 bg-ink-950/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-mint">{shelfOverview.playing.toLocaleString()}</span>
@@ -112,7 +112,7 @@ function ShelfOverviewSection({ overview, t }: { overview: ShelfOverviewCounts; 
 
   return (
     <section className="border-b border-skyglass/15 py-3" aria-label={t('shelfProfile.overview')}>
-      <div className="mb-2 flex items-center gap-2 px-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+      <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
         <Icon name="layers" size={14} strokeWidth={2.2} />
         <span>{t('shelfProfile.overview')}</span>
       </div>
@@ -123,7 +123,7 @@ function ShelfOverviewSection({ overview, t }: { overview: ShelfOverviewCounts; 
               <Icon name={stat.iconName} size={15} strokeWidth={2.2} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-slate-500">{stat.label}</span>
+              <span className="block truncate text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{stat.label}</span>
               <span className="block text-sm font-semibold tabular-nums text-slate-100">{stat.value.toLocaleString()}</span>
             </span>
           </div>
@@ -140,7 +140,7 @@ function ShelfProfileRow({ iconName, label, value }: { iconName: IconName; label
         <Icon name={iconName} size={16} strokeWidth={2.2} />
       </span>
       <span className="min-w-0">
-        <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+        <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
         <span className="block truncate text-sm font-semibold text-slate-100" title={value}>{value}</span>
       </span>
     </div>

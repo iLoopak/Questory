@@ -409,7 +409,7 @@ export function AppearanceSettingsPanel({
                   <span>{t("settings.secondaryAccent")}</span>
                 </div>
                 <div className="mt-3 rounded-lg border p-3">
-                  <div className="qs-neon-preview-button inline-flex rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.12em]">
+                  <div className="qs-neon-preview-button inline-flex rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.14em]">
                     {t("settings.buttonSample")}
                   </div>
                   <div className="mt-3 text-xs text-slate-400">
@@ -547,7 +547,7 @@ export function AppearanceSettingsPanel({
                   type="range"
                   value={neonButtonGradientBalancePreference}
                 />
-                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   <span>Primary</span>
                   <span>Balanced</span>
                   <span>Secondary</span>
@@ -577,7 +577,7 @@ export function AppearanceSettingsPanel({
                   type="range"
                   value={neonButtonGradientMidpointPreference}
                 />
-                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   <span>Sharper</span>
                   <span>50</span>
                   <span>Wider</span>
