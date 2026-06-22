@@ -120,7 +120,7 @@ function HeroGridCardComponent({
     <article
       aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-hero-grid-card relative flex h-full min-h-[260px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[292px] cursor-pointer ${
+      className={`qs-hero-grid-card min-h-[160px] min-w-0 scroll-mt-4 flex flex-col overflow-hidden rounded-lg border cursor-pointer transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${highlightLabel ? 'qs-highlight-card-border ring-1' : ''}`}
       onClick={handleCardClick}
@@ -128,8 +128,8 @@ function HeroGridCardComponent({
       role="button"
       tabIndex={0}
     >
-      {/* Hero artwork — flex-1 fills all space above the actions row */}
-      <div className="relative flex-1 overflow-hidden bg-ink-800">
+      {/* Cinematic artwork zone — 16:9, height determined by card width */}
+      <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-ink-800">
         {/* Multiselect checkbox */}
         {isMultiSelectMode ? (
           <label
@@ -170,7 +170,7 @@ function HeroGridCardComponent({
             {!isHeroLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
             <img
               alt=""
-              className={`h-full w-full object-cover transition-opacity duration-300 ${isHeroLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isHeroLoaded ? 'opacity-100' : 'opacity-0'}`}
               decoding="async"
               loading="lazy"
               onError={() => {
@@ -182,27 +182,27 @@ function HeroGridCardComponent({
             />
           </>
         ) : (
-          <div className="grid h-full place-items-center bg-ink-800 px-4 text-center">
+          <div className="absolute inset-0 grid place-items-center bg-ink-800 px-4 text-center">
             <div>
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border border-mint/20 bg-ink-900 text-xl font-semibold text-mint shadow-glow">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-md border border-mint/20 bg-ink-900 text-lg font-semibold text-mint shadow-glow">
                 {game.title.slice(0, 1).toUpperCase()}
               </div>
-              <div className="mt-3 qs-label-caps text-muted">{t('common.noCover')}</div>
+              <div className="mt-2 qs-label-caps text-muted">{t('common.noCover')}</div>
             </div>
           </div>
         )}
 
-        {/* Gradient overlay + title / platform / rating */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950 via-ink-950/75 to-transparent px-3 pb-3 pt-10">
-          <div className="mb-1.5 flex max-w-full flex-wrap items-center gap-1.5">
+        {/* Gradient overlay — always covers the bottom 65% so the top 35% shows clean art */}
+        <div className="absolute inset-x-0 bottom-0 flex h-[65%] flex-col justify-end bg-gradient-to-t from-ink-950 via-ink-950/75 to-transparent px-3 pb-2.5">
+          <div className="mb-1 flex flex-wrap items-center gap-1">
             <PlatformBadge
-              className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+              className="max-w-full truncate rounded-full px-2 py-0.5 text-xs font-semibold"
               platform={platformLabel ?? game.platform}
               queueState={platformQueueState}
             />
             {shouldShowStatusBadge ? (
               <span
-                className="qs-status-badge max-w-full rounded-md px-2 py-0.5 text-xs font-medium"
+                className="qs-status-badge max-w-full rounded-md px-1.5 py-0.5 text-xs font-medium"
                 title={translateOption(game.status, t)}
               >
                 {translateOption(game.status, t)}
@@ -210,13 +210,13 @@ function HeroGridCardComponent({
             ) : null}
           </div>
           <h3
-            className="line-clamp-2 text-sm font-semibold leading-snug text-white drop-shadow sm:text-base"
+            className="line-clamp-2 text-sm font-semibold leading-snug text-white drop-shadow"
             title={game.title}
           >
             {game.title}
           </h3>
           {game.status === 'Finished' && typeof game.rating === 'number' && game.rating > 0 ? (
-            <div className="mt-1 text-xs leading-none tracking-wider text-amber-400">
+            <div className="mt-0.5 text-xs leading-none tracking-wider text-amber-400">
               {'★'.repeat(game.rating)}{'☆'.repeat(5 - game.rating)}
             </div>
           ) : null}
@@ -226,7 +226,7 @@ function HeroGridCardComponent({
       </div>
 
       {/* Actions row */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-skyglass/15 bg-ink-950/80 p-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-skyglass/15 bg-ink-950 p-2.5">
         <button
           className="qs-game-card-details-button h-9 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
           onClick={(event) => {

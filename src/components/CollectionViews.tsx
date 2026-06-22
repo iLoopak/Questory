@@ -76,7 +76,10 @@ export function CollectionGrid({
 }: CollectionViewProps) {
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [columns, setColumns] = useState(1);
-  const rowHeight = useMemo(() => getVirtualGridRowHeight(), []);
+  const rowHeight = useMemo(
+    () => cardVariant === 'hero' ? getCinematicGridRowHeight() : getVirtualGridRowHeight(),
+    [cardVariant],
+  );
   const platformLabelByGameId = usePlatformLabelMap(games, platformQueueState);
 
   useLayoutEffect(() => {
@@ -911,6 +914,26 @@ function getVirtualGridRowHeight() {
   }
 
   return 268;
+}
+
+// Row height for the cinematic 16:9 HeroGridCard variant.
+// Card height = aspect-[16/9] artwork + ~44px actions row.
+// Estimates are based on typical column widths at each breakpoint.
+function getCinematicGridRowHeight() {
+  if (typeof window === 'undefined') return 220;
+
+  const isHandheld = window.matchMedia(
+    '(orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px)'
+  ).matches;
+
+  // Handheld landscape: ~2 columns at ~280px each → 16:9 = 158px + 44px = 202px
+  if (isHandheld) return 200;
+
+  // sm+ desktop: 2-4 columns at ~260-340px → 16:9 = 146-191px + 44px ≈ 220px avg
+  if (window.matchMedia('(min-width: 640px)').matches) return 225;
+
+  // Mobile 1 column: ~375px wide → 16:9 = 211px + 44px = 255px
+  return 255;
 }
 
 function usePlatformLabelMap(games: Game[], platformQueueState?: PlatformQueueState) {
