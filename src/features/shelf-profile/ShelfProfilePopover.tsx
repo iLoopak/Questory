@@ -42,7 +42,7 @@ export function ShelfProfilePopover({
 }: ShelfProfilePopoverProps) {
   return (
     <div
-      className="absolute left-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-mint/25 bg-ink-950/95 p-3 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      className="absolute left-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-mint/25 bg-ink-950/95 p-3 text-slate-100 shadow-2xl shadow-black/50 backdrop-blur-xl max-h-[calc(100dvh-env(safe-area-inset-top,0px)-4rem)] overflow-y-auto overscroll-contain"
       role="menu"
     >
       <div className="flex min-w-0 items-center gap-3 border-b border-skyglass/15 pb-3">
