@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { TFunction } from '../../i18n';
 import { calculateScore, generateHints, hintsForRemaining, stageForRemaining } from './logic';
-import type { DailyQuestResult, DailyQuestSession } from './types';
+import type { DailyQuestResult, DailyQuestSession, WeeklyStats } from './types';
 import { ArtworkReveal } from './components/ArtworkReveal';
+import { DailyQuestIcon } from './components/DailyQuestIcon';
 import { GuessInput } from './components/GuessInput';
 import { WeeklySummary } from './components/WeeklySummary';
-import type { WeeklyStats } from './types';
 
 const CHALLENGE_DURATION = 120;
 
@@ -138,7 +138,7 @@ export function DailyQuestModal({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-skyglass/12 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-base" aria-hidden="true">🧩</span>
+            <DailyQuestIcon size={18} className="shrink-0 text-mint" />
             <span className="text-sm font-semibold text-white">{t('dailyQuest.title')}</span>
           </div>
           <div className="flex items-center gap-3">

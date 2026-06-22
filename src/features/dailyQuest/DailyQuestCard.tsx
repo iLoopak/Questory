@@ -1,9 +1,11 @@
 import type { Game } from '../../types/game';
 import { useI18n } from '../../i18n';
 import { useDailyQuest } from './useDailyQuest';
-import { ArtworkReveal } from './components/ArtworkReveal';
-import { DailyQuestModal } from './DailyQuestModal';
 import { stageForRemaining } from './logic';
+import { ArtworkReveal } from './components/ArtworkReveal';
+import { DailyQuestIcon } from './components/DailyQuestIcon';
+import { DailyQuestModal } from './DailyQuestModal';
+import type { DailyQuestResult } from './types';
 
 interface DailyQuestCardProps {
   games: Game[];
@@ -26,58 +28,47 @@ export function DailyQuestCard({ games }: DailyQuestCardProps) {
   const alreadyCompleted = session?.completed === true;
   const result = session?.result ?? null;
 
-  // Compute remaining for the home card preview (for stage display)
   const cardStage = (() => {
-    if (alreadyCompleted) return 4;
-    if (!session) return 0;
+    if (alreadyCompleted) return 4 as const;
+    if (!session) return 0 as const;
     const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
     const rem = Math.max(0, 120 - elapsed);
     return stageForRemaining(rem, false);
   })();
 
+  const currentStreak = weeklyStats.currentStreak;
+
   return (
     <>
-      <section className="qs-home-section overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/70 shadow-panel">
+      <section className="rounded-2xl border border-skyglass/15 bg-ink-900/70 p-4 shadow-panel">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-skyglass/10 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-base" aria-hidden="true">🧩</span>
-            <div>
-              <h2 className="text-sm font-semibold text-white">{t('dailyQuest.title')}</h2>
-              <p className="text-xs text-slate-500">
-                {alreadyCompleted
-                  ? t('dailyQuest.alreadyCompleted')
-                  : t('dailyQuest.subtitle')}
-              </p>
-            </div>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <DailyQuestIcon size={16} className="shrink-0 text-mint" />
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-mint truncate">
+              {t('dailyQuest.title')}
+            </span>
           </div>
-          {alreadyCompleted && result ? (
-            <div className="shrink-0 text-right">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{t('dailyQuest.score')}</div>
-              <div className="text-base font-bold text-mint">{result.score}</div>
-            </div>
-          ) : null}
+          {currentStreak > 0 && (
+            <span className="shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-xs font-semibold text-amber-400">
+              🔥 {currentStreak}
+            </span>
+          )}
         </div>
 
         {/* Body */}
-        <div className="px-4 py-3">
-          {!dailyGame ? (
-            /* Empty state: no eligible games */
-            <div className="py-2 text-center text-sm text-slate-500">
-              <p>{t('dailyQuest.noEligibleGames')}</p>
-              <p className="mt-1 text-xs text-slate-600">{t('dailyQuest.noEligibleGamesHint')}</p>
-            </div>
-          ) : alreadyCompleted ? (
-            /* Completed state */
-            <CompletedCardBody game={dailyGame} result={result} today={today} onView={openChallenge} t={t} />
-          ) : (
-            /* Ready-to-play state */
-            <ReadyCardBody game={dailyGame} stage={cardStage} today={today} onPlay={openChallenge} t={t} />
-          )}
-        </div>
+        {!dailyGame ? (
+          <div className="py-1 text-xs text-slate-500">
+            <p>{t('dailyQuest.noEligibleGames')}</p>
+            <p className="mt-0.5 text-slate-600">{t('dailyQuest.noEligibleGamesHint')}</p>
+          </div>
+        ) : alreadyCompleted ? (
+          <CompletedBody game={dailyGame} result={result} today={today} onView={openChallenge} t={t} />
+        ) : (
+          <ReadyBody game={dailyGame} stage={cardStage} today={today} onPlay={openChallenge} t={t} />
+        )}
       </section>
 
-      {/* Modal rendered here so it's always in the DOM when needed */}
       {isOpen && dailyGame && session ? (
         <DailyQuestModal
           game={dailyGame}
@@ -96,7 +87,9 @@ export function DailyQuestCard({ games }: DailyQuestCardProps) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ReadyCardBody({
+type TFn = ReturnType<typeof useI18n>['t'];
+
+function ReadyBody({
   game,
   stage,
   today,
@@ -107,7 +100,7 @@ function ReadyCardBody({
   stage: ReturnType<typeof stageForRemaining>;
   today: string;
   onPlay: () => void;
-  t: ReturnType<typeof useI18n>['t'];
+  t: TFn;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -115,12 +108,12 @@ function ReadyCardBody({
         game={game}
         stage={stage}
         date={today}
-        className="h-20 w-14 shrink-0"
+        className="h-[54px] w-[38px] shrink-0"
       />
-      <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
-        <p className="text-xs text-slate-400">{t('dailyQuest.cardHint')}</p>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="text-xs leading-snug text-slate-400">{t('dailyQuest.cardHint')}</p>
         <button
-          className="qs-home-section-action w-full rounded-xl border border-mint/30 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20 focus:outline-none focus:ring-2 focus:ring-mint/40"
+          className="min-h-9 w-full rounded-xl bg-mint px-3 text-xs font-semibold text-ink-950 transition hover:bg-mint/90 focus:outline-none focus:ring-2 focus:ring-mint/40"
           data-home-focus="true"
           onClick={onPlay}
           type="button"
@@ -132,7 +125,7 @@ function ReadyCardBody({
   );
 }
 
-function CompletedCardBody({
+function CompletedBody({
   game,
   result,
   today,
@@ -140,45 +133,42 @@ function CompletedCardBody({
   t,
 }: {
   game: Game;
-  result: ReturnType<typeof useDailyQuest>['session'] extends null ? never : NonNullable<ReturnType<typeof useDailyQuest>['session']>['result'];
+  result: DailyQuestResult | null;
   today: string;
   onView: () => void;
-  t: ReturnType<typeof useI18n>['t'];
+  t: TFn;
 }) {
   return (
     <button
       className="flex w-full items-center gap-3 text-left focus:outline-none"
       onClick={onView}
       type="button"
+      data-home-focus="true"
     >
       <ArtworkReveal
         game={game}
         stage={4}
         date={today}
-        className="h-20 w-14 shrink-0"
+        className="h-[54px] w-[38px] shrink-0"
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{game.title}</p>
-        <p className="text-xs text-slate-500">{game.platform}</p>
-        {result ? (
-          <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
-            {result.solved ? (
-              <span className="text-green-400">✓ {t('dailyQuest.solved')}</span>
-            ) : (
-              <span className="text-red-400">✗ {t('dailyQuest.failedTitle')}</span>
-            )}
-            <span>·</span>
-            <span>{result.remainingTime}s</span>
-            {result.hintsUsed > 0 && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+          {result ? (
+            result.solved ? (
               <>
+                <span className="font-semibold text-green-400">{t('dailyQuest.score')}: {result.score}</span>
                 <span>·</span>
-                <span>{result.hintsUsed} hints</span>
+                <span>{result.remainingTime}s left</span>
               </>
-            )}
-          </div>
-        ) : null}
+            ) : (
+              <span className="text-red-400">{t('dailyQuest.failedTitle')}</span>
+            )
+          ) : null}
+        </div>
+        <p className="mt-1.5 text-xs text-slate-600">{t('dailyQuest.alreadyCompleted')} · tap to view</p>
       </div>
-      <span className="shrink-0 text-xs text-slate-600">›</span>
+      <span className="shrink-0 text-slate-600" aria-hidden="true">›</span>
     </button>
   );
 }

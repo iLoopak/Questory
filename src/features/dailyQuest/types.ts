@@ -27,4 +27,5 @@ export type WeeklyStats = {
   avgScore: number;
   avgRemainingTime: number;
   currentStreak: number;    // consecutive solved days ending today
+  bestStreak: number;       // longest ever streak across all history
 };
