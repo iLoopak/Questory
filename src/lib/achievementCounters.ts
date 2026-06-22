@@ -17,6 +17,7 @@ export type AchievementCounters = {
   questRunnerRuns: number;
   questRunnerObstaclesDodged: number;
   questRunnerBestScore: number;
+  questRunnerShardsCollected: number;
   libraryFirstCreatedAt: string | null;
   playingStreak: PlayingStreak | null;
 };
@@ -31,6 +32,7 @@ const defaultCounters: AchievementCounters = {
   questRunnerRuns: 0,
   questRunnerObstaclesDodged: 0,
   questRunnerBestScore: 0,
+  questRunnerShardsCollected: 0,
   libraryFirstCreatedAt: null,
   playingStreak: null,
 };
@@ -67,6 +69,7 @@ export function normalizeAchievementCounters(value: unknown): AchievementCounter
     questRunnerRuns: toNonNegInt(v.questRunnerRuns),
     questRunnerObstaclesDodged: toNonNegInt(v.questRunnerObstaclesDodged),
     questRunnerBestScore: toNonNegInt(v.questRunnerBestScore),
+    questRunnerShardsCollected: toNonNegInt(v.questRunnerShardsCollected),
     libraryFirstCreatedAt:
       typeof v.libraryFirstCreatedAt === 'string' ? v.libraryFirstCreatedAt : null,
     playingStreak,

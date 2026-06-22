@@ -1425,7 +1425,7 @@ export function AppController() {
             />
           ) : activeNavItem === 'Quest Runner' ? (
             <div className="px-4 py-4">
-              <QuestRunnerGame />
+              <QuestRunnerGame games={games} />
             </div>
           ) : activeNavItem === 'Settings' ? (
             <SettingsView
