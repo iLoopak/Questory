@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { loadAchievementCounters, saveAchievementCounters } from '../lib/achievementCounters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ const OBS_LABELS = ['Backlog', 'Bad Port', 'Day-1 DLC', 'Dead Save', 'Low Batt',
 
 type Phase = 'idle' | 'running' | 'dead';
 
-type Obstacle = { x: number; w: number; h: number; label: string };
+type Obstacle = { x: number; w: number; h: number; label: string; id: number; dodged: boolean };
 
 type Star = { x: number; y: number; sz: number; sp: number };
 
@@ -47,6 +48,8 @@ interface RunnerState {
   score: number;
   highScore: number;
   obsTimer: number;   // counts down in "px of travel"; spawn obstacle at 0
+  obsIdCounter: number;
+  pendingDodges: number; // obstacles successfully passed this run, to be saved
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -56,7 +59,13 @@ function loadHighScore(): number {
 }
 
 function saveHighScore(n: number) {
-  try { localStorage.setItem(HIGH_SCORE_KEY, String(n)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(HIGH_SCORE_KEY, String(n));
+    const c = loadAchievementCounters();
+    if (n > c.questRunnerBestScore) {
+      saveAchievementCounters({ ...c, questRunnerBestScore: n });
+    }
+  } catch { /* ignore */ }
 }
 
 function makeStars(): Star[] {
@@ -80,6 +89,8 @@ function makeInitialState(hs: number): RunnerState {
     score: 0,
     highScore: hs,
     obsTimer: 280 + Math.random() * 200,
+    obsIdCounter: 0,
+    pendingDodges: 0,
   };
 }
 
@@ -133,12 +144,23 @@ export function QuestRunnerGame() {
   }, []);
 
   const startGame = useCallback(() => {
-    const prevHs = stateRef.current.highScore;
+    // Flush pending dodges from previous run into persistent counters
+    const prev = stateRef.current;
+    if (prev.pendingDodges > 0) {
+      const c = loadAchievementCounters();
+      saveAchievementCounters({ ...c, questRunnerObstaclesDodged: c.questRunnerObstaclesDodged + prev.pendingDodges });
+    }
+
+    const prevHs = prev.highScore;
     const next = makeInitialState(prevHs);
     next.phase = 'running';
-    // Keep the existing stars so the screen doesn't flash
-    next.stars = stateRef.current.stars;
+    // Keep existing stars so the screen doesn't flash
+    next.stars = prev.stars;
     stateRef.current = next;
+
+    // Increment run counter
+    const c = loadAchievementCounters();
+    saveAchievementCounters({ ...c, questRunnerRuns: c.questRunnerRuns + 1 });
   }, []);
 
   const jump = useCallback(() => {
@@ -210,17 +232,26 @@ export function QuestRunnerGame() {
         if (s.obsTimer <= 0) {
           const h = 28 + Math.floor(Math.random() * 55);
           const w = 18 + Math.floor(Math.random() * 22);
+          s.obsIdCounter += 1;
           s.obstacles.push({
             x: CANVAS_W + 8,
             w,
             h,
             label: OBS_LABELS[Math.floor(Math.random() * OBS_LABELS.length)],
+            id: s.obsIdCounter,
+            dodged: false,
           });
           s.obsTimer = 300 + Math.random() * 340;
         }
 
-        // Move + cull obstacles
+        // Move + cull obstacles; count dodges when obstacle clears the player
         for (const ob of s.obstacles) ob.x -= s.speed;
+        for (const ob of s.obstacles) {
+          if (!ob.dodged && ob.x + ob.w < PLAYER_X) {
+            ob.dodged = true;
+            s.pendingDodges += 1;
+          }
+        }
         s.obstacles = s.obstacles.filter(ob => ob.x + ob.w > -20);
 
         // Score (distance-based)

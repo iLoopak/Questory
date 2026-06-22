@@ -1,4 +1,5 @@
 export type QuestShelfStorageKey =
+  | 'questshelf.achievementCounters.v1'
   | 'questshelf.games.v1'
   | 'questshelf.rawgMetadataCache.v1'
   | 'questshelf.rawgSettings.v1'
@@ -41,6 +42,13 @@ export type StorageKeyDescriptor = {
 };
 
 export const storageKeyRegistry: StorageKeyDescriptor[] = [
+  {
+    backup: 'default',
+    key: 'questshelf.achievementCounters.v1',
+    purpose: 'Event-based achievement counters: active days, session opens, Quest Runner stats, backup events, playing streak.',
+    scope: 'core',
+    schema: 'AchievementCounters.',
+  },
   {
     backup: 'default',
     key: 'questshelf.games.v1',
