@@ -1682,6 +1682,8 @@ textarea,
 .qs-collection-toolbar {
   overflow: visible;
   background: rgb(var(--ink-950-rgb));
+  position: relative;
+  z-index: 1;
 }
 
 .qs-collection-toolbar-row {

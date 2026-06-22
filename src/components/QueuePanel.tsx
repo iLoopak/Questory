@@ -224,7 +224,6 @@ export function QueuePanel({
         searchValue={queueSearchTerm}
         searchPlaceholder={t('queue.findGame')}
         onSearchChange={setQueueSearchTerm}
-        onClearFilters={hasActiveFilters ? () => { setPlatformFilter('All Platforms'); setStatusFilter('All Statuses'); } : undefined}
         selects={[
           {
             label: t('toolbar.status'),
@@ -333,7 +332,17 @@ export function QueuePanel({
             </details>
           </>
         }
-      />
+      >
+        {hasActiveFilters ? (
+          <button
+            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-400 transition hover:border-mint/30 hover:bg-mint/10 hover:text-mint"
+            onClick={() => { setPlatformFilter('All Platforms'); setStatusFilter('All Statuses'); }}
+            type="button"
+          >
+            {t('toolbar.clearFilters')}
+          </button>
+        ) : undefined}
+      </CollectionToolbar>
       <p className="-mt-1 mb-2 px-1 text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
 
       {selectedPlatformSummary ? (
