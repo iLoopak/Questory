@@ -94,7 +94,7 @@ export function BacklogPlatformPicker({
       <div className="qs-review-queue-modal p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint"><Icon name="list-plus" /> <span>{t('backlog.choosePlatform')}</span></div>
+            <div className="inline-flex items-center gap-1.5 qs-label-caps text-accent"><Icon name="list-plus" /> <span>{t('backlog.choosePlatform')}</span></div>
             <h2 className="mt-1 text-xl font-bold leading-tight text-white">{t('backlog.addToQueue')}</h2>
             <p className="mt-1 line-clamp-2 text-sm text-slate-400">{game.title}</p>
           </div>
@@ -136,7 +136,7 @@ export function BacklogPlatformPicker({
 
         {isPlatformCreationOpen ? (
           <form className="mt-4 rounded-xl border border-skyglass/15 bg-ink-950/70 p-3" onSubmit={submitPlatformCreation}>
-            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500" htmlFor="backlog-platform-name">
+            <label className="qs-label-caps text-muted" htmlFor="backlog-platform-name">
               New active platform
             </label>
             <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">

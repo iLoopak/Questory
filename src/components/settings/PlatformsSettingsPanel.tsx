@@ -383,7 +383,7 @@ function QueuePlatformManagementRow({
           </div>
         ) : null}
         <details className="mt-2 rounded-md border border-white/10 bg-ink-950/60 p-2">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+          <summary className="cursor-pointer qs-label-caps text-slate-400">
             {t("settings.identity")}
           </summary>
           <div className="mt-3">

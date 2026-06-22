@@ -45,7 +45,7 @@ export function DailyQuestCard({ games }: DailyQuestCardProps) {
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <DailyQuestIcon size={16} className="shrink-0 text-mint" />
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-mint truncate">
+            <span className="text-xs font-semibold uppercase tracking-spread text-mint truncate">
               {t('dailyQuest.title')}
             </span>
           </div>

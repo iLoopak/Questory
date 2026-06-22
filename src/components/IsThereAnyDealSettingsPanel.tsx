@@ -18,7 +18,7 @@ export function IsThereAnyDealSettingsPanel() {
       title={t('itad.title')}
       description={t('itad.settingsHelp')}
       meta={(
-        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+        <span className={`inline-flex rounded-full border px-3 py-1 qs-label-caps ${
           isConfigured
             ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
             : 'border-amber-300/30 bg-amber-300/10 text-amber-100'
@@ -28,7 +28,7 @@ export function IsThereAnyDealSettingsPanel() {
       )}
     >
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('integrations.apiKey')}</span>
+        <span className="qs-label-caps text-muted">{t('integrations.apiKey')}</span>
         <input
           className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
           value={settings.apiKey}

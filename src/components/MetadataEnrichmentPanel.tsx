@@ -383,7 +383,7 @@ export function MetadataEnrichmentPanel({
 
           {isQueueRunning ? (
             <div className="mt-2">
-              <div className="mb-1 flex justify-between text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+              <div className="mb-1 flex justify-between text-xs font-medium uppercase tracking-caps text-slate-500">
                 <span>{t('app.progress')}</span>
                 <span>
                   {progress.completed}/{progress.total}

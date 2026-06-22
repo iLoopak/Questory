@@ -795,7 +795,7 @@ export function QuestRunnerGame({ games }: { games?: Game[] }) {
         </div>
         {highScore > 0 && (
           <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Best</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-slate-500">Best</p>
             <p className="text-base font-bold tabular-nums text-mint">{highScore}</p>
           </div>
         )}

@@ -88,13 +88,13 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-8 text-slate-100" aria-labelledby="playing-now-title">
         <header className="qs-glass flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-mint">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-spread text-mint">
               <Icon name="play-circle" size={14} strokeWidth={2.2} />
               <span>{t('playingNow.title')}</span>
             </div>
             <h2 id="playing-now-title" className="mt-1 text-2xl font-semibold text-white sm:text-3xl">{greeting.headline}</h2>
             {greeting.subtext ? <p className="mt-1 max-w-2xl text-sm text-slate-300">{greeting.subtext}</p> : null}
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{metaLine}</p>
+            <p className="mt-1 qs-label-caps text-muted">{metaLine}</p>
           </div>
           <button
             className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
@@ -123,7 +123,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="playing-now-platform-icon grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name={getPlayingNowPlatformIcon(platform)} size={16} /></span>
-                      <h3 className="truncate text-sm font-semibold uppercase tracking-[0.14em] text-slate-200" title={platform}>{platform}</h3>
+                      <h3 className="truncate text-sm font-semibold uppercase tracking-caps text-slate-200" title={platform}>{platform}</h3>
                     </div>
                     <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs font-semibold text-slate-400">{platformGames.length}</span>
                   </div>
@@ -311,7 +311,7 @@ function OverflowAction({ icon, label, onClick }: { icon: IconName; label: strin
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0"><div className="uppercase tracking-[0.14em] text-slate-500">{label}</div><div className="truncate font-semibold text-slate-200" title={value}>{value}</div></div>;
+  return <div className="min-w-0"><div className="uppercase tracking-caps text-slate-500">{label}</div><div className="truncate font-semibold text-slate-200" title={value}>{value}</div></div>;
 }
 
 function isVisiblePlayingSteamGame(game: Game) {

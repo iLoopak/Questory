@@ -388,7 +388,7 @@ export function RetroImportPanel({
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('retro.platformOverride')}</span>
+          <span className="qs-label-caps text-muted">{t('retro.platformOverride')}</span>
           <select
             className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
             onChange={(event) => setPlatformOverride(event.target.value as RetroPlatformOverride)}
@@ -478,7 +478,7 @@ export function RetroImportPanel({
                         {rom.title}
                       </span>
                       {rom.fileCount > 1 ? (
-                        <span className="shrink-0 rounded-full border border-skyglass/15 bg-ink-900 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-300">
+                        <span className="shrink-0 rounded-full border border-skyglass/15 bg-ink-900 px-2 py-0.5 text-xs font-medium uppercase tracking-label text-slate-300">
                           {rom.discCount > 1 ? `${rom.discCount} discs` : `${rom.fileCount} files`}
                         </span>
                       ) : null}
@@ -575,19 +575,19 @@ function ImportResultPanel({
 
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-4">
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.14em] opacity-75">{t('retro.found')}</dt>
+          <dt className="text-xs uppercase tracking-caps opacity-75">{t('retro.found')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.detectedGames}</dd>
         </div>
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.14em] opacity-75">{t('retro.imported')}</dt>
+          <dt className="text-xs uppercase tracking-caps opacity-75">{t('retro.imported')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.importedGames}</dd>
         </div>
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.14em] opacity-75">{t('retro.duplicates')}</dt>
+          <dt className="text-xs uppercase tracking-caps opacity-75">{t('retro.duplicates')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.skippedDuplicates}</dd>
         </div>
         <div className="rounded-md border border-white/10 bg-ink-950/55 p-2">
-          <dt className="text-xs uppercase tracking-[0.14em] opacity-75">{t('retro.unsupported')}</dt>
+          <dt className="text-xs uppercase tracking-caps opacity-75">{t('retro.unsupported')}</dt>
           <dd className="mt-1 text-lg font-semibold text-white">{summary.unsupportedFiles}</dd>
         </div>
       </dl>

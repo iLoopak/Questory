@@ -48,7 +48,7 @@ export function ShelfProfilePopover({
       <div className="flex min-w-0 items-center gap-3 border-b border-skyglass/15 pb-3">
         <div className="shrink-0">{avatar}</div>
         <div className="min-w-0">
-          <div className="break-words text-sm font-semibold uppercase tracking-[0.14em] text-mint">{shelfName}</div>
+          <div className="break-words text-sm font-semibold uppercase tracking-caps text-mint">{shelfName}</div>
           <div className="mt-1 text-xs text-slate-500">{t('shelfProfile.title')}</div>
         </div>
       </div>
@@ -74,7 +74,7 @@ export function ShelfProfilePopover({
             <Icon name="gamepad-2" size={16} strokeWidth={2.2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('playingNow.title')}</span>
+            <span className="block qs-label-caps text-muted">{t('playingNow.title')}</span>
             <span className="block truncate text-sm font-semibold text-slate-100" title={playingNowGame?.title ?? t('shelfProfile.openPlayingNowHub')}>{playingNowGame?.title ?? t('shelfProfile.openPlayingNowHub')}</span>
           </span>
           <span className="rounded-full border border-mint/25 bg-ink-950/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-mint">{shelfOverview.playing.toLocaleString()}</span>
@@ -112,7 +112,7 @@ function ShelfOverviewSection({ overview, t }: { overview: ShelfOverviewCounts; 
 
   return (
     <section className="border-b border-skyglass/15 py-3" aria-label={t('shelfProfile.overview')}>
-      <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+      <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-spread text-slate-500">
         <Icon name="layers" size={14} strokeWidth={2.2} />
         <span>{t('shelfProfile.overview')}</span>
       </div>
@@ -123,7 +123,7 @@ function ShelfOverviewSection({ overview, t }: { overview: ShelfOverviewCounts; 
               <Icon name={stat.iconName} size={15} strokeWidth={2.2} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{stat.label}</span>
+              <span className="block truncate qs-label-caps text-muted">{stat.label}</span>
               <span className="block text-sm font-semibold tabular-nums text-slate-100">{stat.value.toLocaleString()}</span>
             </span>
           </div>
@@ -140,7 +140,7 @@ function ShelfProfileRow({ iconName, label, value }: { iconName: IconName; label
         <Icon name={iconName} size={16} strokeWidth={2.2} />
       </span>
       <span className="min-w-0">
-        <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+        <span className="block qs-label-caps text-muted">{label}</span>
         <span className="block truncate text-sm font-semibold text-slate-100" title={value}>{value}</span>
       </span>
     </div>

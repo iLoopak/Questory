@@ -43,7 +43,7 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
             <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-mint/15">
               <Icon name="trophy" size={20} className="text-mint" />
             </div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">
+            <div className="qs-label-caps text-accent">
               {t('completion.rateTitle')}
             </div>
             <p className="mt-1.5 line-clamp-2 text-lg font-bold leading-snug text-white">{game.title}</p>

@@ -101,6 +101,32 @@
   --qs-safe-bottom: env(safe-area-inset-bottom, 0px);
   --qs-safe-left: env(safe-area-inset-left, 0px);
   --qs-shell-gap: clamp(0.5rem, 1.4vw, 1rem);
+
+  /* ── Typography scale ──────────────────────────────────── */
+  --font-2xs:    0.625rem;
+  --font-xs:     0.75rem;
+  --font-sm:     0.875rem;
+  --font-base:   1rem;
+  --font-md:     1.0625rem;
+  --font-lg:     1.125rem;
+  --font-xl:     1.25rem;
+  --font-2xl:    1.5rem;
+  --font-3xl:    1.875rem;
+
+  --weight-normal:    400;
+  --weight-medium:    500;
+  --weight-semibold:  600;
+  --weight-bold:      700;
+  --weight-extrabold: 800;
+
+  --tracking-label:   0.08em;
+  --tracking-caps:    0.14em;
+  --tracking-spread:  0.16em;
+
+  --leading-tight:  1.2;
+  --leading-snug:   1.35;
+  --leading-base:   1.5;
+  --leading-loose:  1.7;
 }
 
 :root[data-theme='light'] {
@@ -495,8 +521,8 @@ img {
 .qs-review-future-zone-kicker {
   color: var(--text-muted);
   font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 
@@ -505,7 +531,7 @@ img {
   overflow: hidden;
   color: var(--text-primary);
   font-size: clamp(0.85rem, 1.35vw, 1rem);
-  font-weight: 900;
+  font-weight: var(--weight-extrabold);
   line-height: 1.05;
   text-overflow: ellipsis;
 }
@@ -546,8 +572,8 @@ img {
   margin-bottom: 0.75rem;
   color: var(--text-muted);
   font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-spread);
   text-transform: uppercase;
 }
 
@@ -616,8 +642,8 @@ img {
   padding: 0.45rem 0.75rem;
   background: rgb(var(--ink-950-rgb) / 0.74);
   font-size: clamp(0.9rem, 3vw, 1.35rem);
-  font-weight: 900;
-  letter-spacing: 0.14em;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-caps);
   opacity: var(--qs-swipe-progress, 0);
   text-transform: uppercase;
   transform: rotate(-8deg) scale(calc(0.92 + (var(--qs-swipe-progress, 0) * 0.08)));
@@ -1199,8 +1225,8 @@ body.qs-controller-active .qs-game-card:focus {
   background: rgb(var(--ink-950-rgb) / 0.94);
   padding: 0.75rem;
   color: var(--text-primary);
-  font-size: 0.75rem;
-  line-height: 1.35;
+  font-size: var(--font-xs);
+  line-height: var(--leading-snug);
   box-shadow: 0 20px 70px rgb(var(--overlay-rgb) / 0.5), 0 0 34px rgb(var(--accent-rgb) / 0.22);
   pointer-events: none;
 }
@@ -1208,7 +1234,7 @@ body.qs-controller-active .qs-game-card:focus {
 .qs-controller-debug strong {
   color: var(--accent);
   font-size: 0.8rem;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
 
@@ -1954,8 +1980,8 @@ textarea,
   margin: 0;
   color: var(--accent);
   font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 
@@ -1981,9 +2007,9 @@ textarea,
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2113,8 +2139,8 @@ textarea,
   background: var(--accent);
   color: var(--accent-contrast);
   font-size: 0.66rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
 
@@ -2930,8 +2956,8 @@ body.qs-controller-active .qs-compact-card:focus-within {
     padding: 0.55rem 0.65rem;
   }
 
-  .qs-setup-progress .tracking-\[0\.14em\] {
-    letter-spacing: 0.08em;
+  .qs-setup-progress .tracking-caps {
+    letter-spacing: var(--tracking-label);
   }
 
   .qs-setup-steps {
@@ -3496,4 +3522,15 @@ body.qs-controller-active .qs-compact-card:focus-within {
 .qs-action-sheet-panel,
 .qs-game-action-scroll {
   touch-action: pan-y;
+}
+
+/* ── Typography utilities ──────────────────────────────────────────── */
+
+/* Reusable uppercase label pattern: pair with a text-color utility.
+   e.g. className="qs-label-caps text-muted" or "qs-label-caps text-accent" */
+.qs-label-caps {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
 }

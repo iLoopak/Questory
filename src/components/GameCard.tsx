@@ -188,7 +188,7 @@ function GameCardComponent({
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border border-mint/20 bg-ink-900 text-xl font-semibold text-mint shadow-glow">
                 {game.title.slice(0, 1).toUpperCase()}
               </div>
-              <div className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{t('common.noCover')}</div>
+              <div className="mt-3 text-xs font-medium uppercase tracking-caps text-slate-500">{t('common.noCover')}</div>
             </div>
           </div>
         )}

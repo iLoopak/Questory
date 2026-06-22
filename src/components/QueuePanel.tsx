@@ -230,7 +230,7 @@ export function QueuePanel({
         actionMenu={
           <>
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.addGame')}</span>
+              <span className="qs-label-caps text-muted">{t('queue.addGame')}</span>
               <select
                 className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
                 value={selectedGameId}
@@ -245,7 +245,7 @@ export function QueuePanel({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.targetPlatform')}</span>
+              <span className="qs-label-caps text-muted">{t('queue.targetPlatform')}</span>
               <select
                 className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
                 value={selectedPlatform}
@@ -539,7 +539,7 @@ function AddPlatformModal({
       <form className="max-h-[85vh] overflow-y-auto p-4" onSubmit={submitPlatform}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('queue.platforms')}</div>
+            <div className="qs-label-caps text-accent">{t('queue.platforms')}</div>
             <h2 className="mt-1 text-xl font-semibold text-white">{t('queue.addPlatform')}</h2>
             <p className="mt-1 text-sm text-slate-400">{t('queue.addPlatformHelp')}</p>
           </div>
@@ -858,7 +858,7 @@ function PlatformQueueColumn({
           {({ closeMenu }) => (
             <>
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.futureActiveLimit')}</span>
+                <span className="qs-label-caps text-muted">{t('queue.futureActiveLimit')}</span>
                 <input
                   className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
                   min={1}
@@ -883,7 +883,7 @@ function PlatformQueueColumn({
           <div className="qs-platform-playing-panel w-full min-w-0 rounded-xl border p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-[0.16em]">{playingNowLabel}</h4>
+                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-spread">{playingNowLabel}</h4>
                 <p className="qs-platform-playing-meta mt-1 text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} · {platform}</p>
               </div>
               <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">{t('queue.activeList')}</span>
@@ -1119,7 +1119,7 @@ function QueueEntryRow({
       </div>
       <div className="mt-2 flex min-w-0 items-center gap-2">
         <label className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('queue.movePlatform')}:</span>
+          <span className="shrink-0 qs-label-caps text-muted">{t('queue.movePlatform')}:</span>
           {platformOptions.length > 0 ? (
             <select
               className="h-7 min-w-0 flex-1 rounded border border-white/10 bg-ink-900 px-2 text-xs text-white outline-none focus:border-mint"
@@ -1170,7 +1170,7 @@ function QueueGameRow({
         <button className="qs-platform-playing-link block max-w-full truncate text-left text-base font-semibold" onClick={() => onOpenDetails(game.id)} type="button">
           {game.title}
         </button>
-        <span className="qs-platform-playing-label mt-1 block text-xs font-semibold uppercase tracking-[0.14em]">{playingNowLabel}</span>
+        <span className="qs-platform-playing-label mt-1 block qs-label-caps">{playingNowLabel}</span>
         <span className="qs-platform-playing-meta mt-1 block truncate text-xs">{game.platform}</span>
         <div className="mt-2 flex flex-wrap gap-2">
           <AchievementProgressBadge game={game} />

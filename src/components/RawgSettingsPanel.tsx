@@ -51,7 +51,7 @@ export function RawgSettingsPanel({
       description="Configure RAWG metadata access so QuestShelf can enrich game information while keeping the API key stored locally."
     >
       <label className="block">
-        <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('integrations.apiKey')} <button className="grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setIsHelpOpen(true); }} type="button" aria-label={t('integrations.rawgHelp')}>?</button></span>
+        <span className="flex items-center gap-2 qs-label-caps text-muted">{t('integrations.apiKey')} <button className="grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setIsHelpOpen(true); }} type="button" aria-label={t('integrations.rawgHelp')}>?</button></span>
         <input
           className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
           value={settings.apiKey}

@@ -183,14 +183,14 @@ export function AppearanceSettingsPanel({
       title={t("settings.appearanceTitle")}
       description={t("settings.appearanceHelp")}
       meta={(
-        <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-mint">
+        <span className="rounded-md border border-mint/25 bg-mint/10 px-3 py-1.5 qs-label-caps text-accent">
           {resolvedTheme} {t("settings.active")}
         </span>
       )}
     >
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="qs-label-caps text-muted">
           {t("settings.theme")}
         </div>
         <div
@@ -245,7 +245,7 @@ export function AppearanceSettingsPanel({
       </div>
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="qs-label-caps text-muted">
           {t("settings.template")}
         </div>
         <div
@@ -297,7 +297,7 @@ export function AppearanceSettingsPanel({
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <div className="qs-label-caps text-muted">
                   {t("settings.accentColor")}
                 </div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -330,7 +330,7 @@ export function AppearanceSettingsPanel({
             </label>
 
             <div className="mt-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <div className="qs-label-caps text-muted">
                 {t("settings.recommendedAccents")}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -375,7 +375,7 @@ export function AppearanceSettingsPanel({
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <div className="qs-label-caps text-muted">
                   Neon accent colors
                 </div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -396,7 +396,7 @@ export function AppearanceSettingsPanel({
                   } as CSSProperties
                 }
               >
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                <div className="flex items-center gap-2 qs-label-caps">
                   <span
                     className="h-4 w-4 rounded-full"
                     style={{ backgroundColor: selectedAccentColor }}
@@ -409,7 +409,7 @@ export function AppearanceSettingsPanel({
                   <span>{t("settings.secondaryAccent")}</span>
                 </div>
                 <div className="mt-3 rounded-lg border p-3">
-                  <div className="qs-neon-preview-button inline-flex rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.14em]">
+                  <div className="qs-neon-preview-button inline-flex rounded-md px-3 py-2 text-xs font-black uppercase tracking-caps">
                     {t("settings.buttonSample")}
                   </div>
                   <div className="mt-3 text-xs text-slate-400">
@@ -497,7 +497,7 @@ export function AppearanceSettingsPanel({
             </div>
 
             <div className="mt-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="mb-2 qs-label-caps text-muted">
                 Button style
               </p>
               <div className="flex gap-2" role="radiogroup" aria-label="Button style">
@@ -547,7 +547,7 @@ export function AppearanceSettingsPanel({
                   type="range"
                   value={neonButtonGradientBalancePreference}
                 />
-                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-caps text-slate-500">
                   <span>Primary</span>
                   <span>Balanced</span>
                   <span>Secondary</span>
@@ -577,7 +577,7 @@ export function AppearanceSettingsPanel({
                   type="range"
                   value={neonButtonGradientMidpointPreference}
                 />
-                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <span className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-caps text-slate-500">
                   <span>Sharper</span>
                   <span>50</span>
                   <span>Wider</span>
@@ -586,7 +586,7 @@ export function AppearanceSettingsPanel({
             </div>
 
             <div className="mt-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <div className="qs-label-caps text-muted">
                 Neon preset pairs
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -651,7 +651,7 @@ export function AppearanceSettingsPanel({
 
       <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
         <label className="block">
-          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <span className="block qs-label-caps text-muted">
             {t("settings.language")}
           </span>
           <select

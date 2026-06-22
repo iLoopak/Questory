@@ -229,7 +229,7 @@ function HintPanel({ hints, revealed, t }: { hints: [string, string, string]; re
             key={i}
             className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition ${unlocked ? 'bg-amber-950/30 text-amber-200' : 'bg-ink-900/60 text-slate-600'}`}
           >
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider mt-0.5 w-24 text-current opacity-60">
+            <span className="shrink-0 text-2xs font-semibold uppercase tracking-wider mt-0.5 w-24 text-current opacity-60">
               {labels[i]}
             </span>
             <span className={`flex-1 ${unlocked ? 'font-medium' : 'blur-sm select-none'}`}>
@@ -296,7 +296,7 @@ function ScoreStat({ label, value, accent = false }: { label: string; value: str
   return (
     <div className="rounded-lg bg-ink-900/70 px-3 py-2.5 text-center">
       <div className={`text-base font-bold ${accent ? 'text-mint' : 'text-white'}`}>{value}</div>
-      <div className="mt-0.5 text-[10px] text-slate-500">{label}</div>
+      <div className="mt-0.5 text-2xs text-slate-500">{label}</div>
     </div>
   );
 }

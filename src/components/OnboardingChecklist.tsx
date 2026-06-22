@@ -126,7 +126,7 @@ export function OnboardingChecklist({
 
         <div className="qs-setup-header flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">{t('onboarding.assistant')}</div>
+            <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('onboarding.assistant')}</div>
             <h2 className="mt-0.5 text-2xl font-semibold text-white">{t('onboarding.setupTitle')}</h2>
             <p className="mt-1.5 max-w-xl text-sm text-slate-400">{t('onboarding.wizardSubtitle')}</p>
           </div>
@@ -140,7 +140,7 @@ export function OnboardingChecklist({
         </div>
 
         <div className="qs-setup-progress mt-5 rounded-md border border-skyglass/15 bg-ink-900/50 p-3">
-          <div className="flex justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+          <div className="flex justify-between qs-label-caps text-slate-400">
             <span>{activeStep.title}</span>
             <span>{progressPercent}%</span>
           </div>
@@ -174,7 +174,7 @@ export function OnboardingChecklist({
               <h3 className="text-2xl font-semibold text-white">{activeStep.title}</h3>
               <p className="mt-1 text-sm text-slate-400">{activeStep.summary}</p>
             </div>
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${stepComplete ? 'border-mint/40 bg-mint/10 text-mint' : stepSkipped ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}>
+            <span className={`rounded-full border px-3 py-1 qs-label-caps ${stepComplete ? 'border-mint/40 bg-mint/10 text-mint' : stepSkipped ? 'border-amber-300/40 bg-amber-300/10 text-amber-200' : 'border-skyglass/15 text-slate-300'}`}>
               {stepComplete ? t('onboarding.completed') : stepSkipped ? t('onboarding.skipped') : t('onboarding.openStatus')}
             </span>
           </div>
@@ -236,7 +236,7 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
       <div className="grid gap-4 lg:grid-cols-3">
         <div>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Steam Web API key</span>
+            <span className="qs-label-caps text-muted">Steam Web API key</span>
             <input
               className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
               onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
@@ -254,7 +254,7 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
         </div>
         <div>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SteamID64</span>
+            <span className="qs-label-caps text-muted">SteamID64</span>
             <input
               className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
               onChange={(e) => setSettings({ ...settings, steamId64: e.target.value })}
@@ -289,7 +289,7 @@ function RetroStep({ games, onComplete, onImportGames, onSkip }: { games: Game[]
   useEffect(() => { inputRef.current?.setAttribute('webkitdirectory', ''); inputRef.current?.setAttribute('directory', ''); }, []);
   function scan(files: ScannableRomFile[]) { const result = scanRomFiles(files, games, platform); const existingIds = new Set(games.map((game) => game.id)); const imported = result.detectedRoms.filter((rom) => !rom.isDuplicate).map((rom) => mapDetectedRomToGame(rom, existingIds)); onImportGames(imported); setStatus(`Imported ${imported.length} retro games from ${result.summary.scannedFiles} scanned files.`); if (imported.length > 0) onComplete(); }
   async function pickAndroid() { try { const result = await RetroFolderPicker.pickFolder(); scan(result.files.map((file) => ({ name: file.name, path: file.path, uri: file.uri }))); } catch { setStatus('Folder selection was cancelled or unavailable.'); } }
-  return <div><label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform assignment</span><select className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white" value={platform} onChange={(e) => setPlatform(e.target.value as RetroPlatformOverride)}>{[autoDetectPlatformOption, ...retroImportPlatforms].map((option) => <option key={option} value={option}>{option}</option>)}</select></label><input ref={inputRef} className="hidden" multiple onChange={(e) => scan(Array.from(e.target.files ?? []))} type="file" /><div className="mt-4 flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => runtime.isAndroid ? pickAndroid() : inputRef.current?.click()} type="button">Pick ROM Folder</button><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip</button></div><Status text={status} /></div>;
+  return <div><label className="block"><span className="qs-label-caps text-muted">Platform assignment</span><select className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white" value={platform} onChange={(e) => setPlatform(e.target.value as RetroPlatformOverride)}>{[autoDetectPlatformOption, ...retroImportPlatforms].map((option) => <option key={option} value={option}>{option}</option>)}</select></label><input ref={inputRef} className="hidden" multiple onChange={(e) => scan(Array.from(e.target.files ?? []))} type="file" /><div className="mt-4 flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={() => runtime.isAndroid ? pickAndroid() : inputRef.current?.click()} type="button">Pick ROM Folder</button><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip</button></div><Status text={status} /></div>;
 }
 
 function BackupStep({ onComplete, onOpenSettings }: { onComplete: () => void; onOpenSettings: () => void }) {
@@ -312,7 +312,7 @@ function HowItWorksStep({ onComplete, onSkip }: { onComplete: () => void; onSkip
         {stages.map(([name, desc], i) => (
           <div className="rounded-lg border border-skyglass/15 bg-ink-900 p-4" key={name}>
             <div className="mb-2 text-xs font-semibold tabular-nums text-slate-600">0{i + 1}</div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{name}</div>
+            <div className="qs-label-caps text-accent">{name}</div>
             <p className="mt-1 text-xs leading-5 text-slate-400">{desc}</p>
           </div>
         ))}
@@ -329,7 +329,7 @@ function PersonalizeStep({ accentColorPreference, appTemplatePreference, gameCou
   const previewTitle = personalizedQuestShelfTitle;
   const chooseAccent = (color: string) => { const normalizedColor = normalizeAccentColor(color); if (normalizedColor) onAccentColorChange(normalizedColor === defaultAccentColor ? null : normalizedColor); };
 
-  return <div className="space-y-5"><div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]"><div className="space-y-4"><ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={steamPersonaName || 'Loopak'} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} /><label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Name / Nickname</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" maxLength={maxLibraryOwnerNicknameLength} onChange={(event) => onLibraryOwnerNicknameChange(event.target.value)} placeholder="Loopak" value={libraryOwnerNickname} /></label><div className="flex flex-wrap gap-2">{shelfExamples.map((example) => <button className="rounded-full border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10" key={example} onClick={() => onShelfIdentityChange({ ...shelfIdentity, shelfName: example })} type="button">{example}</button>)}</div><div><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theme selection</div><div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Theme selection"><button aria-pressed={appTemplatePreference === 'classic'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'classic' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('classic')} type="button"><strong>Default</strong><span className="mt-1 block text-xs text-slate-400">Clean dark QuestShelf identity.</span></button><button aria-pressed={appTemplatePreference === 'neon-deck'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'neon-deck' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('neon-deck')} type="button"><strong>Neon</strong><span className="mt-1 block text-xs text-slate-400">Arcade glow and deck-style panels.</span></button></div></div><div><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Accent color</div><div className="mt-2 flex flex-wrap items-center gap-2"><input className="h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1" onChange={(event) => chooseAccent(event.target.value)} type="color" value={selectedAccentColor} />{accentPresets.map((color) => <button aria-label={`Use ${color} accent`} aria-pressed={selectedAccentColor === color} className={`h-11 w-11 rounded-md border ${selectedAccentColor === color ? 'border-white shadow-glow' : 'border-white/10'}`} key={color} onClick={() => chooseAccent(color)} style={{ backgroundColor: color }} type="button" />)}</div></div></div><div className="rounded-2xl border border-mint/25 bg-ink-950/80 p-4 shadow-glow"><div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Live preview</div><div className="mt-3 flex items-center gap-3"><ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" /><h4 className="text-2xl font-semibold text-white">{previewTitle}</h4></div><p className="mt-2 text-sm text-slate-400">Welcome back — your backlog, wishlist, and queue now share this Shelf Identity.</p><div className="mt-5 grid gap-2 text-sm"><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{gameCount} games imported</span><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{platformCount} platforms configured</span><span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-mint">Avatar persists after restart</span></div></div></div><div className="flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={onComplete} type="button">Save personalization</button><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip for now</button></div></div>;
+  return <div className="space-y-5"><div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]"><div className="space-y-4"><ShelfIdentityEditor identity={shelfIdentity} onIdentityChange={onShelfIdentityChange} shelfNamePlaceholder={steamPersonaName || 'Loopak'} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} /><label className="block"><span className="qs-label-caps text-muted">Name / Nickname</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" maxLength={maxLibraryOwnerNicknameLength} onChange={(event) => onLibraryOwnerNicknameChange(event.target.value)} placeholder="Loopak" value={libraryOwnerNickname} /></label><div className="flex flex-wrap gap-2">{shelfExamples.map((example) => <button className="rounded-full border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10" key={example} onClick={() => onShelfIdentityChange({ ...shelfIdentity, shelfName: example })} type="button">{example}</button>)}</div><div><div className="qs-label-caps text-muted">Theme selection</div><div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Theme selection"><button aria-pressed={appTemplatePreference === 'classic'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'classic' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('classic')} type="button"><strong>Default</strong><span className="mt-1 block text-xs text-slate-400">Clean dark QuestShelf identity.</span></button><button aria-pressed={appTemplatePreference === 'neon-deck'} className={`rounded-lg border p-3 text-left ${appTemplatePreference === 'neon-deck' ? 'border-mint/60 bg-mint/10 text-mint' : 'border-skyglass/15 text-slate-200'}`} onClick={() => onAppTemplatePreferenceChange('neon-deck')} type="button"><strong>Neon</strong><span className="mt-1 block text-xs text-slate-400">Arcade glow and deck-style panels.</span></button></div></div><div><div className="qs-label-caps text-muted">Accent color</div><div className="mt-2 flex flex-wrap items-center gap-2"><input className="h-11 w-16 rounded-md border border-white/10 bg-ink-900 p-1" onChange={(event) => chooseAccent(event.target.value)} type="color" value={selectedAccentColor} />{accentPresets.map((color) => <button aria-label={`Use ${color} accent`} aria-pressed={selectedAccentColor === color} className={`h-11 w-11 rounded-md border ${selectedAccentColor === color ? 'border-white shadow-glow' : 'border-white/10'}`} key={color} onClick={() => chooseAccent(color)} style={{ backgroundColor: color }} type="button" />)}</div></div></div><div className="rounded-2xl border border-mint/25 bg-ink-950/80 p-4 shadow-glow"><div className="text-xs font-semibold uppercase tracking-spread text-mint">Live preview</div><div className="mt-3 flex items-center gap-3"><ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-14 w-14" /><h4 className="text-2xl font-semibold text-white">{previewTitle}</h4></div><p className="mt-2 text-sm text-slate-400">Welcome back — your backlog, wishlist, and queue now share this Shelf Identity.</p><div className="mt-5 grid gap-2 text-sm"><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{gameCount} games imported</span><span className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2">{platformCount} platforms configured</span><span className="rounded-md border border-mint/30 bg-mint/10 px-3 py-2 text-mint">Avatar persists after restart</span></div></div></div><div className="flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950" onClick={onComplete} type="button">Save personalization</button><button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip for now</button></div></div>;
 }
 
 
@@ -346,7 +346,7 @@ function AnalyticsStep({ analyticsSettings, onChoose }: { analyticsSettings: Ret
 
   return (
     <div className={`rounded-2xl border p-5 ${selectedChoice === 'enabled' ? 'border-mint/60 bg-mint/10 shadow-glow' : selectedChoice === 'declined' ? 'border-amber-300/40 bg-amber-300/10' : 'border-mint/25 bg-ink-950/70'}`}>
-      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Community Alpha</div>
+      <div className="text-xs font-semibold uppercase tracking-spread text-mint">Community Alpha</div>
       <h3 className="mt-2 text-3xl font-semibold text-white">{t('onboarding.analyticsTitle')}</h3>
       <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-6 text-slate-300">{t('onboarding.analyticsBody')}</p>
       {selectedChoice ? (
@@ -417,7 +417,7 @@ function FinishStep({
         <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1.5">Setup progress: {progress}</span>
       </div>
       <div className="mx-auto mt-5 max-w-lg rounded-xl border border-white/10 bg-ink-950/60 p-4 text-left">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mint">Community Alpha</div>
+        <div className="text-xs font-semibold uppercase tracking-spread text-mint">Community Alpha</div>
         <p className="mt-1 text-sm text-slate-300">Help improve QuestShelf by sharing anonymous usage stats — no game titles, notes, or personal data.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -447,6 +447,6 @@ function FinishStep({
     </div>
   );
 }
-function Input({ label, onChange, type = 'text', value }: { label: string; onChange: (value: string) => void; type?: string; value: string }) { return <label className="block"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" onChange={(e) => onChange(e.target.value)} type={type} value={value} /></label>; }
+function Input({ label, onChange, type = 'text', value }: { label: string; onChange: (value: string) => void; type?: string; value: string }) { return <label className="block"><span className="qs-label-caps text-muted">{label}</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" onChange={(e) => onChange(e.target.value)} type={type} value={value} /></label>; }
 function Status({ text }: { text: string }) { return <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm text-slate-300">{text}</div>; }
 function Actions({ disabled = false, loading = false, onPrimary, onSkip, primary }: { disabled?: boolean; loading?: boolean; onPrimary: () => void; onSkip?: () => void; primary: string }) { return <div className="mt-5 flex flex-wrap gap-2"><button className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 disabled:bg-slate-600" disabled={disabled || loading} onClick={onPrimary} type="button">{loading ? 'Working...' : primary}</button>{onSkip ? <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onSkip} type="button">Skip</button> : null}</div>; }

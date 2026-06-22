@@ -91,7 +91,7 @@ const appLogo = '/icons/questshelf-icon.png';
 
 
 
-function QuestShelfLogo({ className, fallbackClassName = 'text-[10px]' }: { className: string; fallbackClassName?: string }) {
+function QuestShelfLogo({ className, fallbackClassName = 'text-2xs' }: { className: string; fallbackClassName?: string }) {
   const [hasImageError, setHasImageError] = useState(false);
 
   return (
@@ -1017,7 +1017,7 @@ export function AppController() {
               type="button"
             >
               <QuestShelfLogo className="h-7 w-7 rounded-md" />
-              <span className="hidden min-w-0 max-w-[12rem] truncate text-xs font-semibold uppercase tracking-[0.16em] text-mint sm:block">{personalizedQuestShelfTitle}</span>
+              <span className="hidden min-w-0 max-w-[12rem] truncate text-xs font-semibold uppercase tracking-spread text-mint sm:block">{personalizedQuestShelfTitle}</span>
             </button>
             {isShelfProfileOpen ? (
               <ShelfProfilePopover
@@ -1730,7 +1730,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
         <form className="max-h-[calc(92dvh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.addTo')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.addTo')}</span>
               <select
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                 onChange={(event) => setCollectionType(event.target.value as GameCollectionType)}
@@ -1742,7 +1742,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.titleLabel')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.titleLabel')}</span>
               <input
                 autoFocus
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
@@ -1753,7 +1753,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.platform')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.platform')}</span>
               <select
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                 onChange={(event) => setPlatform(event.target.value as GamePlatform)}
@@ -1769,7 +1769,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
 
             {platform === 'Other' ? (
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.customPlatform')}</span>
+                <span className="qs-label-caps text-muted">{t('addGame.customPlatform')}</span>
                 <input
                   className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                   onChange={(event) => setCustomPlatform(event.target.value)}
@@ -1780,7 +1780,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             ) : null}
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.status')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.status')}</span>
               <select
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                 onChange={(event) => setStatus(event.target.value as GameStatus)}
@@ -1795,7 +1795,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.playtimeHours')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.playtimeHours')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 min="0"
@@ -1807,7 +1807,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.coverUrl')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.coverUrl')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setCoverImage(event.target.value)}
@@ -1818,7 +1818,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.tags')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.tags')}</span>
               <input
                 className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setTagText(event.target.value)}
@@ -1828,7 +1828,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             </label>
 
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.notes')}</span>
+              <span className="qs-label-caps text-muted">{t('addGame.notes')}</span>
               <textarea
                 className="mt-2 min-h-28 w-full resize-y rounded-md border border-white/10 bg-ink-950 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                 onChange={(event) => setNotes(event.target.value)}
@@ -1840,7 +1840,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
             {collectionType === 'wishlist' ? (
               <>
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.priority')}</span>
+                  <span className="qs-label-caps text-muted">{t('addGame.priority')}</span>
                   <select
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
                     onChange={(event) => setPriority(event.target.value as WishlistPriority)}
@@ -1855,7 +1855,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.expectedPlaytime')}</span>
+                  <span className="qs-label-caps text-muted">{t('addGame.expectedPlaytime')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     min="0"
@@ -1868,7 +1868,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.priceTarget')}</span>
+                  <span className="qs-label-caps text-muted">{t('addGame.priceTarget')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setPriceTarget(event.target.value)}
@@ -1878,7 +1878,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.releaseDate')}</span>
+                  <span className="qs-label-caps text-muted">{t('addGame.releaseDate')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setReleaseDate(event.target.value)}
@@ -1888,7 +1888,7 @@ function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps)
                 </label>
 
                 <label className="block md:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('addGame.storeUrl')}</span>
+                  <span className="qs-label-caps text-muted">{t('addGame.storeUrl')}</span>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
                     onChange={(event) => setStoreUrl(event.target.value)}
@@ -1935,7 +1935,7 @@ function AppStartupScreen() {
         <div className="flex items-center gap-3">
           <QuestShelfLogo className="h-12 w-12 rounded-lg border border-mint/30" fallbackClassName="text-sm" />
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.16em] text-mint">QuestShelf</div>
+            <div className="text-sm font-semibold uppercase tracking-spread text-mint">QuestShelf</div>
             <h1 className="mt-1 text-2xl font-semibold text-white">{createTranslator(loadLanguagePreference())('common.loadingLibrary')}</h1>
           </div>
         </div>

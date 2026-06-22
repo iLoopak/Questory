@@ -210,7 +210,7 @@ export function SettingsView({
       <div className="qs-settings-shell-header border-b border-skyglass/15 bg-ink-950/90 px-3 py-3 backdrop-blur sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{t('settings.title')}</div>
+            <div className="qs-label-caps text-accent">{t('settings.title')}</div>
             <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-slate-400">
               <span>{t('settings.title')}</span>
               <span className="text-slate-600">/</span>

@@ -53,6 +53,21 @@ export default {
         panel: 'var(--shadow-panel)',
         glow: 'var(--shadow-glow)',
       },
+      fontSize: {
+        '2xs': ['var(--font-2xs)', { lineHeight: '1.2' }],
+      },
+      letterSpacing: {
+        label:  'var(--tracking-label)',
+        caps:   'var(--tracking-caps)',
+        spread: 'var(--tracking-spread)',
+      },
+      textColor: {
+        primary:   'rgb(var(--text-primary-rgb)  / <alpha-value>)',
+        secondary: 'rgb(var(--text-secondary-rgb) / <alpha-value>)',
+        muted:     'rgb(var(--text-subtle-rgb)   / <alpha-value>)',
+        disabled:  'rgb(var(--text-subtle-rgb)   / <alpha-value>)',
+        accent:    'rgb(var(--qs-accent-primary-rgb) / <alpha-value>)',
+      },
     },
   },
   plugins: [],

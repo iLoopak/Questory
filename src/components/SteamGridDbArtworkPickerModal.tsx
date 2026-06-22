@@ -124,7 +124,7 @@ export function SteamGridDbArtworkPickerModal({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 p-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">SteamGridDB</p>
+            <p className="text-xs font-semibold uppercase tracking-spread text-slate-500">SteamGridDB</p>
             <h3 className="text-lg font-semibold text-white">{t('artwork.picker.title')}</h3>
             <p className="mt-0.5 truncate text-sm text-slate-400">{game.title}</p>
           </div>

@@ -254,7 +254,7 @@ export function ArtworkAuditPanel({ games, onApplyArtworkUpdate, onEnrichGames, 
 
           {isFindingArtwork ? (
             <div className="mt-4">
-              <div className="mb-2 flex justify-between text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+              <div className="mb-2 flex justify-between text-xs font-medium uppercase tracking-caps text-slate-500">
                 <span>{t('artwork.finding')}</span>
                 <span>{progress.completed}/{progress.total}</span>
               </div>
