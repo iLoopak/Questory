@@ -1101,6 +1101,7 @@ export function AppController() {
                 featuredGame={resolvedFeaturedGame}
                 games={games}
                 onBack={closePlayingNowHub}
+                onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
                 onOpenDetails={openDetailsFromPlayingNow}
                 onPlayToday={logPlayedToday}
                 onRefreshSteamActivity={(gameIds) => { void refreshSteamPlaytime(gameIds, { showToast: false }); }}
@@ -1252,6 +1253,7 @@ export function AppController() {
                   onBulkStatusChange={updateManyGameStatuses}
                   onClearFilters={handleClearLibraryFilters}
                   onFiltersChange={handleLibraryFiltersChange}
+                  onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
                   onFindMetadata={refreshGameMetadataFromActions}
                   onMoveToLibrary={moveToLibrary}
                   onOpenDetails={handleOpenDetailsFromCollection}
@@ -1318,6 +1320,7 @@ export function AppController() {
                   onBulkStatusChange={updateManyGameStatuses}
                   onClearFilters={handleClearWishlistFilters}
                   onFiltersChange={handleWishlistFiltersChange}
+                  onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
                   onFindMetadata={refreshGameMetadataFromActions}
                   onMoveToLibrary={moveToLibrary}
                   onOpenDetails={handleOpenDetailsFromCollection}
@@ -1338,6 +1341,7 @@ export function AppController() {
               initialPlatform={targetQueuePlatform}
               queueState={platformQueueState}
               onAddGameToQueue={addGameToQueue}
+              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
               onLimitChange={updateQueueLimit}
               onQueueStateChange={setPlatformQueueState}
               onMoveEntry={moveQueueGame}
@@ -1408,6 +1412,7 @@ export function AppController() {
               onAddToQueue={openBacklogPicker}
               onAddToWishlist={addToWishlist}
               onMoveToLibrary={moveToLibrary}
+              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
               onFindMetadata={(game) => startMetadataWorkflow([game.id])}
               onRemove={removeGame}
               onRemoveAndIgnore={removeAndIgnoreSteamGame}

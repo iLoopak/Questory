@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
+import { ArtworkRecoveryButton } from '../../components/ArtworkRecoveryButton';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { getPreferredArtworkSources, getPreferredLogoUrl } from '../../lib/gameCoverImages';
@@ -14,6 +15,7 @@ export type PlayingNowHubProps = {
   featuredGame?: Game | null;
   games: Game[];
   onBack: () => void;
+  onFindArtwork?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
   onPlayToday: (game: Game) => void;
   onRefreshSteamActivity?: (gameIds: string[]) => void;
@@ -32,7 +34,7 @@ type PlayingNowContext = {
   steamActivityToday: boolean;
 };
 
-export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDetails, onPlayToday, onRefreshSteamActivity, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
+export function PlayingNowHub({ activity, featuredGame, games, onBack, onFindArtwork, onOpenDetails, onPlayToday, onRefreshSteamActivity, onStatusChange, queue, queueSummary, shelfNickname, t }: PlayingNowHubProps & { t: TFunction }) {
   const { language } = useI18n();
   const [openMenuGameId, setOpenMenuGameId] = useState<string | null>(null);
   const today = formatLocalDate(new Date());
@@ -134,6 +136,7 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onOpenDet
                         context={activityByGame.get(game.id) ?? getEmptyPlayingNowContext(game, today)}
                         game={game}
                         isMenuOpen={openMenuGameId === game.id}
+                        onFindArtwork={onFindArtwork}
                         onOpenDetails={onOpenDetails}
                         onPlayToday={onPlayToday}
                         onStatusChange={onStatusChange}
@@ -175,7 +178,7 @@ function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
   return 'gamepad-2';
 }
 
-function PlayingNowCover({ game }: { game: Game }) {
+function PlayingNowCover({ game, onFindArtwork }: { game: Game; onFindArtwork?: (game: Game) => void }) {
   const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -209,11 +212,12 @@ function PlayingNowCover({ game }: { game: Game }) {
           {game.title.slice(0, 1).toUpperCase()}
         </span>
       )}
+      {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} compact /> : null}
     </span>
   );
 }
 
-function PlayingNowCard({ context, game, isMenuOpen, onOpenDetails, onPlayToday, onStatusChange, onToggleMenu, platformAccentColor, queueState, t }: { context: PlayingNowContext; game: Game; isMenuOpen: boolean; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; onToggleMenu: () => void; platformAccentColor?: string; queueState?: PlatformQueueState; t: TFunction }) {
+function PlayingNowCard({ context, game, isMenuOpen, onFindArtwork, onOpenDetails, onPlayToday, onStatusChange, onToggleMenu, platformAccentColor, queueState, t }: { context: PlayingNowContext; game: Game; isMenuOpen: boolean; onFindArtwork?: (game: Game) => void; onOpenDetails: (gameId: string) => void; onPlayToday: (game: Game) => void; onStatusChange: (gameId: string, status: GameStatus) => void; onToggleMenu: () => void; platformAccentColor?: string; queueState?: PlatformQueueState; t: TFunction }) {
   const statusBadge = getPlayingNowStatusBadge(context, t);
   const platformStyle = getPlayingNowPlatformStyle(platformAccentColor);
   const logoUrl = getPreferredLogoUrl(game);
@@ -233,7 +237,7 @@ function PlayingNowCard({ context, game, isMenuOpen, onOpenDetails, onPlayToday,
           <div className="absolute inset-0 bg-ink-950/50" />
         </div>
       ) : null}
-      <PlayingNowCover game={game} />
+      <PlayingNowCover game={game} onFindArtwork={onFindArtwork} />
       <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="min-w-0">
           {logoUrl ? (

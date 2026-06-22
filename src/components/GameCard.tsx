@@ -3,6 +3,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { getPreferredArtworkSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
+import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import { GameActionMenu } from './GameActionMenu';
 import { PlatformBadge } from './PlatformBadge';
 import { DealCoverBadges } from './DealCoverBadges';
@@ -16,6 +17,7 @@ type GameCardProps = {
   onAddToQueue?: (game: Game) => void;
   isSelected?: boolean;
   onAddToWishlist?: (game: Game) => void;
+  onFindArtwork?: (game: Game) => void;
   onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
@@ -36,6 +38,7 @@ function GameCardComponent({
   isSelected = false,
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
@@ -206,6 +209,7 @@ function GameCardComponent({
           ) : null}
         </div>
         <DealCoverBadges game={game} variant="grid" />
+        {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} /> : null}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-3 sm:gap-3 sm:p-3.5">

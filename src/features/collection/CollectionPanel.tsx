@@ -85,6 +85,7 @@ export type CollectionPanelProps = {
   onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
   onClearFilters: () => void;
   onFiltersChange: (changes: Partial<CollectionFilters>) => void;
+  onFindArtwork?: (game: Game) => void;
   onFindMetadata: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
@@ -131,6 +132,7 @@ export function CollectionPanel({
   onBulkStatusChange,
   onClearFilters,
   onFiltersChange,
+  onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
@@ -797,6 +799,7 @@ export function CollectionPanel({
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
@@ -814,6 +817,7 @@ export function CollectionPanel({
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onPlayNow={onPlayNow}
@@ -835,6 +839,7 @@ export function CollectionPanel({
             selectedGameIds={selectedGameIds}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}

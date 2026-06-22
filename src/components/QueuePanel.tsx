@@ -1,4 +1,5 @@
 import { Icon } from './Icon';
+import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
@@ -42,6 +43,7 @@ type QueuePanelProps = {
   queueState: PlatformQueueState;
   contentScrollRef: RefObject<HTMLElement | null>;
   onAddGameToQueue: (game: Game, platform: GamePlatform) => void;
+  onFindArtwork?: (game: Game) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onQueueStateChange: (state: PlatformQueueState) => void;
   onMoveEntry: (gameId: string, platform: GamePlatform, direction: 'top' | 'up' | 'down') => void;
@@ -59,6 +61,7 @@ export function QueuePanel({
   queueState,
   contentScrollRef,
   onAddGameToQueue,
+  onFindArtwork,
   onLimitChange,
   onQueueStateChange,
   onMoveEntry,
@@ -418,6 +421,7 @@ export function QueuePanel({
               onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
               onMoveEntry={onMoveEntry}
               onMoveEntryToPlatform={onMoveEntryToPlatform}
+              onFindArtwork={onFindArtwork}
               onPlayNow={onPlayNow}
               onPlayingAction={onPlayingAction}
               onOpenDetails={onOpenDetails}
@@ -764,6 +768,7 @@ function PlatformQueueColumn({
   setPlatformRef,
   queueEntries,
   queueScrollRef,
+  onFindArtwork,
   onHidePlatform,
   onLimitChange,
   onMovePlatform,
@@ -788,6 +793,7 @@ function PlatformQueueColumn({
   setPlatformRef: (element: HTMLElement | null) => void;
   queueEntries: PlatformQueueEntry[];
   queueScrollRef: RefObject<HTMLElement | null>;
+  onFindArtwork?: (game: Game) => void;
   onHidePlatform: (platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onMovePlatform: (platform: GamePlatform, direction: 'up' | 'down') => void;
@@ -890,7 +896,7 @@ function PlatformQueueColumn({
             </div>
             <div className="grid w-full min-w-0 gap-2">
               {currentlyPlaying.map((game) => (
-                <QueueGameRow key={game.id} game={game} platform={platform} playingNowLabel={playingNowLabel} onAction={onPlayingAction} onOpenDetails={onOpenDetails} />
+                <QueueGameRow key={game.id} game={game} platform={platform} playingNowLabel={playingNowLabel} onAction={onPlayingAction} onFindArtwork={onFindArtwork} onOpenDetails={onOpenDetails} />
               ))}
             </div>
           </div>
@@ -1151,21 +1157,26 @@ function QueueGameRow({
   platform,
   playingNowLabel,
   onAction,
+  onFindArtwork,
   onOpenDetails,
 }: {
   game: Game;
   platform: GamePlatform;
   playingNowLabel: string;
   onAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
+  onFindArtwork?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
 }) {
   const { t } = useI18n();
 
   return (
     <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border p-2 text-sm transition">
-      <button className="text-left" onClick={() => onOpenDetails(game.id)} type="button">
-        <QueueCoverThumbnail game={game} size="playing" />
-      </button>
+      <div className="relative self-start">
+        <button className="block text-left" onClick={() => onOpenDetails(game.id)} type="button">
+          <QueueCoverThumbnail game={game} size="playing" />
+        </button>
+        {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} compact /> : null}
+      </div>
       <div className="min-w-0">
         <button className="qs-platform-playing-link block max-w-full truncate text-left text-base font-semibold" onClick={() => onOpenDetails(game.id)} type="button">
           {game.title}

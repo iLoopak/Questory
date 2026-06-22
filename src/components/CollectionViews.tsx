@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { translateOption, useI18n } from '../i18n';
 import { getGameCoverSources } from '../lib/gameCoverImages';
+import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameActionMenu } from './GameActionMenu';
@@ -16,6 +17,7 @@ import { useVirtualWindow } from '../hooks/useVirtualWindow';
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
+  onFindArtwork?: (game: Game) => void;
   onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onPlayNow?: (game: Game) => void;
@@ -61,6 +63,7 @@ export function CollectionGrid({
   selectedGameIds = new Set(),
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
@@ -152,6 +155,7 @@ export function CollectionGrid({
             isSelected={selectedGameIds.has(game.id)}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
@@ -179,6 +183,7 @@ export function CollectionShelf({
   selectedGameIds = new Set(),
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
@@ -334,6 +339,7 @@ export function CollectionShelf({
                   isSelected={selectedGameIds.has(game.id)}
                   onAddToQueue={onAddToQueue}
                   onAddToWishlist={onAddToWishlist}
+                  onFindArtwork={onFindArtwork}
                   onFindMetadata={onFindMetadata}
                   onKeyDown={handleShelfKeyDown}
                   onMoveToLibrary={onMoveToLibrary}
@@ -366,6 +372,7 @@ export function CollectionList({
   selectedGameIds = new Set(),
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onPlayNow,
@@ -425,6 +432,7 @@ export function CollectionList({
             isSelected={selectedGameIds.has(game.id)}
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onPlayNow={onPlayNow}
@@ -468,6 +476,7 @@ const VirtualGridGameCard = memo(function VirtualGridGameCard({
   isSelected,
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onOpenDetails,
@@ -492,6 +501,7 @@ const VirtualGridGameCard = memo(function VirtualGridGameCard({
       suppressWantToPlayStatus={suppressWantToPlayStatus}
       onAddToQueue={onAddToQueue}
       onAddToWishlist={onAddToWishlist}
+      onFindArtwork={onFindArtwork}
       onFindMetadata={onFindMetadata}
       onMoveToLibrary={onMoveToLibrary}
       onOpenDetails={openDetails}
@@ -516,6 +526,7 @@ type ShelfGameCardProps = {
   isSelected: boolean;
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
+  onFindArtwork?: (game: Game) => void;
   onFindMetadata?: (game: Game) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>, absoluteIndex: number, game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
@@ -558,6 +569,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
   isSelected,
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork,
   onFindMetadata,
   onKeyDown,
   onMoveToLibrary,
@@ -669,6 +681,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
           <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
         ) : null}
         <DealCoverBadges game={game} variant="shelf" />
+        {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} compact /> : null}
       </span>
 
       <span className="mt-2.5 block min-h-[2.75rem]">
@@ -720,6 +733,7 @@ type CompactGameRowProps = {
   isSelected: boolean;
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
+  onFindArtwork?: (game: Game) => void;
   onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onPlayNow?: (game: Game) => void;
@@ -744,6 +758,7 @@ const CompactGameRow = memo(function CompactGameRow({
   isSelected,
   onAddToQueue,
   onAddToWishlist,
+  onFindArtwork: _onFindArtwork,
   onFindMetadata,
   onMoveToLibrary,
   onPlayNow,
@@ -943,6 +958,7 @@ function areVirtualCardPropsEqual<
     previousProps.isSelected === nextProps.isSelected &&
     previousProps.onAddToQueue === nextProps.onAddToQueue &&
     previousProps.onAddToWishlist === nextProps.onAddToWishlist &&
+    previousProps.onFindArtwork === nextProps.onFindArtwork &&
     previousProps.onFindMetadata === nextProps.onFindMetadata &&
     previousProps.onMoveToLibrary === nextProps.onMoveToLibrary &&
     previousProps.onOpenDetails === nextProps.onOpenDetails &&

@@ -162,6 +162,10 @@ export function hasProtectedArtwork(game: Game) {
   return source === 'user' || source === 'steam' || (typeof game.steamAppId === 'number' && hasRealArtwork(game));
 }
 
+export function hasFallbackArtwork(game: Game): boolean {
+  return getArtworkCandidates(game, { includeGeneratedFallback: false }).length === 0;
+}
+
 export function isSteamImportedGame(game: Game) {
   return game.externalSource === 'steam' || typeof game.steamAppId === 'number';
 }

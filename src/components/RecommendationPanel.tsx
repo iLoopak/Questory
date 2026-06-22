@@ -26,6 +26,7 @@ type RecommendationPanelProps = {
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onMoveToLibrary: (game: Game) => void;
+  onFindArtwork?: (game: Game) => void;
   onFindMetadata?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
   onRemove: (gameId: string) => void;
@@ -46,6 +47,7 @@ export function RecommendationPanel({
   onAddToQueue,
   onAddToWishlist,
   onMoveToLibrary,
+  onFindArtwork,
   onFindMetadata,
   onOpenDetails,
   onRemove,
@@ -303,6 +305,7 @@ export function RecommendationPanel({
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
@@ -322,6 +325,7 @@ export function RecommendationPanel({
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
@@ -341,6 +345,7 @@ export function RecommendationPanel({
             includeDetailsAction
             onAddToQueue={onAddToQueue}
             onAddToWishlist={onAddToWishlist}
+            onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
             onOpenDetails={onOpenDetails}
