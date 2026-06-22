@@ -378,6 +378,8 @@ export function QuestRunnerGame({ games }: { games?: Game[] }) {
   const stateRef     = useRef<RunnerState>(makeInitialState(loadHighScore()));
   const colorsRef    = useRef<Colors>(readColors());
   const coverImagesRef = useRef<Map<string, CoverEntry>>(new Map());
+  // Tracks the combined (display scale × DPR) factor for the draw context transform
+  const dprScaleRef = useRef(1);
 
   const [highScore, setHighScore] = useState(() => stateRef.current.highScore);
 
@@ -387,6 +389,32 @@ export function QuestRunnerGame({ games }: { games?: Game[] }) {
 
   // Refresh CSS-variable colours after mount (resolved values available then)
   useEffect(() => { colorsRef.current = readColors(); }, []);
+
+  // Resize canvas buffer to match container × DPR so no CSS scaling occurs
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    function resize() {
+      if (!canvas || !container) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = container.clientWidth;
+      if (w === 0) return;
+      const h = Math.round(w * (CANVAS_H / CANVAS_W));
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      // Single scale factor works because we preserve the aspect ratio
+      dprScaleRef.current = canvas.width / CANVAS_W;
+    }
+
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
 
   // Preload cover images from game library (at most 8; skip generated SVGs)
   useEffect(() => {
@@ -573,6 +601,9 @@ export function QuestRunnerGame({ games }: { games?: Game[] }) {
       }
 
       // ── Draw ──────────────────────────────────────────────────────────────
+
+      // Map 600×180 logical coordinates → physical canvas pixels at any DPR/display size
+      ctx.setTransform(dprScaleRef.current, 0, 0, dprScaleRef.current, 0, 0);
 
       // Background
       ctx.fillStyle = c.bg;
@@ -782,7 +813,6 @@ export function QuestRunnerGame({ games }: { games?: Game[] }) {
           ref={canvasRef}
           className="block h-auto w-full"
           height={CANVAS_H}
-          style={{ imageRendering: 'pixelated' }}
           width={CANVAS_W}
         />
       </div>
