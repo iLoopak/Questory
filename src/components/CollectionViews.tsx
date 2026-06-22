@@ -7,6 +7,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
+import { HeroGridCard } from './HeroGridCard';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformBadge } from './PlatformBadge';
 import { DealCoverBadges } from './DealCoverBadges';
@@ -41,6 +42,7 @@ type CollectionViewProps = CollectionActionHandlers &
   CollectionSelectionProps &
   CollectionHighlightProps & {
     games: Game[];
+    cardVariant?: 'hero' | 'standard';
     hideRecommendationBadge?: boolean;
     suppressWantToPlayStatus?: boolean;
     includeDetailsAction?: boolean;
@@ -52,6 +54,7 @@ type CollectionViewProps = CollectionActionHandlers &
 
 export function CollectionGrid({
   games,
+  cardVariant = 'hero',
   debugLabel = 'Collection grid',
   getHighlightLabel,
   hideRecommendationBadge = false,
@@ -144,6 +147,7 @@ export function CollectionGrid({
           <VirtualGridGameCard
             key={game.id}
             game={game}
+            cardVariant={cardVariant}
             getHighlightLabel={getHighlightLabel}
             hideRecommendationBadge={hideRecommendationBadge}
             suppressWantToPlayStatus={suppressWantToPlayStatus}
@@ -449,6 +453,7 @@ type VirtualGridGameCardProps = CollectionActionHandlers &
   CollectionSelectionProps &
   CollectionHighlightProps & {
     game: Game;
+    cardVariant: 'hero' | 'standard';
     hideRecommendationBadge: boolean;
     suppressWantToPlayStatus: boolean;
     includeDetailsAction: boolean;
@@ -460,6 +465,7 @@ type VirtualGridGameCardProps = CollectionActionHandlers &
 
 const VirtualGridGameCard = memo(function VirtualGridGameCard({
   game,
+  cardVariant,
   getHighlightLabel,
   hideRecommendationBadge,
   suppressWantToPlayStatus,
@@ -482,26 +488,30 @@ const VirtualGridGameCard = memo(function VirtualGridGameCard({
   const toggleSelected = useCallback(() => onToggleSelected?.(game.id), [game.id, onToggleSelected]);
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
 
-  return (
-    <GameCard
-      game={game}
-      highlightLabel={highlightLabel}
-      includeDetailsAction={includeDetailsAction}
-      isMultiSelectMode={isMultiSelectMode}
-      isSelected={isSelected}
-      suppressWantToPlayStatus={suppressWantToPlayStatus}
-      onAddToQueue={onAddToQueue}
-      onAddToWishlist={onAddToWishlist}
-      onFindMetadata={onFindMetadata}
-      onMoveToLibrary={onMoveToLibrary}
-      onOpenDetails={openDetails}
-      onRemove={onRemove}
-      onRemoveAndIgnore={onRemoveAndIgnore}
-      onStatusChange={onStatusChange}
-      onToggleSelected={toggleSelected}
-      platformLabel={platformLabel}
-      platformQueueState={platformQueueState}
-    />
+  const sharedProps = {
+    game,
+    highlightLabel,
+    includeDetailsAction,
+    isMultiSelectMode,
+    isSelected,
+    suppressWantToPlayStatus,
+    onAddToQueue,
+    onAddToWishlist,
+    onFindMetadata,
+    onMoveToLibrary,
+    onOpenDetails: openDetails,
+    onRemove,
+    onRemoveAndIgnore,
+    onStatusChange,
+    onToggleSelected: toggleSelected,
+    platformLabel,
+    platformQueueState,
+  };
+
+  return cardVariant === 'hero' ? (
+    <HeroGridCard {...sharedProps} />
+  ) : (
+    <GameCard {...sharedProps} />
   );
 });
 
@@ -956,7 +966,7 @@ function areVirtualCardPropsEqual<
 }
 
 function getMountedCollectionCardCount(container: HTMLElement | null | undefined) {
-  return container?.querySelectorAll('.qs-game-card, .qs-shelf-card, .qs-compact-card').length ?? null;
+  return container?.querySelectorAll('.qs-game-card, .qs-hero-grid-card, .qs-shelf-card, .qs-compact-card').length ?? null;
 }
 
 function RowAction({ label, onClick, primary = false, tone }: { label: string; onClick: () => void; primary?: boolean; tone?: 'danger' }) {
