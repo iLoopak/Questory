@@ -3534,3 +3534,25 @@ body.qs-controller-active .qs-compact-card:focus-within {
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
+
+/* ── Batch completion cover-art float animations ──────────────────── */
+
+@keyframes qs-float-a {
+  from { transform: translateY(0px)   rotate(var(--tile-rotate, 0deg)); }
+  to   { transform: translateY(-9px)  rotate(var(--tile-rotate, 0deg)); }
+}
+@keyframes qs-float-b {
+  from { transform: translateY(-4px)  rotate(var(--tile-rotate, 0deg)); }
+  to   { transform: translateY(5px)   rotate(var(--tile-rotate, 0deg)); }
+}
+@keyframes qs-float-c {
+  from { transform: translateY(-2px)  rotate(var(--tile-rotate, 0deg)); }
+  to   { transform: translateY(-11px) rotate(var(--tile-rotate, 0deg)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qs-batch-cover-tile {
+    animation: none !important;
+    transform: rotate(var(--tile-rotate, 0deg)) !important;
+  }
+}
