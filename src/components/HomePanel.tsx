@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -377,6 +378,9 @@ export function HomePanel({
             nextReviewTarget={nextReviewTarget}
             onOpenReviewMode={() => onOpenReviewMode('backlog')}
           />
+
+          {/* Daily Quest */}
+          {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
 
           {/* Continue Playing */}
           <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
