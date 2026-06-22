@@ -80,7 +80,8 @@ export function QueuePanel({
   const queueListRef = useRef<HTMLDivElement | null>(null);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All'>('All');
+  const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All Platforms'>('All Platforms');
+  const [statusFilter, setStatusFilter] = useState<'All Statuses' | 'Planned' | 'Playing'>('All Statuses');
   const [showQueueHint, setShowQueueHint] = useState(() => localStorage.getItem('qs-queue-hint-v1') !== 'dismissed');
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
@@ -112,14 +113,32 @@ export function QueuePanel({
     return nextPlayingGamesByPlatform;
   }, [games]);
   const displayedQueuePlatforms = useMemo(() => {
-    const visiblePlatforms = platformFilter === 'All' ? activeQueuePlatforms : activeQueuePlatforms.filter((platform) => platform === platformFilter);
+    let visiblePlatforms = platformFilter === 'All Platforms'
+      ? activeQueuePlatforms
+      : activeQueuePlatforms.filter((platform) => platform === platformFilter);
+
+    if (statusFilter === 'Playing') {
+      visiblePlatforms = visiblePlatforms.filter((platform) => (playingGamesByPlatform.get(platform)?.length ?? 0) > 0);
+    } else if (statusFilter === 'Planned') {
+      visiblePlatforms = visiblePlatforms.filter((platform) => visibleQueueEntries.some((e) => e.targetPlatform === platform));
+    }
 
     if (!initialPlatform || !visiblePlatforms.includes(initialPlatform)) {
       return visiblePlatforms;
     }
 
     return [initialPlatform, ...visiblePlatforms.filter((platform) => platform !== initialPlatform)];
-  }, [activeQueuePlatforms, initialPlatform, platformFilter]);
+  }, [activeQueuePlatforms, initialPlatform, platformFilter, playingGamesByPlatform, statusFilter, visibleQueueEntries]);
+
+  const hasActiveFilters = platformFilter !== 'All Platforms' || statusFilter !== 'All Statuses';
+
+  const selectedPlatformSummary = useMemo(() => {
+    if (platformFilter === 'All Platforms') return null;
+    const playing = playingGamesByPlatform.get(platformFilter)?.length ?? 0;
+    const planned = visibleQueueEntries.filter((e) => e.targetPlatform === platformFilter).length;
+    const wishlist = games.filter((g) => g.platform === platformFilter && g.collectionType === 'wishlist').length;
+    return { playing, planned, wishlist };
+  }, [platformFilter, playingGamesByPlatform, visibleQueueEntries, games]);
 
   const normalizedQueueSearch = queueSearchTerm.trim().toLowerCase();
   const addableGames = useMemo(() => {
@@ -205,18 +224,19 @@ export function QueuePanel({
         searchValue={queueSearchTerm}
         searchPlaceholder={t('queue.findGame')}
         onSearchChange={setQueueSearchTerm}
+        onClearFilters={hasActiveFilters ? () => { setPlatformFilter('All Platforms'); setStatusFilter('All Statuses'); } : undefined}
         selects={[
           {
             label: t('toolbar.status'),
-            value: 'Planned',
-            options: ['Planned'],
-            onChange: () => undefined,
+            value: statusFilter,
+            options: ['All Statuses', 'Planned', 'Playing'],
+            onChange: (value) => setStatusFilter(value as 'All Statuses' | 'Planned' | 'Playing'),
           },
           {
             label: t('toolbar.platform'),
             value: platformFilter,
-            options: ['All', ...activeQueuePlatforms],
-            onChange: (value) => setPlatformFilter(value as GamePlatform | 'All'),
+            options: ['All Platforms', ...activeQueuePlatforms],
+            onChange: (value) => setPlatformFilter(value as GamePlatform | 'All Platforms'),
           },
         ]}
         primaryAction={
@@ -316,7 +336,25 @@ export function QueuePanel({
       />
       <p className="-mt-1 mb-2 px-1 text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
 
-      {activeQueuePlatforms.length > 0 ? (
+      {selectedPlatformSummary ? (
+        <div className="mb-3 rounded-xl border border-skyglass/15 bg-ink-950/60 px-4 py-3">
+          <div className="text-sm font-semibold text-white">{platformFilter} {t('queue.platformSummary')}</div>
+          <div className="mt-2 flex gap-6">
+            <div>
+              <div className="text-xl font-bold text-mint">{selectedPlatformSummary.playing}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{t('nav.playingNow')}</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-mint">{selectedPlatformSummary.planned}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{t('queue.planned')}</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-mint">{selectedPlatformSummary.wishlist}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{t('nav.wishlist')}</div>
+            </div>
+          </div>
+        </div>
+      ) : activeQueuePlatforms.length > 0 ? (
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
           {activeQueuePlatforms.map((platform) => {
             const count = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
@@ -386,7 +424,13 @@ export function QueuePanel({
       ) : null}
 
       <div ref={queueListRef} className="qs-queue-list pr-1">
-        <div className="grid gap-2 xl:grid-cols-2">
+        <div className={
+          displayedQueuePlatforms.length === 1
+            ? 'grid gap-2'
+            : displayedQueuePlatforms.length === 2
+            ? 'grid grid-cols-2 gap-2'
+            : 'grid gap-2 xl:grid-cols-2'
+        }>
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
               key={platform}
@@ -397,6 +441,7 @@ export function QueuePanel({
               artworkUrl={getPlatformArtworkUrl(queueState, platform)}
               isHighlighted={platform === initialPlatform}
               platform={platform}
+              statusFilter={statusFilter}
               platformTag={getPlatformTag(queueState, platform)}
               platformOptions={movePlatformOptions}
               setPlatformRef={(element) => {
@@ -438,7 +483,7 @@ export function QueuePanel({
           onClose={() => setIsPlatformModalOpen(false)}
           onCreate={(nextState, platform) => {
             onQueueStateChange(nextState);
-            setPlatformFilter('All');
+            setPlatformFilter('All Platforms');
             setSelectedPlatform(platform);
             setIsPlatformModalOpen(false);
             window.requestAnimationFrame(() => {
@@ -768,6 +813,7 @@ function PlatformQueueColumn({
   setPlatformRef,
   queueEntries,
   queueScrollRef,
+  statusFilter,
   onFindArtwork,
   onHidePlatform,
   onLimitChange,
@@ -793,6 +839,7 @@ function PlatformQueueColumn({
   setPlatformRef: (element: HTMLElement | null) => void;
   queueEntries: PlatformQueueEntry[];
   queueScrollRef: RefObject<HTMLElement | null>;
+  statusFilter: 'All Statuses' | 'Planned' | 'Playing';
   onFindArtwork?: (game: Game) => void;
   onHidePlatform: (platform: GamePlatform) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
@@ -817,6 +864,8 @@ function PlatformQueueColumn({
     virtualizerRef: queueEntriesVirtualizerRef,
   });
   const renderedQueueEntries = queueEntries.slice(virtualQueueEntries.startIndex, virtualQueueEntries.endIndex + 1);
+  const showPlayingSection = statusFilter !== 'Planned';
+  const showPlannedSection = statusFilter !== 'Playing';
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
   const platformAccentColor = accentColor || 'var(--accent)';
   const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
@@ -884,7 +933,7 @@ function PlatformQueueColumn({
         </PlatformOptionsMenu>
       </div>
 
-      {currentlyPlaying.length > 0 ? (
+      {showPlayingSection && currentlyPlaying.length > 0 ? (
         <div className="qs-platform-playing-section mb-3 grid w-full min-w-0 gap-2 border-b border-skyglass/15 pb-3">
           <div className="qs-platform-playing-panel w-full min-w-0 rounded-xl border p-3 shadow-panel">
             <div className="mb-3 flex items-center justify-between gap-2">
@@ -903,7 +952,7 @@ function PlatformQueueColumn({
         </div>
       ) : null}
 
-      <div ref={queueEntriesVirtualizerRef} className="relative" style={{ height: virtualQueueEntries.totalSize }}>
+      {showPlannedSection ? <div ref={queueEntriesVirtualizerRef} className="relative" style={{ height: virtualQueueEntries.totalSize }}>
         {queueEntries.length > 0 ? (
           <div className="absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
             {renderedQueueEntries.map((entry) => {
@@ -937,7 +986,7 @@ function PlatformQueueColumn({
             {t('queue.noQueue')}
           </div>
         )}
-      </div>
+      </div> : null}
     </section>
 
     {isRenameModalOpen ? (
