@@ -3,9 +3,9 @@ import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuiz
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
-import { QueueGhost, shouldShowQueueGhost } from './QueueGhost';
+import { QueueGhost, shouldQueueGhostCarryCover, shouldShowQueueGhost, type QueueGhostCover } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
-import { getPreferredArtworkSources, getPreferredLogoUrl } from '../lib/gameCoverImages';
+import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { PlayActivityRecord } from '../lib/playActivityStorage';
 import type { ReviewModeState, ReviewSource, ReviewStats } from '../lib/reviewModeStorage';
@@ -200,7 +200,18 @@ export function HomePanel({
   const [workflowStripDismissed, setWorkflowStripDismissed] = useState(
     () => localStorage.getItem('qs-workflow-strip-v1') === 'dismissed',
   );
-  const [showGhost] = useState(() => shouldShowQueueGhost());
+  const [showGhost, setShowGhost] = useState(() => shouldShowQueueGhost());
+  const [ghostCarriesCover] = useState(() => shouldQueueGhostCarryCover());
+  const queueGhostCover = useMemo<QueueGhostCover | null>(() => {
+    if (!ghostCarriesCover) return null;
+    return pickQueueGhostCover({
+      nextAdventureEntries,
+      nextReviewCandidate,
+      continuePlayingGames,
+      libraryGames,
+      featuredGame,
+    });
+  }, [continuePlayingGames, featuredGame, ghostCarriesCover, libraryGames, nextAdventureEntries, nextReviewCandidate]);
 
   const hasEnoughProgress =
     continuePlayingGames.length > 0 &&
@@ -366,7 +377,7 @@ export function HomePanel({
         </div>
         {showGhost && (
           <div className="queue-ghost-wrapper">
-            <QueueGhost />
+            <QueueGhost cover={queueGhostCover} onVanish={() => setShowGhost(false)} />
           </div>
         )}
       </section>
@@ -1573,6 +1584,57 @@ function getGameActivitySignal(
   }
 
   return null;
+}
+
+function pickQueueGhostCover({
+  nextAdventureEntries,
+  nextReviewCandidate,
+  continuePlayingGames,
+  libraryGames,
+  featuredGame,
+}: {
+  nextAdventureEntries: NextAdventureEntry[];
+  nextReviewCandidate: Game | null;
+  continuePlayingGames: Game[];
+  libraryGames: Game[];
+  featuredGame: Game | null;
+}): QueueGhostCover | null {
+  const featuredId = featuredGame?.id ?? null;
+  const randomLibraryGames = [...libraryGames].sort(() => Math.random() - 0.5);
+  const priorityGames = [
+    nextAdventureEntries[0]?.game,
+    nextReviewCandidate,
+    continuePlayingGames[0],
+    ...randomLibraryGames,
+  ].filter((game): game is Game => Boolean(game));
+
+  return (
+    findUsableGhostCover(priorityGames.filter((game) => game.id !== featuredId)) ??
+    findUsableGhostCover(priorityGames)
+  );
+}
+
+function findUsableGhostCover(games: Game[]): QueueGhostCover | null {
+  const seen = new Set<string>();
+  for (const game of games) {
+    if (seen.has(game.id)) continue;
+    seen.add(game.id);
+    const imageUrl = getPreferredArtworkSources(game, 'micro').find((url) => isUsableGhostCoverUrl(url));
+    if (imageUrl) {
+      return { title: game.displayTitleOverride?.trim() || game.title, imageUrl };
+    }
+  }
+  return null;
+}
+
+function isUsableGhostCoverUrl(url?: string | null): url is string {
+  if (!url || isMissingOrGeneratedCover(url)) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'data:';
+  } catch {
+    return false;
+  }
 }
 
 function getActivityTime(game: Game) {
