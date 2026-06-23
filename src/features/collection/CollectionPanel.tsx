@@ -8,7 +8,7 @@ import { ViewportModal } from '../../components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
 import { Icon } from '../../components/Icon';
 import { SteamWishlistHtmlImportModal } from '../../components/settings/WishlistSettingsPanel';
-import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
+import { QueueGhost, QUEUE_GHOST_HABITAT_PROBABILITY, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
 import { useI18n } from '../../i18n';
 import { translateOption } from '../../i18n';
 import {
@@ -159,7 +159,7 @@ export function CollectionPanel({
   const [isCollectionSteamAchievementSyncVisible, setIsCollectionSteamAchievementSyncVisible] = useState(false);
   const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
   const [wishlistGhostSlot] = useState(() => pickQueueGhostSlot('wishlist'));
-  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length > 100 && shouldShowQueueGhostInHabitat('wishlist', import.meta.env.DEV ? 0.95 : 0.05));
+  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length > 100 && shouldShowQueueGhostInHabitat('wishlist', QUEUE_GHOST_HABITAT_PROBABILITY));
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);

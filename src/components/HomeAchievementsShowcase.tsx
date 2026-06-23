@@ -6,7 +6,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { ReviewModeState } from '../lib/reviewModeStorage';
 import type { Game } from '../types/game';
 import { Icon } from './Icon';
-import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, QUEUE_GHOST_HABITAT_PROBABILITY, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 const SHOWCASE_SIZE = 5;
 const TOOLTIP_WIDTH = 224;
@@ -101,7 +101,7 @@ function AchievementShowcaseCard({
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     computeCoords();
     setOpen(true);
-    if (queueGhostSlot && achievement.isUnlocked && shouldShowQueueGhostInHabitat('achievements', import.meta.env.DEV ? 0.95 : 0.12)) setShowGhost(true);
+    if (queueGhostSlot && achievement.isUnlocked && shouldShowQueueGhostInHabitat('achievements', QUEUE_GHOST_HABITAT_PROBABILITY)) setShowGhost(true);
   }
 
   function scheduleClose() {
