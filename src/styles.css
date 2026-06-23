@@ -3574,6 +3574,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
   --queue-ghost-body: rgba(235, 249, 255, 0.94);
   --queue-ghost-eye: rgb(var(--ink-950-rgb));
   --queue-ghost-accent-color: var(--qs-secondary-accent);
+  overflow: visible;
   pointer-events: auto;
   filter:
     drop-shadow(0 0 8px var(--queue-ghost-accent-color))
@@ -3633,9 +3634,12 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
 .queue-ghost-cover-prop {
   overflow: visible;
-  transform: rotate(-6deg);
+  transform: translate(0, 0) rotate(-6deg) scale(1);
   transform-box: fill-box;
   transform-origin: center;
+  transition:
+    transform 220ms ease,
+    filter 220ms ease;
 }
 
 .queue-ghost-cover-image {
@@ -3646,6 +3650,21 @@ body.qs-controller-active .qs-compact-card:focus-within {
   border-radius: 3px;
   object-fit: cover;
   box-shadow: 0 3px 8px rgb(var(--overlay-rgb) / 0.38);
+  transition:
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+.queue-ghost--cover-revealed .queue-ghost-cover-prop {
+  transform: translate(6px, -18px) rotate(-1deg) scale(3.15);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--queue-ghost-accent-color) 62%, transparent));
+}
+
+.queue-ghost--cover-revealed .queue-ghost-cover-image {
+  border-color: color-mix(in srgb, var(--queue-ghost-accent-color) 58%, rgb(var(--ink-950-rgb) / 0.28));
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--queue-ghost-accent-color) 38%, transparent),
+    0 10px 24px rgb(var(--overlay-rgb) / 0.48);
 }
 
 .queue-ghost-float {
@@ -3683,5 +3702,10 @@ body.qs-controller-active .qs-compact-card:focus-within {
   .queue-ghost-float,
   .queue-ghost-glow {
     animation: none;
+  }
+
+  .queue-ghost-cover-prop,
+  .queue-ghost-cover-image {
+    transition: none;
   }
 }

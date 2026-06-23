@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
 const GHOST_MESSAGES = [
@@ -76,7 +76,8 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     return GHOST_MESSAGES[Math.floor(Math.random() * GHOST_MESSAGES.length)];
   });
   const [coverVisible, setCoverVisible] = useState(Boolean(cover));
-  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
+  const [coverRevealed, setCoverRevealed] = useState(false);
+  const [tooltipStyle, setTooltipStyle] = useState<CSSProperties>({});
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,7 +102,10 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
 
   function scheduleClose() {
     cancelClose();
-    closeTimerRef.current = setTimeout(() => setOpen(false), 200);
+    closeTimerRef.current = setTimeout(() => {
+      setOpen(false);
+      setCoverRevealed(false);
+    }, 200);
   }
 
   function scheduleOpen() {
@@ -112,12 +116,30 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     }, HOVER_DELAY_MS);
   }
 
-  function handleClick() {
+  function vanishGhost() {
     cancelClose();
     cancelOpen();
     setOpen(false);
+    setCoverRevealed(false);
     hideQueueGhostForSession();
     onVanish?.();
+  }
+
+  function revealCover() {
+    if (!cover || !coverVisible) return;
+    cancelClose();
+    cancelOpen();
+    computeTooltipStyle();
+    setCoverRevealed(true);
+    setOpen(true);
+  }
+
+  function handleClick() {
+    if (cover && coverVisible && !coverRevealed) {
+      revealCover();
+      return;
+    }
+    vanishGhost();
   }
 
   useEffect(() => {
@@ -141,6 +163,7 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     function handle(e: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setCoverRevealed(false);
       }
     }
     document.addEventListener('mousedown', handle, true);
@@ -159,6 +182,8 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     [],
   );
 
+  const tooltipMessage = cover && coverRevealed ? `The backlog remembers:\n${cover.title}` : message;
+
   const tooltip = open ? (
     <div
       className="queue-ghost-tooltip pointer-events-none rounded-xl p-3 backdrop-blur-md"
@@ -166,13 +191,13 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
       style={{
         ...tooltipStyle,
         '--queue-ghost-arrow-x': `${TOOLTIP_ANCHOR_OFFSET}px`,
-      } as React.CSSProperties}
+      } as CSSProperties}
     >
       {/* Speech bubble arrow — upward, pointing at ghost */}
       <div className="queue-ghost-tooltip-arrow" />
       <p className="text-xs font-bold text-white">Queue Ghost</p>
       <p className="text-2xs text-slate-500">The Spirit of Backlog Past</p>
-      <p className="mt-1.5 whitespace-pre-line text-xs leading-snug text-slate-300">{message}</p>
+      <p className="mt-1.5 whitespace-pre-line text-xs leading-snug text-slate-300">{tooltipMessage}</p>
     </div>
   ) : null;
 
@@ -180,15 +205,19 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     <div ref={containerRef} className="relative">
       <button
         ref={buttonRef}
-        aria-expanded={open}
+        aria-expanded={open || coverRevealed}
         aria-haspopup="dialog"
-        aria-label="Queue Ghost"
+        aria-label={cover && coverVisible ? (coverRevealed ? 'Dismiss Queue Ghost' : `Reveal carried cover for ${cover.title}`) : 'Dismiss Queue Ghost'}
         className="block opacity-[0.82] outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95"
         type="button"
         onClick={handleClick}
         onMouseEnter={() => {
           cancelClose();
-          scheduleOpen();
+          if (cover && coverVisible) {
+            revealCover();
+          } else {
+            scheduleOpen();
+          }
         }}
         onMouseLeave={() => {
           cancelOpen();
@@ -197,7 +226,7 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
       >
         <svg
           aria-hidden="true"
-          className="queue-ghost h-auto w-full"
+          className={`queue-ghost h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}`}
           fill="none"
           viewBox="0 0 96 96"
         >
