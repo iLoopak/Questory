@@ -24,7 +24,8 @@ export function shouldShowQueueGhost(): boolean {
   }
 }
 
-const TOOLTIP_WIDTH = 160;
+const TOOLTIP_WIDTH = 156;
+const TOOLTIP_ANCHOR_OFFSET = 34;
 const HOVER_DELAY_MS = 600;
 
 export function QueueGhost() {
@@ -42,8 +43,8 @@ export function QueueGhost() {
     if (!buttonRef.current) return;
     const r = buttonRef.current.getBoundingClientRect();
     const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
-    const left = Math.max(8, Math.min(r.left + r.width / 2 - TOOLTIP_WIDTH / 2, vw - TOOLTIP_WIDTH - 8));
-    setTooltipStyle({ position: 'fixed', top: r.bottom + 12, left, width: TOOLTIP_WIDTH, zIndex: 50 });
+    const left = Math.max(8, Math.min(r.left + r.width * 0.7 - TOOLTIP_ANCHOR_OFFSET, vw - TOOLTIP_WIDTH - 8));
+    setTooltipStyle({ position: 'fixed', top: r.bottom + 4, left, width: TOOLTIP_WIDTH, zIndex: 50 });
   }
 
   function cancelClose() {
@@ -108,7 +109,7 @@ export function QueueGhost() {
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label="Queue Ghost"
-        className="block opacity-[0.92] outline-none"
+        className="block opacity-[0.82] outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95"
         type="button"
         onClick={handleClick}
         onMouseEnter={() => {
@@ -122,7 +123,7 @@ export function QueueGhost() {
       >
         <svg
           aria-hidden="true"
-          className="queue-ghost h-auto w-[38px]"
+          className="queue-ghost h-auto w-full"
           fill="none"
           viewBox="0 0 96 96"
         >
@@ -147,38 +148,15 @@ export function QueueGhost() {
 
       {open && (
         <div
-          className="pointer-events-none rounded-lg bg-ink-950 p-3 backdrop-blur-md"
+          className="queue-ghost-tooltip pointer-events-none rounded-xl p-3 backdrop-blur-md"
           role="tooltip"
           style={{
             ...tooltipStyle,
-            boxShadow:
-              '0 0 0 1px color-mix(in srgb, var(--qs-secondary-accent) 30%, transparent), 0 12px 28px -4px rgba(0,0,0,0.8)',
-          }}
+            '--queue-ghost-arrow-x': `${TOOLTIP_ANCHOR_OFFSET}px`,
+          } as React.CSSProperties}
         >
           {/* Speech bubble arrow — upward, pointing at ghost */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2"
-            style={{
-              top: -9,
-              width: 0,
-              height: 0,
-              borderLeft: '7px solid transparent',
-              borderRight: '7px solid transparent',
-              borderBottom:
-                '9px solid color-mix(in srgb, var(--qs-secondary-accent) 30%, transparent)',
-            }}
-          />
-          <div
-            className="absolute left-1/2 -translate-x-1/2"
-            style={{
-              top: -7,
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderBottom: '8px solid rgb(var(--ink-950-rgb))',
-            }}
-          />
+          <div className="queue-ghost-tooltip-arrow" />
           <p className="text-xs font-bold text-white">Queue Ghost</p>
           <p className="text-2xs text-slate-500">The Spirit of Backlog Past</p>
           <p className="mt-1.5 whitespace-pre-line text-xs leading-snug text-slate-300">{message}</p>

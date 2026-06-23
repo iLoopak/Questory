@@ -3561,12 +3561,46 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
 /* ── Queue Ghost ──────────────────────────────────────────────────────── */
 
+.queue-ghost-wrapper {
+  position: absolute;
+  top: -10px;
+  right: clamp(11.5rem, 21vw, 13.75rem);
+  z-index: 5;
+  width: 36px;
+  transform: translateY(-35%);
+}
+
 .queue-ghost {
-  --queue-ghost-body: rgba(235, 249, 255, 0.96);
+  --queue-ghost-body: rgba(235, 249, 255, 0.94);
   --queue-ghost-eye: rgb(var(--ink-950-rgb));
   --queue-ghost-accent-color: var(--qs-secondary-accent);
   pointer-events: auto;
-  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--queue-ghost-accent-color) 55%, transparent));
+  filter:
+    drop-shadow(0 0 8px var(--queue-ghost-accent-color))
+    drop-shadow(0 0 16px color-mix(in srgb, var(--queue-ghost-accent-color) 44%, transparent));
+}
+
+.queue-ghost-tooltip {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--queue-ghost-accent-color, var(--qs-secondary-accent)) 7%, transparent), transparent 58%),
+    var(--surface-raised);
+  border: 1px solid color-mix(in srgb, var(--qs-secondary-accent) 34%, transparent);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--qs-secondary-accent) 18%, transparent),
+    0 14px 30px -8px rgb(var(--overlay-rgb) / 0.72);
+}
+
+.queue-ghost-tooltip-arrow {
+  position: absolute;
+  top: -7px;
+  left: var(--queue-ghost-arrow-x, 34px);
+  width: 13px;
+  height: 13px;
+  transform: rotate(45deg);
+  border-left: 1px solid color-mix(in srgb, var(--qs-secondary-accent) 38%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--qs-secondary-accent) 38%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--qs-secondary-accent) 18%, var(--surface-raised)), var(--surface-raised));
 }
 
 .queue-ghost-body {
@@ -3587,14 +3621,14 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
 .queue-ghost-glow {
   fill: var(--queue-ghost-accent-color);
-  opacity: 0.35;
+  opacity: 0.46;
   animation: queueGhostGlow 4s ease-in-out infinite;
   transform-origin: center;
 }
 
 .queue-ghost-accent {
   fill: var(--queue-ghost-accent-color);
-  opacity: 0.30;
+  opacity: 0.40;
 }
 
 .queue-ghost-float {
@@ -3611,8 +3645,21 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 @keyframes queueGhostGlow {
-  0%, 100% { opacity: 0.30; transform: scale(0.95); }
-  50%       { opacity: 0.52; transform: scale(1.06); }
+  0%, 100% { opacity: 0.38; transform: scale(0.95); }
+  50%       { opacity: 0.62; transform: scale(1.06); }
+}
+
+@media (max-width: 760px) {
+  .queue-ghost-wrapper {
+    display: none;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 920px) {
+  .queue-ghost-wrapper {
+    right: 10.75rem;
+    width: 34px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

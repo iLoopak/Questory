@@ -365,7 +365,7 @@ export function HomePanel({
           ) : null}
         </div>
         {showGhost && (
-          <div className="absolute -top-2 right-[220px] z-10">
+          <div className="queue-ghost-wrapper">
             <QueueGhost />
           </div>
         )}
