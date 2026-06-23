@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Tooltip messages — short, atmospheric, rotating per session
 const GHOST_MESSAGES = [
   'Queue Ghost never forgets.',
   'The backlog remembers.',
@@ -17,7 +16,7 @@ export function shouldShowQueueGhost(): boolean {
   try {
     const stored = sessionStorage.getItem(GHOST_SESSION_KEY);
     if (stored !== null) return stored === '1';
-    const show = Math.random() < 0.5;
+    const show = Math.random() < 0.015;
     sessionStorage.setItem(GHOST_SESSION_KEY, show ? '1' : '0');
     return show;
   } catch {
@@ -30,8 +29,19 @@ export function QueueGhost() {
   const [message] = useState(
     () => GHOST_MESSAGES[Math.floor(Math.random() * GHOST_MESSAGES.length)],
   );
+  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  function computeTooltipStyle() {
+    if (!buttonRef.current) return;
+    const r = buttonRef.current.getBoundingClientRect();
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
+    const tooltipWidth = 176;
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - tooltipWidth / 2, vw - tooltipWidth - 8));
+    setTooltipStyle({ position: 'fixed', top: r.bottom + 8, left, width: tooltipWidth, zIndex: 50 });
+  }
 
   function cancelClose() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -44,10 +54,10 @@ export function QueueGhost() {
 
   function handleClick() {
     cancelClose();
+    if (!open) computeTooltipStyle();
     setOpen((prev) => !prev);
   }
 
-  // Dismiss on outside interaction while open
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent | TouchEvent) {
@@ -71,49 +81,52 @@ export function QueueGhost() {
   );
 
   return (
-    <div ref={containerRef} className="relative shrink-0">
+    <div ref={containerRef} className="relative">
       <button
+        ref={buttonRef}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label="Queue Ghost"
-        className="queue-ghost-float block outline-none"
+        className="block outline-none"
         type="button"
         onClick={handleClick}
         onMouseEnter={() => {
           cancelClose();
+          computeTooltipStyle();
           setOpen(true);
         }}
         onMouseLeave={scheduleClose}
       >
-        {/* Ghost SVG — 20×24 viewBox, rendered at 20×24 CSS px */}
         <svg
           aria-hidden="true"
-          className="h-6 w-5"
+          className="queue-ghost h-auto w-12"
           fill="none"
-          viewBox="0 0 20 24"
+          viewBox="0 0 96 96"
         >
-          {/* Glow puddle beneath ghost, tinted with secondary accent */}
-          <ellipse className="queue-ghost-glow" cx="10" cy="23" rx="4.5" ry="0.8" />
-
-          {/* Main body — pale translucent white */}
-          <path
-            className="queue-ghost-body"
-            d="M10 1C15 1 18 5 18 10L18 19Q15.5 23 13 19Q10.5 23 8 19Q5.5 23 2 19L2 10C2 5 5 1 10 1Z"
-          />
-
-          {/* Subtle secondary-accent sheen in upper body */}
-          <ellipse className="queue-ghost-accent" cx="8" cy="7" rx="2.5" ry="1.5" />
-
-          {/* Eyes — dark ink, slightly droopy for melancholy */}
-          <ellipse className="queue-ghost-eyes" cx="7.5" cy="11" rx="1.2" ry="1.5" />
-          <ellipse className="queue-ghost-eyes" cx="12.5" cy="11" rx="1.2" ry="1.5" />
+          <ellipse className="queue-ghost-glow" cx="48" cy="76" rx="28" ry="8" />
+          <g className="queue-ghost-float">
+            <path
+              className="queue-ghost-body"
+              d="M48 12 C28 12 14 28 14 48 V66 C14 76 20 82 28 84 C34 86 38 78 44 84 C48 88 52 88 56 84 C62 78 66 86 72 84 C80 82 82 76 82 66 V48 C82 28 68 12 48 12Z"
+            />
+            <path
+              className="queue-ghost-accent"
+              d="M22 62 C28 66 34 67 42 64 C50 61 58 61 66 64 C72 66 76 65 82 62 V67 C82 76 80 82 72 84 C66 86 62 78 56 84 C52 88 48 88 44 84 C38 78 34 86 28 84 C20 82 14 76 14 66 V62 C16 61 18 61 22 62Z"
+            />
+            <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="7" />
+            <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="7" />
+            <circle cx="40" cy="40" r="1.5" fill="white" />
+            <circle cx="60" cy="40" r="1.5" fill="white" />
+            <path className="queue-ghost-mouth" d="M44 57 C46 59 50 59 52 57" />
+          </g>
         </svg>
       </button>
 
       {open && (
         <div
-          className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-44 rounded-xl border border-[var(--qs-secondary-accent)]/30 bg-ink-950/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl"
+          className="pointer-events-none rounded-xl border border-[var(--qs-secondary-accent)]/30 bg-ink-950/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl"
           role="tooltip"
+          style={tooltipStyle}
         >
           <p className="text-xs font-bold text-white">Queue Ghost</p>
           <p className="text-2xs text-slate-500">The Spirit of Backlog Past</p>
