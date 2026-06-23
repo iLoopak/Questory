@@ -3,7 +3,7 @@ import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuiz
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
-import { QueueGhost, getQueueGhostVariant, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
+import { QueueGhost, getQueueGhostVariant, releaseQueueGhostHabitat, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -245,6 +245,8 @@ export function HomePanel({
     setShowGhost(true);
   }, [newlyUnlockedAchievement]);
 
+  useEffect(() => () => releaseQueueGhostHabitat('home'), []);
+
   const queueGhostAchievement = queueGhostVariant === 'achievement' ? newlyUnlockedAchievement : null;
   const queueGhostCover = useMemo<QueueGhostCover | null>(() => {
     if (queueGhostVariant !== 'cover') return null;
@@ -403,7 +405,7 @@ export function HomePanel({
         </div>
         {showGhost && (
           <div className="queue-ghost-wrapper">
-            <QueueGhost achievement={queueGhostAchievement} cover={queueGhostCover} variant={queueGhostVariant} onVanish={() => setShowGhost(false)} />
+            <QueueGhost achievement={queueGhostAchievement} cover={queueGhostCover} variant={queueGhostVariant} onVanish={() => { releaseQueueGhostHabitat('home'); setShowGhost(false); }} />
           </div>
         )}
       </section>
