@@ -206,19 +206,42 @@ export function HomePanel({
     queueEntries.length + continuePlayingGames.length >= 5;
   const showFirstDayPanel = libraryGames.length > 0 && !progressDismissed && !hasEnoughProgress;
 
+  const yakuzaCount = useMemo(
+    () => libraryGames.filter((g) => /yakuza|like a dragon|ryu ga gotoku/i.test(g.title)).length,
+    [libraryGames],
+  );
+
+  const playStreak = useMemo(() => computePlayStreak(playActivity ?? []), [playActivity]);
+
+  const hasPlayedRecently = useMemo(
+    () => (playActivity ?? []).some((r) => r.date >= getNDaysAgoStr(7)),
+    [playActivity],
+  );
+
   const greeting = useRef<string | null>(null);
   if (!greeting.current) {
-    greeting.current = pickHeroMessage({
-      activeCount: continuePlayingGames.length,
-      finishedCount,
-      hasAchievements: libraryGames.some((g) => Boolean(g.steamAchievementsTotal)),
-      hasRetro: libraryGames.some((g) => g.externalSource === 'retro-rom'),
-      hasSteam: libraryGames.some((g) => g.externalSource === 'steam' || g.steamAppId != null),
-      librarySize: libraryGames.length,
-      queueCount: queueEntries.length,
-      reviewedCount,
-      reviewRemainingCount,
-    });
+    const recentEasterEggs = getRecentEasterEggKeys();
+    const heroResult = pickHeroMessage(
+      {
+        activeCount: continuePlayingGames.length,
+        finishedCount,
+        hasAchievements: libraryGames.some((g) => Boolean(g.steamAchievementsTotal)),
+        hasRetro: libraryGames.some((g) => g.externalSource === 'retro-rom'),
+        hasSteam: libraryGames.some((g) => g.externalSource === 'steam' || g.steamAppId != null),
+        librarySize: libraryGames.length,
+        queueCount: queueEntries.length,
+        reviewedCount,
+        reviewRemainingCount,
+        yakuzaCount,
+        playStreak,
+        hasPlayedRecently,
+      },
+      recentEasterEggs,
+    );
+    greeting.current = heroResult.message;
+    if (heroResult.easterEggKey) {
+      recordEasterEggKey(heroResult.easterEggKey);
+    }
   }
 
 
@@ -1661,15 +1684,187 @@ type HeroMessageContext = {
   queueCount: number;
   reviewedCount: number;
   reviewRemainingCount: number;
+  yakuzaCount: number;
+  playStreak: number;
+  hasPlayedRecently: boolean;
 };
 
-function pickHeroMessage(ctx: HeroMessageContext): string {
+// ── Easter egg tracking ───────────────────────────────────────────────────────
+
+const RECENT_EGGS_KEY = 'qs-hero-recent-eggs';
+const MAX_RECENT_EGGS = 5;
+
+function getRecentEasterEggKeys(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_EGGS_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordEasterEggKey(key: string): void {
+  const recent = getRecentEasterEggKeys();
+  const updated = [...recent.filter((k) => k !== key), key].slice(-MAX_RECENT_EGGS);
+  try {
+    localStorage.setItem(RECENT_EGGS_KEY, JSON.stringify(updated));
+  } catch { /* ignore */ }
+}
+
+// ── Activity helpers ──────────────────────────────────────────────────────────
+
+function getNDaysAgoStr(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function computePlayStreak(activity: PlayActivityRecord[]): number {
+  if (activity.length === 0) return 0;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const yesterdayStr = getNDaysAgoStr(1);
+  const dates = [...new Set(activity.map((r) => r.date))].sort().reverse();
+  if (dates[0] !== todayStr && dates[0] !== yesterdayStr) return 0;
+  let streak = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i - 1] + 'T12:00:00');
+    const curr = new Date(dates[i] + 'T12:00:00');
+    const diff = Math.round((prev.getTime() - curr.getTime()) / 86400000);
+    if (diff === 1) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// ── Hero message system ───────────────────────────────────────────────────────
+
+type EasterEggCandidate = {
+  key: string;
+  weight: number;
+  condition: boolean;
+  messages: string[];
+};
+
+function pickHeroMessage(
+  ctx: HeroMessageContext,
+  recentEasterEggs: string[],
+): { message: string; easterEggKey?: string } {
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+  const easterEggs: EasterEggCandidate[] = [
+    {
+      key: 'ultra-rare',
+      weight: 0.005,
+      condition: true,
+      messages: [
+        'The cake is a lie.',
+        'Wake up, Samurai. We have a backlog to burn.',
+        "Hey, you. You're finally awake.",
+        'Would you kindly review another game?',
+        'War. War never changes. The backlog does.',
+        'Stay awhile and listen.',
+        'One does not simply finish the backlog.',
+        'Perhaps the real achievement was the games we ignored along the way.',
+      ],
+    },
+    {
+      key: 'yakuza',
+      weight: 0.02,
+      condition: ctx.yakuzaCount >= 3,
+      messages: [
+        'Majima Everywhere.',
+        'Kiryu would probably finish the backlog.',
+        'Ichiban believes in you.',
+        'The Dragon of Dojima recommends playing today.',
+        'Like a Dragon spotted in your plans.',
+        'Majima is disappointed in your queue discipline.',
+        'Your backlog has entered Kamurocho.',
+      ],
+    },
+    {
+      key: 'collector',
+      weight: 0.02,
+      condition: ctx.librarySize > 500,
+      messages: [
+        'Buying games and playing games remain separate hobbies.',
+        'You own enough games for several lifetimes.',
+        'Impressive. Concerning. But impressive.',
+        'The collection grows stronger.',
+        'Your Steam library can be seen from space.',
+        'At this point, Steam is a lifestyle.',
+      ],
+    },
+    {
+      key: 'extreme-backlog',
+      weight: 0.02,
+      condition: ctx.reviewRemainingCount > 1000,
+      messages: [
+        'The queue has achieved sentience.',
+        'The backlog remembers.',
+        'Quest Queue has become a permanent residence.',
+        'One review at a time.',
+        `${ctx.reviewRemainingCount.toLocaleString('en-US')} games remain. No pressure.`,
+        'Your future self has questions.',
+      ],
+    },
+    {
+      key: 'retro',
+      weight: 0.02,
+      condition: ctx.hasRetro,
+      messages: [
+        'Retro never left.',
+        'Pixels never truly die.',
+        'Some memories deserve a replay.',
+        'The backlog spans generations.',
+        'Somewhere in your plans is a forgotten masterpiece.',
+        'Insert memory card.',
+      ],
+    },
+    {
+      key: 'inactivity',
+      weight: 0.05,
+      condition: !ctx.hasPlayedRecently && ctx.activeCount > 0,
+      messages: [
+        'Your games are starting to talk about you.',
+        'The backlog noticed your absence.',
+        'One session is better than no session.',
+        'Your adventures miss you.',
+        'Even 15 minutes counts.',
+      ],
+    },
+    {
+      key: 'streak',
+      weight: 0.05,
+      condition: ctx.playStreak >= 7,
+      messages: [
+        'Touch grass achievement temporarily revoked.',
+        'Please remember to hydrate.',
+        'The streak must continue.',
+        'Momentum is a beautiful thing.',
+        'One more session?',
+      ],
+    },
+  ];
+
+  for (const egg of easterEggs) {
+    if (!egg.condition) continue;
+    if (recentEasterEggs.includes(egg.key)) continue;
+    if (Math.random() < egg.weight) {
+      return { message: pick(egg.messages), easterEggKey: egg.key };
+    }
+  }
+
+  return { message: pickContextualMessage(ctx) };
+}
+
+function pickContextualMessage(ctx: HeroMessageContext): string {
   const { activeCount, finishedCount, hasAchievements, hasRetro, hasSteam, librarySize, queueCount, reviewedCount, reviewRemainingCount } = ctx;
   const s = (n: number) => n === 1 ? '' : 's';
   const n = (v: number) => v.toLocaleString('en-US');
   const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
-  // Category 9: Rare — 5% chance, shown regardless of context
+  // Rare — 5% chance
   const rareMessages = [
     'Go play something.',
     'Stop organising.\nStart playing.',
@@ -1681,23 +1876,21 @@ function pickHeroMessage(ctx: HeroMessageContext): string {
   ];
   if (Math.random() < 0.05) return pick(rareMessages);
 
-  // Category 8: Dry Humor — 12% chance
+  // Dry Humor — 12% chance
   const dryHumorMessages = [
-    'You bought it.\nEventually you\'ll play it.',
+    "You bought it.\nEventually you'll play it.",
     'The backlog has achieved sentience.',
-    'Today\'s plan:\navoid opening the Steam sale.',
-    'You cannot finish them all.\nAnd that\'s okay.',
-    'QuestShelf believes in you.\nThe queue is less certain.',
+    "Today's plan:\navoid opening the Steam sale.",
+    "You cannot finish them all.\nAnd that's okay.",
+    "QuestShelf believes in you.\nThe queue is less certain.",
     'This seemed like a good idea at the time.',
     'Nothing says optimism like another imported library.',
     'The shelf grows. The shelf endures.',
   ];
   if (Math.random() < 0.12) return pick(dryHumorMessages);
 
-  // Build contextual pool
   const contextual: string[] = [];
 
-  // Category 1: Queue Awareness
   if (reviewRemainingCount > 0) {
     contextual.push('The queue remembers.');
     contextual.push('One review at a time.');
@@ -1708,37 +1901,30 @@ function pickHeroMessage(ctx: HeroMessageContext): string {
     if (reviewRemainingCount > 200 && librarySize > 200) {
       contextual.push(`Somewhere in those ${n(librarySize)} games is your next favourite.`);
     }
-    if (reviewedCount > 5 && reviewRemainingCount > 0) {
+    if (reviewedCount > 5) {
       contextual.push(`You reviewed ${n(reviewedCount)} game${s(reviewedCount)}.\n${n(reviewRemainingCount)} still waiting.`);
     }
   }
 
-  // Category 2: Playing Momentum
   if (activeCount > 0) {
     contextual.push(`${n(activeCount)} adventure${s(activeCount)} already in progress.`);
     contextual.push('You already know what to play.');
     contextual.push('Keep the momentum going.');
     contextual.push(`Your current game${s(activeCount)} ${activeCount === 1 ? 'is' : 'are'} still right there.`);
     contextual.push('One session is better than no session.');
-    if (activeCount > 1) {
-      contextual.push('The hardest part is choosing.\nYou already did that.');
-    }
+    if (activeCount > 1) contextual.push('The hardest part is choosing.\nYou already did that.');
     contextual.push('You are closer to the credits than yesterday.');
   }
 
-  // Category 3: Platform Plans
   if (queueCount > 0) {
     contextual.push('Your next adventure is already waiting.');
     contextual.push('You made the plan.\nTrust the plan.');
     contextual.push('Future fun has already been scheduled.');
     contextual.push('Platform Plans are promises to yourself.');
     contextual.push('A good backlog is a curated backlog.');
-    if (queueCount > 5) {
-      contextual.push(`${n(queueCount)} game${s(queueCount)} queued.\nLet's see who goes first.`);
-    }
+    if (queueCount > 5) contextual.push(`${n(queueCount)} game${s(queueCount)} queued.\nLet's see who goes first.`);
   }
 
-  // Category 4: Achievement Hunter
   if (hasAchievements) {
     contextual.push('There is always one more achievement.');
     contextual.push('Completion is a journey.');
@@ -1747,7 +1933,6 @@ function pickHeroMessage(ctx: HeroMessageContext): string {
     contextual.push('That rare achievement will not unlock itself.');
   }
 
-  // Category 5: Steam Collector
   if (hasSteam && librarySize > 300) {
     contextual.push('Your collection is thriving.');
     contextual.push('Every library tells a story.');
@@ -1762,19 +1947,15 @@ function pickHeroMessage(ctx: HeroMessageContext): string {
     }
   }
 
-  // Category 6: Retro Gamer
   if (hasRetro) {
     contextual.push('Some classics age better than others.');
     contextual.push('Pixels never truly die.');
     contextual.push('The backlog spans generations.');
     contextual.push('Retro never left.');
     contextual.push('Somewhere in your plans is a forgotten masterpiece.');
-    if (librarySize > 100) {
-      contextual.push('A memory card would not survive this collection.');
-    }
+    if (librarySize > 100) contextual.push('A memory card would not survive this collection.');
   }
 
-  // Category 7: Progress Milestones
   if (reviewedCount > 10) {
     contextual.push(`${n(reviewedCount)} games reviewed. Not bad.`);
     contextual.push('Progress compounds.');
@@ -1786,7 +1967,6 @@ function pickHeroMessage(ctx: HeroMessageContext): string {
     contextual.push('A smaller queue is a beautiful thing.');
   }
 
-  // Static fallback pool
   const staticMessages = [
     'The list grows. The list is patient.',
     'Pick one. Future you will thank you.',
