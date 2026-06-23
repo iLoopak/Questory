@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
+import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -443,6 +444,13 @@ export function HomePanel({
             games={games}
             queueState={queueState}
             reviewModeState={reviewModeState}
+          />
+
+          {/* Steam Achievements progress companion */}
+          <HomeSteamAchievementsWidget
+            games={games}
+            isSteamAchievementSyncing={isSteamAchievementSyncing}
+            onSyncSteamAchievements={onSyncSteamAchievements}
           />
 
         </div>
