@@ -147,6 +147,7 @@ export function HomePanel({
     return games.filter((game) => isBacklogReviewCandidate(game) && !ignoredReviewGameIds.has(game.id) && !reviewModeState.reviewedGames[game.id]).length;
   }, [games, ignoredReviewGameIds, reviewModeState.reviewedGames]);
   const finishedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Finished').length, [libraryGames]);
+  const droppedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Dropped').length, [libraryGames]);
   const unratedFinishedCount = useMemo(() => libraryGames.filter((g) => g.status === 'Finished' && !g.rating).length, [libraryGames]);
 
   const hasSteamGames = useMemo(() => games.some((g) => g.steamAppId != null), [games]);
@@ -267,6 +268,7 @@ export function HomePanel({
     const heroResult = pickHeroMessage(
       {
         activeCount: continuePlayingGames.length,
+        droppedCount,
         finishedCount,
         hasAchievements: libraryGames.some((g) => Boolean(g.steamAchievementsTotal)),
         hasRetro: libraryGames.some((g) => g.externalSource === 'retro-rom'),
@@ -1773,8 +1775,11 @@ function SyncStatusLine({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{label}</span><span className="text-right text-slate-300">Last sync: {value}</span></div>;
 }
 
+type HeroMessageCategory = 'normal' | 'motivation' | 'queueGhostLore';
+
 type HeroMessageContext = {
   activeCount: number;
+  droppedCount: number;
   finishedCount: number;
   hasAchievements: boolean;
   hasRetro: boolean;
@@ -1942,6 +1947,55 @@ function pickHeroMessage(
         'The streak must continue.',
         'Momentum is a beautiful thing.',
         'One more session?',
+      ],
+    },
+    {
+      key: 'queue-ghost-lore',
+      weight: 0.015,
+      condition: true,
+      messages: [
+        'Nobody knows where Queue Ghost came from.',
+        'Some say Queue Ghost was born from unfinished games.',
+        'Nobody remembers adding Queue Ghost to the backlog.',
+        'Queue Ghost appeared shortly after the first imported library.',
+        'Queue Ghost has been watching your backlog.',
+        'Queue Ghost never forgets a dropped game.',
+        'Queue Ghost looks worried.',
+        'Queue Ghost seems pleased.',
+        'Queue Ghost appears unusually calm today.',
+        'Queue Ghost is concerned about the queue.',
+        'Some games are never truly forgotten.',
+        'Even ignored games leave echoes.',
+        'Queue Ghost was here before Platform Plans.',
+        'Queue Ghost refuses to discuss Steam sales.',
+        'Queue Ghost denies all allegations.',
+        'Queue Ghost claims this backlog is manageable.',
+        'Queue Ghost has seen things.',
+        'Queue Ghost believes in second chances.',
+        'Queue Ghost is not a bug.',
+      ],
+    },
+    {
+      key: 'queue-ghost-lore-ctx',
+      weight: 0.025,
+      condition: ctx.reviewRemainingCount > 1000 || (ctx.queueCount === 0 && ctx.librarySize > 10) || (!ctx.hasPlayedRecently && ctx.librarySize > 5) || ctx.droppedCount >= 5,
+      messages: [
+        ...(ctx.reviewRemainingCount > 1000 ? [
+          'Queue Ghost looks worried.',
+          'The backlog grows stronger.',
+          'We may need a bigger queue.',
+        ] : []),
+        ...(ctx.queueCount === 0 && ctx.librarySize > 10 ? [
+          'Queue Ghost seems unusually peaceful.',
+          'Silence. At last.',
+        ] : []),
+        ...(!ctx.hasPlayedRecently && ctx.librarySize > 5 ? [
+          'Queue Ghost has been waiting.',
+          'The backlog misses you.',
+        ] : []),
+        ...(ctx.droppedCount >= 5 ? [
+          'Queue Ghost remembers every abandoned adventure.',
+        ] : []),
       ],
     },
   ];
