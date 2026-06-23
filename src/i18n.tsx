@@ -1004,6 +1004,15 @@ const en = {
   'dailyQuest.hint3Label': 'Hint 3 · Title',
   'dailyQuest.bestStreak': 'Best streak',
   'dailyQuest.close': 'Close',
+  'steamAchievements.title': 'Achievements',
+  'steamAchievements.filterAll': 'All',
+  'steamAchievements.filterUnlocked': 'Unlocked',
+  'steamAchievements.filterLocked': 'Locked',
+  'steamAchievements.progress': '{unlocked} / {total} unlocked',
+  'steamAchievements.hidden': 'Hidden achievement',
+  'steamAchievements.unlockedOn': 'Unlocked {date}',
+  'steamAchievements.noAchievements': 'No achievement data available.',
+  'steamAchievements.close': 'Close',
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -1999,6 +2008,15 @@ const cs: Dictionary = {
   'dailyQuest.hint3Label': 'Nápověda 3 · Název',
   'dailyQuest.bestStreak': 'Nejdelší serie',
   'dailyQuest.close': 'Zavřít',
+  'steamAchievements.title': 'Achievementy',
+  'steamAchievements.filterAll': 'Vše',
+  'steamAchievements.filterUnlocked': 'Odemčené',
+  'steamAchievements.filterLocked': 'Zamčené',
+  'steamAchievements.progress': '{unlocked} / {total} odemčeno',
+  'steamAchievements.hidden': 'Skrytý achievement',
+  'steamAchievements.unlockedOn': 'Odemčeno {date}',
+  'steamAchievements.noAchievements': 'Žádná data o achievementech.',
+  'steamAchievements.close': 'Zavřít',
 };
 
 const dictionaries: Record<AppLanguage, Dictionary> = {
