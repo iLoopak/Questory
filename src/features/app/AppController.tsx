@@ -85,6 +85,8 @@ import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
+import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGhost';
+import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
 import { useControllerAction } from '../../lib/controllerActions';
 
 const appLogo = '/icons/questshelf-icon.png';
@@ -271,6 +273,7 @@ export function AppController() {
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
+  const [pendingAchievementGhost, setPendingAchievementGhost] = useState<QueueGhostAchievement | null>(null);
   const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
   const achievementCountersRef = useRef(achievementCounters);
   achievementCountersRef.current = achievementCounters;
@@ -374,9 +377,23 @@ export function AppController() {
     const notify = addToastRef.current;
     if (!notify) return;
 
+    let firstNewNonMeta: QuestShelfAchievementProgress | undefined;
+
     for (const a of questShelfAchievements) {
       if (a.isUnlocked && !prevUnlockedIdsRef.current.has(a.id)) {
         notify({ category: 'success', dedupeKey: `achievement-unlock:${a.id}`, message: `Achievement unlocked: ${a.title}`, details: a.description });
+        if (!firstNewNonMeta && !a.isMeta) {
+          firstNewNonMeta = a;
+        }
+      }
+    }
+
+    if (firstNewNonMeta) {
+      const seen = getSeenAchievementGhostIds();
+      if (!seen.has(firstNewNonMeta.id)) {
+        const allUnlocked = questShelfAchievements.filter((a) => a.isUnlocked && !a.isMeta);
+        setSeenAchievementGhostIds(new Set([...seen, ...allUnlocked.map((a) => a.id)]));
+        setPendingAchievementGhost({ title: firstNewNonMeta.title, icon: firstNewNonMeta.icon });
       }
     }
 
@@ -1615,6 +1632,16 @@ export function AppController() {
         <Icon name="settings" />
         <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
       </button> : null}
+
+      {pendingAchievementGhost ? (
+        <div className="qs-achievement-ghost-host" aria-hidden="true">
+          <QueueGhost
+            variant="achievement"
+            achievement={pendingAchievementGhost}
+            onVanish={() => setPendingAchievementGhost(null)}
+          />
+        </div>
+      ) : null}
     </main>
     </I18nProvider>
   );
