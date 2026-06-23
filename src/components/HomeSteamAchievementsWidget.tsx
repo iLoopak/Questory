@@ -1,10 +1,14 @@
 import { useMemo } from 'react';
 import { useI18n, type TFunction } from '../i18n';
-import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
-import type { Game } from '../types/game';
+import type { Game, SteamAchievement } from '../types/game';
 import { Icon } from './Icon';
 
-const WIDGET_SIZE = 4;
+const SHOWCASE_SIZE = 8;
+
+type RecentAchievement = {
+  achievement: SteamAchievement;
+  gameTitle: string;
+};
 
 type HomeSteamAchievementsWidgetProps = {
   games: Game[];
@@ -24,12 +28,12 @@ export function HomeSteamAchievementsWidget({
     [games],
   );
 
-  const featured = useMemo(() => selectFeatured(steamLibraryGames), [steamLibraryGames]);
-
-  // No Steam games at all — don't clutter Home
+  // No Steam games at all — don't show the widget
   if (steamLibraryGames.length === 0) return null;
 
-  const hasData = featured.length > 0;
+  const hasDetailData = steamLibraryGames.some((g) => Array.isArray(g.steamAchievements));
+
+  const recent = useMemo(() => selectRecentUnlocked(steamLibraryGames), [steamLibraryGames]);
 
   return (
     <section className="qs-home-section rounded-2xl border border-skyglass/15 bg-ink-900/74 shadow-panel p-4">
@@ -50,93 +54,97 @@ export function HomeSteamAchievementsWidget({
         ) : null}
       </div>
 
-      {hasData ? (
+      {recent.length > 0 ? (
         <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-          {featured.map((game) => (
-            <SteamGameAchievementCard key={game.id} game={game} t={t} />
+          {recent.map(({ achievement, gameTitle }) => (
+            <RecentAchievementCard
+              key={`${gameTitle}:${achievement.apiName}`}
+              achievement={achievement}
+              gameTitle={gameTitle}
+              t={t}
+            />
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-500">{t('home.steamAchievementsEmpty')}</p>
+        <p className="text-sm text-slate-500">
+          {hasDetailData ? t('home.steamAchievementsEmpty') : t('home.steamAchievementsNoData')}
+        </p>
       )}
     </section>
   );
 }
 
-function SteamGameAchievementCard({ game, t }: { game: Game; t: TFunction }) {
-  const hasAchievements = hasSteamAchievementSummary(game);
-  const isUnsupported = game.steamAchievementsUnsupported === true;
-  const percent = game.steamAchievementsPercent ?? 0;
-  const unlocked = game.steamAchievementsUnlocked ?? 0;
-  const total = game.steamAchievementsTotal ?? 0;
+function RecentAchievementCard({
+  achievement,
+  gameTitle,
+  t,
+}: {
+  achievement: SteamAchievement;
+  gameTitle: string;
+  t: TFunction;
+}) {
+  const unlockDate = achievement.unlockTime
+    ? new Date(achievement.unlockTime * 1000).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
 
   return (
-    <div
-      className={`qs-achievement-card flex w-36 shrink-0 flex-col gap-2 p-3 ${
-        percent === 100 ? 'qs-achievement-card--unlocked' : 'qs-achievement-card--locked'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-1">
-        {game.coverImage ? (
-          <img
-            alt=""
-            aria-hidden="true"
-            className="h-11 w-11 shrink-0 rounded-lg object-cover"
-            src={game.coverImage}
-          />
-        ) : (
-          <div className="qs-achievement-card__icon">
-            <Icon name="steam" size={18} />
-          </div>
-        )}
-        {percent === 100 ? (
-          <Icon name="check-circle" size={13} className="mt-0.5 shrink-0 text-mint" />
-        ) : null}
-      </div>
-
-      <p className="line-clamp-2 flex-1 text-xs font-semibold leading-tight text-white">{game.title}</p>
-
-      {isUnsupported && !hasAchievements ? (
-        <span className="text-2xs text-slate-600">{t('home.steamAchievementsUnavailable')}</span>
-      ) : hasAchievements ? (
-        <div className="space-y-1">
-          <span className="text-2xs text-slate-400">
-            {unlocked} / {total}
-          </span>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-mint/60 transition-all"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        </div>
+    <div className="qs-achievement-card qs-achievement-card--unlocked flex w-36 shrink-0 flex-col gap-2 p-3">
+      {/* Achievement icon */}
+      {achievement.iconUrl ? (
+        <img
+          alt=""
+          aria-hidden="true"
+          className="h-11 w-11 shrink-0 rounded-lg object-cover"
+          loading="lazy"
+          src={achievement.iconUrl}
+        />
       ) : (
-        <span className="text-2xs text-slate-600">{t('home.steamAchievementsEmpty')}</span>
+        <div className="qs-achievement-card__icon">
+          <Icon name="trophy" size={18} />
+        </div>
+      )}
+
+      {/* Achievement name — primary label */}
+      <p className="line-clamp-2 flex-1 text-xs font-semibold leading-tight text-white">
+        {achievement.displayName}
+      </p>
+
+      {/* Game title — secondary */}
+      <p className="line-clamp-1 text-2xs text-slate-400">{gameTitle}</p>
+
+      {/* Unlock date */}
+      {unlockDate ? (
+        <p className="text-2xs text-mint/70">{unlockDate}</p>
+      ) : (
+        <span className="qs-achievement-card__progress self-start">
+          {t('home.qsAchievementsUnlocked')}
+        </span>
       )}
     </div>
   );
 }
 
-function selectFeatured(steamGames: Game[]): Game[] {
-  const withData = steamGames.filter(hasSteamAchievementSummary);
+function selectRecentUnlocked(steamGames: Game[]): RecentAchievement[] {
+  const result: RecentAchievement[] = [];
 
-  if (withData.length === 0) return [];
+  for (const game of steamGames) {
+    if (!Array.isArray(game.steamAchievements)) continue;
+    for (const achievement of game.steamAchievements) {
+      if (achievement.unlocked) {
+        result.push({ achievement, gameTitle: game.title });
+      }
+    }
+  }
 
-  return withData
-    .slice()
-    .sort((a, b) => {
-      // Playing first
-      const aPlaying = a.status === 'Playing' ? 0 : 1;
-      const bPlaying = b.status === 'Playing' ? 0 : 1;
-      if (aPlaying !== bPlaying) return aPlaying - bPlaying;
+  result.sort((a, b) => {
+    const tA = a.achievement.unlockTime ?? 0;
+    const tB = b.achievement.unlockTime ?? 0;
+    return tB - tA;
+  });
 
-      // Then by last played descending
-      const aTime = a.lastPlayedAt ? new Date(a.lastPlayedAt).getTime() : 0;
-      const bTime = b.lastPlayedAt ? new Date(b.lastPlayedAt).getTime() : 0;
-      if (aTime !== bTime) return bTime - aTime;
-
-      // Then by completion percent descending (show closest to done)
-      return (b.steamAchievementsPercent ?? 0) - (a.steamAchievementsPercent ?? 0);
-    })
-    .slice(0, WIDGET_SIZE);
+  return result.slice(0, SHOWCASE_SIZE);
 }
