@@ -3855,7 +3855,8 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 .queue-ghost-habitat--platform-plans.queue-ghost-slot--toolbarCorner,
-.queue-ghost-habitat--wishlist.queue-ghost-slot--toolbarCorner {
+.queue-ghost-habitat--wishlist.queue-ghost-slot--toolbarCorner,
+.queue-ghost-habitat--library.queue-ghost-slot--toolbarCorner {
   right: 4.5rem;
   top: -1.75rem;
   width: 58px;
@@ -3869,7 +3870,8 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 .queue-ghost-habitat--platform-plans.queue-ghost-slot--emptySpaceTopRight,
-.queue-ghost-habitat--wishlist.queue-ghost-slot--emptySpaceTopRight {
+.queue-ghost-habitat--wishlist.queue-ghost-slot--emptySpaceTopRight,
+.queue-ghost-habitat--library.queue-ghost-slot--emptySpaceTopRight {
   right: 1rem;
   top: 4.75rem;
   width: 56px;
@@ -3905,6 +3907,18 @@ body.qs-controller-active .qs-compact-card:focus-within {
   transform: rotate(-5deg);
 }
 
+.queue-ghost-habitat--library {
+  right: 1.25rem;
+  top: 0.25rem;
+}
+
+.queue-ghost-habitat--library.queue-ghost-slot--gridEdge {
+  right: -0.35rem;
+  top: 9rem;
+  width: 58px;
+  transform: rotate(-5deg);
+}
+
 .queue-ghost-habitat--game-detail {
   right: 1rem;
   top: 4.25rem;
@@ -3934,6 +3948,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 @media (max-width: 640px) {
   .queue-ghost-habitat--quest-queue,
   .queue-ghost-habitat--wishlist,
+  .queue-ghost-habitat--library,
   .queue-ghost-habitat--game-detail {
     width: 56px;
   }
