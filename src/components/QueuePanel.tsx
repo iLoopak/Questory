@@ -36,7 +36,7 @@ import { HltbBadge } from './HltbBadge';
 import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
-import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 type QueuePanelProps = {
   games: Game[];
@@ -84,7 +84,8 @@ export function QueuePanel({
   const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All Platforms'>('All Platforms');
   const [statusFilter, setStatusFilter] = useState<'All Statuses' | 'Planned' | 'Playing'>('All Statuses');
   const [showQueueHint, setShowQueueHint] = useState(() => localStorage.getItem('qs-queue-hint-v1') !== 'dismissed');
-  const [showPlatformGhost, setShowPlatformGhost] = useState(() => shouldShowQueueGhostInHabitat('platformPlans', import.meta.env.DEV ? 0.95 : 0.15));
+  const [platformGhostSlot] = useState(() => pickQueueGhostSlot('platformPlans'));
+  const [showPlatformGhost, setShowPlatformGhost] = useState(() => Boolean(platformGhostSlot) && shouldShowQueueGhostInHabitat('platformPlans', import.meta.env.DEV ? 0.95 : 0.15));
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
@@ -404,8 +405,8 @@ export function QueuePanel({
 
       {displayedQueuePlatforms.length === 0 ? (
         <div className="relative rounded-lg border border-dashed border-mint/30 bg-mint/10 p-5 text-sm text-slate-200">
-          {showPlatformGhost ? (
-            <div className="queue-ghost-habitat queue-ghost-habitat--platform-plans">
+          {showPlatformGhost && platformGhostSlot ? (
+            <div className={`queue-ghost-habitat queue-ghost-habitat--platform-plans queue-ghost-slot--${platformGhostSlot}`}>
               <QueueGhost variant="default" message={pickQueueGhostMessage(platformPlanGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('platformPlans'); setShowPlatformGhost(false); }} />
             </div>
           ) : null}

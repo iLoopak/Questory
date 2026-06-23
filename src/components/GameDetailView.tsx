@@ -16,7 +16,7 @@ import { RawgLinkDialog } from './RawgLinkDialog';
 import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
 import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
-import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 type GameDetailViewProps = {
   activity?: PlayActivityRecord[];
@@ -76,7 +76,8 @@ export function GameDetailView({
   const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
-  const [showPausedGhost, setShowPausedGhost] = useState(() => isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail', import.meta.env.DEV ? 0.95 : 0.1));
+  const [pausedGhostSlot] = useState(() => pickQueueGhostSlot('gameDetail'));
+  const [showPausedGhost, setShowPausedGhost] = useState(() => Boolean(pausedGhostSlot) && isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail', import.meta.env.DEV ? 0.95 : 0.1));
 
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
 
@@ -226,8 +227,8 @@ export function GameDetailView({
 
   return (
     <section className="relative h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
-      {showPausedGhost ? (
-        <div className="queue-ghost-habitat queue-ghost-habitat--game-detail">
+      {showPausedGhost && pausedGhostSlot ? (
+        <div className={`queue-ghost-habitat queue-ghost-habitat--game-detail queue-ghost-slot--${pausedGhostSlot}`}>
           <QueueGhost variant="sleepy" message={pickQueueGhostMessage(pausedGameGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('gameDetail'); setShowPausedGhost(false); }} />
         </div>
       ) : null}
