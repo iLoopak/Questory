@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
+import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -436,6 +437,13 @@ export function HomePanel({
               />
             )}
           </HomeSection>
+
+          {/* QuestShelf Achievements showcase */}
+          <HomeAchievementsShowcase
+            games={games}
+            queueState={queueState}
+            reviewModeState={reviewModeState}
+          />
 
         </div>
 
