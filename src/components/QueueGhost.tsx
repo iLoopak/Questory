@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 
@@ -15,6 +15,29 @@ const GHOST_MESSAGES = [
 const GHOST_SESSION_KEY = 'qs-ghost-v1';
 
 export type QueueGhostVariant = 'default' | 'cover' | 'sleepy' | 'panic' | 'achievement' | 'midnight';
+
+export type QueueGhostHabitat =
+  | 'home'
+  | 'questQueue'
+  | 'achievements'
+  | 'platformPlans'
+  | 'gameDetail'
+  | 'wishlist';
+
+let activeQueueGhostHabitat: QueueGhostHabitat | null = null;
+
+export function shouldShowQueueGhostInHabitat(habitat: QueueGhostHabitat, probability: number): boolean {
+  if (activeQueueGhostHabitat) return false;
+  if (Math.random() >= probability) return false;
+  activeQueueGhostHabitat = habitat;
+  return true;
+}
+
+export function releaseQueueGhostHabitat(habitat: QueueGhostHabitat) {
+  if (activeQueueGhostHabitat === habitat) {
+    activeQueueGhostHabitat = null;
+  }
+}
 
 export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.75;
 const CONTEXTUAL_VARIANT_PROBABILITIES: Record<'sleepy' | 'panic' | 'midnight' | 'achievement', number> = {
@@ -44,7 +67,10 @@ type QueueGhostVariantContext = {
 };
 
 export function shouldShowQueueGhost(): boolean {
-  return getSessionRandomFlag(GHOST_SESSION_KEY, QUEUE_GHOST_PROBABILITY);
+  if (activeQueueGhostHabitat) return false;
+  const show = getSessionRandomFlag(GHOST_SESSION_KEY, QUEUE_GHOST_PROBABILITY);
+  if (show) activeQueueGhostHabitat = 'home';
+  return show;
 }
 
 export function getQueueGhostVariant({
@@ -95,6 +121,7 @@ type QueueGhostProps = {
   achievement?: QueueGhostAchievement | null;
   cover?: QueueGhostCover | null;
   variant?: QueueGhostVariant;
+  message?: string;
   onVanish?: () => void;
 };
 
@@ -111,9 +138,10 @@ const COVER_GHOST_MESSAGES = [
   'Queue Ghost is carrying:',
 ] as const;
 
-export function QueueGhost({ achievement = null, cover = null, variant = cover ? 'cover' : 'default', onVanish }: QueueGhostProps) {
+export function QueueGhost({ achievement = null, cover = null, variant = cover ? 'cover' : 'default', message: customMessage, onVanish }: QueueGhostProps) {
   const [open, setOpen] = useState(false);
-  const [message] = useState(() => {
+  const message = useMemo(() => {
+    if (customMessage) return customMessage;
     if (variant === 'achievement' && achievement) {
       return `Queue Ghost brought you something.\n${achievement.title}`;
     }
@@ -123,7 +151,7 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     }
     const messages = VARIANT_MESSAGES[variant === 'sleepy' || variant === 'panic' || variant === 'midnight' ? variant : 'default'];
     return messages[Math.floor(Math.random() * messages.length)];
-  });
+  }, [customMessage, achievement, cover, variant]);
   const [coverVisible, setCoverVisible] = useState(variant === 'cover' && Boolean(cover));
   const [coverRevealed, setCoverRevealed] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<CSSProperties>({});
@@ -170,7 +198,7 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     cancelOpen();
     setOpen(false);
     setCoverRevealed(false);
-    hideQueueGhostForSession();
+    if (activeQueueGhostHabitat === 'home') hideQueueGhostForSession();
     onVanish?.();
   }
 

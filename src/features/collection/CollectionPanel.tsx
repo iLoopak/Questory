@@ -8,6 +8,7 @@ import { ViewportModal } from '../../components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
 import { Icon } from '../../components/Icon';
 import { SteamWishlistHtmlImportModal } from '../../components/settings/WishlistSettingsPanel';
+import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
 import { useI18n } from '../../i18n';
 import { translateOption } from '../../i18n';
 import {
@@ -157,6 +158,7 @@ export function CollectionPanel({
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
   const [isCollectionSteamAchievementSyncVisible, setIsCollectionSteamAchievementSyncVisible] = useState(false);
   const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
+  const [showWishlistGhost, setShowWishlistGhost] = useState(() => collectionType === 'wishlist' && games.length > 100 && shouldShowQueueGhostInHabitat('wishlist', import.meta.env.DEV ? 0.95 : 0.05));
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -210,6 +212,8 @@ export function CollectionPanel({
   const hasActiveFilters = isCollectionFiltered(filters);
   const activeFilterCount = getActiveFilterCount(filters);
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
+
+  useEffect(() => () => releaseQueueGhostHabitat('wishlist'), []);
 
   useEffect(() => {
     contentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
@@ -469,6 +473,12 @@ export function CollectionPanel({
   }
 
   return (
+    <div className="relative h-full min-h-0">
+      {showWishlistGhost ? (
+        <div className="queue-ghost-habitat queue-ghost-habitat--wishlist">
+          <QueueGhost variant="default" message={pickQueueGhostMessage(wishlistGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('wishlist'); setShowWishlistGhost(false); }} />
+        </div>
+      ) : null}
     <GameListShell
       scrollRef={collectionPanelRef}
       stickyChrome={
@@ -901,6 +911,7 @@ export function CollectionPanel({
       )}
 
     </GameListShell>
+    </div>
   );
 }
 
@@ -1106,4 +1117,15 @@ function LibraryProgressSummary({
       </div>
     </section>
   );
+}
+
+const wishlistGhostMessages = [
+  'Buying and playing remain separate hobbies.',
+  'Queue Ghost understands.',
+  'Someday.',
+  "One more sale won't hurt.",
+] as const;
+
+function pickQueueGhostMessage(messages: readonly string[]) {
+  return messages[Math.floor(Math.random() * messages.length)];
 }

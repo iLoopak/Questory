@@ -19,6 +19,7 @@ import { PlatformBadge } from './PlatformBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
+import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 export type ReviewModeAction =
   | 'queue'
@@ -155,6 +156,12 @@ export function ReviewModePanel({
   const [sessionGameIds, setSessionGameIds] = useState<string[]>([]);
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
   const [actionStats, setActionStats] = useState<ReviewActionStats>(emptyReviewActionStats);
+  const [showQueueGhost, setShowQueueGhost] = useState(() => {
+    if (source !== 'backlog') return false;
+    if (games.length === 0) return shouldShowQueueGhostInHabitat('questQueue', import.meta.env.DEV ? 0.95 : 0.2);
+    if (games.length > 1000) return shouldShowQueueGhostInHabitat('questQueue', import.meta.env.DEV ? 0.95 : 0.05);
+    return false;
+  });
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);
   const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | typeof anyPlatform>(anyPlatform);
   const [isQueuePickerOpen, setIsQueuePickerOpen] = useState(false);
@@ -267,6 +274,8 @@ export function ReviewModePanel({
     setNoteDraft('');
     setRetainedUtilityGameIds(new Set());
   }, [selectedPlatform, source]);
+
+  useEffect(() => () => releaseQueueGhostHabitat('questQueue'), []);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -483,6 +492,15 @@ export function ReviewModePanel({
 
   return (
     <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
+      {showQueueGhost ? (
+        <div className="queue-ghost-habitat queue-ghost-habitat--quest-queue">
+          <QueueGhost
+            variant={games.length === 0 ? 'sleepy' : 'panic'}
+            message={games.length === 0 ? pickQueueGhostMessage(emptyQuestQueueGhostMessages) : undefined}
+            onVanish={() => { releaseQueueGhostHabitat('questQueue'); setShowQueueGhost(false); }}
+          />
+        </div>
+      ) : null}
       <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
         <div
           aria-label={`Quest Queue: ${completedCount} of ${totalCount} session games reviewed`}
@@ -1477,4 +1495,14 @@ function getActionClassName(tone: 'accent' | 'neutral' | 'danger' | 'quiet', isH
   }
 
   return 'border-skyglass/15 bg-ink-950/70 text-slate-200 hover:bg-mint/10 hover:text-white';
+}
+
+const emptyQuestQueueGhostMessages = [
+  'Queue Ghost is unemployed.',
+  'The queue is at peace.',
+  'Until the next Steam sale.',
+] as const;
+
+function pickQueueGhostMessage(messages: readonly string[]) {
+  return messages[Math.floor(Math.random() * messages.length)];
 }

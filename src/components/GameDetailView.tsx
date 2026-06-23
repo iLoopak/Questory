@@ -16,6 +16,7 @@ import { RawgLinkDialog } from './RawgLinkDialog';
 import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
 import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
+import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 type GameDetailViewProps = {
   activity?: PlayActivityRecord[];
@@ -75,6 +76,7 @@ export function GameDetailView({
   const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
+  const [showPausedGhost, setShowPausedGhost] = useState(() => isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail', import.meta.env.DEV ? 0.95 : 0.1));
 
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
 
@@ -87,6 +89,8 @@ export function GameDetailView({
     ].filter((s): s is string => Boolean(s));
     return [...new Set(candidates)];
   }, [game.heroImage, game.wideCoverImage, game.backgroundImage, game.coverImage]);
+
+  useEffect(() => () => releaseQueueGhostHabitat('gameDetail'), []);
 
   useLayoutEffect(() => {
     detailScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
@@ -221,7 +225,12 @@ export function GameDetailView({
   ];
 
   return (
-    <section className="h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
+    <section className="relative h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
+      {showPausedGhost ? (
+        <div className="queue-ghost-habitat queue-ghost-habitat--game-detail">
+          <QueueGhost variant="sleepy" message={pickQueueGhostMessage(pausedGameGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('gameDetail'); setShowPausedGhost(false); }} />
+        </div>
+      ) : null}
       <div className="flex h-full min-h-0 flex-col">
         <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
@@ -1289,4 +1298,21 @@ function formatRelativeActivityDate(value?: string | null) {
   }
 
   return activityDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const pausedGameGhostMessages = [
+  'We should return someday.',
+  'This adventure still waits.',
+  'The backlog remembers this one.',
+] as const;
+
+function isLongPausedGame(game: Game) {
+  if (game.status !== 'Paused' || !game.lastPlayedAt) return false;
+  const lastPlayedMs = new Date(game.lastPlayedAt).getTime();
+  if (!Number.isFinite(lastPlayedMs)) return false;
+  return Date.now() - lastPlayedMs > 30 * 24 * 60 * 60 * 1000;
+}
+
+function pickQueueGhostMessage(messages: readonly string[]) {
+  return messages[Math.floor(Math.random() * messages.length)];
 }

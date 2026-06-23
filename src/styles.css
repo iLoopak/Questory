@@ -3779,3 +3779,49 @@ body.qs-controller-active .qs-compact-card:focus-within {
     animation: none;
   }
 }
+
+/* ── Queue Ghost habitats outside Home ─────────────────────────────────── */
+.queue-ghost-habitat {
+  position: absolute;
+  width: 72px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.queue-ghost-habitat > * {
+  pointer-events: auto;
+}
+
+.queue-ghost-habitat--quest-queue {
+  right: 1.25rem;
+  top: -1.75rem;
+}
+
+.queue-ghost-habitat--platform-plans {
+  right: 1rem;
+  top: -2.35rem;
+}
+
+.queue-ghost-habitat--achievement-card {
+  right: -0.65rem;
+  top: -1.1rem;
+  width: 44px;
+}
+
+.queue-ghost-habitat--wishlist {
+  right: 1.25rem;
+  top: 0.25rem;
+}
+
+.queue-ghost-habitat--game-detail {
+  right: 1rem;
+  top: 4.25rem;
+}
+
+@media (max-width: 640px) {
+  .queue-ghost-habitat--quest-queue,
+  .queue-ghost-habitat--wishlist,
+  .queue-ghost-habitat--game-detail {
+    width: 56px;
+  }
+}

@@ -6,6 +6,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { ReviewModeState } from '../lib/reviewModeStorage';
 import type { Game } from '../types/game';
 import { Icon } from './Icon';
+import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 const SHOWCASE_SIZE = 5;
 const TOOLTIP_WIDTH = 224;
@@ -84,6 +85,7 @@ function AchievementShowcaseCard({
   const progressPct = target > 0 ? Math.min(100, Math.round((achievement.current / target) * 100)) : 0;
 
   const [open, setOpen] = useState(false);
+  const [showGhost, setShowGhost] = useState(false);
   const [coords, setCoords] = useState<TooltipCoords>({ top: 0, bottom: 0, centerX: 0 });
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +100,7 @@ function AchievementShowcaseCard({
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     computeCoords();
     setOpen(true);
+    if (achievement.isUnlocked && shouldShowQueueGhostInHabitat('achievements', import.meta.env.DEV ? 0.95 : 0.12)) setShowGhost(true);
   }
 
   function scheduleClose() {
@@ -151,7 +154,7 @@ function AchievementShowcaseCard({
         aria-label={achievement.title}
         aria-describedby={open ? tooltipId : undefined}
         aria-expanded={open}
-        className={`qs-achievement-card flex w-36 shrink-0 cursor-pointer select-none flex-col gap-2 p-3 ${
+        className={`qs-achievement-card relative flex w-36 shrink-0 cursor-pointer select-none flex-col gap-2 p-3 ${
           achievement.isUnlocked ? 'qs-achievement-card--unlocked' : 'qs-achievement-card--locked'
         }`}
         onMouseEnter={openTooltip}
@@ -168,6 +171,12 @@ function AchievementShowcaseCard({
           }
         }}
       >
+        {showGhost ? (
+          <div className="queue-ghost-habitat queue-ghost-habitat--achievement-card">
+            <QueueGhost variant="achievement" achievement={{ title: achievement.title, icon: achievement.icon }} message={pickQueueGhostMessage(achievementGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('achievements'); setShowGhost(false); }} />
+          </div>
+        ) : null}
+
         <div className="flex items-start justify-between gap-1">
           <div className="qs-achievement-card__icon">
             <Icon name={achievement.icon} size={18} />
@@ -313,4 +322,13 @@ function selectShowcase(achievements: QuestShelfAchievementProgress[]): QuestShe
   }
 
   return result.slice(0, SHOWCASE_SIZE);
+}
+
+const achievementGhostMessages = [
+  'Queue Ghost approves.',
+  'You have made the Ghost proud.',
+] as const;
+
+function pickQueueGhostMessage(messages: readonly string[]) {
+  return messages[Math.floor(Math.random() * messages.length)];
 }
