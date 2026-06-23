@@ -3563,11 +3563,11 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
 .queue-ghost-wrapper {
   position: absolute;
-  top: -10px;
+  top: -4px;
   right: clamp(11.5rem, 21vw, 13.75rem);
   z-index: 5;
   width: 36px;
-  transform: translateY(-35%);
+  transform: translateY(-10%);
 }
 
 .queue-ghost {
