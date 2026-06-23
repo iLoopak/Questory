@@ -75,14 +75,19 @@ export function releaseQueueGhostHabitat(habitat: QueueGhostHabitat) {
   }
 }
 
-export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.75;
+export const QUEUE_GHOST_DEVELOPMENT_PROBABILITY = 0.95;
+export const QUEUE_GHOST_PRODUCTION_PROBABILITY = 0.05;
+export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : QUEUE_GHOST_PRODUCTION_PROBABILITY;
+export const QUEUE_GHOST_HABITAT_PROBABILITY = QUEUE_GHOST_PROBABILITY;
+export const QUEUE_GHOST_VARIANT_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.12;
+
 const CONTEXTUAL_VARIANT_PROBABILITIES: Record<'sleepy' | 'panic' | 'midnight' | 'achievement', number> = {
-  sleepy: import.meta.env.DEV ? 0.95 : 0.3,
-  panic: import.meta.env.DEV ? 0.95 : 0.4,
-  midnight: import.meta.env.DEV ? 0.95 : 0.05,
+  sleepy: QUEUE_GHOST_VARIANT_PROBABILITY,
+  panic: QUEUE_GHOST_VARIANT_PROBABILITY,
+  midnight: import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.03,
   achievement: 1,
 };
-const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.8;
+const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : QUEUE_GHOST_VARIANT_PROBABILITY;
 
 export type QueueGhostCover = {
   title: string;
@@ -138,6 +143,8 @@ export function hideQueueGhostForSession() {
 }
 
 function getSessionRandomFlag(key: string, probability: number): boolean {
+  if (import.meta.env.DEV) return Math.random() < probability;
+
   try {
     const stored = sessionStorage.getItem(key);
     if (stored !== null) return stored === '1';

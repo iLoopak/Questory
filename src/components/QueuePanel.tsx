@@ -36,7 +36,7 @@ import { HltbBadge } from './HltbBadge';
 import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
-import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, QUEUE_GHOST_HABITAT_PROBABILITY, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 type QueuePanelProps = {
   games: Game[];
@@ -85,7 +85,7 @@ export function QueuePanel({
   const [statusFilter, setStatusFilter] = useState<'All Statuses' | 'Planned' | 'Playing'>('All Statuses');
   const [showQueueHint, setShowQueueHint] = useState(() => localStorage.getItem('qs-queue-hint-v1') !== 'dismissed');
   const [platformGhostSlot] = useState(() => pickQueueGhostSlot('platformPlans'));
-  const [showPlatformGhost, setShowPlatformGhost] = useState(() => Boolean(platformGhostSlot) && shouldShowQueueGhostInHabitat('platformPlans', import.meta.env.DEV ? 0.95 : 0.15));
+  const [showPlatformGhost, setShowPlatformGhost] = useState(() => Boolean(platformGhostSlot) && shouldShowQueueGhostInHabitat('platformPlans', QUEUE_GHOST_HABITAT_PROBABILITY));
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
