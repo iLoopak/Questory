@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuizCard';
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
@@ -488,6 +489,9 @@ export function HomePanel({
 
           {/* Daily Quest */}
           {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
+
+          {/* Achievement Quiz */}
+          <AchievementQuizCard games={games} />
 
           {/* Quest Queue Remaining */}
           <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
