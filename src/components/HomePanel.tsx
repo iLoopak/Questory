@@ -3,7 +3,7 @@ import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuiz
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
-import { QueueGhost, getQueueGhostVariant, releaseQueueGhostHabitat, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
+import { QueueGhost, getQueueGhostVariant, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -229,7 +229,8 @@ export function HomePanel({
     });
   }, [games, queueState, reviewModeState]);
   const newlyUnlockedAchievement = useMemo(() => pickNewlyUnlockedAchievement(questShelfAchievements), [questShelfAchievements]);
-  const [showGhost, setShowGhost] = useState(() => Boolean(newlyUnlockedAchievement) || shouldShowQueueGhost());
+  const [queueGhostSlot] = useState(() => pickQueueGhostSlot('home'));
+  const [showGhost, setShowGhost] = useState(() => Boolean(queueGhostSlot) && (Boolean(newlyUnlockedAchievement) || shouldShowQueueGhost()));
   const [queueGhostVariant, setQueueGhostVariant] = useState<QueueGhostVariant>(() =>
     getQueueGhostVariant({
       achievement: newlyUnlockedAchievement,
@@ -403,8 +404,8 @@ export function HomePanel({
             </button>
           ) : null}
         </div>
-        {showGhost && (
-          <div className="queue-ghost-wrapper">
+        {showGhost && queueGhostSlot && (
+          <div className={`queue-ghost-wrapper queue-ghost-slot--${queueGhostSlot}`}>
             <QueueGhost achievement={queueGhostAchievement} cover={queueGhostCover} variant={queueGhostVariant} onVanish={() => { releaseQueueGhostHabitat('home'); setShowGhost(false); }} />
           </div>
         )}

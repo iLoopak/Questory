@@ -6,7 +6,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { ReviewModeState } from '../lib/reviewModeStorage';
 import type { Game } from '../types/game';
 import { Icon } from './Icon';
-import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 const SHOWCASE_SIZE = 5;
 const TOOLTIP_WIDTH = 224;
@@ -85,6 +85,7 @@ function AchievementShowcaseCard({
   const progressPct = target > 0 ? Math.min(100, Math.round((achievement.current / target) * 100)) : 0;
 
   const [open, setOpen] = useState(false);
+  const [queueGhostSlot] = useState(() => pickQueueGhostSlot('achievements'));
   const [showGhost, setShowGhost] = useState(false);
   const [coords, setCoords] = useState<TooltipCoords>({ top: 0, bottom: 0, centerX: 0 });
   const cardRef = useRef<HTMLDivElement>(null);
@@ -100,7 +101,7 @@ function AchievementShowcaseCard({
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     computeCoords();
     setOpen(true);
-    if (achievement.isUnlocked && shouldShowQueueGhostInHabitat('achievements', import.meta.env.DEV ? 0.95 : 0.12)) setShowGhost(true);
+    if (queueGhostSlot && achievement.isUnlocked && shouldShowQueueGhostInHabitat('achievements', import.meta.env.DEV ? 0.95 : 0.12)) setShowGhost(true);
   }
 
   function scheduleClose() {
@@ -171,8 +172,8 @@ function AchievementShowcaseCard({
           }
         }}
       >
-        {showGhost ? (
-          <div className="queue-ghost-habitat queue-ghost-habitat--achievement-card">
+        {showGhost && queueGhostSlot ? (
+          <div className={`queue-ghost-habitat queue-ghost-habitat--achievement-card queue-ghost-slot--${queueGhostSlot}`}>
             <QueueGhost variant="achievement" achievement={{ title: achievement.title, icon: achievement.icon }} message={pickQueueGhostMessage(achievementGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('achievements'); setShowGhost(false); }} />
           </div>
         ) : null}

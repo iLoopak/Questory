@@ -8,7 +8,7 @@ import { ViewportModal } from '../../components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
 import { Icon } from '../../components/Icon';
 import { SteamWishlistHtmlImportModal } from '../../components/settings/WishlistSettingsPanel';
-import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
 import { useI18n } from '../../i18n';
 import { translateOption } from '../../i18n';
 import {
@@ -158,7 +158,8 @@ export function CollectionPanel({
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
   const [isCollectionSteamAchievementSyncVisible, setIsCollectionSteamAchievementSyncVisible] = useState(false);
   const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
-  const [showWishlistGhost, setShowWishlistGhost] = useState(() => collectionType === 'wishlist' && games.length > 100 && shouldShowQueueGhostInHabitat('wishlist', import.meta.env.DEV ? 0.95 : 0.05));
+  const [wishlistGhostSlot] = useState(() => pickQueueGhostSlot('wishlist'));
+  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length > 100 && shouldShowQueueGhostInHabitat('wishlist', import.meta.env.DEV ? 0.95 : 0.05));
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -474,8 +475,8 @@ export function CollectionPanel({
 
   return (
     <div className="relative h-full min-h-0">
-      {showWishlistGhost ? (
-        <div className="queue-ghost-habitat queue-ghost-habitat--wishlist">
+      {showWishlistGhost && wishlistGhostSlot ? (
+        <div className={`queue-ghost-habitat queue-ghost-habitat--wishlist queue-ghost-slot--${wishlistGhostSlot}`}>
           <QueueGhost variant="default" message={pickQueueGhostMessage(wishlistGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('wishlist'); setShowWishlistGhost(false); }} />
         </div>
       ) : null}

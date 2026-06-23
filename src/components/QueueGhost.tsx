@@ -26,8 +26,44 @@ export type QueueGhostHabitat =
 
 let activeQueueGhostHabitat: QueueGhostHabitat | null = null;
 
+const QUEUE_GHOST_SAFE_SLOTS = {
+  home: ['heroTopRight', 'heroPeekTop', 'journeyCorner', 'wishlistEdge', 'queueCardCorner'],
+  questQueue: ['queueHeaderCorner', 'sidePanelPeek', 'emptyStateCorner'],
+  achievements: ['achievementBadgePeek', 'achievementCorner'],
+  platformPlans: ['toolbarCorner', 'platformCardEdge', 'emptySpaceTopRight'],
+  gameDetail: ['coverEdgePeek', 'detailHeaderCorner', 'statsPanelCorner'],
+  wishlist: ['toolbarCorner', 'gridEdge', 'emptySpaceTopRight'],
+} as const satisfies Record<QueueGhostHabitat, readonly string[]>;
+
+export type QueueGhostSlot = (typeof QUEUE_GHOST_SAFE_SLOTS)[QueueGhostHabitat][number];
+
+function getAvailableQueueGhostSlots(habitat: QueueGhostHabitat): readonly QueueGhostSlot[] {
+  if (typeof window === 'undefined') return QUEUE_GHOST_SAFE_SLOTS[habitat];
+
+  const { innerWidth, innerHeight } = window;
+  if (innerWidth < 761 || innerHeight < 520) return [];
+
+  const slots = QUEUE_GHOST_SAFE_SLOTS[habitat];
+  if (innerWidth < 1040) {
+    return slots.filter((slot) => !['sidePanelPeek', 'wishlistEdge', 'gridEdge'].includes(slot));
+  }
+
+  return slots;
+}
+
+export function pickQueueGhostSlot(habitat: QueueGhostHabitat): QueueGhostSlot | null {
+  const slots = getAvailableQueueGhostSlots(habitat);
+  if (slots.length === 0) return null;
+  return slots[Math.floor(Math.random() * slots.length)];
+}
+
+export function hasAvailableQueueGhostSlot(habitat: QueueGhostHabitat): boolean {
+  return getAvailableQueueGhostSlots(habitat).length > 0;
+}
+
 export function shouldShowQueueGhostInHabitat(habitat: QueueGhostHabitat, probability: number): boolean {
   if (activeQueueGhostHabitat) return false;
+  if (!hasAvailableQueueGhostSlot(habitat)) return false;
   if (Math.random() >= probability) return false;
   activeQueueGhostHabitat = habitat;
   return true;
@@ -68,6 +104,7 @@ type QueueGhostVariantContext = {
 
 export function shouldShowQueueGhost(): boolean {
   if (activeQueueGhostHabitat) return false;
+  if (!hasAvailableQueueGhostSlot('home')) return false;
   const show = getSessionRandomFlag(GHOST_SESSION_KEY, QUEUE_GHOST_PROBABILITY);
   if (show) activeQueueGhostHabitat = 'home';
   return show;

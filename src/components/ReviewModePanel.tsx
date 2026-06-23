@@ -19,7 +19,7 @@ import { PlatformBadge } from './PlatformBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
-import { QueueGhost, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 export type ReviewModeAction =
   | 'queue'
@@ -156,8 +156,9 @@ export function ReviewModePanel({
   const [sessionGameIds, setSessionGameIds] = useState<string[]>([]);
   const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
   const [actionStats, setActionStats] = useState<ReviewActionStats>(emptyReviewActionStats);
+  const [queueGhostSlot] = useState(() => pickQueueGhostSlot('questQueue'));
   const [showQueueGhost, setShowQueueGhost] = useState(() => {
-    if (source !== 'backlog') return false;
+    if (!queueGhostSlot || source !== 'backlog') return false;
     if (games.length === 0) return shouldShowQueueGhostInHabitat('questQueue', import.meta.env.DEV ? 0.95 : 0.2);
     if (games.length > 1000) return shouldShowQueueGhostInHabitat('questQueue', import.meta.env.DEV ? 0.95 : 0.05);
     return false;
@@ -492,8 +493,8 @@ export function ReviewModePanel({
 
   return (
     <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
-      {showQueueGhost ? (
-        <div className="queue-ghost-habitat queue-ghost-habitat--quest-queue">
+      {showQueueGhost && queueGhostSlot ? (
+        <div className={`queue-ghost-habitat queue-ghost-habitat--quest-queue queue-ghost-slot--${queueGhostSlot}`}>
           <QueueGhost
             variant={games.length === 0 ? 'sleepy' : 'panic'}
             message={games.length === 0 ? pickQueueGhostMessage(emptyQuestQueueGhostMessages) : undefined}
