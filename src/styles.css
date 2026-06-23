@@ -3665,7 +3665,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
 .queue-ghost-cover-prop {
   overflow: visible;
-  transform: translate(0, 0) rotate(-6deg) scale(1);
+  transform: translate(0, 0) rotate(var(--queue-ghost-cover-rotation, -6deg)) scale(1);
   transform-box: fill-box;
   transform-origin: center;
   transition:
@@ -3687,7 +3687,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 .queue-ghost--cover-revealed .queue-ghost-cover-prop {
-  transform: translate(6px, -18px) rotate(-1deg) scale(3.15);
+  transform: translate(6px, -18px) rotate(var(--queue-ghost-cover-rotation, -1deg)) scale(3.15);
   filter: drop-shadow(0 0 8px color-mix(in srgb, var(--queue-ghost-accent-color) 62%, transparent));
 }
 
