@@ -844,6 +844,7 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
             steamAchievementsUnlocked: syncedGame.steamAchievementsUnlocked,
             steamAchievementsPercent: syncedGame.steamAchievementsPercent,
             steamLastAchievementUnlockTime: syncedGame.steamLastAchievementUnlockTime,
+            ...(syncedGame.steamAchievements ? { steamAchievements: syncedGame.steamAchievements } : {}),
           }
         : {}),
       steamAchievementsUnsupported: syncedGame.steamAchievementsUnsupported,
