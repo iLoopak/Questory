@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const GHOST_MESSAGES = [
   'Queue Ghost never forgets.',
@@ -27,6 +28,7 @@ export function shouldShowQueueGhost(): boolean {
 const TOOLTIP_WIDTH = 156;
 const TOOLTIP_ANCHOR_OFFSET = 34;
 const HOVER_DELAY_MS = 600;
+const TOOLTIP_Z_INDEX = 10_000;
 
 export function QueueGhost() {
   const [open, setOpen] = useState(false);
@@ -34,6 +36,7 @@ export function QueueGhost() {
     () => GHOST_MESSAGES[Math.floor(Math.random() * GHOST_MESSAGES.length)],
   );
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +47,7 @@ export function QueueGhost() {
     const r = buttonRef.current.getBoundingClientRect();
     const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
     const left = Math.max(8, Math.min(r.left + r.width * 0.7 - TOOLTIP_ANCHOR_OFFSET, vw - TOOLTIP_WIDTH - 8));
-    setTooltipStyle({ position: 'fixed', top: r.bottom + 4, left, width: TOOLTIP_WIDTH, zIndex: 50 });
+    setTooltipStyle({ position: 'fixed', top: r.bottom + 4, left, width: TOOLTIP_WIDTH, zIndex: TOOLTIP_Z_INDEX });
   }
 
   function cancelClose() {
@@ -80,6 +83,22 @@ export function QueueGhost() {
   }
 
   useEffect(() => {
+    setPortalHost(document.body);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    computeTooltipStyle();
+
+    window.addEventListener('resize', computeTooltipStyle);
+    window.addEventListener('scroll', computeTooltipStyle, true);
+    return () => {
+      window.removeEventListener('resize', computeTooltipStyle);
+      window.removeEventListener('scroll', computeTooltipStyle, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -101,6 +120,23 @@ export function QueueGhost() {
     },
     [],
   );
+
+  const tooltip = open ? (
+    <div
+      className="queue-ghost-tooltip pointer-events-none rounded-xl p-3 backdrop-blur-md"
+      role="tooltip"
+      style={{
+        ...tooltipStyle,
+        '--queue-ghost-arrow-x': `${TOOLTIP_ANCHOR_OFFSET}px`,
+      } as React.CSSProperties}
+    >
+      {/* Speech bubble arrow — upward, pointing at ghost */}
+      <div className="queue-ghost-tooltip-arrow" />
+      <p className="text-xs font-bold text-white">Queue Ghost</p>
+      <p className="text-2xs text-slate-500">The Spirit of Backlog Past</p>
+      <p className="mt-1.5 whitespace-pre-line text-xs leading-snug text-slate-300">{message}</p>
+    </div>
+  ) : null;
 
   return (
     <div ref={containerRef} className="relative">
@@ -146,22 +182,7 @@ export function QueueGhost() {
         </svg>
       </button>
 
-      {open && (
-        <div
-          className="queue-ghost-tooltip pointer-events-none rounded-xl p-3 backdrop-blur-md"
-          role="tooltip"
-          style={{
-            ...tooltipStyle,
-            '--queue-ghost-arrow-x': `${TOOLTIP_ANCHOR_OFFSET}px`,
-          } as React.CSSProperties}
-        >
-          {/* Speech bubble arrow — upward, pointing at ghost */}
-          <div className="queue-ghost-tooltip-arrow" />
-          <p className="text-xs font-bold text-white">Queue Ghost</p>
-          <p className="text-2xs text-slate-500">The Spirit of Backlog Past</p>
-          <p className="mt-1.5 whitespace-pre-line text-xs leading-snug text-slate-300">{message}</p>
-        </div>
-      )}
+      {portalHost && tooltip ? createPortal(tooltip, portalHost) : null}
     </div>
   );
 }
