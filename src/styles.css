@@ -3631,6 +3631,23 @@ body.qs-controller-active .qs-compact-card:focus-within {
   opacity: 0.40;
 }
 
+.queue-ghost-cover-prop {
+  overflow: visible;
+  transform: rotate(-6deg);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.queue-ghost-cover-image {
+  display: block;
+  width: 22px;
+  height: 30px;
+  border: 1px solid rgb(var(--ink-950-rgb) / 0.28);
+  border-radius: 3px;
+  object-fit: cover;
+  box-shadow: 0 3px 8px rgb(var(--overlay-rgb) / 0.38);
+}
+
 .queue-ghost-float {
   animation: queueGhostFloat 4.8s ease-in-out infinite;
   transform-origin: center;

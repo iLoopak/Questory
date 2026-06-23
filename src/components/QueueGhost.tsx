@@ -12,16 +12,41 @@ const GHOST_MESSAGES = [
 ] as const;
 
 const GHOST_SESSION_KEY = 'qs-ghost-v1';
+const GHOST_COVER_SESSION_KEY = 'qs-ghost-cover-v1';
+
+export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.75;
+export const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.8;
+
+export type QueueGhostCover = {
+  title: string;
+  imageUrl: string;
+};
 
 export function shouldShowQueueGhost(): boolean {
+  return getSessionRandomFlag(GHOST_SESSION_KEY, QUEUE_GHOST_PROBABILITY);
+}
+
+export function shouldQueueGhostCarryCover(): boolean {
+  return getSessionRandomFlag(GHOST_COVER_SESSION_KEY, QUEUE_GHOST_COVER_PROBABILITY);
+}
+
+export function hideQueueGhostForSession() {
   try {
-    const stored = sessionStorage.getItem(GHOST_SESSION_KEY);
+    sessionStorage.setItem(GHOST_SESSION_KEY, '0');
+  } catch {
+    // Ignore unavailable session storage; the in-memory Home state still hides the ghost.
+  }
+}
+
+function getSessionRandomFlag(key: string, probability: number): boolean {
+  try {
+    const stored = sessionStorage.getItem(key);
     if (stored !== null) return stored === '1';
-    const show = Math.random() < 0.75;
-    sessionStorage.setItem(GHOST_SESSION_KEY, show ? '1' : '0');
+    const show = Math.random() < probability;
+    sessionStorage.setItem(key, show ? '1' : '0');
     return show;
   } catch {
-    return Math.random() < 0.75;
+    return Math.random() < probability;
   }
 }
 
@@ -30,11 +55,27 @@ const TOOLTIP_ANCHOR_OFFSET = 34;
 const HOVER_DELAY_MS = 600;
 const TOOLTIP_Z_INDEX = 10_000;
 
-export function QueueGhost() {
+type QueueGhostProps = {
+  cover?: QueueGhostCover | null;
+  onVanish?: () => void;
+};
+
+const COVER_GHOST_MESSAGES = [
+  'Queue Ghost found this one.',
+  'The backlog remembers:',
+  'Queue Ghost is carrying:',
+] as const;
+
+export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
   const [open, setOpen] = useState(false);
-  const [message] = useState(
-    () => GHOST_MESSAGES[Math.floor(Math.random() * GHOST_MESSAGES.length)],
-  );
+  const [message] = useState(() => {
+    if (cover) {
+      const prefix = COVER_GHOST_MESSAGES[Math.floor(Math.random() * COVER_GHOST_MESSAGES.length)];
+      return `${prefix}\n${cover.title}`;
+    }
+    return GHOST_MESSAGES[Math.floor(Math.random() * GHOST_MESSAGES.length)];
+  });
+  const [coverVisible, setCoverVisible] = useState(Boolean(cover));
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,12 +115,9 @@ export function QueueGhost() {
   function handleClick() {
     cancelClose();
     cancelOpen();
-    if (open) {
-      setOpen(false);
-    } else {
-      computeTooltipStyle();
-      setOpen(true);
-    }
+    setOpen(false);
+    hideQueueGhostForSession();
+    onVanish?.();
   }
 
   useEffect(() => {
@@ -178,6 +216,17 @@ export function QueueGhost() {
             <circle cx="40" cy="40" r="1.5" fill="white" />
             <circle cx="60" cy="40" r="1.5" fill="white" />
             <path className="queue-ghost-mouth" d="M44 57 C46 59 50 59 52 57" />
+            {cover && coverVisible ? (
+              <foreignObject className="queue-ghost-cover-prop" x="52" y="50" width="25" height="34">
+                <img
+                  alt=""
+                  className="queue-ghost-cover-image"
+                  decoding="async"
+                  src={cover.imageUrl}
+                  onError={() => setCoverVisible(false)}
+                />
+              </foreignObject>
+            ) : null}
           </g>
         </svg>
       </button>
