@@ -14,6 +14,7 @@ import { buildHltbSearchUrl, formatHltbBadge, getHltbGameSearchTitle, hasHltbDat
 import type { RawgSearchResult } from '../types/rawg';
 import { RawgLinkDialog } from './RawgLinkDialog';
 import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
+import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
 
 type GameDetailViewProps = {
@@ -70,6 +71,7 @@ export function GameDetailView({
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isRawgLinkOpen, setIsRawgLinkOpen] = useState(false);
   const [isArtworkPickerOpen, setIsArtworkPickerOpen] = useState(false);
+  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
@@ -300,7 +302,13 @@ export function GameDetailView({
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
                     <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                    {achievementSummary ? <HeroStat label={t('collection.achievements')} value={achievementSummary} /> : null}
+                    {achievementSummary ? (
+                      <HeroStat
+                        label={t('collection.achievements')}
+                        value={achievementSummary}
+                        onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
+                      />
+                    ) : null}
 {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                   </div>
                 </div>
@@ -358,6 +366,14 @@ export function GameDetailView({
 
             {isArtworkPickerOpen ? (
               <SteamGridDbArtworkPickerModal game={game} onClose={() => setIsArtworkPickerOpen(false)} onSave={saveArtworkFromPicker} />
+            ) : null}
+
+            {isAchievementsOpen && game.steamAchievements ? (
+              <SteamAchievementsPanel
+                achievements={game.steamAchievements}
+                gameTitle={game.title}
+                onClose={() => setIsAchievementsOpen(false)}
+              />
             ) : null}
 
             {isEditing ? (
@@ -461,7 +477,13 @@ export function GameDetailView({
                     <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? t('detail.notAvailable')} />
                     <ReadOnlyField label={t('detail.imported')} value={formatDateTime(game.importedAt, t('detail.notAvailable'))} />
                     <ReadOnlyField label={t('detail.source')} value={game.externalSource ?? t('detail.notAvailable')} />
-                    {achievementSummary ? <ReadOnlyField label={t('collection.achievements')} value={achievementSummary} /> : null}
+                    {achievementSummary ? (
+                      <ReadOnlyField
+                        label={t('collection.achievements')}
+                        value={achievementSummary}
+                        onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
+                      />
+                    ) : null}
                     {game.steamLastAchievementUnlockTime ? (
                       <ReadOnlyField label={t('detail.lastAchievementUnlock')} value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString(), t('detail.notAvailable'))} />
                     ) : null}
@@ -653,12 +675,18 @@ function EditSelect({ label, onChange, options, value }: { label: string; onChan
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
-function HeroStat({ accent, label, value }: { accent?: boolean; label: string; value: string }) {
-  return (
-    <div className={`rounded-xl border px-3 py-2 ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'}`}>
+function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {
+  const className = `rounded-xl border px-3 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
+  const content = (
+    <>
       <div className="qs-label-caps text-muted">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button className={className} type="button" onClick={onClick}>{content}</button>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
@@ -1005,15 +1033,22 @@ function MetadataAccordion({ children, summary, title }: MetadataAccordionProps)
 
 type ReadOnlyFieldProps = {
   label: string;
+  onClick?: () => void;
   value: string;
 };
 
-function ReadOnlyField({ label, value }: ReadOnlyFieldProps) {
-  return (
-    <div className="min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2">
+function ReadOnlyField({ label, onClick, value }: ReadOnlyFieldProps) {
+  const className = `min-w-0 rounded-md border border-white/10 bg-ink-900/60 px-3 py-2 text-left ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
+  const content = (
+    <>
       <div className="text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
       <div className="mt-1 truncate text-sm text-slate-300">{value}</div>
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button className={className} type="button" onClick={onClick}>{content}</button>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 

@@ -1,4 +1,4 @@
-import { getSteamAchievementSummary, SteamApiError } from '../services/steamApi';
+import { getSteamAchievements, SteamApiError } from '../services/steamApi';
 import type { Game } from '../types/game';
 import type { SteamAchievementSyncSummary, SteamSettings } from '../types/steam';
 
@@ -7,7 +7,7 @@ export const STEAM_ACHIEVEMENT_SYNC_BATCH_DELAY_MS = 1000;
 export const STEAM_ACHIEVEMENT_SYNC_MAX_RETRIES = 2;
 export const STEAM_ACHIEVEMENT_SYNC_RETRY_DELAY_MS = 500;
 
-type SteamAchievementSummaryResult = Awaited<ReturnType<typeof getSteamAchievementSummary>>;
+type SteamAchievementDetailResult = Awaited<ReturnType<typeof getSteamAchievements>>;
 
 type SteamAchievementGameSyncStatus = 'updated' | 'skipped' | 'no-achievements' | 'unavailable' | 'failed';
 
@@ -49,7 +49,7 @@ export async function syncSteamAchievementsForGames(
 ): Promise<SteamAchievementSyncResult> {
   const targetGames = games.filter((game) => targetGameIds.has(game.id));
   const syncableGames = targetGames.filter(isSteamAchievementSyncableGame);
-  const summariesByAppId = new Map<number, SteamAchievementSummaryResult>();
+  const detailsByAppId = new Map<number, SteamAchievementDetailResult>();
   const noAchievementAppIds = new Set<number>();
   const failedAppIds = new Set<number>();
   let nextGames = games;
@@ -79,7 +79,7 @@ export async function syncSteamAchievementsForGames(
             game,
             noAchievementAppIds,
             settings,
-            summariesByAppId,
+            detailsByAppId,
             force,
           },
           () => {
@@ -90,7 +90,7 @@ export async function syncSteamAchievementsForGames(
       ),
     );
 
-    nextGames = mergeSteamAchievementBatch(nextGames, batchResults, summariesByAppId, syncedAt, summary);
+    nextGames = mergeSteamAchievementBatch(nextGames, batchResults, detailsByAppId, syncedAt, summary);
 
     const progress = { completed, total: syncableGames.length };
     debugSteamAchievementSync('batch completed', {
@@ -117,7 +117,7 @@ async function syncSteamAchievementsForGameWithProgress(
     game: Game;
     noAchievementAppIds: Set<number>;
     settings: SteamSettings;
-    summariesByAppId: Map<number, SteamAchievementSummaryResult>;
+    detailsByAppId: Map<number, SteamAchievementDetailResult>;
     force: boolean;
   },
   onProcessed: () => void,
@@ -144,14 +144,14 @@ async function syncSteamAchievementsForGame({
   game,
   noAchievementAppIds,
   settings,
-  summariesByAppId,
+  detailsByAppId,
   force,
 }: {
   failedAppIds: Set<number>;
   game: Game;
   noAchievementAppIds: Set<number>;
   settings: SteamSettings;
-  summariesByAppId: Map<number, SteamAchievementSummaryResult>;
+  detailsByAppId: Map<number, SteamAchievementDetailResult>;
   force: boolean;
 }): Promise<SteamAchievementGameSyncResult> {
   const steamAppId = game.steamAppId;
@@ -167,7 +167,7 @@ async function syncSteamAchievementsForGame({
     return { gameId: game.id, steamAppId, status: 'no-achievements' };
   }
 
-  if (summariesByAppId.has(steamAppId)) {
+  if (detailsByAppId.has(steamAppId)) {
     return { gameId: game.id, steamAppId, status: 'updated' };
   }
 
@@ -180,10 +180,10 @@ async function syncSteamAchievementsForGame({
   }
 
   try {
-    const achievementSummary = await getSteamAchievementSummaryWithRetry(settings, steamAppId);
+    const achievementDetail = await getSteamAchievementsWithRetry(settings, steamAppId);
 
-    if (achievementSummary) {
-      summariesByAppId.set(steamAppId, achievementSummary);
+    if (achievementDetail) {
+      detailsByAppId.set(steamAppId, achievementDetail);
       return { gameId: game.id, steamAppId, status: 'updated' };
     }
 
@@ -208,12 +208,12 @@ async function syncSteamAchievementsForGame({
   }
 }
 
-async function getSteamAchievementSummaryWithRetry(settings: SteamSettings, steamAppId: number) {
+async function getSteamAchievementsWithRetry(settings: SteamSettings, steamAppId: number) {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= STEAM_ACHIEVEMENT_SYNC_MAX_RETRIES; attempt += 1) {
     try {
-      return await getSteamAchievementSummary(settings, steamAppId);
+      return await getSteamAchievements(settings, steamAppId);
     } catch (error) {
       lastError = error;
 
@@ -238,7 +238,7 @@ async function getSteamAchievementSummaryWithRetry(settings: SteamSettings, stea
 function mergeSteamAchievementBatch(
   games: Game[],
   batchResults: SteamAchievementGameSyncResult[],
-  summariesByAppId: Map<number, SteamAchievementSummaryResult>,
+  detailsByAppId: Map<number, SteamAchievementDetailResult>,
   syncedAt: string,
   summary: SteamAchievementSyncSummary,
 ) {
@@ -276,19 +276,21 @@ function mergeSteamAchievementBatch(
       return game;
     }
 
-    const achievementSummary = summariesByAppId.get(result.steamAppId);
+    const detail = detailsByAppId.get(result.steamAppId);
 
-    if (!achievementSummary) {
+    if (!detail) {
       summary.noAchievementDataCount += 1;
       return game;
     }
 
+    const { summary: achievementSummary, achievements } = detail;
     const hasChanged =
       game.steamAchievementsTotal !== achievementSummary.total ||
       game.steamAchievementsUnlocked !== achievementSummary.unlocked ||
       game.steamAchievementsPercent !== achievementSummary.percent ||
       game.steamLastAchievementUnlockTime !== achievementSummary.lastUnlockTime ||
-      game.steamAchievementsUnsupported === true;
+      game.steamAchievementsUnsupported === true ||
+      !game.steamAchievements;
 
     if (!hasChanged) {
       summary.unchangedCount += 1;
@@ -302,6 +304,7 @@ function mergeSteamAchievementBatch(
       steamAchievementsUnlocked: achievementSummary.unlocked,
       steamAchievementsPercent: achievementSummary.percent,
       steamLastAchievementUnlockTime: achievementSummary.lastUnlockTime,
+      steamAchievements: achievements,
       steamAchievementsUnsupported: false,
       steamAchievementsLastCheckedAt: Date.parse(syncedAt),
       updatedAt: syncedAt,

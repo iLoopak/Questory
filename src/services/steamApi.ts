@@ -1,4 +1,4 @@
-import type { Game } from '../types/game';
+import type { Game, SteamAchievement } from '../types/game';
 import type {
   SteamApiDebugEntry,
   SteamOwnedGame,
@@ -59,12 +59,19 @@ type PlayerAchievementsResponse = {
   };
 };
 
+type GameSchemaAchievement = {
+  name?: string;        // apiName
+  displayName?: string;
+  description?: string;
+  icon?: string;        // full URL to achievement icon
+  icongray?: string;    // full URL to locked/gray icon
+  hidden?: number;      // 0 or 1
+};
+
 type GameSchemaResponse = {
   game?: {
     availableGameStats?: {
-      achievements?: Array<{
-        name?: string;
-      }>;
+      achievements?: GameSchemaAchievement[];
     };
   };
 };
@@ -499,6 +506,68 @@ export async function getSteamAchievementSummary(
     unlocked,
     percent: total > 0 ? Math.round((unlocked / total) * 100) : 0,
     lastUnlockTime,
+  };
+}
+
+export async function getSteamAchievements(
+  settings: SteamSettings,
+  appId: number,
+): Promise<{ summary: SteamAchievementSummary; achievements: SteamAchievement[] } | null> {
+  const gameSchema = await requestSteamStatsEndpoint<GameSchemaResponse>('GetSchemaForGame', settings, appId);
+  const schemaRows = Array.isArray(gameSchema.game?.availableGameStats?.achievements)
+    ? gameSchema.game.availableGameStats.achievements
+    : [];
+
+  if (schemaRows.length <= 0) {
+    return null;
+  }
+
+  const playerAchievements = await requestSteamStatsEndpoint<PlayerAchievementsResponse>('GetPlayerAchievements', settings, appId);
+  const achievementRows = Array.isArray(playerAchievements.playerstats?.achievements)
+    ? playerAchievements.playerstats.achievements
+    : [];
+  const total = Math.max(achievementRows.length, schemaRows.length);
+
+  if (playerAchievements.playerstats?.success === false && achievementRows.length === 0) {
+    return null;
+  }
+
+  if (total <= 0) {
+    return null;
+  }
+
+  const playerByApiName = new Map(achievementRows.map((a) => [a.apiname ?? '', a]));
+  const unlocked = achievementRows.filter((a) => a.achieved === 1).length;
+  const lastUnlockTime = achievementRows.reduce<number | undefined>((latest, a) => {
+    if (a.achieved !== 1 || !a.unlocktime) return latest;
+    return Math.max(latest ?? 0, a.unlocktime);
+  }, undefined);
+
+  const achievements: SteamAchievement[] = schemaRows.map((schema) => {
+    const apiName = schema.name ?? '';
+    const player = playerByApiName.get(apiName);
+    const isUnlocked = player?.achieved === 1;
+    const result: SteamAchievement = {
+      apiName,
+      displayName: schema.displayName || apiName,
+      unlocked: isUnlocked,
+    };
+    if (schema.description) result.description = schema.description;
+    if (schema.icon) result.iconUrl = schema.icon;
+    if (schema.icongray) result.grayIconUrl = schema.icongray;
+    if (schema.hidden === 1) result.hidden = true;
+    if (isUnlocked && player?.unlocktime) result.unlockTime = player.unlocktime;
+    return result;
+  });
+
+  return {
+    summary: {
+      total,
+      unlocked,
+      percent: total > 0 ? Math.round((unlocked / total) * 100) : 0,
+      lastUnlockTime,
+    },
+    achievements,
   };
 }
 

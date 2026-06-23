@@ -39,6 +39,17 @@ export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
 export type ArtworkSource = 'user' | 'steam' | 'steamgriddb' | 'rawg' | 'imported' | 'generated-fallback';
 
+export type SteamAchievement = {
+  apiName: string;
+  displayName: string;
+  description?: string;
+  iconUrl?: string;
+  grayIconUrl?: string;
+  hidden?: boolean;
+  unlocked: boolean;
+  unlockTime?: number;
+};
+
 export type RomFileReference = {
   extension?: string;
   fileName: string;
@@ -86,6 +97,7 @@ export type Game = {
   steamLastAchievementUnlockTime?: number;
   steamAchievementsUnsupported?: boolean;
   steamAchievementsLastCheckedAt?: number;
+  steamAchievements?: SteamAchievement[];
   lastSteamActivityAt?: string;
   lastSteamActivityDeltaMinutes?: number;
   externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
