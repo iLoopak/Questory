@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n, type TFunction } from '../i18n';
 import type { SteamAchievement } from '../types/game';
 import { Icon } from './Icon';
 
@@ -114,7 +114,7 @@ export function SteamAchievementsPanel({ achievements, gameTitle, onClose }: Ste
   );
 }
 
-function AchievementRow({ achievement, t }: { achievement: SteamAchievement; t: (key: string) => string }) {
+function AchievementRow({ achievement, t }: { achievement: SteamAchievement; t: TFunction }) {
   const iconUrl = achievement.unlocked ? achievement.iconUrl : (achievement.grayIconUrl ?? achievement.iconUrl);
   const unlockDate = achievement.unlockTime
     ? new Date(achievement.unlockTime * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
