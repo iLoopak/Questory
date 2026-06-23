@@ -3,6 +3,7 @@ import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuiz
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
+import { QueueGhost, shouldShowQueueGhost } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -199,6 +200,7 @@ export function HomePanel({
   const [workflowStripDismissed, setWorkflowStripDismissed] = useState(
     () => localStorage.getItem('qs-workflow-strip-v1') === 'dismissed',
   );
+  const [showGhost] = useState(() => shouldShowQueueGhost());
 
   const hasEnoughProgress =
     continuePlayingGames.length > 0 &&
@@ -314,6 +316,7 @@ export function HomePanel({
           {shelfTitle ? <div className="text-xs font-semibold text-mint">{shelfTitle}</div> : null}
           <div className="mt-0.5 text-xs leading-snug text-slate-500 whitespace-pre-line">{greeting.current}</div>
         </div>
+        {showGhost && <QueueGhost />}
         <div className="flex shrink-0 flex-col items-end gap-1">
           <div className="flex items-center gap-3">
             <div className="text-right">

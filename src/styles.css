@@ -3558,3 +3558,42 @@ body.qs-controller-active .qs-compact-card:focus-within {
     transform: rotate(var(--tile-rotate, 0deg)) !important;
   }
 }
+
+/* ── Queue Ghost ──────────────────────────────────────────────────────── */
+
+.queue-ghost-body {
+  fill: rgb(255 255 255 / 0.82);
+  stroke: rgb(255 255 255 / 0.12);
+  stroke-width: 0.5;
+}
+
+.queue-ghost-eyes {
+  fill: rgb(var(--ink-950-rgb));
+}
+
+/* Glow puddle — tinted with the user's secondary accent */
+.queue-ghost-glow {
+  fill: rgb(var(--qs-accent-secondary-rgb) / 0.45);
+  filter: blur(2px);
+}
+
+/* Subtle sheen highlight using secondary accent at very low opacity */
+.queue-ghost-accent {
+  fill: rgb(var(--qs-accent-secondary-rgb) / 0.22);
+}
+
+@keyframes queue-ghost-float {
+  0%, 100% { transform: translateY(0px)   rotate(0deg);    }
+  35%       { transform: translateY(-5px)  rotate(-1.2deg); }
+  70%       { transform: translateY(-3px)  rotate(0.8deg);  }
+}
+
+.queue-ghost-float {
+  animation: queue-ghost-float 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-ghost-float {
+    animation: none;
+  }
+}
