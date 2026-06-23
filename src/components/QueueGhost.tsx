@@ -16,13 +16,16 @@ export function shouldShowQueueGhost(): boolean {
   try {
     const stored = sessionStorage.getItem(GHOST_SESSION_KEY);
     if (stored !== null) return stored === '1';
-    const show = Math.random() < 0.015;
+    const show = Math.random() < 0.75;
     sessionStorage.setItem(GHOST_SESSION_KEY, show ? '1' : '0');
     return show;
   } catch {
-    return Math.random() < 0.015;
+    return Math.random() < 0.75;
   }
 }
+
+const TOOLTIP_WIDTH = 160;
+const HOVER_DELAY_MS = 600;
 
 export function QueueGhost() {
   const [open, setOpen] = useState(false);
@@ -31,6 +34,7 @@ export function QueueGhost() {
   );
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -38,13 +42,16 @@ export function QueueGhost() {
     if (!buttonRef.current) return;
     const r = buttonRef.current.getBoundingClientRect();
     const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
-    const tooltipWidth = 176;
-    const left = Math.max(8, Math.min(r.left + r.width / 2 - tooltipWidth / 2, vw - tooltipWidth - 8));
-    setTooltipStyle({ position: 'fixed', top: r.bottom + 8, left, width: tooltipWidth, zIndex: 50 });
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - TOOLTIP_WIDTH / 2, vw - TOOLTIP_WIDTH - 8));
+    setTooltipStyle({ position: 'fixed', top: r.bottom + 12, left, width: TOOLTIP_WIDTH, zIndex: 50 });
   }
 
   function cancelClose() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+  }
+
+  function cancelOpen() {
+    if (openTimerRef.current) clearTimeout(openTimerRef.current);
   }
 
   function scheduleClose() {
@@ -52,10 +59,23 @@ export function QueueGhost() {
     closeTimerRef.current = setTimeout(() => setOpen(false), 200);
   }
 
+  function scheduleOpen() {
+    cancelOpen();
+    openTimerRef.current = setTimeout(() => {
+      computeTooltipStyle();
+      setOpen(true);
+    }, HOVER_DELAY_MS);
+  }
+
   function handleClick() {
     cancelClose();
-    if (!open) computeTooltipStyle();
-    setOpen((prev) => !prev);
+    cancelOpen();
+    if (open) {
+      setOpen(false);
+    } else {
+      computeTooltipStyle();
+      setOpen(true);
+    }
   }
 
   useEffect(() => {
@@ -76,6 +96,7 @@ export function QueueGhost() {
   useEffect(
     () => () => {
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      if (openTimerRef.current) clearTimeout(openTimerRef.current);
     },
     [],
   );
@@ -87,19 +108,21 @@ export function QueueGhost() {
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label="Queue Ghost"
-        className="block outline-none"
+        className="block opacity-[0.92] outline-none"
         type="button"
         onClick={handleClick}
         onMouseEnter={() => {
           cancelClose();
-          computeTooltipStyle();
-          setOpen(true);
+          scheduleOpen();
         }}
-        onMouseLeave={scheduleClose}
+        onMouseLeave={() => {
+          cancelOpen();
+          scheduleClose();
+        }}
       >
         <svg
           aria-hidden="true"
-          className="queue-ghost h-auto w-12"
+          className="queue-ghost h-auto w-[38px]"
           fill="none"
           viewBox="0 0 96 96"
         >
@@ -124,10 +147,38 @@ export function QueueGhost() {
 
       {open && (
         <div
-          className="pointer-events-none rounded-xl border border-[var(--qs-secondary-accent)]/30 bg-ink-950/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl"
+          className="pointer-events-none rounded-lg bg-ink-950 p-3 backdrop-blur-md"
           role="tooltip"
-          style={tooltipStyle}
+          style={{
+            ...tooltipStyle,
+            boxShadow:
+              '0 0 0 1px color-mix(in srgb, var(--qs-secondary-accent) 30%, transparent), 0 12px 28px -4px rgba(0,0,0,0.8)',
+          }}
         >
+          {/* Speech bubble arrow — upward, pointing at ghost */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{
+              top: -9,
+              width: 0,
+              height: 0,
+              borderLeft: '7px solid transparent',
+              borderRight: '7px solid transparent',
+              borderBottom:
+                '9px solid color-mix(in srgb, var(--qs-secondary-accent) 30%, transparent)',
+            }}
+          />
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{
+              top: -7,
+              width: 0,
+              height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderBottom: '8px solid rgb(var(--ink-950-rgb))',
+            }}
+          />
           <p className="text-xs font-bold text-white">Queue Ghost</p>
           <p className="text-2xs text-slate-500">The Spirit of Backlog Past</p>
           <p className="mt-1.5 whitespace-pre-line text-xs leading-snug text-slate-300">{message}</p>
