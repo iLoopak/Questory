@@ -3566,7 +3566,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
   --queue-ghost-eye: rgb(var(--ink-950-rgb));
   --queue-ghost-accent-color: var(--qs-secondary-accent);
   pointer-events: auto;
-  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--queue-ghost-accent-color) 35%, transparent));
+  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--queue-ghost-accent-color) 55%, transparent));
 }
 
 .queue-ghost-body {
@@ -3587,14 +3587,14 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
 .queue-ghost-glow {
   fill: var(--queue-ghost-accent-color);
-  opacity: 0.24;
+  opacity: 0.35;
   animation: queueGhostGlow 4s ease-in-out infinite;
   transform-origin: center;
 }
 
 .queue-ghost-accent {
   fill: var(--queue-ghost-accent-color);
-  opacity: 0.10;
+  opacity: 0.30;
 }
 
 .queue-ghost-float {
@@ -3611,8 +3611,8 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 @keyframes queueGhostGlow {
-  0%, 100% { opacity: 0.18; transform: scale(0.95); }
-  50%       { opacity: 0.36; transform: scale(1.04); }
+  0%, 100% { opacity: 0.30; transform: scale(0.95); }
+  50%       { opacity: 0.52; transform: scale(1.06); }
 }
 
 @media (prefers-reduced-motion: reduce) {
