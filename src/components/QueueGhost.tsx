@@ -22,7 +22,8 @@ export type QueueGhostHabitat =
   | 'achievements'
   | 'platformPlans'
   | 'gameDetail'
-  | 'wishlist';
+  | 'wishlist'
+  | 'library';
 
 let activeQueueGhostHabitat: QueueGhostHabitat | null = null;
 
@@ -33,6 +34,7 @@ const QUEUE_GHOST_SAFE_SLOTS = {
   platformPlans: ['toolbarCorner', 'platformCardEdge', 'emptySpaceTopRight'],
   gameDetail: ['coverEdgePeek', 'detailHeaderCorner', 'statsPanelCorner'],
   wishlist: ['toolbarCorner', 'gridEdge', 'emptySpaceTopRight'],
+  library: ['toolbarCorner', 'gridEdge', 'emptySpaceTopRight'],
 } as const satisfies Record<QueueGhostHabitat, readonly string[]>;
 
 export type QueueGhostSlot = (typeof QUEUE_GHOST_SAFE_SLOTS)[QueueGhostHabitat][number];
@@ -54,7 +56,9 @@ function getAvailableQueueGhostSlots(habitat: QueueGhostHabitat): readonly Queue
 export function pickQueueGhostSlot(habitat: QueueGhostHabitat): QueueGhostSlot | null {
   const slots = getAvailableQueueGhostSlots(habitat);
   if (slots.length === 0) return null;
-  return slots[Math.floor(Math.random() * slots.length)];
+  const slot = slots[Math.floor(Math.random() * slots.length)];
+  if (import.meta.env.DEV) console.debug(`[QueueGhost] picked slot="${slot}" habitat="${habitat}"`);
+  return slot;
 }
 
 export function hasAvailableQueueGhostSlot(habitat: QueueGhostHabitat): boolean {
@@ -66,6 +70,7 @@ export function shouldShowQueueGhostInHabitat(habitat: QueueGhostHabitat, probab
   if (!hasAvailableQueueGhostSlot(habitat)) return false;
   if (Math.random() >= probability) return false;
   activeQueueGhostHabitat = habitat;
+  if (import.meta.env.DEV) console.debug(`[QueueGhost] activated habitat="${habitat}"`);
   return true;
 }
 

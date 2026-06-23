@@ -158,8 +158,10 @@ export function CollectionPanel({
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
   const [isCollectionSteamAchievementSyncVisible, setIsCollectionSteamAchievementSyncVisible] = useState(false);
   const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
-  const [wishlistGhostSlot] = useState(() => pickQueueGhostSlot('wishlist'));
-  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length > 100 && shouldShowQueueGhostInHabitat('wishlist', QUEUE_GHOST_HABITAT_PROBABILITY));
+  const [wishlistGhostSlot] = useState(() => collectionType === 'wishlist' ? pickQueueGhostSlot('wishlist') : null);
+  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length >= 1 && shouldShowQueueGhostInHabitat('wishlist', QUEUE_GHOST_HABITAT_PROBABILITY));
+  const [libraryGhostSlot] = useState(() => collectionType === 'library' ? pickQueueGhostSlot('library') : null);
+  const [showLibraryGhost, setShowLibraryGhost] = useState(() => Boolean(libraryGhostSlot) && collectionType === 'library' && games.length >= 5 && shouldShowQueueGhostInHabitat('library', QUEUE_GHOST_HABITAT_PROBABILITY));
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -215,6 +217,7 @@ export function CollectionPanel({
   const activeAdvancedFilterCount = getActiveAdvancedFilterCount(filters);
 
   useEffect(() => () => releaseQueueGhostHabitat('wishlist'), []);
+  useEffect(() => () => releaseQueueGhostHabitat('library'), []);
 
   useEffect(() => {
     contentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
@@ -478,6 +481,11 @@ export function CollectionPanel({
       {showWishlistGhost && wishlistGhostSlot ? (
         <div className={`queue-ghost-habitat queue-ghost-habitat--wishlist queue-ghost-slot--${wishlistGhostSlot}`}>
           <QueueGhost variant="default" message={pickQueueGhostMessage(wishlistGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('wishlist'); setShowWishlistGhost(false); }} />
+        </div>
+      ) : null}
+      {showLibraryGhost && libraryGhostSlot ? (
+        <div className={`queue-ghost-habitat queue-ghost-habitat--library queue-ghost-slot--${libraryGhostSlot}`}>
+          <QueueGhost variant="default" message={pickQueueGhostMessage(libraryGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('library'); setShowLibraryGhost(false); }} />
         </div>
       ) : null}
     <GameListShell
@@ -1125,6 +1133,13 @@ const wishlistGhostMessages = [
   'Queue Ghost understands.',
   'Someday.',
   "One more sale won't hurt.",
+] as const;
+
+const libraryGhostMessages = [
+  'Queue Ghost never forgets.',
+  'Somewhere in here is your next favourite.',
+  'The backlog has layers.',
+  'Queue Ghost has been here before.',
 ] as const;
 
 function pickQueueGhostMessage(messages: readonly string[]) {
