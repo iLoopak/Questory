@@ -160,6 +160,12 @@ const TOOLTIP_WIDTH = 156;
 const TOOLTIP_ANCHOR_OFFSET = 34;
 const HOVER_DELAY_MS = 600;
 const TOOLTIP_Z_INDEX = 10_000;
+const MIN_COVER_ROTATION_DEGREES = -10;
+const MAX_COVER_ROTATION_DEGREES = 10;
+
+function randomBetween(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
 
 type QueueGhostProps = {
   achievement?: QueueGhostAchievement | null;
@@ -204,6 +210,10 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const coverRotation = useMemo(
+    () => randomBetween(MIN_COVER_ROTATION_DEGREES, MAX_COVER_ROTATION_DEGREES),
+    [],
+  );
 
   function computeTooltipStyle() {
     if (!buttonRef.current) return;
@@ -359,6 +369,7 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
           aria-hidden="true"
           className={`queue-ghost queue-ghost--${variant} h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}`}
           fill="none"
+          style={{ '--queue-ghost-cover-rotation': `${coverRotation}deg` } as CSSProperties}
           viewBox="0 0 96 96"
         >
           <ellipse className="queue-ghost-glow" cx="48" cy="76" rx="28" ry="8" />
