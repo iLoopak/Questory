@@ -3565,7 +3565,8 @@ body.qs-controller-active .qs-compact-card:focus-within {
   position: absolute;
   top: -4px;
   right: clamp(11.5rem, 21vw, 13.75rem);
-  z-index: 5;
+  isolation: isolate;
+  z-index: 9999;
   width: 36px;
   transform: translateY(-10%);
 }
@@ -3783,8 +3784,9 @@ body.qs-controller-active .qs-compact-card:focus-within {
 /* ── Queue Ghost habitats outside Home ─────────────────────────────────── */
 .queue-ghost-habitat {
   position: absolute;
+  isolation: isolate;
   width: 72px;
-  z-index: 6;
+  z-index: 9999;
   pointer-events: none;
 }
 
