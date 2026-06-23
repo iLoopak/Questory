@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n, type TFunction } from '../i18n';
 import { loadAchievementCounters } from '../lib/achievementCounters';
 import { getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -68,7 +68,7 @@ function AchievementShowcaseCard({
   t,
 }: {
   achievement: QuestShelfAchievementProgress;
-  t: (key: string) => string;
+  t: TFunction;
 }) {
   const target = achievement.target ?? 1;
   const progressPct = target > 0 ? Math.min(100, Math.round((achievement.current / target) * 100)) : 0;
