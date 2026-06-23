@@ -9,6 +9,7 @@ import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCo
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import { getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
 import { loadAchievementCounters } from '../lib/achievementCounters';
+import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../lib/achievementGhostStorage';
 import type { PlayActivityRecord } from '../lib/playActivityStorage';
 import type { ReviewModeState, ReviewSource, ReviewStats } from '../lib/reviewModeStorage';
 import type { ItadDealSyncState } from '../config/syncStates';
@@ -2081,16 +2082,13 @@ function pickContextualMessage(ctx: HeroMessageContext): string {
   return pick(staticMessages);
 }
 
-const QUEUE_GHOST_UNLOCKED_ACHIEVEMENTS_KEY = 'qs-queue-ghost-unlocked-achievements-v1';
-
 function pickNewlyUnlockedAchievement(achievements: QuestShelfAchievementProgress[]): QueueGhostAchievement | null {
   const unlocked = achievements.filter((achievement) => achievement.isUnlocked && !achievement.isMeta);
   if (unlocked.length === 0) return null;
   try {
-    const stored = localStorage.getItem(QUEUE_GHOST_UNLOCKED_ACHIEVEMENTS_KEY);
-    const seen = new Set<string>(stored ? JSON.parse(stored) : []);
+    const seen = getSeenAchievementGhostIds();
     const fresh = unlocked.find((achievement) => !seen.has(achievement.id));
-    localStorage.setItem(QUEUE_GHOST_UNLOCKED_ACHIEVEMENTS_KEY, JSON.stringify(unlocked.map((achievement) => achievement.id)));
+    setSeenAchievementGhostIds(unlocked.map((achievement) => achievement.id));
     return fresh ? { title: fresh.title, icon: fresh.icon } : null;
   } catch {
     return null;
