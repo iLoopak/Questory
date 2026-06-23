@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon, type IconName } from './Icon';
 
 const GHOST_MESSAGES = [
   'Queue Ghost never forgets.',
@@ -12,22 +13,57 @@ const GHOST_MESSAGES = [
 ] as const;
 
 const GHOST_SESSION_KEY = 'qs-ghost-v1';
-const GHOST_COVER_SESSION_KEY = 'qs-ghost-cover-v1';
+
+export type QueueGhostVariant = 'default' | 'cover' | 'sleepy' | 'panic' | 'achievement' | 'midnight';
 
 export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.75;
-export const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.8;
+const CONTEXTUAL_VARIANT_PROBABILITIES: Record<'sleepy' | 'panic' | 'midnight' | 'achievement', number> = {
+  sleepy: import.meta.env.DEV ? 0.95 : 0.3,
+  panic: import.meta.env.DEV ? 0.95 : 0.4,
+  midnight: import.meta.env.DEV ? 0.95 : 0.05,
+  achievement: 1,
+};
+const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? 0.95 : 0.8;
 
 export type QueueGhostCover = {
   title: string;
   imageUrl: string;
 };
 
+export type QueueGhostAchievement = {
+  title: string;
+  icon: IconName;
+};
+
+type QueueGhostVariantContext = {
+  achievement?: QueueGhostAchievement | null;
+  hasNoPlayTodaySessionForSevenDays?: boolean;
+  queueSize?: number;
+  isMidnight?: boolean;
+  hasCover?: boolean;
+};
+
 export function shouldShowQueueGhost(): boolean {
   return getSessionRandomFlag(GHOST_SESSION_KEY, QUEUE_GHOST_PROBABILITY);
 }
 
+export function getQueueGhostVariant({
+  achievement = null,
+  hasNoPlayTodaySessionForSevenDays = false,
+  queueSize = 0,
+  isMidnight = false,
+  hasCover = false,
+}: QueueGhostVariantContext): QueueGhostVariant {
+  if (achievement && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.achievement) return 'achievement';
+  if (hasNoPlayTodaySessionForSevenDays && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.sleepy) return 'sleepy';
+  if (queueSize > 1000 && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.panic) return 'panic';
+  if (isMidnight && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.midnight) return 'midnight';
+  if (hasCover && Math.random() < QUEUE_GHOST_COVER_PROBABILITY) return 'cover';
+  return 'default';
+}
+
 export function shouldQueueGhostCarryCover(): boolean {
-  return getSessionRandomFlag(GHOST_COVER_SESSION_KEY, QUEUE_GHOST_COVER_PROBABILITY);
+  return getQueueGhostVariant({ hasCover: true }) === 'cover';
 }
 
 export function hideQueueGhostForSession() {
@@ -56,8 +92,17 @@ const HOVER_DELAY_MS = 600;
 const TOOLTIP_Z_INDEX = 10_000;
 
 type QueueGhostProps = {
+  achievement?: QueueGhostAchievement | null;
   cover?: QueueGhostCover | null;
+  variant?: QueueGhostVariant;
   onVanish?: () => void;
+};
+
+const VARIANT_MESSAGES: Record<Exclude<QueueGhostVariant, 'cover' | 'achievement'>, readonly string[]> = {
+  default: GHOST_MESSAGES,
+  sleepy: ['The backlog misses you.', 'Queue Ghost has been waiting.', 'Even fifteen minutes counts.', 'Your adventures miss you.'],
+  panic: ['It keeps growing.', 'Queue Ghost is concerned.', 'The backlog grows stronger.', 'We may need a bigger queue.'],
+  midnight: ["You're still here?", 'Sleep is temporary. Backlog is forever.', 'Queue Ghost does not judge.', 'One more game?', 'This seems like a tomorrow problem.'],
 };
 
 const COVER_GHOST_MESSAGES = [
@@ -66,16 +111,20 @@ const COVER_GHOST_MESSAGES = [
   'Queue Ghost is carrying:',
 ] as const;
 
-export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
+export function QueueGhost({ achievement = null, cover = null, variant = cover ? 'cover' : 'default', onVanish }: QueueGhostProps) {
   const [open, setOpen] = useState(false);
   const [message] = useState(() => {
-    if (cover) {
+    if (variant === 'achievement' && achievement) {
+      return `Queue Ghost brought you something.\n${achievement.title}`;
+    }
+    if (variant === 'cover' && cover) {
       const prefix = COVER_GHOST_MESSAGES[Math.floor(Math.random() * COVER_GHOST_MESSAGES.length)];
       return `${prefix}\n${cover.title}`;
     }
-    return GHOST_MESSAGES[Math.floor(Math.random() * GHOST_MESSAGES.length)];
+    const messages = VARIANT_MESSAGES[variant === 'sleepy' || variant === 'panic' || variant === 'midnight' ? variant : 'default'];
+    return messages[Math.floor(Math.random() * messages.length)];
   });
-  const [coverVisible, setCoverVisible] = useState(Boolean(cover));
+  const [coverVisible, setCoverVisible] = useState(variant === 'cover' && Boolean(cover));
   const [coverRevealed, setCoverRevealed] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<CSSProperties>({});
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
@@ -174,6 +223,16 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     };
   }, [open]);
 
+
+  useEffect(() => {
+    if (variant !== 'achievement') return;
+    const timer = setTimeout(() => {
+      setOpen(false);
+      onVanish?.();
+    }, 3200);
+    return () => clearTimeout(timer);
+  }, [onVanish, variant]);
+
   useEffect(
     () => () => {
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -182,7 +241,7 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
     [],
   );
 
-  const tooltipMessage = cover && coverRevealed ? `The backlog remembers:\n${cover.title}` : message;
+  const tooltipMessage = variant === 'cover' && cover && coverRevealed ? `The backlog remembers:\n${cover.title}` : message;
 
   const tooltip = open ? (
     <div
@@ -207,8 +266,8 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
         ref={buttonRef}
         aria-expanded={open || coverRevealed}
         aria-haspopup="dialog"
-        aria-label={cover && coverVisible ? (coverRevealed ? 'Dismiss Queue Ghost' : `Reveal carried cover for ${cover.title}`) : 'Dismiss Queue Ghost'}
-        className="block opacity-[0.82] outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95"
+        aria-label={variant === 'cover' && cover && coverVisible ? (coverRevealed ? 'Dismiss Queue Ghost' : `Reveal carried cover for ${cover.title}`) : 'Dismiss Queue Ghost'}
+        className={`block outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95 ${variant === 'sleepy' ? 'opacity-[0.64]' : 'opacity-[0.82]'}`}
         type="button"
         onClick={handleClick}
         onMouseEnter={() => {
@@ -226,7 +285,7 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
       >
         <svg
           aria-hidden="true"
-          className={`queue-ghost h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}`}
+          className={`queue-ghost queue-ghost--${variant} h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}`}
           fill="none"
           viewBox="0 0 96 96"
         >
@@ -240,12 +299,35 @@ export function QueueGhost({ cover = null, onVanish }: QueueGhostProps) {
               className="queue-ghost-accent"
               d="M22 62 C28 66 34 67 42 64 C50 61 58 61 66 64 C72 66 76 65 82 62 V67 C82 76 80 82 72 84 C66 86 62 78 56 84 C52 88 48 88 44 84 C38 78 34 86 28 84 C20 82 14 76 14 66 V62 C16 61 18 61 22 62Z"
             />
-            <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="7" />
-            <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="7" />
-            <circle cx="40" cy="40" r="1.5" fill="white" />
-            <circle cx="60" cy="40" r="1.5" fill="white" />
-            <path className="queue-ghost-mouth" d="M44 57 C46 59 50 59 52 57" />
-            {cover && coverVisible ? (
+            {variant === 'sleepy' ? (
+              <>
+                <path className="queue-ghost-eye queue-ghost-eye--closed" d="M33 43 C36 46 40 46 43 43" />
+                <path className="queue-ghost-eye queue-ghost-eye--closed" d="M53 43 C56 46 60 46 63 43" />
+                <text className="queue-ghost-zzz" x="63" y="25">Zzz</text>
+              </>
+            ) : variant === 'panic' ? (
+              <>
+                <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="8" />
+                <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="8" />
+                <path className="queue-ghost-mouth" d="M44 59 C47 55 51 55 54 59" />
+              </>
+            ) : (
+              <>
+                <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="7" />
+                <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="7" />
+                <circle cx="40" cy="40" r="1.5" fill="white" />
+                <circle cx="60" cy="40" r="1.5" fill="white" />
+                <path className="queue-ghost-mouth" d="M44 57 C46 59 50 59 52 57" />
+              </>
+            )}
+            {variant === 'achievement' && achievement ? (
+              <foreignObject className="queue-ghost-achievement-prop" x="55" y="48" width="28" height="28">
+                <div className="queue-ghost-achievement-badge" title={achievement.title}>
+                  <Icon name={achievement.icon} size={14} />
+                </div>
+              </foreignObject>
+            ) : null}
+            {variant === 'cover' && cover && coverVisible ? (
               <foreignObject className="queue-ghost-cover-prop" x="52" y="50" width="25" height="34">
                 <img
                   alt=""

@@ -3,10 +3,12 @@ import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuiz
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
-import { QueueGhost, shouldQueueGhostCarryCover, shouldShowQueueGhost, type QueueGhostCover } from './QueueGhost';
+import { QueueGhost, getQueueGhostVariant, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
+import { getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
+import { loadAchievementCounters } from '../lib/achievementCounters';
 import type { PlayActivityRecord } from '../lib/playActivityStorage';
 import type { ReviewModeState, ReviewSource, ReviewStats } from '../lib/reviewModeStorage';
 import type { ItadDealSyncState } from '../config/syncStates';
@@ -200,19 +202,6 @@ export function HomePanel({
   const [workflowStripDismissed, setWorkflowStripDismissed] = useState(
     () => localStorage.getItem('qs-workflow-strip-v1') === 'dismissed',
   );
-  const [showGhost, setShowGhost] = useState(() => shouldShowQueueGhost());
-  const [ghostCarriesCover] = useState(() => shouldQueueGhostCarryCover());
-  const queueGhostCover = useMemo<QueueGhostCover | null>(() => {
-    if (!ghostCarriesCover) return null;
-    return pickQueueGhostCover({
-      nextAdventureEntries,
-      nextReviewCandidate,
-      continuePlayingGames,
-      libraryGames,
-      featuredGame,
-    });
-  }, [continuePlayingGames, featuredGame, ghostCarriesCover, libraryGames, nextAdventureEntries, nextReviewCandidate]);
-
   const hasEnoughProgress =
     continuePlayingGames.length > 0 &&
     activePlatformCount > 0 &&
@@ -230,6 +219,43 @@ export function HomePanel({
     () => (playActivity ?? []).some((r) => r.date >= getNDaysAgoStr(7)),
     [playActivity],
   );
+
+  const questShelfAchievements = useMemo(() => {
+    const counters = loadAchievementCounters();
+    return getQuestShelfAchievements(games, queueState, {
+      counters,
+      reviewStats: reviewModeState.stats,
+      reviewedGamesCount: Object.keys(reviewModeState.reviewedGames).length,
+    });
+  }, [games, queueState, reviewModeState]);
+  const newlyUnlockedAchievement = useMemo(() => pickNewlyUnlockedAchievement(questShelfAchievements), [questShelfAchievements]);
+  const [showGhost, setShowGhost] = useState(() => Boolean(newlyUnlockedAchievement) || shouldShowQueueGhost());
+  const [queueGhostVariant, setQueueGhostVariant] = useState<QueueGhostVariant>(() =>
+    getQueueGhostVariant({
+      achievement: newlyUnlockedAchievement,
+      hasNoPlayTodaySessionForSevenDays: !hasPlayedRecently,
+      queueSize: queueEntries.length,
+      isMidnight: isLocalMidnightWindow(),
+      hasCover: true,
+    }),
+  );
+  useEffect(() => {
+    if (!newlyUnlockedAchievement) return;
+    setQueueGhostVariant('achievement');
+    setShowGhost(true);
+  }, [newlyUnlockedAchievement]);
+
+  const queueGhostAchievement = queueGhostVariant === 'achievement' ? newlyUnlockedAchievement : null;
+  const queueGhostCover = useMemo<QueueGhostCover | null>(() => {
+    if (queueGhostVariant !== 'cover') return null;
+    return pickQueueGhostCover({
+      nextAdventureEntries,
+      nextReviewCandidate,
+      continuePlayingGames,
+      libraryGames,
+      featuredGame,
+    });
+  }, [continuePlayingGames, featuredGame, libraryGames, nextAdventureEntries, nextReviewCandidate, queueGhostVariant]);
 
   const greeting = useRef<string | null>(null);
   if (!greeting.current) {
@@ -377,7 +403,7 @@ export function HomePanel({
         </div>
         {showGhost && (
           <div className="queue-ghost-wrapper">
-            <QueueGhost cover={queueGhostCover} onVanish={() => setShowGhost(false)} />
+            <QueueGhost achievement={queueGhostAchievement} cover={queueGhostCover} variant={queueGhostVariant} onVanish={() => setShowGhost(false)} />
           </div>
         )}
       </section>
@@ -2050,4 +2076,25 @@ function pickContextualMessage(ctx: HeroMessageContext): string {
 
   if (contextual.length > 0) return pick(contextual);
   return pick(staticMessages);
+}
+
+const QUEUE_GHOST_UNLOCKED_ACHIEVEMENTS_KEY = 'qs-queue-ghost-unlocked-achievements-v1';
+
+function pickNewlyUnlockedAchievement(achievements: QuestShelfAchievementProgress[]): QueueGhostAchievement | null {
+  const unlocked = achievements.filter((achievement) => achievement.isUnlocked && !achievement.isMeta);
+  if (unlocked.length === 0) return null;
+  try {
+    const stored = localStorage.getItem(QUEUE_GHOST_UNLOCKED_ACHIEVEMENTS_KEY);
+    const seen = new Set<string>(stored ? JSON.parse(stored) : []);
+    const fresh = unlocked.find((achievement) => !seen.has(achievement.id));
+    localStorage.setItem(QUEUE_GHOST_UNLOCKED_ACHIEVEMENTS_KEY, JSON.stringify(unlocked.map((achievement) => achievement.id)));
+    return fresh ? { title: fresh.title, icon: fresh.icon } : null;
+  } catch {
+    return null;
+  }
+}
+
+function isLocalMidnightWindow(): boolean {
+  const hour = new Date().getHours();
+  return hour >= 0 && hour < 3;
 }

@@ -3709,3 +3709,73 @@ body.qs-controller-active .qs-compact-card:focus-within {
     transition: none;
   }
 }
+
+.queue-ghost--sleepy {
+  --queue-ghost-body: rgba(235, 249, 255, 0.78);
+}
+
+.queue-ghost--sleepy .queue-ghost-float {
+  animation-duration: 7.4s;
+}
+
+.queue-ghost--panic .queue-ghost-float {
+  animation: queueGhostPanicFloat 3.4s ease-in-out infinite;
+}
+
+.queue-ghost--achievement .queue-ghost-float {
+  animation: queueGhostAchievementVisit 3.2s ease-in-out both;
+}
+
+.queue-ghost-eye--closed {
+  fill: none;
+  stroke: var(--queue-ghost-eye);
+  stroke-linecap: round;
+  stroke-width: 2.4;
+}
+
+.queue-ghost-zzz {
+  fill: color-mix(in srgb, var(--queue-ghost-accent-color) 74%, white);
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.82;
+}
+
+.queue-ghost-achievement-prop {
+  overflow: visible;
+}
+
+.queue-ghost-achievement-badge {
+  align-items: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--queue-ghost-accent-color) 60%, white), var(--queue-ghost-accent-color));
+  border: 1px solid rgb(var(--ink-950-rgb) / 0.32);
+  border-radius: 999px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--queue-ghost-accent-color) 52%, transparent);
+  color: rgb(var(--ink-950-rgb));
+  display: flex;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
+@keyframes queueGhostPanicFloat {
+  0%   { transform: translate(0, 0) rotate(-2deg); }
+  30%  { transform: translate(1px, -5px) rotate(2deg); }
+  55%  { transform: translate(-1px, -8px) rotate(-1deg); }
+  78%  { transform: translate(1px, -3px) rotate(1deg); }
+  100% { transform: translate(0, 0) rotate(-2deg); }
+}
+
+@keyframes queueGhostAchievementVisit {
+  0%   { opacity: 0; transform: translate(-18px, 8px) scale(0.88) rotate(-6deg); }
+  18%  { opacity: 1; transform: translate(0, -3px) scale(1) rotate(1deg); }
+  70%  { opacity: 1; transform: translate(0, -6px) scale(1.02) rotate(-1deg); }
+  100% { opacity: 0; transform: translate(18px, -10px) scale(0.92) rotate(5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-ghost--sleepy .queue-ghost-float,
+  .queue-ghost--panic .queue-ghost-float,
+  .queue-ghost--achievement .queue-ghost-float {
+    animation: none;
+  }
+}
