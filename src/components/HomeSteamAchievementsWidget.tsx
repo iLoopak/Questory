@@ -60,7 +60,6 @@ export function HomeSteamAchievementsWidget({
             <RecentAchievementCard
               key={`${gameTitle}:${achievement.apiName}`}
               achievement={achievement}
-              gameTitle={gameTitle}
               t={t}
             />
           ))}
@@ -76,11 +75,9 @@ export function HomeSteamAchievementsWidget({
 
 function RecentAchievementCard({
   achievement,
-  gameTitle,
   t,
 }: {
   achievement: SteamAchievement;
-  gameTitle: string;
   t: TFunction;
 }) {
   const unlockDate = achievement.unlockTime
@@ -93,30 +90,24 @@ function RecentAchievementCard({
 
   return (
     <div className="qs-achievement-card qs-achievement-card--unlocked flex w-36 shrink-0 flex-col gap-2 p-3">
-      {/* Achievement icon */}
       {achievement.iconUrl ? (
         <img
           alt=""
           aria-hidden="true"
-          className="h-11 w-11 shrink-0 rounded-lg object-cover"
+          className="h-14 w-14 shrink-0 rounded-lg object-cover"
           loading="lazy"
           src={achievement.iconUrl}
         />
       ) : (
         <div className="qs-achievement-card__icon">
-          <Icon name="trophy" size={18} />
+          <Icon name="trophy" size={22} />
         </div>
       )}
 
-      {/* Achievement name — primary label */}
-      <p className="line-clamp-2 flex-1 text-xs font-semibold leading-tight text-white">
+      <p className="line-clamp-3 flex-1 text-xs font-semibold leading-tight text-white">
         {achievement.displayName}
       </p>
 
-      {/* Game title — secondary */}
-      <p className="line-clamp-1 text-2xs text-slate-400">{gameTitle}</p>
-
-      {/* Unlock date */}
       {unlockDate ? (
         <p className="text-2xs text-mint/70">{unlockDate}</p>
       ) : (
