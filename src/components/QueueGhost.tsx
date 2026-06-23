@@ -17,7 +17,7 @@ export function shouldShowQueueGhost(): boolean {
   try {
     const stored = sessionStorage.getItem(GHOST_SESSION_KEY);
     if (stored !== null) return stored === '1';
-    const show = Math.random() < 0.015;
+    const show = Math.random() < 0.5;
     sessionStorage.setItem(GHOST_SESSION_KEY, show ? '1' : '0');
     return show;
   } catch {
