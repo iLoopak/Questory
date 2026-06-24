@@ -19,7 +19,7 @@ import { PlatformBadge } from './PlatformBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
-import { QueueGhost, QUEUE_GHOST_HABITAT_PROBABILITY, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 export type ReviewModeAction =
   | 'queue'
@@ -159,8 +159,8 @@ export function ReviewModePanel({
   const [queueGhostSlot] = useState(() => pickQueueGhostSlot('questQueue'));
   const [showQueueGhost, setShowQueueGhost] = useState(() => {
     if (!queueGhostSlot || source !== 'backlog') return false;
-    if (games.length === 0) return shouldShowQueueGhostInHabitat('questQueue', QUEUE_GHOST_HABITAT_PROBABILITY);
-    if (games.length > 1000) return shouldShowQueueGhostInHabitat('questQueue', QUEUE_GHOST_HABITAT_PROBABILITY);
+    if (games.length === 0) return shouldShowQueueGhostInHabitat('questQueue');
+    if (games.length > 1000) return shouldShowQueueGhostInHabitat('questQueue');
     return false;
   });
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);

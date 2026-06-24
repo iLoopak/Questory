@@ -16,7 +16,7 @@ import { RawgLinkDialog } from './RawgLinkDialog';
 import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
 import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
-import { QueueGhost, QUEUE_GHOST_HABITAT_PROBABILITY, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 type GameDetailViewProps = {
   activity?: PlayActivityRecord[];
@@ -77,7 +77,7 @@ export function GameDetailView({
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const overflowMenuId = useId();
   const [pausedGhostSlot] = useState(() => pickQueueGhostSlot('gameDetail'));
-  const [showPausedGhost, setShowPausedGhost] = useState(() => Boolean(pausedGhostSlot) && isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail', QUEUE_GHOST_HABITAT_PROBABILITY));
+  const [showPausedGhost, setShowPausedGhost] = useState(() => Boolean(pausedGhostSlot) && isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail'));
 
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
 
