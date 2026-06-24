@@ -21,7 +21,7 @@ import java.util.Locale;
 @CapacitorPlugin(name = "NativeBackupExport")
 public class BackupExportPlugin extends Plugin {
     private static final String BACKUP_MIME_TYPE = "application/json";
-    private static final String TAG = "QuestShelfBackupExport";
+    private static final String TAG = "QuestoryBackupExport";
 
     @PluginMethod
     public void exportBackup(PluginCall call) {
@@ -37,7 +37,7 @@ public class BackupExportPlugin extends Plugin {
         try {
             File backupDirectory = new File(getContext().getCacheDir(), "backups");
             if (!backupDirectory.exists() && !backupDirectory.mkdirs()) {
-                call.reject("QuestShelf could not create the backup export folder.");
+                call.reject("Questory could not create the backup export folder.");
                 return;
             }
 
@@ -62,7 +62,7 @@ public class BackupExportPlugin extends Plugin {
 
             grantBackupReadPermission(shareIntent, backupUri);
 
-            Intent chooserIntent = Intent.createChooser(shareIntent, "Export QuestShelf backup");
+            Intent chooserIntent = Intent.createChooser(shareIntent, "Export Questory backup");
             chooserIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
             Activity activity = getActivity();
@@ -78,8 +78,8 @@ public class BackupExportPlugin extends Plugin {
             response.put("uri", backupUri.toString());
             call.resolve(response);
         } catch (Exception error) {
-            Log.e(TAG, "QuestShelf backup export failed.", error);
-            call.reject("QuestShelf could not export the backup file: " + readableErrorMessage(error), error);
+            Log.e(TAG, "Questory backup export failed.", error);
+            call.reject("Questory could not export the backup file: " + readableErrorMessage(error), error);
         }
     }
 

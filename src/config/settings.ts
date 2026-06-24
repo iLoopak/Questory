@@ -57,7 +57,7 @@ export const settingsCategoryMeta: Record<SettingsCategory, SettingsCategoryMeta
     shortDescription: 'Shelf identity and nav',
   },
   'Data & Backup': {
-    description: 'Export, restore, import, reset, and sync QuestShelf data without a backend.',
+    description: 'Export, restore, import, reset, and sync Questory data without a backend.',
     label: 'Data & Backup',
     shortDescription: 'Backup, restore, sync',
   },

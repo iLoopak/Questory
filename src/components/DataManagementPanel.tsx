@@ -129,7 +129,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       onBackupExported?.();
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.error('QuestShelf backup export failed.', error);
+        console.error('Questory backup export failed.', error);
       }
 
       const readableMessage = error instanceof Error && error.message.trim() ? ` ${error.message}` : '';
@@ -230,7 +230,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       ...currentSettings,
       autoBackupEnabled: true,
     }));
-    showMessage('Auto-backup enabled. QuestShelf will debounce saves after local data changes.', 'success');
+    showMessage('Auto-backup enabled. Questory will debounce saves after local data changes.', 'success');
   }
 
   function disableAutoBackup() {
@@ -293,7 +293,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    showMessage('Local QuestShelf data was reset on this device. QuestShelf will reload.', 'success');
+    showMessage('Local Questory data was reset on this device. Questory will reload.', 'success');
     window.setTimeout(() => window.location.reload(), 600);
   }
 
@@ -369,7 +369,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       <div className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm leading-6 text-slate-400">
         <div className="font-medium text-white">{t('data.portableSync')}</div>
         <div className="mt-1">
-          QuestShelf currently uses {portableSyncProviders[0].label.toLowerCase()} export/import.{' '}
+          Questory currently uses {portableSyncProviders[0].label.toLowerCase()} export/import.{' '}
           {portableSyncProviders[1].label} support is planned for user-owned cloud folders without accounts.
         </div>
       </div>
@@ -474,7 +474,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       <section className="mt-4 rounded-lg border border-red-400/30 bg-red-500/5 p-4">
         <h3 className="text-base font-semibold text-red-300">Danger Zone</h3>
         <p className="mt-1 text-sm leading-5 text-slate-400">
-          These actions permanently remove local QuestShelf data.
+          These actions permanently remove local Questory data.
         </p>
         <div className="mt-4 flex flex-wrap items-start gap-4 border-t border-red-400/20 pt-4">
           <div>
@@ -522,7 +522,7 @@ function ResetConfirmModal({ onConfirm, onClose }: { onConfirm: () => void; onCl
       <div className="p-5">
         <h3 className="text-lg font-semibold text-white">Reset local data</h3>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          This will permanently remove all local QuestShelf data from this device. Type{' '}
+          This will permanently remove all local Questory data from this device. Type{' '}
           <span className="font-mono font-bold text-red-300">RESET</span> to confirm.
         </p>
         <input
@@ -640,7 +640,7 @@ function StorageRecoveryPanel({
         <div>
           <h3 className="text-lg font-semibold text-white">{t('data.storageRecovery')}</h3>
           <p className="mt-1 max-w-2xl text-sm leading-6">
-            QuestShelf found local data it could not read safely. The app used fallback defaults and did not delete the
+            Questory found local data it could not read safely. The app used fallback defaults and did not delete the
             original raw values.
           </p>
         </div>

@@ -39,10 +39,10 @@ export function formatPersonalizedQuestShelfTitle(name: string | null | undefine
   const normalizedName = sanitizeLibraryOwnerNickname(name);
 
   if (!normalizedName) {
-    return 'QuestShelf';
+    return 'Questory';
   }
 
-  return /questshelf/i.test(normalizedName) ? normalizedName : `${normalizedName}’s QuestShelf`;
+  return /quest(shelf|ory)/i.test(normalizedName) ? normalizedName : `${normalizedName}’s Questory`;
 }
 
 export function getPersonalizedQuestShelfTitle(nickname: string, steamProfileName?: string | null) {
@@ -53,5 +53,5 @@ export function getPersonalizedQuestShelfTitle(nickname: string, steamProfileNam
   }
 
   const normalizedSteamProfileName = sanitizeLibraryOwnerNickname(steamProfileName);
-  return normalizedSteamProfileName ? formatPersonalizedQuestShelfTitle(normalizedSteamProfileName) : 'QuestShelf';
+  return normalizedSteamProfileName ? formatPersonalizedQuestShelfTitle(normalizedSteamProfileName) : 'Questory';
 }

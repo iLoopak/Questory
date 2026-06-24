@@ -275,7 +275,7 @@ export function SteamSettingsPanel({
   return (
     <SettingsSection
       title={t('steam.integration')}
-      description="Connect Steam, test what QuestShelf can read, then choose what to import or refresh."
+      description="Connect Steam, test what Questory can read, then choose what to import or refresh."
       className="min-w-0 border-white/10 bg-ink-900/70"
     >
         <section className="rounded-lg border border-mint/25 bg-ink-950 p-4">
@@ -382,7 +382,7 @@ export function SteamSettingsPanel({
             <p className="text-xs font-semibold uppercase tracking-spread text-mint">3</p>
             <h3 className="mt-1 text-lg font-semibold text-white">{t('steam.nextSteps')}</h3>
             <p className="mt-1 text-sm leading-6 text-slate-400">
-              Use the connection result to bring Steam data into your local QuestShelf library.
+              Use the connection result to bring Steam data into your local Questory library.
             </p>
           </div>
 
@@ -403,7 +403,7 @@ export function SteamSettingsPanel({
 
             <ActionCard
               title={t('steam.importSteamWishlistManual')}
-              description="Automatic Steam Wishlist sync is unreliable, so QuestShelf uses the manual bookmarklet helper."
+              description="Automatic Steam Wishlist sync is unreliable, so Questory uses the manual bookmarklet helper."
               actionLabel={t('steam.importSteamWishlistManual')}
               disabled={!onOpenManualWishlistImport}
               buttonRef={manualWishlistImportButtonRef}
@@ -807,7 +807,7 @@ function SteamHelpModal({ topic, onClose }: { topic: 'steam-api-key' | 'steam-id
         <h3 className="text-lg font-semibold text-white">{isApiKey ? 'Steam Web API key' : 'SteamID64 lookup'}</h3>
         <p className="mt-2 leading-6">
           {isApiKey
-            ? 'QuestShelf uses your Steam Web API key to read your owned games from Steam. Generate a key from Steam Community and paste it here.'
+            ? 'Questory uses your Steam Web API key to read your owned games from Steam. Generate a key from Steam Community and paste it here.'
             : 'SteamID64 is the long numeric ID for your Steam account. Use a lookup site if your profile URL uses a custom name.'}
         </p>
         <a className="mt-4 inline-flex h-10 items-center rounded-md bg-mint px-4 font-semibold text-ink-950" href={url} target="_blank" rel="noreferrer">

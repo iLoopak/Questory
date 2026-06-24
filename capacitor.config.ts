@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.questshelf.handheld',
-  appName: 'QuestShelf',
+  appName: 'Questory',
   webDir: 'dist',
   backgroundColor: '#0d0c0c',
   android: {

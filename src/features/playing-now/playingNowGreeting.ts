@@ -70,7 +70,7 @@ const greetingPools: Record<AppLanguage, Record<PlayingNowTimeBucket, GreetingTe
 
 const easterEggSubtextPools: Record<AppLanguage, string[]> = {
   en: [
-    'Achievement unlocked: opened QuestShelf.',
+    'Achievement unlocked: opened Questory.',
     'The backlog is not judging you. Yet.',
     'Quest Queue is watching.',
     'Today is a perfect day to ignore the wishlist.',
@@ -78,7 +78,7 @@ const easterEggSubtextPools: Record<AppLanguage, string[]> = {
     'Saving the world can wait. Unless it is in your backlog.',
   ],
   cs: [
-    'Achievement odemčen: otevřen QuestShelf.',
+    'Achievement odemčen: otevřen Questory.',
     'Backlog tě nehodnotí. Zatím.',
     'Quest Queue tě sleduje.',
     'Ideální den ignorovat wishlist.',

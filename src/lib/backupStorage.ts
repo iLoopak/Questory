@@ -28,7 +28,7 @@ export const deviceBackupStorageKeys = ['questshelf.syncFolderSettings.v1'] as c
 export const allBackupStorageKeys = [...coreBackupStorageKeys, ...integrationBackupStorageKeys] as const;
 
 export type QuestShelfBackup = {
-  app: 'QuestShelf';
+  app: 'QuestShelf' | 'Questory';
   data: Partial<Record<(typeof allBackupStorageKeys)[number], unknown>>;
   metadata: {
     appVersion: string;
@@ -69,7 +69,7 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
     : [...coreBackupStorageKeys];
 
   return {
-    app: 'QuestShelf',
+    app: 'Questory',
     schemaVersion: questShelfBackupVersion,
     metadata: {
       appVersion: questShelfAppVersion,
@@ -168,16 +168,16 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
   if (!value || typeof value !== 'object') {
     return {
       ok: false,
-      error: 'Backup file does not contain a QuestShelf backup object.',
+      error: 'Backup file does not contain a Questory backup object.',
     };
   }
 
   const backup = value as Partial<QuestShelfBackup>;
 
-  if (backup.app !== 'QuestShelf') {
+  if (backup.app !== 'QuestShelf' && backup.app !== 'Questory') {
     return {
       ok: false,
-      error: 'Backup file is not marked as a QuestShelf backup.',
+      error: 'Backup file is not marked as a Questory backup.',
     };
   }
 
@@ -201,7 +201,7 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
   if (typeof metadata.appVersion !== 'string' || metadata.appVersion.trim().length === 0) {
     return {
       ok: false,
-      error: 'Backup metadata is missing the QuestShelf app version.',
+      error: 'Backup metadata is missing the Questory app version.',
     };
   }
 

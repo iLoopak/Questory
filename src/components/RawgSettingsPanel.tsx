@@ -48,7 +48,7 @@ export function RawgSettingsPanel({
   return (
     <SettingsSection
       title={t('integrations.gameInfo')}
-      description="Configure RAWG metadata access so QuestShelf can enrich game information while keeping the API key stored locally."
+      description="Configure RAWG metadata access so Questory can enrich game information while keeping the API key stored locally."
     >
       <label className="block">
         <span className="flex items-center gap-2 qs-label-caps text-muted">{t('integrations.apiKey')} <button className="grid h-6 w-6 place-items-center rounded-full border border-mint/30 text-xs text-mint" onClick={(event) => { event.preventDefault(); setIsHelpOpen(true); }} type="button" aria-label={t('integrations.rawgHelp')}>?</button></span>

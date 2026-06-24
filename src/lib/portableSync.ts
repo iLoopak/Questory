@@ -11,7 +11,7 @@ export const portableSyncProviders: PortableSyncProvider[] = [
   {
     id: 'json-download',
     label: 'Backup JSON file',
-    description: 'Manual export and import using a portable QuestShelf JSON backup.',
+    description: 'Manual export and import using a portable Questory JSON backup.',
     status: 'available',
   },
   {

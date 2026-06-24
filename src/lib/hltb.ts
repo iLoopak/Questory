@@ -100,11 +100,11 @@ export class HltbProviderError extends Error {
   }
 }
 
-// Browser adapter for QuestShelf's internal HLTB endpoint. UI code never calls
+// Browser adapter for Questory's internal HLTB endpoint. UI code never calls
 // howlongtobeat.com directly; the Node/Vite middleware owns the provider request.
 export class HowLongToBeatProvider implements HltbProvider {
   async search(title: string, signal?: AbortSignal): Promise<HltbSearchResult[]> {
-    debugHltb('provider', 'QuestShelf custom HLTB endpoint');
+    debugHltb('provider', 'Questory custom HLTB endpoint');
     debugHltb('search title', title);
 
     try {
@@ -119,7 +119,7 @@ export class HowLongToBeatProvider implements HltbProvider {
       const data = await readHltbEndpointResponse(response);
       const rawResults = getEndpointResults(data);
       if (!rawResults) {
-        throw new HltbProviderError('QuestShelf HLTB endpoint returned an invalid response.', 'invalid-response', response.status);
+        throw new HltbProviderError('Questory HLTB endpoint returned an invalid response.', 'invalid-response', response.status);
       }
 
       const results = rawResults.map(mapHltbEndpointResult).filter((result): result is HltbSearchResult => Boolean(result));
@@ -314,7 +314,7 @@ function parseEndpointJson(text: string, status: number): unknown {
     return JSON.parse(text);
   } catch (error) {
     throw new HltbProviderError(
-      `QuestShelf HLTB endpoint returned non-JSON data${error instanceof Error ? `: ${error.message}` : '.'}`,
+      `Questory HLTB endpoint returned non-JSON data${error instanceof Error ? `: ${error.message}` : '.'}`,
       'parse',
       status,
     );
@@ -325,8 +325,8 @@ function createEndpointHltbError(status: number, data: unknown) {
   const reason = getEndpointFailureReason(data, status);
   const message = getEndpointFailureMessage(data)
     ?? (status === 404
-      ? 'QuestShelf HLTB endpoint is unavailable in this build. A Node/server runtime is required for HLTB sync.'
-      : `QuestShelf HLTB endpoint failed with HTTP ${status}.`);
+      ? 'Questory HLTB endpoint is unavailable in this build. A Node/server runtime is required for HLTB sync.'
+      : `Questory HLTB endpoint failed with HTTP ${status}.`);
 
   return new HltbProviderError(message, reason, status);
 }

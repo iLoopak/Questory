@@ -57,7 +57,7 @@ export function loadPendingUndoActions(now = Date.now()): PendingUndoAction[] {
       .filter((action) => action.expiresAt === null || action.expiresAt > now)
       .map(normalizePendingUndoAction);
   } catch (error) {
-    console.warn('QuestShelf could not load pending undo actions.', error);
+    console.warn('Questory could not load pending undo actions.', error);
     return [];
   }
 }
@@ -70,7 +70,7 @@ export function savePendingUndoActions(actions: PendingUndoAction[]) {
   try {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
   } catch (error) {
-    console.warn('QuestShelf could not save pending undo actions.', error);
+    console.warn('Questory could not save pending undo actions.', error);
   }
 }
 

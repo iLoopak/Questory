@@ -55,7 +55,7 @@ type AchievementGhostCandidate = QueueGhostAchievement & { id: string; seenIds: 
 const focusSelector = '[data-home-focus="true"]';
 
 export function HomePanel({
-  appTitle = 'QuestShelf',
+  appTitle = 'Questory',
   avatar,
   shelfTitle = '',
   featuredGame = null,
@@ -521,7 +521,7 @@ export function HomePanel({
             )}
           </HomeSection>
 
-          {/* QuestShelf Achievements showcase */}
+          {/* Questory Achievements showcase */}
           <HomeWidgetErrorBoundary title={t('home.qsAchievements')}>
             <HomeAchievementsShowcase
               games={games}
@@ -703,7 +703,7 @@ function JourneyProgressCard({
     <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-spread text-mint">Your QuestShelf Journey</div>
+          <div className="text-xs font-semibold uppercase tracking-spread text-mint">Your Questory Journey</div>
           <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
             <span>✓ Imported <strong className="text-white">{importedCount}</strong> games</span>
             <span>✓ Reviewed <strong className="text-white">{reviewedCount}</strong> games</span>
@@ -770,7 +770,7 @@ class HomeWidgetErrorBoundary extends Component<HomeWidgetErrorBoundaryProps, Ho
             </span>
             <div>
               <h3 className="qs-home-section-title text-base font-semibold text-white">{this.props.title}</h3>
-              <p className="mt-1 text-sm text-slate-400">This home widget could not be shown, but the rest of QuestShelf is still ready.</p>
+              <p className="mt-1 text-sm text-slate-400">This home widget could not be shown, but the rest of Questory is still ready.</p>
             </div>
           </div>
         </section>
@@ -836,7 +836,7 @@ function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
       >
         <Icon name="x" size={13} />
       </button>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-spread text-slate-500">How QuestShelf Works</div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-spread text-slate-500">How Questory Works</div>
       <div className="grid gap-2 pr-4 sm:grid-cols-4">
         {stages.map(([name, desc]) => (
           <div className="text-xs text-slate-400" key={name}>
@@ -2056,7 +2056,7 @@ function pickContextualMessage(ctx: HeroMessageContext): string {
     'This is your sign.',
     'Pick a game. Any game.',
     'Your next favourite game might already be installed.',
-    'Close QuestShelf.\nLaunch a game.',
+    'Close Questory.\nLaunch a game.',
     'Seriously.',
   ];
   if (Math.random() < 0.05) return pick(rareMessages);
@@ -2067,7 +2067,7 @@ function pickContextualMessage(ctx: HeroMessageContext): string {
     'The backlog has achieved sentience.',
     "Today's plan:\navoid opening the Steam sale.",
     "You cannot finish them all.\nAnd that's okay.",
-    "QuestShelf believes in you.\nThe queue is less certain.",
+    "Questory believes in you.\nThe queue is less certain.",
     'This seemed like a good idea at the time.',
     'Nothing says optimism like another imported library.',
     'The shelf grows. The shelf endures.',

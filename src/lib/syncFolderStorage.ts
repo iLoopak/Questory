@@ -80,7 +80,7 @@ export async function chooseBackupFileHandle() {
     suggestedName: 'questshelf-backup.json',
     types: [
       {
-        description: 'QuestShelf backup JSON',
+        description: 'Questory backup JSON',
         accept: {
           'application/json': ['.json'],
         },
@@ -102,7 +102,7 @@ export async function openBackupFileWithPicker() {
     excludeAcceptAllOption: false,
     types: [
       {
-        description: 'QuestShelf backup JSON',
+        description: 'Questory backup JSON',
         accept: {
           'application/json': ['.json'],
         },
@@ -135,7 +135,7 @@ export async function saveBackupToSelectedFile(includeIntegrationSettings: boole
   if (!permission) {
     return {
       ok: false as const,
-      error: 'QuestShelf lost permission to write this backup file. Reselect the file.',
+      error: 'Questory lost permission to write this backup file. Reselect the file.',
       permissionLost: true,
     };
   }
@@ -156,7 +156,7 @@ export async function readBackupFromHandle(handle: FileSystemFileHandleLike) {
   if (!permission) {
     return {
       ok: false as const,
-      error: 'QuestShelf cannot read this backup file. Reselect the file and try again.',
+      error: 'Questory cannot read this backup file. Reselect the file and try again.',
       permissionLost: true,
     };
   }

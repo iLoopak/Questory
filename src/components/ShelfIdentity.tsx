@@ -12,7 +12,7 @@ export function ShelfAvatar({ avatarSelection, customAvatarDataUrl, steamAvatarU
 
   if (avatarSelection === 'app-icon') {
     return (
-      <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="QuestShelf Q">
+      <div className={`${className} qs-shelf-avatar--app-icon overflow-hidden`} title="Questory Q">
         <img
           alt=""
           className="h-full w-full object-contain opacity-100"
@@ -60,7 +60,7 @@ export function ShelfIdentityEditor({ identity, onIdentityChange, shelfNamePlace
     }
   }
   const options: Array<{ label: string; value: ShelfAvatarSelection; recommended?: boolean }> = [
-    { label: 'QuestShelf Q', value: 'app-icon' },
+    { label: 'Questory Q', value: 'app-icon' },
     ...(steamAvatarUrl ? [{ label: 'Steam avatar', value: 'steam' as const, recommended: true }] : []),
     ...builtInAvatars.map((avatar) => ({ label: avatar.label, value: `built-in:${avatar.id}` as ShelfAvatarSelection })),
     ...(identity.customAvatarDataUrl ? [{ label: 'Custom upload', value: 'custom' as const }] : []),

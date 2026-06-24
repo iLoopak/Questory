@@ -233,7 +233,7 @@ export function CollectionPanel({
     const panel = collectionPanelRef.current;
     const panelRect = panel?.getBoundingClientRect();
 
-    console.debug('[QuestShelf Library] render window', {
+    console.debug('[Questory Library] render window', {
       collectionType,
       filteredItemCount: games.length,
       realCoverCount,
@@ -323,7 +323,7 @@ export function CollectionPanel({
   }
 
   function removeSelectedGames() {
-    if (selectedCount === 0 || !window.confirm(`Remove ${selectedCount} selected games from QuestShelf?`)) {
+    if (selectedCount === 0 || !window.confirm(`Remove ${selectedCount} selected games from Questory?`)) {
       return;
     }
 

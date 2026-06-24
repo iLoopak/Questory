@@ -99,7 +99,7 @@ function QuestShelfLogo({ className, fallbackClassName = 'text-2xs' }: { classNa
   return (
     <div className={`grid shrink-0 place-items-center overflow-hidden bg-ink-950 text-mint shadow-glow ${className}`} aria-hidden="true">
       {hasImageError ? (
-        <span className={`font-semibold leading-none ${fallbackClassName}`}>QS</span>
+        <span className={`font-semibold leading-none ${fallbackClassName}`}>Questory</span>
       ) : (
         <img className="qs-logo-glow h-full w-full object-cover" src={appLogo} alt="" onError={() => setHasImageError(true)} />
       )}
@@ -1968,7 +1968,7 @@ function AppStartupScreen() {
         <div className="flex items-center gap-3">
           <QuestShelfLogo className="h-12 w-12 rounded-lg border border-mint/30" fallbackClassName="text-sm" />
           <div>
-            <div className="text-sm font-semibold uppercase tracking-spread text-mint">QuestShelf</div>
+            <div className="text-sm font-semibold uppercase tracking-spread text-mint">Questory</div>
             <h1 className="mt-1 text-2xl font-semibold text-white">{createTranslator(loadLanguagePreference())('common.loadingLibrary')}</h1>
           </div>
         </div>

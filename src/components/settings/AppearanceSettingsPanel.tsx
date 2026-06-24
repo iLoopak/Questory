@@ -679,7 +679,7 @@ export function AppearanceSettingsPanel({
             {t("settings.androidIntegration")}
           </span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">
-            QuestShelf respects Android light/dark mode when Follow Device is
+            Questory respects Android light/dark mode when Follow Device is
             selected and refreshes system chrome after resume.
           </span>
         </div>

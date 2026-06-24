@@ -9,7 +9,7 @@ type BeforeInstallPromptEvent = Event & {
 
 const installDismissedKey = 'questshelf.installHintDismissed.v1';
 
-export function PwaStatusBanner({ appTitle = 'QuestShelf' }: { appTitle?: string }) {
+export function PwaStatusBanner({ appTitle = 'Questory' }: { appTitle?: string }) {
   const { t } = useI18n();
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [isNativeAndroid] = useState(() => isNativeAndroidRuntime());

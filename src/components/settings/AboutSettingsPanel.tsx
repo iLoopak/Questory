@@ -34,7 +34,7 @@ export function AboutSettingsPanel({
       />
       <SettingsSection
         title="Anonymous usage analytics"
-        description="Help improve QuestShelf by sending anonymous usage counts. No game titles, notes, tags, account IDs, external IDs, search queries, file paths, URLs, or raw error messages are sent."
+        description="Help improve Questory by sending anonymous usage counts. No game titles, notes, tags, account IDs, external IDs, search queries, file paths, URLs, or raw error messages are sent."
         actions={(
           <label className="inline-flex cursor-pointer items-center gap-3 rounded-md border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-medium text-slate-200">
             <input
