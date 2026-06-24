@@ -44,6 +44,12 @@ function generateFakeName(existingLower: Set<string>, seed: number): string {
   return 'The Secret Achievement';
 }
 
+// Number of days a game is excluded from selection after it was last shown.
+export const QUIZ_GAME_COOLDOWN_DAYS = 14;
+
+// Minimum candidate pool size before the cooldown window is relaxed.
+const QUIZ_MIN_CANDIDATE_POOL = 5;
+
 export function getEligibleGames(games: Game[]): Game[] {
   return games.filter((g) => {
     if (g.collectionType !== 'library') return false;
@@ -53,10 +59,65 @@ export function getEligibleGames(games: Game[]): Game[] {
   });
 }
 
-export function selectDailyGame(eligible: Game[], date: string): Game | null {
+/**
+ * Builds the set of game IDs that should be excluded from today's selection.
+ * For each of the past `days` dates:
+ *  - if the log has a recorded selection, use that entry directly
+ *  - otherwise approximate using the hash-based formula on the full eligible pool
+ *    (covers the period before this cooldown system was introduced)
+ */
+export function buildRecentlyUsedSet(
+  eligible: Game[],
+  today: string,
+  days: number,
+  log: Record<string, string>,
+): Set<string> {
+  const ids = new Set<string>();
+  for (let i = 1; i <= days; i++) {
+    const d = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const loggedId = log[dateStr];
+    if (loggedId) {
+      ids.add(loggedId);
+    } else if (eligible.length > 0) {
+      // No log entry: fall back to the hash that would have been used before the cooldown system
+      const seed = hashString(dateStr + 'achievement');
+      ids.add(eligible[seed % eligible.length].id);
+    }
+  }
+  return ids;
+}
+
+export function selectDailyGame(
+  eligible: Game[],
+  date: string,
+  recentlyUsed: Set<string> = new Set(),
+): Game | null {
   if (eligible.length === 0) return null;
+
   const seed = hashString(date + 'achievement');
-  return eligible[seed % eligible.length];
+  const candidates =
+    recentlyUsed.size > 0 ? eligible.filter((g) => !recentlyUsed.has(g.id)) : eligible;
+
+  // If the cooldown filter would leave too few candidates, fall back to the full pool.
+  const pool = candidates.length >= QUIZ_MIN_CANDIDATE_POOL ? candidates : eligible;
+  const selected = pool[seed % pool.length];
+
+  if (import.meta.env.DEV) {
+    console.debug('[AchievementQuiz] Selected game', {
+      gameId: selected.id,
+      title: selected.title,
+      candidatePoolSize: pool.length,
+      eligiblePoolSize: eligible.length,
+      recentlyUsedCount: recentlyUsed.size,
+      cooldownActive: pool === candidates && candidates.length < eligible.length,
+      date,
+      seed,
+    });
+  }
+
+  return selected;
 }
 
 export function generateQuestion(game: Game, date: string): QuizQuestion | null {
