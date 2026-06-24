@@ -605,7 +605,6 @@ export function AppController() {
         : null,
       steamSettingsSnapshot.apiKey.trim() ? 'steam-api-key' : null,
       steamSettingsSnapshot.steamId64.trim() ? 'steam-id64' : null,
-      steamSettingsSnapshot.apiKey.trim() && steamSettingsSnapshot.steamId64.trim() ? 'steam-connect' : null,
       platformQueueState.activePlatforms.length > 0 ? 'platforms' : null,
       platformQueueState.entries.length > 0 || games.some((game) => game.tags.includes('queue')) ? 'queue-game' : null,
       themePreference ? 'visual-preferences' : null,
