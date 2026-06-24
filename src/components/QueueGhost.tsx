@@ -187,14 +187,6 @@ type QueueGhostProps = {
   onVanish?: () => void;
 };
 
-const VARIANT_MESSAGES: Record<Exclude<QueueGhostVariant, 'cover' | 'achievement'>, readonly string[]> = {
-  default: GHOST_MESSAGES,
-  sleepy: ['The backlog misses you.', 'Queue Ghost has been waiting.', 'Even fifteen minutes counts.', 'Your adventures miss you.'],
-  panic: ['It keeps growing.', 'Queue Ghost is concerned.', 'The backlog grows stronger.', 'We may need a bigger queue.'],
-  midnight: ["You're still here?", 'Sleep is temporary. Backlog is forever.', 'Queue Ghost does not judge.', 'One more game?', 'This seems like a tomorrow problem.'],
-  peek: PEEK_GHOST_REVEAL_MESSAGES,
-};
-
 const COVER_GHOST_MESSAGES = [
   'Queue Ghost found this one.',
   'The backlog remembers:',
@@ -208,6 +200,14 @@ const PEEK_GHOST_REVEAL_MESSAGES = [
   'The backlog sees you.',
   "Queue Ghost remembers.",
 ] as const;
+
+const VARIANT_MESSAGES: Record<Exclude<QueueGhostVariant, 'cover' | 'achievement'>, readonly string[]> = {
+  default: GHOST_MESSAGES,
+  sleepy: ['The backlog misses you.', 'Queue Ghost has been waiting.', 'Even fifteen minutes counts.', 'Your adventures miss you.'],
+  panic: ['It keeps growing.', 'Queue Ghost is concerned.', 'The backlog grows stronger.', 'We may need a bigger queue.'],
+  midnight: ["You're still here?", 'Sleep is temporary. Backlog is forever.', 'Queue Ghost does not judge.', 'One more game?', 'This seems like a tomorrow problem.'],
+  peek: PEEK_GHOST_REVEAL_MESSAGES,
+};
 
 export function QueueGhost({ achievement = null, cover = null, variant = cover ? 'cover' : 'default', message: customMessage, onVanish }: QueueGhostProps) {
   const [open, setOpen] = useState(false);
