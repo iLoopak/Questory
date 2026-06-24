@@ -7,6 +7,8 @@ export type IconName =
   | 'bookmark-pen'
   | 'check'
   | 'check-circle'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'chevrons-right'
   | 'database-sparkles'
   | 'external-link'
@@ -78,6 +80,8 @@ const iconPaths: Record<IconName, ReactNode> = {
   'arrow-left': <><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></>,
   check: <path d="m20 6-11 11-5-5" />,
   'check-circle': <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>,
+  'chevron-left': <path d="m15 18-6-6 6-6" />,
+  'chevron-right': <path d="m9 18 6-6-6-6" />,
   'chevrons-right': <><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></>,
 
   'database-sparkles': <><ellipse cx="12" cy="5" rx="7" ry="3" /><path d="M5 5v10c0 1.7 3.1 3 7 3s7-1.3 7-3V5" /><path d="M5 10c0 1.7 3.1 3 7 3 1.1 0 2.2-.1 3.1-.3" /><path d="m18 12 .6 1.4L20 14l-1.4.6L18 16l-.6-1.4L16 14l1.4-.6L18 12Z" /></>,
