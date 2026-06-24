@@ -4096,3 +4096,17 @@ body.qs-controller-active .qs-compact-card:focus-within {
     font-size: 0.68rem;
   }
 }
+
+.qs-game-actions-trigger {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-width: 1199px) {
+  .qs-game-actions-trigger {
+    display: grid;
+  }
+
+  .qs-review-utility-actions {
+    display: none;
+  }
+}
