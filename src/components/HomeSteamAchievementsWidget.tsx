@@ -28,12 +28,16 @@ export function HomeSteamAchievementsWidget({
     [games],
   );
 
-  // No Steam games at all — don't show the widget
-  if (steamLibraryGames.length === 0) return null;
-
-  const hasDetailData = steamLibraryGames.some((g) => Array.isArray(g.steamAchievements));
+  const hasDetailData = useMemo(
+    () => steamLibraryGames.some((g) => Array.isArray(g.steamAchievements)),
+    [steamLibraryGames],
+  );
 
   const recent = useMemo(() => selectRecentUnlocked(steamLibraryGames), [steamLibraryGames]);
+
+  // No Steam games at all — don't show the widget, but only after every hook above
+  // has been called so React hook order stays stable as imports complete.
+  if (steamLibraryGames.length === 0) return null;
 
   return (
     <section className="qs-home-section rounded-2xl border border-skyglass/15 bg-ink-900/74 shadow-panel p-4">
@@ -54,7 +58,9 @@ export function HomeSteamAchievementsWidget({
         ) : null}
       </div>
 
-      {recent.length > 0 ? (
+      {isSteamAchievementSyncing ? (
+        <p className="text-sm text-slate-500">{t('home.steamAchievementsSyncing')}</p>
+      ) : recent.length > 0 ? (
         <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
           {recent.map(({ achievement, gameTitle }) => (
             <RecentAchievementCard
@@ -125,9 +131,9 @@ function selectRecentUnlocked(steamGames: Game[]): RecentAchievement[] {
   for (const game of steamGames) {
     if (!Array.isArray(game.steamAchievements)) continue;
     for (const achievement of game.steamAchievements) {
-      if (achievement.unlocked) {
-        result.push({ achievement, gameTitle: game.title });
-      }
+      if (!achievement || typeof achievement !== 'object') continue;
+      if (!achievement.unlocked || typeof achievement.apiName !== 'string' || typeof achievement.displayName !== 'string') continue;
+      result.push({ achievement, gameTitle: game.title });
     }
   }
 

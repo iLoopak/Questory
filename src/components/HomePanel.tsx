@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { AchievementQuizCard } from '../features/achievementQuiz/AchievementQuizCard';
 import { DailyQuestCard } from '../features/dailyQuest/DailyQuestCard';
 import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
@@ -516,18 +516,22 @@ export function HomePanel({
           </HomeSection>
 
           {/* QuestShelf Achievements showcase */}
-          <HomeAchievementsShowcase
-            games={games}
-            queueState={queueState}
-            reviewModeState={reviewModeState}
-          />
+          <HomeWidgetErrorBoundary title={t('home.qsAchievements')}>
+            <HomeAchievementsShowcase
+              games={games}
+              queueState={queueState}
+              reviewModeState={reviewModeState}
+            />
+          </HomeWidgetErrorBoundary>
 
           {/* Steam Achievements progress companion */}
-          <HomeSteamAchievementsWidget
-            games={games}
-            isSteamAchievementSyncing={isSteamAchievementSyncing}
-            onSyncSteamAchievements={onSyncSteamAchievements}
-          />
+          <HomeWidgetErrorBoundary title={t('home.steamAchievements')}>
+            <HomeSteamAchievementsWidget
+              games={games}
+              isSteamAchievementSyncing={isSteamAchievementSyncing}
+              onSyncSteamAchievements={onSyncSteamAchievements}
+            />
+          </HomeWidgetErrorBoundary>
 
         </div>
 
@@ -727,6 +731,48 @@ function JourneyProgressCard({
 
 function getGamePlatformLabel(game: Game, queueState: PlatformQueueState): GamePlatform {
   return queueState.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
+}
+
+
+type HomeWidgetErrorBoundaryProps = {
+  children: ReactNode;
+  title: string;
+};
+
+type HomeWidgetErrorBoundaryState = {
+  hasError: boolean;
+};
+
+class HomeWidgetErrorBoundary extends Component<HomeWidgetErrorBoundaryProps, HomeWidgetErrorBoundaryState> {
+  state: HomeWidgetErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): HomeWidgetErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[HomeWidgetErrorBoundary] Home widget failed to render', { error, info, title: this.props.title });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="qs-home-section rounded-2xl border border-amber-300/20 bg-ink-900/74 p-4 shadow-panel">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 rounded-full border border-amber-300/25 bg-amber-300/10 p-2 text-amber-200">
+              <Icon name="sparkles" size={16} />
+            </span>
+            <div>
+              <h3 className="qs-home-section-title text-base font-semibold text-white">{this.props.title}</h3>
+              <p className="mt-1 text-sm text-slate-400">This home widget could not be shown, but the rest of QuestShelf is still ready.</p>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function HomeSection({
