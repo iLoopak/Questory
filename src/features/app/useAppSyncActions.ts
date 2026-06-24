@@ -366,7 +366,7 @@ export function useAppSyncActions({
       const result = refreshSteamPlaytimeForGames(games, targetGameIds, ownedGames, refreshedAt);
       const completed = result.summary.updatedCount + result.summary.unchangedCount + result.summary.failedCount;
 
-      setGames(result.games);
+      setGames((currentGames) => mergeSteamPlaytimeUpdates(currentGames, result.games, targetGameIds));
       if (result.activityRecords.length > 0) {
         setPlayActivity((currentActivity) => appendSteamPlaytimeDeltaActivity(currentActivity, result.activityRecords));
       }
@@ -571,16 +571,7 @@ export function useAppSyncActions({
   function importSteamWishlistItems(wishlistItems: SteamWishlistItem[]): SteamWishlistSyncSummary {
     const syncedAt = new Date().toISOString();
     const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
-    const nextGames = [...games];
-    const librarySteamAppIds = new Set(
-      games
-        .filter((game) => game.collectionType === 'library')
-        .map((game) => game.steamAppId)
-        .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
-    );
-    const wishlistIndexBySteamAppId = new Map<number, number>();
-    const wishlistIndexByTitle = new Map<string, number>();
-    const summary: SteamWishlistSyncSummary = {
+    let summary: SteamWishlistSyncSummary = {
       addedCount: 0,
       failedCount: 0,
       fetchedCount: wishlistItems.length,
@@ -590,158 +581,28 @@ export function useAppSyncActions({
       updatedCount: 0,
     };
 
-    games.forEach((game, index) => {
-      if (game.collectionType !== 'wishlist') {
-        return;
-      }
-
-      if (typeof game.steamAppId === 'number') {
-        wishlistIndexBySteamAppId.set(game.steamAppId, index);
-      }
-
-      const normalizedTitle = normalizeGameTitleForWishlistMatch(game.title);
-
-      if (normalizedTitle && !wishlistIndexByTitle.has(normalizedTitle)) {
-        wishlistIndexByTitle.set(normalizedTitle, index);
-      }
+    setGames((currentGames) => {
+      const result = mergeSteamWishlistItems(currentGames, wishlistItems, ignoredSteamAppIds, syncedAt);
+      summary = result.summary;
+      return result.games;
     });
 
-    wishlistItems.forEach((item) => {
-      if (!item.appid || !item.name) {
-        summary.failedCount += 1;
-        return;
-      }
-
-      if (ignoredSteamAppIds.has(item.appid)) {
-        summary.skippedIgnoredCount += 1;
-        return;
-      }
-
-      if (librarySteamAppIds.has(item.appid)) {
-        summary.skippedAlreadyInLibraryCount += 1;
-        return;
-      }
-
-      const normalizedTitle = normalizeGameTitleForWishlistMatch(item.name);
-      const existingWishlistIndex = wishlistIndexBySteamAppId.get(item.appid) ?? (normalizedTitle ? wishlistIndexByTitle.get(normalizedTitle) : undefined);
-      const mappedGame = mapSteamWishlistItemToLocalGame(item, syncedAt);
-
-      if (typeof existingWishlistIndex === 'number') {
-        const existingGame = nextGames[existingWishlistIndex];
-        const mergedGame = touchGameRecord(mergeSteamWishlistSync(existingGame, mappedGame, syncedAt));
-        nextGames[existingWishlistIndex] = mergedGame;
-        wishlistIndexBySteamAppId.set(item.appid, existingWishlistIndex);
-
-        if (normalizedTitle) {
-          wishlistIndexByTitle.set(normalizedTitle, existingWishlistIndex);
-        }
-
-        if (areSteamWishlistSyncedFieldsEqual(existingGame, mergedGame)) {
-          summary.unchangedCount += 1;
-        } else {
-          summary.updatedCount += 1;
-        }
-
-        return;
-      }
-
-      nextGames.push(touchGameRecord(mappedGame));
-      wishlistIndexBySteamAppId.set(item.appid, nextGames.length - 1);
-
-      if (normalizedTitle) {
-        wishlistIndexByTitle.set(normalizedTitle, nextGames.length - 1);
-      }
-
-      summary.addedCount += 1;
-    });
-
-    setGames(nextGames);
     return summary;
   }
 
   function importSteamWishlistHtmlItems(items: ParsedSteamWishlistImportItem[], inputSkippedCount = 0): SteamWishlistHtmlImportSummary {
     const importedAt = new Date().toISOString();
-    const existingWishlistIndexBySteamAppId = new Map<number, number>();
-
-    games.forEach((game, index) => {
-      if (game.collectionType === 'wishlist' && typeof game.steamAppId === 'number') {
-        existingWishlistIndexBySteamAppId.set(game.steamAppId, index);
-      }
-    });
-
-    const existingGameIds = new Set(games.map((game) => game.id));
-    const nextGames = [...games];
-    const summary: SteamWishlistHtmlImportSummary = {
+    let summary: SteamWishlistHtmlImportSummary = {
       addedCount: 0,
       existingCount: 0,
       skippedCount: inputSkippedCount,
     };
 
-    items.forEach((item) => {
-      if (!item.appid) {
-        summary.existingCount += 1;
-        console.warn('[Steam Wishlist HTML Import] Skipped parsed item without a Steam app id.', { item });
-        return;
-      }
-
-      const mappedGame = mapSteamWishlistItemToLocalGame(item, importedAt);
-      const existingWishlistIndex = existingWishlistIndexBySteamAppId.get(item.appid);
-
-      if (typeof existingWishlistIndex === 'number') {
-        const existingGame = nextGames[existingWishlistIndex];
-
-        if (shouldReplaceSteamWishlistPlaceholderTitle(existingGame, mappedGame)) {
-          nextGames[existingWishlistIndex] = touchGameRecord({
-            ...existingGame,
-            title: mappedGame.title,
-            steamAppId: existingGame.steamAppId ?? mappedGame.steamAppId,
-            externalSource: existingGame.externalSource ?? mappedGame.externalSource,
-            externalUrl: mappedGame.externalUrl,
-            storeUrl: mappedGame.storeUrl,
-            wishlistImportedAt: existingGame.wishlistImportedAt ?? importedAt,
-            wishlistSyncedAt: importedAt,
-          });
-          console.info('[Steam Wishlist HTML Import] Repaired existing placeholder wishlist title.', {
-            appid: item.appid,
-            previousTitle: existingGame.title,
-            repairedTitle: mappedGame.title,
-          });
-        } else {
-          console.debug('[Steam Wishlist HTML Import] Existing wishlist item kept unchanged.', {
-            appid: item.appid,
-            existingTitle: existingGame.title,
-            importedTitle: mappedGame.title,
-          });
-        }
-
-        summary.existingCount += 1;
-        return;
-      }
-
-      let wishlistId = mappedGame.id;
-      let suffix = 2;
-
-      while (existingGameIds.has(wishlistId)) {
-        wishlistId = `${mappedGame.id}-${suffix}`;
-        suffix += 1;
-      }
-
-      existingGameIds.add(wishlistId);
-      existingWishlistIndexBySteamAppId.set(item.appid, nextGames.length);
-      nextGames.push(touchGameRecord({
-        ...mappedGame,
-        id: wishlistId,
-        wishlistSyncedAt: undefined,
-      }));
-      console.debug('[Steam Wishlist HTML Import] Added wishlist item.', {
-        appid: item.appid,
-        title: mappedGame.title,
-        id: wishlistId,
-      });
-      summary.addedCount += 1;
+    setGames((currentGames) => {
+      const result = mergeSteamWishlistHtmlItems(currentGames, items, importedAt, inputSkippedCount);
+      summary = result.summary;
+      return result.games;
     });
-
-    setGames(nextGames);
 
     const message = formatSteamWishlistHtmlImportSummary(summary, t);
     addToastNotification({
@@ -852,6 +713,214 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
       updatedAt: syncedGame.updatedAt,
     };
   });
+}
+
+function mergeSteamPlaytimeUpdates(currentGames: Game[], syncedGames: Game[], targetGameIds: Set<string>) {
+  const syncedGamesById = new Map(syncedGames.map((game) => [game.id, game]));
+
+  return currentGames.map((game) => {
+    if (!targetGameIds.has(game.id)) {
+      return game;
+    }
+
+    const syncedGame = syncedGamesById.get(game.id);
+
+    if (!syncedGame) {
+      return game;
+    }
+
+    return {
+      ...game,
+      lastPlayedAt: syncedGame.lastPlayedAt,
+      lastSteamActivityAt: syncedGame.lastSteamActivityAt,
+      lastSteamActivityDeltaMinutes: syncedGame.lastSteamActivityDeltaMinutes,
+      playtimeHours: syncedGame.playtimeHours,
+      steamPlaytimeMinutes: syncedGame.steamPlaytimeMinutes,
+      updatedAt: syncedGame.updatedAt,
+    };
+  });
+}
+
+function mergeSteamWishlistItems(
+  currentGames: Game[],
+  wishlistItems: SteamWishlistItem[],
+  ignoredSteamAppIds: Set<number>,
+  syncedAt: string,
+) {
+  const nextGames = [...currentGames];
+  const librarySteamAppIds = new Set(
+    currentGames
+      .filter((game) => game.collectionType === 'library')
+      .map((game) => game.steamAppId)
+      .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+  );
+  const wishlistIndexBySteamAppId = new Map<number, number>();
+  const wishlistIndexByTitle = new Map<string, number>();
+  const summary: SteamWishlistSyncSummary = {
+    addedCount: 0,
+    failedCount: 0,
+    fetchedCount: wishlistItems.length,
+    skippedAlreadyInLibraryCount: 0,
+    skippedIgnoredCount: 0,
+    unchangedCount: 0,
+    updatedCount: 0,
+  };
+
+  currentGames.forEach((game, index) => {
+    if (game.collectionType !== 'wishlist') {
+      return;
+    }
+
+    if (typeof game.steamAppId === 'number') {
+      wishlistIndexBySteamAppId.set(game.steamAppId, index);
+    }
+
+    const normalizedTitle = normalizeGameTitleForWishlistMatch(game.title);
+
+    if (normalizedTitle && !wishlistIndexByTitle.has(normalizedTitle)) {
+      wishlistIndexByTitle.set(normalizedTitle, index);
+    }
+  });
+
+  wishlistItems.forEach((item) => {
+    if (!item.appid || !item.name) {
+      summary.failedCount += 1;
+      return;
+    }
+
+    if (ignoredSteamAppIds.has(item.appid)) {
+      summary.skippedIgnoredCount += 1;
+      return;
+    }
+
+    if (librarySteamAppIds.has(item.appid)) {
+      summary.skippedAlreadyInLibraryCount += 1;
+      return;
+    }
+
+    const normalizedTitle = normalizeGameTitleForWishlistMatch(item.name);
+    const existingWishlistIndex = wishlistIndexBySteamAppId.get(item.appid) ?? (normalizedTitle ? wishlistIndexByTitle.get(normalizedTitle) : undefined);
+    const mappedGame = mapSteamWishlistItemToLocalGame(item, syncedAt);
+
+    if (typeof existingWishlistIndex === 'number') {
+      const existingGame = nextGames[existingWishlistIndex];
+      const mergedGame = touchGameRecord(mergeSteamWishlistSync(existingGame, mappedGame, syncedAt));
+      nextGames[existingWishlistIndex] = mergedGame;
+      wishlistIndexBySteamAppId.set(item.appid, existingWishlistIndex);
+
+      if (normalizedTitle) {
+        wishlistIndexByTitle.set(normalizedTitle, existingWishlistIndex);
+      }
+
+      if (areSteamWishlistSyncedFieldsEqual(existingGame, mergedGame)) {
+        summary.unchangedCount += 1;
+      } else {
+        summary.updatedCount += 1;
+      }
+
+      return;
+    }
+
+    nextGames.push(touchGameRecord(mappedGame));
+    wishlistIndexBySteamAppId.set(item.appid, nextGames.length - 1);
+
+    if (normalizedTitle) {
+      wishlistIndexByTitle.set(normalizedTitle, nextGames.length - 1);
+    }
+
+    summary.addedCount += 1;
+  });
+
+  return { games: nextGames, summary };
+}
+
+function mergeSteamWishlistHtmlItems(
+  currentGames: Game[],
+  items: ParsedSteamWishlistImportItem[],
+  importedAt: string,
+  inputSkippedCount: number,
+) {
+  const existingWishlistIndexBySteamAppId = new Map<number, number>();
+
+  currentGames.forEach((game, index) => {
+    if (game.collectionType === 'wishlist' && typeof game.steamAppId === 'number') {
+      existingWishlistIndexBySteamAppId.set(game.steamAppId, index);
+    }
+  });
+
+  const existingGameIds = new Set(currentGames.map((game) => game.id));
+  const nextGames = [...currentGames];
+  const summary: SteamWishlistHtmlImportSummary = {
+    addedCount: 0,
+    existingCount: 0,
+    skippedCount: inputSkippedCount,
+  };
+
+  items.forEach((item) => {
+    if (!item.appid) {
+      summary.existingCount += 1;
+      console.warn('[Steam Wishlist HTML Import] Skipped parsed item without a Steam app id.', { item });
+      return;
+    }
+
+    const mappedGame = mapSteamWishlistItemToLocalGame(item, importedAt);
+    const existingWishlistIndex = existingWishlistIndexBySteamAppId.get(item.appid);
+
+    if (typeof existingWishlistIndex === 'number') {
+      const existingGame = nextGames[existingWishlistIndex];
+
+      if (shouldReplaceSteamWishlistPlaceholderTitle(existingGame, mappedGame)) {
+        nextGames[existingWishlistIndex] = touchGameRecord({
+          ...existingGame,
+          title: mappedGame.title,
+          steamAppId: existingGame.steamAppId ?? mappedGame.steamAppId,
+          externalSource: existingGame.externalSource ?? mappedGame.externalSource,
+          externalUrl: mappedGame.externalUrl,
+          storeUrl: mappedGame.storeUrl,
+          wishlistImportedAt: existingGame.wishlistImportedAt ?? importedAt,
+          wishlistSyncedAt: importedAt,
+        });
+        console.info('[Steam Wishlist HTML Import] Repaired existing placeholder wishlist title.', {
+          appid: item.appid,
+          previousTitle: existingGame.title,
+          repairedTitle: mappedGame.title,
+        });
+      } else {
+        console.debug('[Steam Wishlist HTML Import] Existing wishlist item kept unchanged.', {
+          appid: item.appid,
+          existingTitle: existingGame.title,
+          importedTitle: mappedGame.title,
+        });
+      }
+
+      summary.existingCount += 1;
+      return;
+    }
+
+    let wishlistId = mappedGame.id;
+    let suffix = 2;
+
+    while (existingGameIds.has(wishlistId)) {
+      wishlistId = `${mappedGame.id}-${suffix}`;
+      suffix += 1;
+    }
+
+    existingGameIds.add(wishlistId);
+    existingWishlistIndexBySteamAppId.set(item.appid, nextGames.length);
+    nextGames.push(touchGameRecord({
+      ...mappedGame,
+      id: wishlistId,
+      wishlistSyncedAt: undefined,
+    }));
+    console.debug('[Steam Wishlist HTML Import] Added wishlist item.', {
+      appid: item.appid,
+      title: mappedGame.title,
+      id: wishlistId,
+    });
+    summary.addedCount += 1;
+  });
+
+  return { games: nextGames, summary };
 }
 
 function normalizeGameTitleForWishlistMatch(title: string) {

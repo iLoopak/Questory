@@ -688,47 +688,45 @@ export function AppController() {
   });
 
   function importGames(importedGames: Game[]) {
-    let createdGames: Game[] = [];
+    const existingSteamAppIds = new Set(
+      games
+        .map((game) => game.steamAppId)
+        .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+    );
+    const existingRetroKeys = new Set(
+      games
+        .filter((game) => game.externalSource === 'retro-rom')
+        .map(getRetroDuplicateKey)
+        .filter((key): key is string => Boolean(key)),
+    );
 
-    setGames((currentGames) => {
-      const existingSteamAppIds = new Set(
-        currentGames
-          .map((game) => game.steamAppId)
-          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
-      );
-      const existingRetroKeys = new Set(
-        currentGames
-          .filter((game) => game.externalSource === 'retro-rom')
-          .map(getRetroDuplicateKey)
-          .filter((key): key is string => Boolean(key)),
-      );
+    const newGames = importedGames.filter((game) => {
+      if (typeof game.steamAppId === 'number' && existingSteamAppIds.has(game.steamAppId)) {
+        return false;
+      }
 
-      const newGames = importedGames.filter((game) => {
-        if (typeof game.steamAppId === 'number' && existingSteamAppIds.has(game.steamAppId)) {
-          return false;
-        }
+      const retroKey = getRetroDuplicateKey(game);
+      if (retroKey && existingRetroKeys.has(retroKey)) {
+        return false;
+      }
 
-        const retroKey = getRetroDuplicateKey(game);
-        if (retroKey && existingRetroKeys.has(retroKey)) {
-          return false;
-        }
+      if (retroKey) {
+        existingRetroKeys.add(retroKey);
+      }
 
-        if (retroKey) {
-          existingRetroKeys.add(retroKey);
-        }
-
-        return true;
-      });
-
-      createdGames = newGames.map((game) =>
-        touchGameRecord({
-          ...game,
-          collectionType: 'library' as const,
-        }),
-      );
-
-      return createdGames.length > 0 ? [...currentGames, ...createdGames] : currentGames;
+      return true;
     });
+
+    const createdGames = newGames.map((game) =>
+      touchGameRecord({
+        ...game,
+        collectionType: 'library' as const,
+      }),
+    );
+
+    if (createdGames.length > 0) {
+      setGames((currentGames) => [...currentGames, ...createdGames]);
+    }
 
     return createdGames;
   }
