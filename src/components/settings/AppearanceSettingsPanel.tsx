@@ -380,7 +380,7 @@ export function AppearanceSettingsPanel({
                 </div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
                   Tune the Neon template with a primary glow color and a
-                  secondary edge color. Orange / Blue remains the default.
+                  secondary edge color. Green / Blue is the default.
                 </p>
               </div>
               <div
