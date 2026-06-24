@@ -1,5 +1,5 @@
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
-import type { RawgGameDetails, RawgMetadata, RawgSearchResult } from '../types/rawg';
+import type { RawgGameDetails, RawgMetadata, RawgScreenshotList, RawgSearchResult } from '../types/rawg';
 
 const RAWG_API_BASE_URL = 'https://api.rawg.io/api';
 
@@ -81,6 +81,13 @@ export async function searchGameByName(title: string): Promise<RawgSearchResult[
 
 export async function getGameDetails(rawgId: number): Promise<RawgGameDetails> {
   return requestRawg<RawgGameDetails>(`/games/${rawgId}`);
+}
+
+export async function getGameScreenshots(rawgId: number): Promise<string[]> {
+  const data = await requestRawg<RawgScreenshotList>(`/games/${rawgId}/screenshots`, {
+    page_size: '5',
+  });
+  return data.results.map((s) => s.image);
 }
 
 export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {

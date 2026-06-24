@@ -20,6 +20,7 @@ import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type R
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { ScreenshotStrip } from './ScreenshotStrip';
 
 export type ReviewModeAction =
   | 'queue'
@@ -958,6 +959,9 @@ function FocusedReviewCard({
             </h3>
           </div>
         </div>
+
+        {/* Screenshot strip — compact vibe check, hidden when no screenshots are available */}
+        <ScreenshotStrip className="mt-3 w-full px-2" game={game} />
 
         {hasGamepad ? (
           <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 qs-label-caps text-slate-400">

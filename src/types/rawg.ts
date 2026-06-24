@@ -30,6 +30,18 @@ export type RawgGameDetails = RawgSearchResult & {
   playtime?: number;
 };
 
+export type RawgScreenshot = {
+  id: number;
+  image: string;
+  width: number;
+  height: number;
+};
+
+export type RawgScreenshotList = {
+  count: number;
+  results: RawgScreenshot[];
+};
+
 export type RawgMetadata = Pick<
   Game,
   | 'rawgId'
