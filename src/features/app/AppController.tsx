@@ -611,6 +611,9 @@ export function AppController() {
       games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam')
         ? 'steam-import'
         : null,
+      games.some((game) => game.collectionType === 'library' && game.externalSource === 'steam')
+        ? 'steam-connect'
+        : null,
       games.some((game) => game.collectionType === 'library' && game.externalSource === 'retro-rom')
         ? 'retro-import'
         : null,
@@ -1517,7 +1520,7 @@ export function AppController() {
               onSteamApiKeyConfigured={() => markOnboardingItemComplete('steam-api-key')}
               onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
               onSteamProfileNameChange={handleSteamProfileNameChange}
-              onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+              onSteamLibraryImported={() => markOnboardingItemsComplete(['steam-import', 'steam-connect'])}
               onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
               onSyncSteamWishlist={syncSteamWishlist}
               onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
@@ -1613,7 +1616,7 @@ export function AppController() {
           onOpenLibrary={() => handleOnboardingAction('ready', 'primary')}
           onOpenQueue={() => handleOnboardingAction('ready', 'secondary')}
           onSkip={skipOnboardingItem}
-          onSteamLibraryImported={() => markOnboardingItemComplete('steam-import')}
+          onSteamLibraryImported={() => markOnboardingItemsComplete(['steam-import', 'steam-connect'])}
           onSteamProfileNameChange={handleSteamProfileNameChange}
           libraryOwnerNickname={libraryOwnerNickname}
           personalizedQuestShelfTitle={personalizedQuestShelfTitle}
