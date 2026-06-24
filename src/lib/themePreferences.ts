@@ -156,14 +156,14 @@ export function saveThemePreference(preference: ThemePreference) {
 
 export function loadAppTemplatePreference(): AppTemplatePreference {
   if (typeof window === 'undefined') {
-    return 'classic';
+    return 'neon-deck';
   }
 
   try {
     const storedPreference = window.localStorage.getItem(appTemplateStorageKey);
-    return isAppTemplatePreference(storedPreference) ? storedPreference : 'classic';
+    return isAppTemplatePreference(storedPreference) ? storedPreference : 'neon-deck';
   } catch {
-    return 'classic';
+    return 'neon-deck';
   }
 }
 

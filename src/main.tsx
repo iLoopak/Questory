@@ -6,6 +6,8 @@ import { configureHandheldImmersiveMode } from './lib/handheldImmersiveMode';
 import { hydrateLocalStorageFromPreferences } from './lib/localPersistence';
 import { persistentStorageKeys } from './lib/persistentStorageKeys';
 import {
+  accentColorStorageKey,
+  appTemplateStorageKey,
   applyAccentColorPreference,
   applyAppTemplatePreference,
   applyThemePreference,
@@ -27,6 +29,18 @@ void startApp();
 
 async function startApp() {
   await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
+
+  // First-launch detection: if the template key has never been written, this is a clean
+  // install. Seed the neon-deck green accent so new users get Green / Blue as default
+  // rather than the classic orange. Existing users keep their stored preferences untouched.
+  try {
+    if (!window.localStorage.getItem(appTemplateStorageKey) && !window.localStorage.getItem(accentColorStorageKey)) {
+      window.localStorage.setItem(accentColorStorageKey, '#22c55e');
+    }
+  } catch {
+    // Ignore unavailable storage — the in-memory default is fine.
+  }
+
   const appTemplatePreference = loadAppTemplatePreference();
 
   applyAppTemplatePreference(appTemplatePreference);
