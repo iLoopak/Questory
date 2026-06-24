@@ -12,7 +12,7 @@ import { createQuestShelfBackup } from '../lib/backupStorage';
 import { exportQuestShelfBackupFile } from '../lib/backupExport';
 import { ShelfAvatar, ShelfIdentityEditor } from './ShelfIdentity';
 import { getComputedShelfTitle, type ShelfIdentitySettings } from '../lib/shelfIdentity';
-import { onboardingItemIds, type OnboardingItemId } from '../lib/onboardingStorage';
+import { getOnboardingProgress, onboardingItemIds, type OnboardingItemId } from '../lib/onboardingStorage';
 import { loadAnalyticsSettings, updateAnalyticsEnabled } from '../lib/analytics';
 import { defaultAccentColor, normalizeAccentColor, type AccentColorPreference, type AppTemplatePreference } from '../lib/themePreferences';
 import type { Game } from '../types/game';
@@ -91,8 +91,7 @@ export function OnboardingChecklist({
   const initialStepIndex = firstUnfinishedStepIndex === -1 ? steps.length - 1 : firstUnfinishedStepIndex;
   const [activeStepIndex, setActiveStepIndex] = useState(initialStepIndex);
   const activeStep = steps[activeStepIndex];
-  const finishedCount = steps.filter((step) => completedItemIds.has(step.id) || skippedItemIds.has(step.id)).length;
-  const progressPercent = Math.round((finishedCount / steps.length) * 100);
+  const onboardingProgress = getOnboardingProgress(completedItemIds, skippedItemIds);
   const stepComplete = completedItemIds.has(activeStep.id);
   const stepSkipped = skippedItemIds.has(activeStep.id);
   const nextRequiresCurrentStep = activeStep.id === 'steam-connect' && !stepComplete && !stepSkipped;
@@ -139,10 +138,10 @@ export function OnboardingChecklist({
         <div className="qs-setup-progress mt-5 rounded-md border border-skyglass/15 bg-ink-900/50 p-3">
           <div className="flex justify-between qs-label-caps text-slate-400">
             <span>{activeStep.title}</span>
-            <span>{progressPercent}%</span>
+            <span>{onboardingProgress.percent}%</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-mint transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
+            <div className="h-full rounded-full bg-mint transition-[width] duration-300" style={{ width: `${onboardingProgress.percent}%` }} />
           </div>
         </div>
 
@@ -179,7 +178,7 @@ export function OnboardingChecklist({
             {activeStep.id === 'steam-connect' ? <SteamStep games={games} isComplete={stepComplete} onComplete={() => onComplete('steam-connect')} onContinue={goNext} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={onboardingQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
             {activeStep.id === 'how-it-works' ? <HowItWorksStep onComplete={() => { onComplete('how-it-works'); goNext(); }} onSkip={skipStep} /> : null}
-            {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={onboardingQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
+            {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={onboardingQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${onboardingProgress.completed}/${onboardingProgress.total}`} /> : null}
           </div>
         </div>
 

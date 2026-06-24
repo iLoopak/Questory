@@ -2,9 +2,13 @@ import { loadLocalJson, savePersistedJson } from './localPersistence';
 
 const STORAGE_KEY = 'questshelf.onboarding.v1';
 
-export const onboardingItemIds = ['steam-connect', 'rawg-api-key', 'retro-import', 'backup-exported', 'make-it-yours', 'how-it-works', 'ready', 'analytics-notice'] as const;
+export const onboardingItemIds = ['steam-connect', 'make-it-yours', 'how-it-works', 'ready'] as const;
 
 const legacyOnboardingItemIds = [
+  'rawg-api-key',
+  'retro-import',
+  'backup-exported',
+  'analytics-notice',
   'manual-game',
   'steam-api-key',
   'steam-id64',
@@ -21,6 +25,12 @@ export const allOnboardingItemIds = [...onboardingItemIds, ...legacyOnboardingIt
 
 export type OnboardingItemId = (typeof allOnboardingItemIds)[number];
 
+export type OnboardingProgress = {
+  completed: number;
+  total: number;
+  percent: number;
+};
+
 export type OnboardingState = {
   completedAt: Partial<Record<OnboardingItemId, string>>;
   hasSeenChecklist: boolean;
@@ -34,6 +44,17 @@ const emptyOnboardingState: OnboardingState = {
   skipped: false,
   skippedAt: {},
 };
+
+export function getOnboardingProgress(completedItemIds: Set<OnboardingItemId>, skippedItemIds: Set<OnboardingItemId>): OnboardingProgress {
+  const completed = onboardingItemIds.filter((itemId) => completedItemIds.has(itemId) || skippedItemIds.has(itemId)).length;
+  const total = onboardingItemIds.length;
+
+  return {
+    completed,
+    total,
+    percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+  };
+}
 
 export function loadOnboardingState(): OnboardingState {
   return loadLocalJson(STORAGE_KEY, emptyOnboardingState, normalizeOnboardingState);

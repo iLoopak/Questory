@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { isMockGame, loadGames } from '../../lib/gameStorage';
-import { loadOnboardingState, onboardingItemIds, type OnboardingItemId, type OnboardingState } from '../../lib/onboardingStorage';
+import { getOnboardingProgress, loadOnboardingState, onboardingItemIds, type OnboardingItemId, type OnboardingState } from '../../lib/onboardingStorage';
 import { loadSteamSettings } from '../../lib/steamSettingsStorage';
-import { loadAnalyticsSettings } from '../../lib/analytics';
 import type { SettingsCategory } from '../../config/settings';
 import type { NavItem } from '../../config/navigation';
 import type { Game } from '../../types/game';
@@ -24,12 +23,10 @@ export function useOnboardingController({ setActiveNavItem, setActiveSettingsCat
     return !initialState.hasSeenChecklist && !initialState.skipped && !hasExistingLibrary && !hasExistingSettings;
   });
 
-  const analyticsSettings = loadAnalyticsSettings();
-  const requiredOnboardingItemIds = useMemo(() => onboardingItemIds, []);
-  const completedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => itemId === 'analytics-notice' && analyticsSettings.hasSeenAnalyticsNotice || Boolean(onboardingState.completedAt[itemId]))), [analyticsSettings.hasSeenAnalyticsNotice, onboardingState.completedAt]);
+  const completedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.completedAt[itemId]))), [onboardingState.completedAt]);
   const skippedOnboardingItemIds = useMemo(() => new Set(onboardingItemIds.filter((itemId) => Boolean(onboardingState.skippedAt[itemId]))), [onboardingState.skippedAt]);
-  const finishedOnboardingItemIds = useMemo(() => new Set(requiredOnboardingItemIds.filter((itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId))), [completedOnboardingItemIds, requiredOnboardingItemIds, skippedOnboardingItemIds]);
-  const isOnboardingComplete = finishedOnboardingItemIds.size === requiredOnboardingItemIds.length;
+  const onboardingProgress = useMemo(() => getOnboardingProgress(completedOnboardingItemIds, skippedOnboardingItemIds), [completedOnboardingItemIds, skippedOnboardingItemIds]);
+  const isOnboardingComplete = onboardingProgress.completed === onboardingProgress.total;
 
   function updateOnboardingState(updater: (currentState: OnboardingState) => OnboardingState) {
     setOnboardingState((currentState) => updater(currentState));
@@ -78,5 +75,5 @@ export function useOnboardingController({ setActiveNavItem, setActiveSettingsCat
     setActiveSettingsCategory('Integrations');
   }
 
-  return { completedOnboardingItemIds, finishedOnboardingItemIds, handleOnboardingAction, hideOnboarding, isOnboardingComplete, isOnboardingOpen, markOnboardingItemComplete, markOnboardingItemsComplete, onboardingState, openOnboarding, restartOnboarding, setOnboardingState, skipOnboardingItem, skippedOnboardingItemIds };
+  return { completedOnboardingItemIds, onboardingProgress, handleOnboardingAction, hideOnboarding, isOnboardingComplete, isOnboardingOpen, markOnboardingItemComplete, markOnboardingItemsComplete, onboardingState, openOnboarding, restartOnboarding, setOnboardingState, skipOnboardingItem, skippedOnboardingItemIds };
 }

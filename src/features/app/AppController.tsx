@@ -37,7 +37,7 @@ import { loadAchievementCounters, saveAchievementCounters, type AchievementCount
 import { loadGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import { loadLanguagePreference } from '../../lib/languagePreference';
-import { onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
+import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import { formatLocalDate, loadPlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
@@ -237,7 +237,7 @@ export function AppController() {
 
   const {
     completedOnboardingItemIds,
-    finishedOnboardingItemIds,
+    onboardingProgress,
     handleOnboardingAction,
     hideOnboarding,
     isOnboardingComplete,
@@ -1631,9 +1631,9 @@ export function AppController() {
           onAccentColorChange={setAccentColorPreference}
         />
       ) : null}
-      {!isOnboardingComplete ? <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}>
+      {!isOnboardingComplete ? <button className="qs-setup-launcher" onClick={openOnboarding} type="button" aria-label={formatMessageTemplate(t('app.openSetupChecklist'), { completed: onboardingProgress.completed, total: onboardingProgress.total })}>
         <Icon name="settings" />
-        <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: finishedOnboardingItemIds.size, total: onboardingItemIds.length })}</strong>
+        <strong>{formatMessageTemplate(t('app.setupProgress'), { completed: onboardingProgress.completed, total: onboardingProgress.total })}</strong>
       </button> : null}
 
       {pendingAchievementGhost ? (

@@ -20,7 +20,7 @@ import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import { type ControllerProfileId } from '../../lib/controllerProfiles';
 import { getQuestShelfAchievements } from '../../lib/questShelfAchievements';
 import type { NavigationVisibilityPreferences } from '../../lib/navigationVisibilityPreferences';
-import { onboardingItemIds, type OnboardingItemId } from '../../lib/onboardingStorage';
+import { getOnboardingProgress, type OnboardingItemId } from '../../lib/onboardingStorage';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { ShelfIdentitySettings } from '../../lib/shelfIdentity';
 import type { AccentColorPreference, AppTemplatePreference, GradientOrientationPreference, NeonButtonStylePreference, ResolvedTheme, ThemePreference } from '../../lib/themePreferences';
@@ -196,9 +196,7 @@ export function SettingsView({
   const steamWishlistImportButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeCategoryMeta = activeCategory ? getSettingsCategoryMeta(activeCategory) : null;
   const t = useMemo(() => createTranslator(language), [language]);
-  const onboardingFinishedCount = onboardingItemIds.filter(
-    (itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId),
-  ).length;
+  const onboardingProgress = getOnboardingProgress(completedOnboardingItemIds, skippedOnboardingItemIds);
 
   function selectCategory(category: SettingsCategory) {
     onCategoryChange(category);
@@ -402,7 +400,8 @@ export function SettingsView({
             <div className="space-y-4">
               <AboutSettingsPanel runtimeEnvironment={runtimeEnvironment} />
               <OnboardingSettingsPanel
-                completedCount={onboardingFinishedCount}
+                completedCount={onboardingProgress.completed}
+                totalCount={onboardingProgress.total}
                 isComplete={isOnboardingComplete}
                 onOpenOnboarding={onOpenOnboarding}
                 onRestartOnboarding={onRestartOnboarding}
@@ -591,11 +590,13 @@ function SettingsCategoryIcon({ category }: { category: SettingsCategory }) {
 
 function OnboardingSettingsPanel({
   completedCount,
+  totalCount,
   isComplete,
   onOpenOnboarding,
   onRestartOnboarding,
 }: {
   completedCount: number;
+  totalCount: number;
   isComplete: boolean;
   onOpenOnboarding: () => void;
   onRestartOnboarding: () => void;
@@ -605,7 +606,7 @@ function OnboardingSettingsPanel({
   return (
     <SettingsSection
       title={isComplete ? t('settings.setupComplete') : t('settings.setupAssistant')}
-      description={`${completedCount} setup items finished or skipped. Reopen the assistant to continue guidance, or restart it from the beginning.`}
+      description={`Setup progress: ${completedCount}/${totalCount}. Reopen the assistant to continue guidance, or restart it from the beginning.`}
       actions={(
         <>
           <button
