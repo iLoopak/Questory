@@ -40,7 +40,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
   }
 
   // Migration guard: preserve user-owned optional fields via spread, then repair only the fields
-  // that QuestShelf needs to render safely. Do not overwrite valid notes, tags, or status.
+  // that Questory needs to render safely. Do not overwrite valid notes, tags, or status.
   return {
     ...(game as Game),
     collectionType: normalizeLoadedCollectionType(game.collectionType),

@@ -97,17 +97,17 @@ export function sanitizeShelfNickname(value: unknown) {
   if (typeof value !== 'string') return '';
   const normalized = value.trim().replace(/\s+/g, ' ');
   if (!normalized) return '';
-  const withoutQuestShelfSuffix = normalized.replace(/[’']s\s+QuestShelf$/i, '').trim();
-  const withoutQuestShelfPrefix = withoutQuestShelfSuffix.replace(/^QuestShelf\s*:\s*/i, '').trim();
-  if (/^(My QuestShelf|Můj QuestShelf)$/i.test(withoutQuestShelfPrefix)) return '';
-  if (/^QuestShelf$/i.test(withoutQuestShelfPrefix)) return '';
-  return withoutQuestShelfPrefix.slice(0, maxShelfNameLength);
+  const withoutBrandedSuffix = normalized.replace(/[’']s\s+(QuestShelf|Questory)$/i, '').trim();
+  const withoutBrandedPrefix = withoutBrandedSuffix.replace(/^(QuestShelf|Questory)\s*:\s*/i, '').trim();
+  if (/^(My (QuestShelf|Questory)|Můj (QuestShelf|Questory))$/i.test(withoutBrandedPrefix)) return '';
+  if (/^(QuestShelf|Questory)$/i.test(withoutBrandedPrefix)) return '';
+  return withoutBrandedPrefix.slice(0, maxShelfNameLength);
 }
 
 export function formatShelfDisplayName(nickname: string | null | undefined, language: 'en' | 'cs' = 'en') {
   const normalizedNickname = sanitizeShelfNickname(nickname);
-  if (language === 'cs') return normalizedNickname ? `QuestShelf: ${normalizedNickname}` : 'Můj QuestShelf';
-  return normalizedNickname ? `${normalizedNickname}'s QuestShelf` : 'My QuestShelf';
+  if (language === 'cs') return normalizedNickname ? `Questory: ${normalizedNickname}` : 'Můj Questory';
+  return normalizedNickname ? `${normalizedNickname}'s Questory` : 'My Questory';
 }
 
 export function sanitizeAvatarDataUrl(value: unknown) {

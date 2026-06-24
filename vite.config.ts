@@ -13,8 +13,8 @@ export default defineConfig({
       filename: 'manifest.webmanifest',
       includeAssets: ['favicon.ico', 'icons/favicon-16.png', 'icons/favicon-32.png', 'icons/favicon-48.png', 'icons/questshelf-icon-180.png'],
       manifest: {
-        name: 'QuestShelf',
-        short_name: 'QuestShelf',
+        name: 'Questory',
+        short_name: 'Questory',
         description: 'A local-first game library, metadata, and recommendation shelf.',
         start_url: '/',
         scope: '/',
@@ -118,7 +118,7 @@ const HLTB_PROVIDER_ENDPOINT = {
   origin: 'https://howlongtobeat.com',
   searchPath: null,
   status: 'unavailable',
-  reason: 'The old hltb-for-deck /api/search route now returns 404 HTML. A newer token-gated /api/find flow exists in community notes, but QuestShelf keeps HLTB disabled until that flow is verified for this provider.',
+  reason: 'The old hltb-for-deck /api/search route now returns 404 HTML. A newer token-gated /api/find flow exists in community notes, but Questory keeps HLTB disabled until that flow is verified for this provider.',
   candidateSearchPath: '/api/find',
   candidateInitPath: '/api/find/init',
 } as const;

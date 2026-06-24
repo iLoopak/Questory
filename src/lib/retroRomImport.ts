@@ -198,7 +198,7 @@ export function scanRomFiles(
     if (!normalizedTitle || !title) {
       scanIssues.push({
         fileName,
-        reason: 'QuestShelf could not create a readable game title from this file name.',
+        reason: 'Questory could not create a readable game title from this file name.',
         type: 'empty-title',
       });
       return [];

@@ -157,7 +157,7 @@ export function RetroImportPanel({
       const result = await RetroFolderPicker.rescanFolder({ folderUri: lastAndroidFolderUri });
       handleAndroidFolderResult(result);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'QuestShelf could not rescan the saved Android folder. Select the folder again to refresh permission.';
+      const message = error instanceof Error ? error.message : 'Questory could not rescan the saved Android folder. Select the folder again to refresh permission.';
       setStatusMessage({ message, tone: 'warning' });
     } finally {
       setIsAndroidFolderScanLoading(false);
@@ -274,11 +274,11 @@ export function RetroImportPanel({
         scannedFiles: scanSummary.scannedFiles,
         skippedDuplicates: duplicateCount,
         unsupportedFiles: scanSummary.unsupportedFiles,
-        warning: 'QuestShelf could not save the imported games. Local data was not changed.',
+        warning: 'Questory could not save the imported games. Local data was not changed.',
       });
       setImportedGames([]);
       setStatusMessage({
-        message: 'QuestShelf could not save the imported games. Local data was not changed.',
+        message: 'Questory could not save the imported games. Local data was not changed.',
         tone: 'error',
       });
       console.error('[QuestShelf Retro Import] storage failure', error);
@@ -345,7 +345,7 @@ export function RetroImportPanel({
         <div>
           <h2 className="text-xl font-semibold text-white">{t('retro.importTitle')}</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-            Import emulator library entries from files you explicitly select. QuestShelf reads filenames only and never uploads or copies ROM data.
+            Import emulator library entries from files you explicitly select. Questory reads filenames only and never uploads or copies ROM data.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -409,7 +409,7 @@ export function RetroImportPanel({
               ? 'Android folder import uses Storage Access Framework with persisted read permission when the provider allows it. Use Rescan folder to refresh the saved folder.'
               : 'Android folder import uses Storage Access Framework to scan a selected folder recursively without copying ROM data.'
             : supportsWebFolderPicker
-              ? 'Folder selection is available on this device. QuestShelf still validates every file before import.'
+              ? 'Folder selection is available on this device. Questory still validates every file before import.'
               : 'Folder selection is not supported on this device. Select multiple ROM files instead.'}
         </div>
       </div>
@@ -750,7 +750,7 @@ function createZeroImportWarning({
   }
 
   if (failures.length > 0) {
-    return 'QuestShelf found validation issues and did not create any Library games.';
+    return 'Questory found validation issues and did not create any Library games.';
   }
 
   return 'No games were created. Review the scan notes and try again.';

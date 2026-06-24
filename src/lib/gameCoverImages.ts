@@ -290,7 +290,7 @@ function getInitials(title: string) {
     .filter(Boolean);
 
   if (words.length === 0) {
-    return 'QS';
+    return 'Q';
   }
 
   return words.slice(0, 2).map((word) => word[0]?.toUpperCase()).join('');

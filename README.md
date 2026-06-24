@@ -1,12 +1,12 @@
-# QuestShelf
+# Questory
 
-**QuestShelf is a local-first gaming backlog planner for people with too many games, too many platforms, and not enough actual play time.**
+**Questory is a local-first gaming backlog planner for people with too many games, too many platforms, and not enough actual play time.**
 
 It is not trying to be a launcher, a social network, or a perfectly finished product yet. It is an early-alpha project focused on turning a messy pile of owned games, wishlist games, retro imports, and “I should play that someday” guilt into a more playful plan.
 
 ## Screenshot / preview
 
-QuestShelf does not currently include full app screenshots in the repository. The existing checked-in images are app icons, splash art, and placeholder cover assets.
+Questory does not currently include full app screenshots in the repository. The existing checked-in images are app icons, splash art, and placeholder cover assets.
 
 Suggested screenshot locations for a public README update:
 
@@ -21,13 +21,13 @@ docs/screenshots/playing-now.png
 When screenshots are added, this section can become:
 
 ```md
-![QuestShelf Home](docs/screenshots/home.png)
-![QuestShelf Library](docs/screenshots/library.png)
+![Questory Home](docs/screenshots/home.png)
+![Questory Library](docs/screenshots/library.png)
 ```
 
-## What is QuestShelf?
+## What is Questory?
 
-QuestShelf is a backlog-first game planning app. The main idea is simple:
+Questory is a backlog-first game planning app. The main idea is simple:
 
 - collect your games in one local shelf,
 - import what you can from Steam or other sources,
@@ -44,7 +44,7 @@ A lot of game tracking tools are great at cataloging, launching, reviewing, or s
 
 > I already own too many games. I keep buying more. I forget what I was playing. I bounce between Steam, handhelds, retro folders, wishlists, and notes. Then I spend my limited free time choosing instead of playing.
 
-QuestShelf is built around that feeling. It is meant to help answer:
+Questory is built around that feeling. It is meant to help answer:
 
 - What am I playing right now?
 - What should I play next on this platform?
@@ -71,7 +71,7 @@ These are grouped honestly based on the current codebase. “Available now” me
 - **RAWG metadata enrichment** — user-provided RAWG API key, per-game search, suggested/manual matches, batch enrichment, local cache, and safe writes that avoid overwriting user-owned tracking fields.
 - **Metadata/artwork refresh tools** — artwork audit, missing-artwork buckets, Steam/RAWG/user artwork priority, generated fallback covers, bulk repair actions, and per-game artwork refresh paths.
 - **Steam achievements display/sync support** — Steam achievement fields are stored on games, shown in details/cards/widgets, and can be synced for eligible Steam games through app actions.
-- **QuestShelf achievements** — local achievement registry and progress display for QuestShelf milestones such as imports, queue activity, wishlist growth, retro support, Steam connection, and other app usage.
+- **Questory achievements** — local achievement registry and progress display for Questory milestones such as imports, queue activity, wishlist growth, retro support, Steam connection, and other app usage.
 - **Daily Quest and Achievement Quiz** — local mini-challenge/quiz modules with storage, modal/card UI, artwork reveal/guess components, and weekly summaries.
 - **Retro library import** — retro ROM import panel, platform detection/override, ROM metadata fields, Android folder picker support, and options to send imported retro games into Quest Queue.
 - **Data portability** — JSON backup download/import, merge/replace flows, integration-key exclusion by default, local reset protections, and sync-folder/auto-backup foundation where browser APIs allow it.
@@ -102,12 +102,12 @@ Grounded in the current direction of the app:
 - stronger Android APK distribution notes,
 - more robust metadata/artwork matching and conflict handling,
 - better accessibility/gamepad testing,
-- richer QuestShelf achievement tuning,
+- richer Questory achievement tuning,
 - and UX feedback loops for backlog-heavy players.
 
 ## How it works
 
-1. **Start with an empty shelf.** QuestShelf does not create a fake library for normal users.
+1. **Start with an empty shelf.** Questory does not create a fake library for normal users.
 2. **Add or import games.** Add games manually, import owned Steam games, import Steam wishlist entries manually, or import retro ROM lists.
 3. **Clean up the shelf.** Use filters, metadata enrichment, artwork repair, details editing, and bulk actions.
 4. **Triage the backlog.** Use Quest Queue / Review Mode to make quick decisions instead of endlessly scrolling.
@@ -119,19 +119,19 @@ Grounded in the current direction of the app:
 
 ### Playnite
 
-Playnite is excellent if your main need is a powerful launcher and PC library manager. QuestShelf is aiming at a different center of gravity: **planning, triage, and backlog decisions first**. It does not try to replace a launcher.
+Playnite is excellent if your main need is a powerful launcher and PC library manager. Questory is aiming at a different center of gravity: **planning, triage, and backlog decisions first**. It does not try to replace a launcher.
 
 ### Backloggd
 
-Backloggd is great for social/review-style game tracking. QuestShelf is more personal and local-first: **what should I play, what should I drop, what belongs in the queue, and what am I actively playing now?**
+Backloggd is great for social/review-style game tracking. Questory is more personal and local-first: **what should I play, what should I drop, what belongs in the queue, and what am I actively playing now?**
 
 ### Spreadsheets
 
-Spreadsheets are flexible, but they are manual and easy to abandon. QuestShelf tries to turn the same tracking work into a guided, playful workflow with queues, cards, artwork, filters, stats, and tiny achievement/review loops.
+Spreadsheets are flexible, but they are manual and easy to abandon. Questory tries to turn the same tracking work into a guided, playful workflow with queues, cards, artwork, filters, stats, and tiny achievement/review loops.
 
 ## Project status
 
-QuestShelf is **early alpha / work in progress**.
+Questory is **early alpha / work in progress**.
 
 Expect rough edges:
 
@@ -145,7 +145,7 @@ Feedback is very welcome, especially from people with large backlogs across Stea
 
 ## Try it / install
 
-QuestShelf currently runs from source or a static deployment of the built web app.
+Questory currently runs from source or a static deployment of the built web app.
 
 Requirements:
 
@@ -210,15 +210,15 @@ npm test
 
 ## PWA
 
-QuestShelf is configured as an installable Progressive Web App for static hosting and iOS Safari **Add to Home Screen** installs.
+Questory is configured as an installable Progressive Web App for static hosting and iOS Safari **Add to Home Screen** installs.
 
 The PWA manifest uses:
 
-- App name and short name: `QuestShelf`
+- App name and short name: `Questory`
 - Start URL and scope: `/`
 - Display mode: `standalone`
-- Dark/neon app colors using the QuestShelf dark navy shell
-- PNG app icons generated from the QuestShelf source icon
+- Dark/neon app colors using the Questory dark navy shell
+- PNG app icons generated from the Questory source icon
 
 Offline support is intentionally app-shell focused:
 
@@ -228,13 +228,13 @@ Offline support is intentionally app-shell focused:
 - Steam, RAWG, IsThereAnyDeal, HLTB, SteamGridDB, and other remote actions still require network/API access,
 - external images may depend on browser cache and are not guaranteed offline.
 
-### Add QuestShelf to iPhone Home Screen
+### Add Questory to iPhone Home Screen
 
-1. Deploy QuestShelf over HTTPS or open an HTTPS preview URL in **Safari** on iPhone.
+1. Deploy Questory over HTTPS or open an HTTPS preview URL in **Safari** on iPhone.
 2. Tap Safari's **Share** button.
 3. Choose **Add to Home Screen**.
-4. Confirm the name **QuestShelf** and tap **Add**.
-5. Launch QuestShelf from the new Home Screen icon.
+4. Confirm the name **Questory** and tap **Add**.
+5. Launch Questory from the new Home Screen icon.
 
 Known iOS PWA limitations:
 
@@ -245,7 +245,7 @@ Known iOS PWA limitations:
 
 ## Android / APK
 
-QuestShelf includes a Capacitor Android project for handheld/APK packaging.
+Questory includes a Capacitor Android project for handheld/APK packaging.
 
 Typical Android build flow:
 
@@ -274,7 +274,7 @@ Android notes:
 
 ## Deployment
 
-QuestShelf does not require a custom server for the app shell. Deploy the `dist/` folder produced by `npm run build` to any static host.
+Questory does not require a custom server for the app shell. Deploy the `dist/` folder produced by `npm run build` to any static host.
 
 ### Vercel
 
@@ -299,7 +299,7 @@ Important deployment caveat: the static app shell can be hosted anywhere, but pr
 
 ## Data storage, backup, and recovery
 
-QuestShelf is local-first.
+Questory is local-first.
 
 Known storage areas include:
 

@@ -813,7 +813,7 @@ function parseSteamWishlistPageHtml(html: string) {
 
   if (!wishlistDataMatch) {
     throw new SteamWishlistError(
-      'Steam returned the wishlist page, but QuestShelf could not find wishlist data in the page. The wishlist may be private, rate-limited, or Steam may have changed the page format.',
+      'Steam returned the wishlist page, but Questory could not find wishlist data in the page. The wishlist may be private, rate-limited, or Steam may have changed the page format.',
       'malformed-response',
     );
   }

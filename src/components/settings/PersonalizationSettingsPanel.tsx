@@ -28,7 +28,7 @@ const personalizationAvatarOptions: Array<{
   label: string;
   value: ShelfAvatarSelection;
 }> = [
-  { label: 'QuestShelf Q', value: 'app-icon' },
+  { label: 'Questory Q', value: 'app-icon' },
   { label: 'Controller', value: 'built-in:controller' },
   { label: 'Achievement Hunter', value: 'built-in:achievement-hunter' },
   { label: 'Retro', value: 'built-in:retro-explorer' },

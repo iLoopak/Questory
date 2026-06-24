@@ -66,7 +66,7 @@ export function getNavDescription(activeNavItem: NavItem) {
   }
 
   if (activeNavItem === 'Quest Runner') {
-    return 'A small runner game hidden in QuestShelf. Jump over backlog stacks.';
+    return 'A small runner game hidden in Questory. Jump over backlog stacks.';
   }
 
   return 'Local library and wishlist data stays on this device.';

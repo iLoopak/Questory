@@ -69,7 +69,7 @@ export function UndoToastStack({ actions, onDismiss, onOpenQueue, onOpenSteamSet
 
       onDismiss(actionId);
     } catch (error) {
-      console.warn('QuestShelf toast action failed.', error);
+      console.warn('Questory toast action failed.', error);
       setFailedActionIds((currentIds) => new Set(currentIds).add(actionId));
     } finally {
       setRunningActionKeys((currentKeys) => {

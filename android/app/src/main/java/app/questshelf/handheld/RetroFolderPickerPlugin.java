@@ -86,7 +86,7 @@ public class RetroFolderPickerPlugin extends Plugin {
             response.put("pickedNow", pickedNow);
             call.resolve(response);
         } catch (Exception error) {
-            call.reject("QuestShelf could not scan the selected folder.", error);
+            call.reject("Questory could not scan the selected folder.", error);
         }
     }
 
