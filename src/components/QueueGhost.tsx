@@ -227,10 +227,12 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
   const [coverRevealed, setCoverRevealed] = useState(false);
   const [peekRevealed, setPeekRevealed] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<CSSProperties>({});
+  const [ghostPortalStyle, setGhostPortalStyle] = useState<CSSProperties | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const ghostPortalRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const coverRotation = useMemo(
     () => randomBetween(MIN_COVER_ROTATION_DEGREES, MAX_COVER_ROTATION_DEGREES),
@@ -311,6 +313,35 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     setPortalHost(document.body);
   }, []);
 
+  // Portal the ghost body to document.body at fixed position so it's always in the root
+  // stacking context — above the sticky nav bar (z-50) regardless of any intermediate
+  // stacking contexts created by the scroll section or -webkit-overflow-scrolling: touch.
+  useEffect(() => {
+    function measure() {
+      if (!containerRef.current) return;
+      const r = containerRef.current.getBoundingClientRect();
+      if (r.top + r.height < 0 || r.top > window.innerHeight) {
+        setGhostPortalStyle(null);
+      } else {
+        setGhostPortalStyle({
+          position: 'fixed',
+          top: r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height || r.width,
+          zIndex: TOOLTIP_Z_INDEX,
+        });
+      }
+    }
+    measure();
+    window.addEventListener('scroll', measure, { passive: true, capture: true });
+    window.addEventListener('resize', measure, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', measure, { capture: true });
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     computeTooltipStyle();
@@ -326,10 +357,10 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent | TouchEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setCoverRevealed(false);
-      }
+      const target = e.target as Node;
+      if (ghostPortalRef.current?.contains(target)) return;
+      setOpen(false);
+      setCoverRevealed(false);
     }
     document.addEventListener('mousedown', handle, true);
     document.addEventListener('touchstart', handle, true);
@@ -387,92 +418,112 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     </div>
   ) : null;
 
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        ref={buttonRef}
-        aria-expanded={open || coverRevealed}
-        aria-haspopup="dialog"
-        aria-label={variant === 'cover' && cover && coverVisible ? (coverRevealed ? 'Dismiss Queue Ghost' : `Reveal carried cover for ${cover.title}`) : 'Dismiss Queue Ghost'}
-        className={`block outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95 ${variant === 'sleepy' ? 'opacity-[0.64]' : variant === 'peek' && !peekRevealed ? 'opacity-[0.62]' : 'opacity-[0.82]'}`}
-        type="button"
-        onClick={handleClick}
-        onMouseEnter={() => {
-          cancelClose();
-          if (variant === 'peek' && !peekRevealed) {
-            revealPeek();
-          } else if (cover && coverVisible) {
-            revealCover();
-          } else {
-            scheduleOpen();
-          }
-        }}
-        onMouseLeave={() => {
-          cancelOpen();
-          scheduleClose();
-        }}
+  const ghostBody = (
+    <button
+      ref={buttonRef}
+      aria-expanded={open || coverRevealed}
+      aria-haspopup="dialog"
+      aria-label={variant === 'cover' && cover && coverVisible ? (coverRevealed ? 'Dismiss Queue Ghost' : `Reveal carried cover for ${cover.title}`) : 'Dismiss Queue Ghost'}
+      className={`block outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95 ${variant === 'sleepy' ? 'opacity-[0.64]' : variant === 'peek' && !peekRevealed ? 'opacity-[0.62]' : 'opacity-[0.82]'}`}
+      type="button"
+      onClick={handleClick}
+      onMouseEnter={() => {
+        cancelClose();
+        if (variant === 'peek' && !peekRevealed) {
+          revealPeek();
+        } else if (cover && coverVisible) {
+          revealCover();
+        } else {
+          scheduleOpen();
+        }
+      }}
+      onMouseLeave={() => {
+        cancelOpen();
+        scheduleClose();
+      }}
+    >
+      <svg
+        aria-hidden="true"
+        className={`queue-ghost queue-ghost--${variant} h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}${variant === 'peek' && peekRevealed ? ' queue-ghost--peek-revealed' : ''}`}
+        fill="none"
+        style={{ '--queue-ghost-cover-rotation': `${coverRotation}deg` } as CSSProperties}
+        viewBox="0 0 96 96"
       >
-        <svg
-          aria-hidden="true"
-          className={`queue-ghost queue-ghost--${variant} h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}${variant === 'peek' && peekRevealed ? ' queue-ghost--peek-revealed' : ''}`}
-          fill="none"
-          style={{ '--queue-ghost-cover-rotation': `${coverRotation}deg` } as CSSProperties}
-          viewBox="0 0 96 96"
-        >
-          <ellipse className="queue-ghost-glow" cx="48" cy="76" rx="28" ry="8" />
-          <g className="queue-ghost-float">
-            <path
-              className="queue-ghost-body"
-              d="M48 12 C28 12 14 28 14 48 V66 C14 76 20 82 28 84 C34 86 38 78 44 84 C48 88 52 88 56 84 C62 78 66 86 72 84 C80 82 82 76 82 66 V48 C82 28 68 12 48 12Z"
-            />
-            <path
-              className="queue-ghost-accent"
-              d="M22 62 C28 66 34 67 42 64 C50 61 58 61 66 64 C72 66 76 65 82 62 V67 C82 76 80 82 72 84 C66 86 62 78 56 84 C52 88 48 88 44 84 C38 78 34 86 28 84 C20 82 14 76 14 66 V62 C16 61 18 61 22 62Z"
-            />
-            {variant === 'sleepy' ? (
-              <>
-                <path className="queue-ghost-eye queue-ghost-eye--closed" d="M33 43 C36 46 40 46 43 43" />
-                <path className="queue-ghost-eye queue-ghost-eye--closed" d="M53 43 C56 46 60 46 63 43" />
-                <text className="queue-ghost-zzz" x="63" y="25">Zzz</text>
-              </>
-            ) : variant === 'panic' ? (
-              <>
-                <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="8" />
-                <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="8" />
-                <path className="queue-ghost-mouth" d="M44 59 C47 55 51 55 54 59" />
-              </>
-            ) : (
-              <>
-                <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="7" />
-                <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="7" />
-                <circle cx="40" cy="40" r="1.5" fill="white" />
-                <circle cx="60" cy="40" r="1.5" fill="white" />
-                <path className="queue-ghost-mouth" d="M44 57 C46 59 50 59 52 57" />
-              </>
-            )}
-            {variant === 'achievement' && achievement ? (
-              <foreignObject className="queue-ghost-achievement-prop" x="55" y="48" width="28" height="28">
-                <div className="queue-ghost-achievement-badge" title={achievement.title}>
-                  <Icon name={achievement.icon} size={14} />
-                </div>
-              </foreignObject>
-            ) : null}
-            {variant === 'cover' && cover && coverVisible ? (
-              <foreignObject className="queue-ghost-cover-prop" x="52" y="50" width="25" height="34">
-                <img
-                  alt=""
-                  className="queue-ghost-cover-image"
-                  decoding="async"
-                  src={cover.imageUrl}
-                  onError={() => setCoverVisible(false)}
-                />
-              </foreignObject>
-            ) : null}
-          </g>
-        </svg>
-      </button>
+        <ellipse className="queue-ghost-glow" cx="48" cy="76" rx="28" ry="8" />
+        <g className="queue-ghost-float">
+          <path
+            className="queue-ghost-body"
+            d="M48 12 C28 12 14 28 14 48 V66 C14 76 20 82 28 84 C34 86 38 78 44 84 C48 88 52 88 56 84 C62 78 66 86 72 84 C80 82 82 76 82 66 V48 C82 28 68 12 48 12Z"
+          />
+          <path
+            className="queue-ghost-accent"
+            d="M22 62 C28 66 34 67 42 64 C50 61 58 61 66 64 C72 66 76 65 82 62 V67 C82 76 80 82 72 84 C66 86 62 78 56 84 C52 88 48 88 44 84 C38 78 34 86 28 84 C20 82 14 76 14 66 V62 C16 61 18 61 22 62Z"
+          />
+          {variant === 'sleepy' ? (
+            <>
+              <path className="queue-ghost-eye queue-ghost-eye--closed" d="M33 43 C36 46 40 46 43 43" />
+              <path className="queue-ghost-eye queue-ghost-eye--closed" d="M53 43 C56 46 60 46 63 43" />
+              <text className="queue-ghost-zzz" x="63" y="25">Zzz</text>
+            </>
+          ) : variant === 'panic' ? (
+            <>
+              <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="8" />
+              <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="8" />
+              <path className="queue-ghost-mouth" d="M44 59 C47 55 51 55 54 59" />
+            </>
+          ) : (
+            <>
+              <ellipse className="queue-ghost-eye" cx="38" cy="42" rx="5" ry="7" />
+              <ellipse className="queue-ghost-eye" cx="58" cy="42" rx="5" ry="7" />
+              <circle cx="40" cy="40" r="1.5" fill="white" />
+              <circle cx="60" cy="40" r="1.5" fill="white" />
+              <path className="queue-ghost-mouth" d="M44 57 C46 59 50 59 52 57" />
+            </>
+          )}
+          {variant === 'achievement' && achievement ? (
+            <foreignObject className="queue-ghost-achievement-prop" x="55" y="48" width="28" height="28">
+              <div className="queue-ghost-achievement-badge" title={achievement.title}>
+                <Icon name={achievement.icon} size={14} />
+              </div>
+            </foreignObject>
+          ) : null}
+          {variant === 'cover' && cover && coverVisible ? (
+            <foreignObject className="queue-ghost-cover-prop" x="52" y="50" width="25" height="34">
+              <img
+                alt=""
+                className="queue-ghost-cover-image"
+                decoding="async"
+                src={cover.imageUrl}
+                onError={() => setCoverVisible(false)}
+              />
+            </foreignObject>
+          ) : null}
+        </g>
+      </svg>
+    </button>
+  );
+
+  return (
+    <>
+      {/* Invisible placeholder — keeps layout space in the hero so CSS slot positioning
+          still dictates where the ghost should appear; used as the position reference. */}
+      <div
+        ref={containerRef}
+        aria-hidden="true"
+        style={{ width: '100%', aspectRatio: '1', visibility: 'hidden', pointerEvents: 'none' }}
+      />
+
+      {/* Ghost body portaled to document.body at position:fixed — always in the root stacking
+          context, so it renders above the sticky nav bar (z-50) regardless of any intermediate
+          stacking contexts inside the scroll section. */}
+      {portalHost && ghostPortalStyle ? createPortal(
+        <div ref={ghostPortalRef} style={ghostPortalStyle}>
+          {ghostBody}
+        </div>,
+        portalHost,
+      ) : null}
 
       {portalHost && tooltip ? createPortal(tooltip, portalHost) : null}
-    </div>
+    </>
   );
 }
