@@ -133,7 +133,7 @@ export function DailyQuestModal({
         role="dialog"
         aria-modal="true"
         aria-label={t('dailyQuest.title')}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border-t border-skyglass/20 bg-ink-950 sm:inset-0 sm:my-auto sm:rounded-2xl sm:border sm:border-skyglass/20"
+        className="qs-daily-quest-modal fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border-t border-skyglass/20 bg-ink-950 sm:inset-0 sm:my-auto sm:rounded-2xl sm:border sm:border-skyglass/20"
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-skyglass/12 px-4 py-3">

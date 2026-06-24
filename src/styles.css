@@ -101,6 +101,8 @@
   --qs-safe-bottom: env(safe-area-inset-bottom, 0px);
   --qs-safe-left: env(safe-area-inset-left, 0px);
   --qs-shell-gap: clamp(0.5rem, 1.4vw, 1rem);
+  --qs-handheld-safe-top: max(0.75rem, calc(var(--qs-safe-top) + 0.5rem));
+  --qs-handheld-safe-bottom: max(1rem, calc(var(--qs-safe-bottom) + 0.75rem));
 
   /* ── Typography scale ──────────────────────────────────── */
   --font-2xs:    0.625rem;
@@ -284,7 +286,7 @@ img {
 
 .qs-app-shell {
   min-height: 100dvh;
-  padding-bottom: max(0.75rem, var(--qs-safe-bottom));
+  padding-bottom: var(--qs-handheld-safe-bottom);
 }
 
 .qs-top-nav {
@@ -2193,6 +2195,23 @@ textarea,
   touch-action: auto;
 }
 
+.qs-viewport-modal:not(.qs-viewport-modal-fullscreen),
+.qs-action-sheet,
+.qs-game-actions-sheet,
+.qs-game-action-backdrop {
+  padding-top: max(0.5rem, var(--qs-safe-top));
+  padding-right: max(0.5rem, var(--qs-safe-right));
+  padding-bottom: max(0.5rem, var(--qs-safe-bottom));
+  padding-left: max(0.5rem, var(--qs-safe-left));
+}
+
+.qs-action-sheet-panel,
+.qs-game-actions-sheet > .relative,
+.qs-game-action-sheet {
+  max-height: calc(100dvh - max(0.5rem, var(--qs-safe-top)) - max(1rem, var(--qs-safe-bottom)));
+}
+
+
 .qs-modal-open .qs-header-back-to-top {
   opacity: 0;
   pointer-events: none;
@@ -2717,12 +2736,15 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-bottom: max(0.75rem, var(--qs-safe-bottom));
+  padding-top: var(--qs-handheld-safe-top);
+  padding-bottom: var(--qs-handheld-safe-bottom);
 }
 
 .qs-handheld-shell > section {
   flex: 1;
   min-height: 0;
+  scroll-padding-top: var(--qs-handheld-safe-top);
+  scroll-padding-bottom: var(--qs-handheld-safe-bottom);
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
@@ -2854,10 +2876,10 @@ body.qs-controller-active .qs-compact-card:focus-within {
   max-width: 52rem;
   margin-inline: auto;
   padding:
-    max(1.5rem, var(--qs-safe-top))
-    max(1.25rem, var(--qs-safe-right))
-    max(2rem, var(--qs-safe-bottom))
-    max(1.25rem, var(--qs-safe-left));
+    max(1.5rem, calc(var(--qs-safe-top) + 1rem))
+    max(1.25rem, calc(var(--qs-safe-right) + 1rem))
+    max(2rem, calc(var(--qs-safe-bottom) + 1rem))
+    max(1.25rem, calc(var(--qs-safe-left) + 1rem));
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -4108,5 +4130,17 @@ body.qs-controller-active .qs-compact-card:focus-within {
 
   .qs-review-utility-actions {
     display: none;
+  }
+}
+
+.qs-daily-quest-modal {
+  bottom: max(0px, var(--qs-safe-bottom));
+  max-height: calc(100dvh - max(0.5rem, var(--qs-safe-top)) - max(0.5rem, var(--qs-safe-bottom)));
+}
+
+@media (min-width: 640px) {
+  .qs-daily-quest-modal {
+    margin-top: max(0.5rem, var(--qs-safe-top));
+    margin-bottom: max(0.5rem, var(--qs-safe-bottom));
   }
 }
