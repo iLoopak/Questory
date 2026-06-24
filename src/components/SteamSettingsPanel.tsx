@@ -586,6 +586,7 @@ function SteamApiDebugSummary({ entries, latestEntry, steamId64 }: SteamApiDebug
         <div className="mt-3 min-w-0 rounded border border-white/10 bg-black/20 px-2 py-2 text-xs leading-5 text-slate-400">
           <div className="truncate">Endpoint: {latestEntry.endpoint}</div>
           <div className="truncate">Request: {latestEntry.requestUrl}</div>
+          <div className="line-clamp-3">Result: {latestEntry.responseSummary}</div>
         </div>
       ) : null}
     </div>
