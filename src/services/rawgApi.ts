@@ -1,3 +1,4 @@
+import { postIntegration } from '../lib/integrationProxy';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 import type { RawgGameDetails, RawgMetadata, RawgScreenshotList, RawgSearchResult } from '../types/rawg';
 
@@ -29,34 +30,34 @@ function getRawgApiKey() {
 }
 
 async function requestRawg<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+  const apiKey = getRawgApiKey();
+  if (!import.meta.env.DEV || import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL?.trim()) {
+    try {
+      const route = path === '/games' ? '/games' : path.endsWith('/screenshots') ? '/games/{id}/screenshots' : '/games/{id}';
+      const rawgId = path.match(/^\/games\/(\d+)/)?.[1];
+      const payload = await postIntegration<{ response: T }>('rawg', 'request', { apiKey, route, rawgId, params });
+      return payload.response;
+    } catch (error) {
+      throw mapRawgProxyError(error);
+    }
+  }
+
   const url = new URL(`${RAWG_API_BASE_URL}${path}`);
-  url.searchParams.set('key', getRawgApiKey());
-
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value);
-  });
-
+  url.searchParams.set('key', apiKey);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   let response: Response;
-
-  try {
-    response = await fetch(url);
-  } catch {
-    throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure');
-  }
-
-  if (response.status === 429 || response.status === 503) {
-    throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
-  }
-
-  if (!response.ok) {
-    throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
-  }
-
+  try { response = await fetch(url); } catch { throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure'); }
+  if (response.status === 429 || response.status === 503) throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
+  if (response.status === 401 || response.status === 403) throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
+  if (!response.ok) throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
   return (await response.json()) as T;
+}
+
+function mapRawgProxyError(error: unknown): RawgApiError {
+  const code = typeof (error as { code?: unknown })?.code === 'string' ? (error as { code: string }).code : '';
+  if (code === 'INVALID_API_KEY') return new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
+  if (code === 'RATE_LIMITED' || code === 'PROVIDER_UNAVAILABLE' || code === 'PROVIDER_TIMEOUT') return new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
+  return new RawgApiError(error instanceof Error ? error.message : 'RAWG request failed through the integration proxy.', 'api-failure');
 }
 
 export async function searchGameByName(title: string): Promise<RawgSearchResult[]> {

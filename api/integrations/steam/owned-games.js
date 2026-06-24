@@ -1,0 +1,7 @@
+import { endpoint, requireString, upstreamJson } from '../_shared/proxy.js';
+export default (req,res)=>endpoint(req,res,'steam',async(body)=>{
+ const apiKey=requireString(body,'apiKey','steam','Steam API key'); const steamId64=requireString(body,'steamId64','steam','SteamID64');
+ const url=new URL('https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/');
+ url.searchParams.set('key',apiKey); url.searchParams.set('steamid',steamId64); url.searchParams.set('format','json'); url.searchParams.set('include_appinfo','true'); url.searchParams.set('include_played_free_games','true');
+ return {success:true,provider:'steam',response:await upstreamJson('steam',url)};
+});

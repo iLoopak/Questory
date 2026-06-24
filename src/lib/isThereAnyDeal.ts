@@ -1,5 +1,6 @@
 import type { Game } from '../types/game';
 import type { ItadMatchConfidence } from '../types/itad';
+import { postIntegration } from './integrationProxy';
 
 const directItadApiBaseUrl = 'https://api.isthereanydeal.com';
 const developmentItadApiBaseUrl = '/api/itad';
@@ -146,7 +147,9 @@ async function findItadGameByTitle(title: string, apiKey: string): Promise<ItadM
   url.searchParams.set('title', title);
   url.searchParams.set('results', '5');
 
-  const results = await itadFetch<ItadSearchResult[]>(url, apiKey);
+  const results = shouldUseItadIntegrationProxy()
+    ? (await postIntegration<{ response: ItadSearchResult[] }>('itad', 'search', { apiKey, title, results: '5' })).response
+    : await itadFetch<ItadSearchResult[]>(url, apiKey);
   const normalizedTitle = normalizeTitle(title);
   const exactMatches = results.filter((result) => normalizeTitle(result.title) === normalizedTitle && result.type !== 'dlc');
 
@@ -173,10 +176,12 @@ async function fetchOverviewForMatches(matches: ItadMatch[], apiKey: string) {
     url.searchParams.set('country', defaultCountry);
     url.searchParams.set('vouchers', 'true');
 
-    const response = await itadFetch<ItadOverviewResponse>(url, apiKey, {
-      body: JSON.stringify(batch.map((match) => match.id)),
-      method: 'POST',
-    });
+    const response = shouldUseItadIntegrationProxy()
+      ? (await postIntegration<{ response: ItadOverviewResponse }>('itad', 'overview', { apiKey, ids: batch.map((match) => match.id), country: defaultCountry })).response
+      : await itadFetch<ItadOverviewResponse>(url, apiKey, {
+        body: JSON.stringify(batch.map((match) => match.id)),
+        method: 'POST',
+      });
 
     response.prices?.forEach((entry) => {
       deals.set(entry.id, mapOverviewEntryToDealSummary(entry));
@@ -290,4 +295,8 @@ function normalizeTitle(title: string) {
     .replace(/\b(edition|standard edition|game of the year|goty)\b/g, '')
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+function shouldUseItadIntegrationProxy() {
+  return !import.meta.env.DEV || Boolean(import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL?.trim());
 }

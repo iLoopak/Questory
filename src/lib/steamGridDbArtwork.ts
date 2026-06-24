@@ -2,6 +2,7 @@ import { isMissingOrGeneratedCover, getStoredArtworkSource } from './gameCoverIm
 import { getMetadataSearchTitle } from './rawgMetadataEnrichment';
 import type { Game } from '../types/game';
 import { loadSteamGridDbSettings } from './steamGridDbSettingsStorage';
+import { postIntegration } from './integrationProxy';
 
 export type SteamGridDbArtwork = Partial<Pick<Game, 'coverImage' | 'wideCoverImage' | 'heroImage' | 'logoImage' | 'iconImage' | 'artworkSource' | 'artworkUpdatedAt' | 'artworkSourceMetadata'>>;
 
@@ -61,7 +62,9 @@ export async function fetchSteamGridDbArtworkForGame(game: Game, options: FetchS
 
   let response: Response;
   try {
-    response = await fetch(`/api/steamgriddb/artwork?${params.toString()}`, init);
+    response = shouldUseSteamGridDbIntegrationProxy()
+      ? makeJsonResponse(await postIntegration<SteamGridDbArtwork>('steamgriddb', 'artwork', { apiKey, steamAppId: game.steamAppId, title }))
+      : await fetch(`/api/steamgriddb/artwork?${params.toString()}`, init);
   } catch {
     return null;
   }
@@ -98,7 +101,9 @@ export async function fetchSteamGridDbArtworkCandidates(game: Game): Promise<Ste
 
   let response: Response;
   try {
-    response = await fetch(`/api/steamgriddb/artwork?${params.toString()}`, init);
+    response = shouldUseSteamGridDbIntegrationProxy()
+      ? makeJsonResponse(await postIntegration<SteamGridDbArtworkCandidates>('steamgriddb', 'artwork', { apiKey, steamAppId: game.steamAppId, title, mode: 'candidates' }))
+      : await fetch(`/api/steamgriddb/artwork?${params.toString()}`, init);
   } catch {
     return { status: 'error' };
   }
@@ -147,7 +152,9 @@ export async function testSteamGridDbConnection(game: Game, options: FetchSteamG
     : undefined;
 
   try {
-    const response = await fetch(`/api/steamgriddb/artwork?${params.toString()}&test=1`, init);
+    const response = shouldUseSteamGridDbIntegrationProxy()
+      ? makeJsonResponse(await postIntegration<SteamGridDbArtwork>('steamgriddb', 'artwork', { apiKey, steamAppId: game.steamAppId, title, test: true }))
+      : await fetch(`/api/steamgriddb/artwork?${params.toString()}&test=1`, init);
     const body = await readSteamGridDbTestBody(response);
     if (response.ok) {
       const artwork = sanitizeArtworkResponse(body as SteamGridDbArtwork);
@@ -279,4 +286,12 @@ function getSteamGridDbTestMessage(status: SteamGridDbTestStatus, body: Record<s
     case 'network-error': return 'SteamGridDB test failed because of a network or dev endpoint error.';
     default: return 'SteamGridDB provider returned an unexpected error.';
   }
+}
+
+function shouldUseSteamGridDbIntegrationProxy() {
+  return !import.meta.env.DEV || Boolean(import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL?.trim());
+}
+
+function makeJsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
