@@ -43,10 +43,9 @@ type ShelfIdentityEditorProps = {
   onIdentityChange: (identity: ShelfIdentitySettings) => void;
   shelfNamePlaceholder?: string;
   steamAvatarUrl?: string;
-  steamPersonaName?: string;
 };
 
-export function ShelfIdentityEditor({ identity, onIdentityChange, shelfNamePlaceholder = 'Loopak', steamAvatarUrl, steamPersonaName }: ShelfIdentityEditorProps) {
+export function ShelfIdentityEditor({ identity, onIdentityChange, shelfNamePlaceholder = 'Your shelf nickname', steamAvatarUrl }: ShelfIdentityEditorProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploadStatus, setUploadStatus] = useState('');
   const setSelection = (avatarSelection: ShelfAvatarSelection) => onIdentityChange({ ...identity, avatarSelection, shelfAvatar: avatarSelection });
@@ -62,13 +61,13 @@ export function ShelfIdentityEditor({ identity, onIdentityChange, shelfNamePlace
   }
   const options: Array<{ label: string; value: ShelfAvatarSelection; recommended?: boolean }> = [
     { label: 'QuestShelf Q', value: 'app-icon' },
-    ...(steamAvatarUrl ? [{ label: `Steam avatar${steamPersonaName ? ` · ${steamPersonaName}` : ''}`, value: 'steam' as const, recommended: true }] : []),
+    ...(steamAvatarUrl ? [{ label: 'Steam avatar', value: 'steam' as const, recommended: true }] : []),
     ...builtInAvatars.map((avatar) => ({ label: avatar.label, value: `built-in:${avatar.id}` as ShelfAvatarSelection })),
     ...(identity.customAvatarDataUrl ? [{ label: 'Custom upload', value: 'custom' as const }] : []),
   ];
   return <div className="space-y-4">
     <label className="block"><span className="qs-label-caps text-muted">Name / Nickname</span><input className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" maxLength={48} onChange={(event) => onIdentityChange({ ...identity, shelfName: event.target.value })} placeholder={shelfNamePlaceholder} value={identity.shelfName} /></label>
-    <div><div className="qs-label-caps text-muted">Avatar</div><div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{options.map((option) => <button aria-pressed={identity.avatarSelection === option.value} className={`flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition ${identity.avatarSelection === option.value ? 'border-mint/60 bg-mint/10 text-white shadow-glow' : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/35'}`} key={option.value} onClick={() => setSelection(option.value)} type="button"><ShelfAvatar {...identity} avatarSelection={option.value} isActive={identity.avatarSelection === option.value} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-11 w-11" /><span><strong>{option.label}</strong>{option.recommended ? <span className="mt-1 block text-xs text-mint">Recommended</span> : null}</span></button>)}</div></div>
+    <div><div className="qs-label-caps text-muted">Avatar</div><div className="mt-2 grid auto-rows-fr gap-2 sm:grid-cols-2 xl:grid-cols-3">{options.map((option) => <button aria-pressed={identity.avatarSelection === option.value} className={`flex h-full min-h-20 items-center gap-3 rounded-lg border p-3 text-left text-sm transition ${identity.avatarSelection === option.value ? 'border-mint/60 bg-mint/10 text-white shadow-glow' : 'border-skyglass/15 bg-ink-900/70 text-slate-300 hover:border-mint/35'}`} key={option.value} onClick={() => setSelection(option.value)} type="button"><ShelfAvatar {...identity} avatarSelection={option.value} isActive={identity.avatarSelection === option.value} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-11 w-11 shrink-0" /><span className="min-w-0 flex-1 overflow-hidden"><strong className="line-clamp-2 block overflow-hidden break-words leading-5">{option.label}</strong>{option.recommended ? <span className="mt-1 block text-xs text-mint">Recommended</span> : null}</span></button>)}</div></div>
     <div className="flex flex-wrap items-center gap-2"><input accept="image/*" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} ref={inputRef} type="file" /><button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 hover:bg-mint/10" onClick={() => inputRef.current?.click()} type="button">Upload custom avatar</button><span className="text-xs text-slate-500">Resized locally for PWA and Android storage.</span></div>{uploadStatus ? <div className="rounded-md border border-skyglass/15 bg-ink-900 px-3 py-2 text-sm text-slate-300">{uploadStatus}</div> : null}
   </div>;
 }
