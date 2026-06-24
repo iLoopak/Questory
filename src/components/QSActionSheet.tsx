@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { getGameCoverSources } from '../lib/gameCoverImages';
+import { GameCoverImage } from './GameCoverImage';
 import { Icon, type IconName } from './Icon';
 import { PlatformBadge } from './PlatformBadge';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
@@ -31,7 +31,6 @@ export function QSActionSheet({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
 
-  const coverSource = getGameCoverSources(game)[0];
   const platformLabel: GamePlatform =
     queueState.entries.find((e) => e.gameId === game.id)?.targetPlatform ?? game.platform;
   const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}h played` : null;
@@ -131,13 +130,7 @@ export function QSActionSheet({
             {/* Game header */}
             <div className="mb-5 flex gap-3.5">
               <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800 shadow-panel">
-                {coverSource ? (
-                  <img alt="" className="h-full w-full object-cover" src={coverSource} />
-                ) : (
-                  <div className="grid h-full place-items-center text-xl font-bold text-mint/50">
-                    {game.title.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
+                <GameCoverImage className="h-full w-full object-cover" game={game} />
               </div>
               <div className="min-w-0 flex-1 py-0.5">
                 <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>

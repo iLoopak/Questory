@@ -8,7 +8,7 @@ import { Icon, type IconName } from './Icon';
 import type { Game, GameStatus } from '../types/game';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
-import { getGameCoverSources } from '../lib/gameCoverImages';
+import { GameCoverImage } from './GameCoverImage';
 
 type GameActionMenuProps = {
   game: Game;
@@ -193,7 +193,6 @@ function GameActionMenuOverlay({
     [game, includeDetails, onAddToQueue, onAddToWishlist, onClose, onFindMetadata, onMoveToLibrary, onOpenDetails, onRemove, onRemoveAndIgnore, onStatusChange, t],
   );
 
-  const coverSrc = getGameCoverSources(game)[0];
   const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}h played` : null;
 
   useEffect(() => {
@@ -269,13 +268,7 @@ function GameActionMenuOverlay({
       >
         <div className="qs-game-action-header qs-sheet-drag-region" {...dragHandleProps}>
           <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800">
-            {coverSrc ? (
-              <img alt="" className="h-full w-full object-cover" src={coverSrc} />
-            ) : (
-              <div className="grid h-full place-items-center text-xl font-bold text-mint/50">
-                {game.title.slice(0, 1).toUpperCase()}
-              </div>
-            )}
+            <GameCoverImage className="h-full w-full object-cover" game={game} />
           </div>
           <div className="min-w-0 flex-1">
             <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
