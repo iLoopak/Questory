@@ -95,6 +95,10 @@ export function OnboardingChecklist({
   const progressPercent = Math.round((finishedCount / steps.length) * 100);
   const stepComplete = completedItemIds.has(activeStep.id);
   const stepSkipped = skippedItemIds.has(activeStep.id);
+  const nextRequiresCurrentStep = activeStep.id === 'steam-connect' && !stepComplete && !stepSkipped;
+  const nextButtonClassName = stepComplete
+    ? 'h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950 shadow-glow ring-2 ring-mint/40'
+    : 'h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300';
 
   function goNext() { setActiveStepIndex((index) => Math.min(index + 1, steps.length - 1)); }
   function goToNextIncompleteStep(handledStepId: OnboardingItemId) {
@@ -171,7 +175,7 @@ export function OnboardingChecklist({
             </span>
           </div>
           <div key={activeStepIndex} className="qs-setup-step-body">
-            {activeStep.id === 'steam-connect' ? <SteamStep games={games} onComplete={() => { onComplete('steam-connect'); goNext(); }} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
+            {activeStep.id === 'steam-connect' ? <SteamStep games={games} isComplete={stepComplete} onComplete={() => onComplete('steam-connect')} onContinue={goNext} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={personalizedQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
             {activeStep.id === 'how-it-works' ? <HowItWorksStep onComplete={() => { onComplete('how-it-works'); goNext(); }} onSkip={skipStep} /> : null}
             {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={personalizedQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${finishedCount}/${steps.length}`} /> : null}
@@ -187,11 +191,16 @@ export function OnboardingChecklist({
           >
             {t('action.back')}
           </button>
-          <div className="flex gap-2">
+          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+            {activeStep.id === 'steam-connect' && stepComplete ? (
+              <p className="rounded-full border border-mint/40 bg-mint/10 px-3 py-1.5 text-sm font-semibold text-mint" role="status">
+                ✓ Steam setup completed. You can continue to the next step.
+              </p>
+            ) : null}
             <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm text-slate-300" onClick={skipStep} type="button">
               {t('onboarding.skipStep')}
             </button>
-            <button className="h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950" onClick={goNext} type="button">
+            <button className={nextButtonClassName} disabled={nextRequiresCurrentStep} onClick={goNext} type="button">
               {activeStepIndex === steps.length - 1 ? t('onboarding.stayHere') : t('onboarding.next')}
             </button>
           </div>
@@ -204,7 +213,7 @@ export function OnboardingChecklist({
 
 type SteamImportResult = { status: 'success'; importedCount: number; skippedCount: number } | { status: 'error'; message: string };
 
-function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImported, onSteamProfileNameChange }: { games: Game[]; onComplete: () => void; onImportGames: (games: Game[]) => Game[]; onSkip: () => void; onSteamLibraryImported?: () => void; onSteamProfileNameChange?: (profileName: string) => void }) {
+function SteamStep({ games, isComplete, onComplete, onContinue, onImportGames, onSkip, onSteamLibraryImported, onSteamProfileNameChange }: { games: Game[]; isComplete: boolean; onComplete: () => void; onContinue: () => void; onImportGames: (games: Game[]) => Game[]; onSkip: () => void; onSteamLibraryImported?: () => void; onSteamProfileNameChange?: (profileName: string) => void }) {
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
   const [status, setStatus] = useState('Enter your credentials below, then click Import to bring in your library.');
   const [importResult, setImportResult] = useState<SteamImportResult | null>(null);
@@ -227,10 +236,11 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
       const createdGames = onImportGames(mapped);
       const skippedCount = Math.max(0, ownedGames.length - createdGames.length);
       if (profile) setSettings({ ...settings, profile: { ...profile, updatedAt: new Date().toISOString() } });
-      if (createdGames.length > 0) onSteamLibraryImported?.();
+      onSteamLibraryImported?.();
+      onComplete();
       if (profile) onSteamProfileNameChange?.(profile.personaName || profile.profileName || '');
       setImportResult({ status: 'success', importedCount: createdGames.length, skippedCount });
-      setStatus(`Imported ${createdGames.length} Steam games.`);
+      setStatus('✓ Steam setup completed. You can continue to the next step.');
     } catch (error) {
       const message = error instanceof SteamApiError ? error.message : 'Steam import failed. Check credentials and profile privacy.';
       setStatus(message);
@@ -286,9 +296,10 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
       {importResult?.status === 'success' ? (
         <div className="mt-5 rounded-lg border border-mint/30 bg-mint/10 p-4 text-sm text-slate-100">
           <p className="text-base font-semibold text-mint">Steam import complete</p>
+          <p className="mt-1 font-semibold text-mint" role="status">✓ Steam setup completed. You can continue to the next step.</p>
           <p className="mt-1">Imported {importResult.importedCount} Steam games.</p>
           {importResult.skippedCount > 0 ? <p className="mt-1 text-slate-300">Skipped {importResult.skippedCount} games that were already in your library.</p> : null}
-          <button className="mt-4 h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950" onClick={onComplete} type="button">Continue</button>
+          <button className="mt-4 h-11 rounded-md bg-mint px-5 text-sm font-semibold text-ink-950 shadow-glow ring-2 ring-mint/40" onClick={onContinue} type="button">Continue</button>
         </div>
       ) : null}
       {importResult?.status === 'error' ? (
@@ -297,7 +308,7 @@ function SteamStep({ games, onComplete, onImportGames, onSkip, onSteamLibraryImp
           <p className="mt-1">{importResult.message}</p>
         </div>
       ) : null}
-      <Actions primary={importResult?.status === 'error' ? 'Try again' : 'Import Steam Library'} onPrimary={importLibrary} onSkip={onSkip} loading={isLoading} />
+      <Actions disabled={isComplete && importResult?.status === 'success'} primary={importResult?.status === 'error' ? 'Try again' : isComplete && importResult?.status === 'success' ? 'Steam setup completed' : 'Import Steam Library'} onPrimary={importLibrary} onSkip={onSkip} loading={isLoading} />
     </div>
   );
 }
