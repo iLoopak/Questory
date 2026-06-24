@@ -8,7 +8,7 @@ type ShelfProfilePopoverProps = {
   activeAchievement?: QuestShelfAchievementProgress | null;
   avatar: ReactNode;
   featuredGame?: Game | null;
-  onOpenPersonalization: () => void;
+  onOpenSettings: () => void;
   onOpenPlayingNow: () => void;
   playingNowGame?: Game | null;
   shelfName: string;
@@ -33,7 +33,7 @@ export function ShelfProfilePopover({
   activeAchievement,
   avatar,
   featuredGame,
-  onOpenPersonalization,
+  onOpenSettings,
   onOpenPlayingNow,
   playingNowGame,
   shelfName,
@@ -86,7 +86,7 @@ export function ShelfProfilePopover({
       <div className="border-b border-skyglass/15 py-2">
         <button
           className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/70"
-          onClick={onOpenPersonalization}
+          onClick={onOpenSettings}
           role="menuitem"
           type="button"
         >

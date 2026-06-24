@@ -975,7 +975,7 @@ export function AppController() {
     setIsShelfProfileOpen(false);
     setSelectedGameId(null);
     setActiveNavItem('Settings');
-    setActiveSettingsCategory('Personalization');
+    setActiveSettingsCategory(null);
   }
 
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
@@ -1041,7 +1041,7 @@ export function AppController() {
                 activeAchievement={activeShelfAchievement}
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
                 featuredGame={resolvedFeaturedGame}
-                onOpenPersonalization={openSettingsFromShelfProfile}
+                onOpenSettings={openSettingsFromShelfProfile}
                 onOpenPlayingNow={openPlayingNowHubFromShelfProfile}
                 playingNowGame={playingNowGame}
                 shelfName={personalizedQuestShelfTitle}
