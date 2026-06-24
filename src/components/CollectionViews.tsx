@@ -75,8 +75,9 @@ export function CollectionGrid({
   scrollElementRef,
 }: CollectionViewProps) {
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const renderedGridRef = useRef<HTMLDivElement | null>(null);
   const [columns, setColumns] = useState(1);
-  const rowHeight = useMemo(() => getVirtualGridRowHeight(), []);
+  const [rowHeight, setRowHeight] = useState(() => getVirtualGridRowHeight());
   const platformLabelByGameId = usePlatformLabelMap(games, platformQueueState);
 
   useLayoutEffect(() => {
@@ -116,6 +117,57 @@ export function CollectionGrid({
   const endItemIndex = Math.min(games.length, (virtualRows.endIndex + 1) * columns);
   const renderedGames = games.slice(startItemIndex, endItemIndex);
 
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    let animationFrame = 0;
+
+    function measureRowHeight() {
+      const grid = renderedGridRef.current;
+
+      if (!grid) {
+        return;
+      }
+
+      const renderedRowCount = Math.ceil(renderedGames.length / Math.max(1, columns));
+
+      if (renderedRowCount <= 0) {
+        setRowHeight(getVirtualGridRowHeight());
+        return;
+      }
+
+      const computedStyle = window.getComputedStyle(grid);
+      const rowGap = Number.parseFloat(computedStyle.rowGap || computedStyle.gap || '0') || 0;
+      const measuredRowHeight = Math.ceil((grid.scrollHeight + rowGap) / renderedRowCount);
+
+      if (!Number.isFinite(measuredRowHeight) || measuredRowHeight <= 0) {
+        return;
+      }
+
+      setRowHeight((currentHeight) => currentHeight === measuredRowHeight ? currentHeight : measuredRowHeight);
+    }
+
+    function scheduleMeasure() {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(measureRowHeight);
+    }
+
+    scheduleMeasure();
+
+    const resizeObserver = typeof ResizeObserver !== 'undefined' && renderedGridRef.current ? new ResizeObserver(scheduleMeasure) : null;
+    resizeObserver?.observe(renderedGridRef.current as Element);
+    Array.from(renderedGridRef.current?.children ?? []).forEach((child) => resizeObserver?.observe(child));
+    window.addEventListener('resize', scheduleMeasure);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleMeasure);
+    };
+  }, [columns, renderedGames.length]);
+
   useEffect(() => {
     if (!import.meta.env.DEV) {
       return;
@@ -134,12 +186,15 @@ export function CollectionGrid({
       columns,
       viewportHeight: virtualRows.viewportSize,
       containerHeight: container?.clientHeight ?? null,
+      measuredRowHeight: rowHeight,
+      virtualTotalHeight: virtualRows.totalSize,
     });
-  }, [columns, debugLabel, endItemIndex, games.length, renderedGames.length, scrollElementRef, startItemIndex, virtualRows.endIndex, virtualRows.startIndex, virtualRows.viewportSize]);
+  }, [columns, debugLabel, endItemIndex, games.length, renderedGames.length, rowHeight, scrollElementRef, startItemIndex, virtualRows.endIndex, virtualRows.startIndex, virtualRows.totalSize, virtualRows.viewportSize]);
 
   return (
     <div ref={gridRef} className="relative" style={{ height: virtualRows.totalSize }}>
       <div
+        ref={renderedGridRef}
         className="qs-game-grid absolute left-0 top-0 w-full grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2 2xl:grid-cols-4"
         style={{ transform: `translateY(${virtualRows.offsetBefore}px)` }}
       >
@@ -890,7 +945,10 @@ function getVirtualGridColumns(width: number) {
     return 1;
   }
 
-  const minimumCardWidth = 256;
+  const isHandheld = typeof window !== 'undefined' && window.matchMedia(
+    '(orientation: landscape) and (max-height: 620px), (pointer: coarse) and (max-width: 940px)'
+  ).matches;
+  const minimumCardWidth = isHandheld ? 200 : 256;
   const gap = 8;
   const measuredColumns = Math.max(1, Math.floor((width + gap) / (minimumCardWidth + gap)));
   const largeScreenColumnCap = typeof window !== 'undefined' && window.innerWidth >= 1536 ? 4 : measuredColumns;
