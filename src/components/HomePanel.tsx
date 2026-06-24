@@ -6,6 +6,7 @@ import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
 import { QueueGhost, getQueueGhostVariant, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
 import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
+import { GameCoverImage } from './GameCoverImage';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import { getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
 import { loadAchievementCounters } from '../lib/achievementCounters';
@@ -810,7 +811,6 @@ function GamePosterButton({
   activitySignal?: string | null;
 }) {
   const { t } = useI18n();
-  const coverSource = getPreferredArtworkSources(game, 'portrait')[0] ?? null;
   const ambientSource = getPreferredArtworkSources(game, 'landscape')[0] ?? null;
   const logoUrl = getPreferredLogoUrl(game);
   const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
@@ -830,6 +830,7 @@ function GamePosterButton({
             className="h-full w-full scale-105 object-cover opacity-[0.12] blur-sm"
             decoding="async"
             loading="lazy"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             src={ambientSource}
           />
           <div className="absolute inset-0 bg-ink-950/60" />
@@ -838,19 +839,7 @@ function GamePosterButton({
 
       {/* Portrait cover */}
       <span className={`relative shrink-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-800 ${hero ? 'h-24 w-16' : 'h-20 w-[3.25rem]'}`}>
-        {coverSource ? (
-          <img
-            alt=""
-            className="h-full w-full object-cover"
-            decoding="async"
-            loading="lazy"
-            src={coverSource}
-          />
-        ) : (
-          <span className="grid h-full w-full place-items-center text-lg font-semibold text-mint/60">
-            {game.title.slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
       </span>
 
       {/* Text + metadata */}
@@ -1016,8 +1005,6 @@ function WishlistDealCard({
   onClick: () => void;
   t: ReturnType<typeof useI18n>['t'];
 }) {
-  const coverSources = getPreferredArtworkSources(game, 'portrait');
-  const coverSource = coverSources[0];
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
     typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
@@ -1032,13 +1019,7 @@ function WishlistDealCard({
       type="button"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-ink-800">
-        {coverSource ? (
-          <img alt="" className="h-full w-full object-cover" decoding="async" loading="lazy" src={coverSource} />
-        ) : (
-          <div className="grid h-full place-items-center text-3xl font-bold text-mint/40">
-            {game.title.slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
         {discount ? (
           <div className="absolute left-1.5 top-1.5 rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">
             {discount}
@@ -1072,7 +1053,6 @@ function WishlistDealActionSheet({
   onOpenDetails: (game: Game) => void;
 }) {
   const { t } = useI18n();
-  const coverSource = getPreferredArtworkSources(game, 'portrait')[0];
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
     typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
@@ -1105,13 +1085,7 @@ function WishlistDealActionSheet({
         <div className="px-4 pb-2 pt-1">
           <div className="mb-5 flex gap-3.5">
             <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800 shadow-panel">
-              {coverSource ? (
-                <img alt="" className="h-full w-full object-cover" src={coverSource} />
-              ) : (
-                <div className="grid h-full place-items-center text-xl font-bold text-mint/50">
-                  {game.title.slice(0, 1).toUpperCase()}
-                </div>
-              )}
+              <GameCoverImage className="h-full w-full object-cover" game={game} />
             </div>
             <div className="min-w-0 flex-1 py-0.5">
               <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>

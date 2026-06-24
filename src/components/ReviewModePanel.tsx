@@ -12,6 +12,7 @@ import { getControllerButtonLabels, type ConfirmCancelConvention } from '../lib/
 import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources, getGeneratedFallbackCover, hasFallbackArtwork } from '../lib/gameCoverImages';
+import { GameCoverImage } from './GameCoverImage';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -1351,7 +1352,6 @@ function BatchCelebrationCovers({ games }: { games: Game[] }) {
   return (
     <div aria-hidden="true" className="mt-5 flex items-end justify-center gap-1.5 overflow-hidden" style={{ height: '5.5rem' }}>
       {tiles.map((game, index) => {
-        const src = getGameCoverSources(game)[0] ?? null;
         const rotation = TILE_ROTATIONS[index] ?? 0;
         const variant = TILE_FLOAT_VARIANTS[index] ?? 'a';
         const duration = TILE_DURATIONS[index] ?? 2.7;
@@ -1372,9 +1372,7 @@ function BatchCelebrationCovers({ games }: { games: Game[] }) {
               animationFillMode: 'both',
             } as CSSProperties}
           >
-            {src ? (
-              <img alt="" className="h-full w-full object-cover" decoding="async" loading="eager" src={src} />
-            ) : null}
+            <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="eager" />
           </span>
         );
       })}
