@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 import type { Game } from '../types/game';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 type CompletionRatingSheetProps = {
   game: Game;
@@ -13,6 +14,8 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
   const { t } = useI18n();
   const [selected, setSelected] = useState(game.rating ?? 0);
   const [hovered, setHovered] = useState(0);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose: onSkip });
   const displayRating = hovered || selected;
 
   useEffect(() => {
@@ -33,10 +36,11 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
       <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" onClick={onSkip} />
       <div
         className="relative rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        style={{ paddingBottom: 'max(1.5rem, var(--qs-safe-bottom))' }}
+        ref={panelRef}
+        style={{ paddingBottom: 'max(1.5rem, var(--qs-safe-bottom))', ...dragStyle }}
       >
-        <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1.5 w-16 rounded-full bg-skyglass/35" />
+        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}>
+          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
         </div>
         <div className="px-5 pb-2 pt-2">
           <div className="mb-5 text-center">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 type ViewportModalPlacement = 'bottom-sheet' | 'center' | 'fullscreen';
 
@@ -114,12 +115,14 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, p
     }
   }
 
+  const isFullscreen = placement === 'fullscreen';
+  const isCentered = placement === 'center';
+  const isBottomSheet = placement === 'bottom-sheet';
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef: dialogRef, onClose });
+
   if (typeof document === 'undefined') {
     return null;
   }
-
-  const isFullscreen = placement === 'fullscreen';
-  const isCentered = placement === 'center';
 
   const backdropClassName = isFullscreen
     ? 'qs-viewport-modal qs-viewport-modal-fullscreen fixed inset-0 overflow-y-auto'
@@ -146,8 +149,14 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, p
         onClick={isFullscreen ? undefined : (event) => event.stopPropagation()}
         ref={dialogRef}
         role="dialog"
+        style={isBottomSheet ? dragStyle : undefined}
         tabIndex={-1}
       >
+        {isBottomSheet ? (
+          <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3 sm:hidden" {...dragHandleProps}>
+            <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
+          </div>
+        ) : null}
         {children}
       </section>
     </div>,

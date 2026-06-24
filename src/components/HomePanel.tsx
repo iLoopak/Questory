@@ -20,6 +20,7 @@ import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 import { PlatformBadge } from './PlatformBadge';
 import { QSActionSheet } from './QSActionSheet';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -1053,6 +1054,8 @@ function WishlistDealActionSheet({
   onOpenDetails: (game: Game) => void;
 }) {
   const { t } = useI18n();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
   const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
   const price =
     typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
@@ -1077,10 +1080,11 @@ function WishlistDealActionSheet({
       <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
       <div
         className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}
+        ref={panelRef}
+        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))', ...dragStyle }}
       >
-        <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1.5 w-16 rounded-full bg-skyglass/35" />
+        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}>
+          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
         </div>
         <div className="px-4 pb-2 pt-1">
           <div className="mb-5 flex gap-3.5">
@@ -1692,6 +1696,8 @@ function SyncMaintenanceSheet({
   onSyncSteamPlaytime?: () => void;
 }) {
   const { t } = useI18n();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
   const isItadSyncing = itadDealSyncState?.status === 'loading';
 
   useEffect(() => {
@@ -1705,8 +1711,8 @@ function SyncMaintenanceSheet({
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={t('home.syncMaintenance')}>
       <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl" style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))' }}>
-        <div className="flex justify-center pb-2 pt-3"><div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" /></div>
+      <div ref={panelRef} className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl" style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))', ...dragStyle }}>
+        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}><div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" /></div>
         <div className="px-4 pb-2 pt-1">
           <h3 className="mb-4 text-base font-bold text-white">{t('home.syncMaintenance')}</h3>
           <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">

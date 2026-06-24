@@ -15,6 +15,7 @@ import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources, getGeneratedFallbackCover, hasFallbackArtwork } from '../lib/gameCoverImages';
 import { GameCoverImage } from './GameCoverImage';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { PlatformBadge } from './PlatformBadge';
@@ -1121,6 +1122,8 @@ function GameActionsSheet({
 }) {
   const { t } = useI18n();
   const firstButtonRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
   const externalLinks = getGameActionExternalLinks(game, t);
 
   useEffect(() => {
@@ -1153,8 +1156,10 @@ function GameActionsSheet({
         onClick={onClose}
         type="button"
       />
-      <div className="relative max-h-[82dvh] overflow-y-auto rounded-t-3xl border-t border-skyglass/20 bg-ink-950 p-4 pb-[max(1rem,var(--qs-safe-bottom))] shadow-2xl">
-        <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-skyglass/35" aria-hidden="true" />
+      <div ref={panelRef} className="relative max-h-[82dvh] overflow-y-auto rounded-t-3xl border-t border-skyglass/20 bg-ink-950 p-4 pb-[max(1rem,var(--qs-safe-bottom))] shadow-2xl" style={dragStyle}>
+        <div className="qs-sheet-drag-region -mx-4 -mt-4 mb-3 flex justify-center px-4 pb-2 pt-3" {...dragHandleProps}>
+          <div className="qs-sheet-handle h-1.5 w-14 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
+        </div>
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 id="qs-game-actions-title" className="text-base font-bold text-white">Game Actions</h2>
