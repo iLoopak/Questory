@@ -3811,6 +3811,43 @@ body.qs-controller-active .qs-compact-card:focus-within {
   }
 }
 
+/* ── Peek Ghost variant ─────────────────────────────────────────────────── */
+
+/* Clip to show only head + eyes (top 54% of 96-unit viewBox) */
+.queue-ghost--peek {
+  clip-path: inset(0 0 46% 0);
+  transition: clip-path 0.22s ease-out;
+}
+
+/* Reveal: expand clip to show full ghost */
+.queue-ghost--peek.queue-ghost--peek-revealed {
+  clip-path: inset(0 0 0% 0);
+}
+
+/* Suppress the full float animation in peek state; use subtle bob instead */
+.queue-ghost--peek:not(.queue-ghost--peek-revealed) .queue-ghost-float {
+  animation: queueGhostPeekBob 4.2s ease-in-out infinite;
+}
+
+@keyframes queueGhostPeekBob {
+  0%, 100% { transform: translateY(0); }
+  48%, 52% { transform: translateY(-1.5px); }
+}
+
+/* Mute glow shadow in peek state */
+.queue-ghost--peek:not(.queue-ghost--peek-revealed) {
+  filter: drop-shadow(0 0 5px var(--queue-ghost-accent-color));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-ghost--peek:not(.queue-ghost--peek-revealed) .queue-ghost-float {
+    animation: none;
+  }
+  .queue-ghost--peek {
+    transition: none;
+  }
+}
+
 /* ── Queue Ghost habitats outside Home ─────────────────────────────────── */
 .queue-ghost-habitat {
   position: absolute;

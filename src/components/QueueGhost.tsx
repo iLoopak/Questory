@@ -14,7 +14,7 @@ const GHOST_MESSAGES = [
 
 const GHOST_SESSION_KEY = 'qs-ghost-v1';
 
-export type QueueGhostVariant = 'default' | 'cover' | 'sleepy' | 'panic' | 'achievement' | 'midnight';
+export type QueueGhostVariant = 'default' | 'cover' | 'sleepy' | 'panic' | 'achievement' | 'midnight' | 'peek';
 
 export type QueueGhostHabitat =
   | 'home'
@@ -86,11 +86,12 @@ export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOP
 export const QUEUE_GHOST_HABITAT_PROBABILITY = QUEUE_GHOST_PROBABILITY;
 export const QUEUE_GHOST_VARIANT_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.12;
 
-const CONTEXTUAL_VARIANT_PROBABILITIES: Record<'sleepy' | 'panic' | 'midnight' | 'achievement', number> = {
+const CONTEXTUAL_VARIANT_PROBABILITIES: Record<'sleepy' | 'panic' | 'midnight' | 'achievement' | 'peek', number> = {
   sleepy: QUEUE_GHOST_VARIANT_PROBABILITY,
   panic: QUEUE_GHOST_VARIANT_PROBABILITY,
   midnight: import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.03,
   achievement: 1,
+  peek: import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.05,
 };
 const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : QUEUE_GHOST_VARIANT_PROBABILITY;
 
@@ -132,6 +133,12 @@ export function getQueueGhostVariant({
   if (queueSize > 1000 && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.panic) return 'panic';
   if (isMidnight && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.midnight) return 'midnight';
   if (hasCover && Math.random() < QUEUE_GHOST_COVER_PROBABILITY) return 'cover';
+  if (Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.peek) return 'peek';
+  return 'default';
+}
+
+export function pickSimpleVariant(): QueueGhostVariant {
+  if (Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.peek) return 'peek';
   return 'default';
 }
 
@@ -185,12 +192,21 @@ const VARIANT_MESSAGES: Record<Exclude<QueueGhostVariant, 'cover' | 'achievement
   sleepy: ['The backlog misses you.', 'Queue Ghost has been waiting.', 'Even fifteen minutes counts.', 'Your adventures miss you.'],
   panic: ['It keeps growing.', 'Queue Ghost is concerned.', 'The backlog grows stronger.', 'We may need a bigger queue.'],
   midnight: ["You're still here?", 'Sleep is temporary. Backlog is forever.', 'Queue Ghost does not judge.', 'One more game?', 'This seems like a tomorrow problem.'],
+  peek: PEEK_GHOST_REVEAL_MESSAGES,
 };
 
 const COVER_GHOST_MESSAGES = [
   'Queue Ghost found this one.',
   'The backlog remembers:',
   'Queue Ghost is carrying:',
+] as const;
+
+const PEEK_GHOST_REVEAL_MESSAGES = [
+  'Queue Ghost was here.',
+  "You weren't meant to see this.",
+  'Queue Ghost has been watching.',
+  'The backlog sees you.',
+  "Queue Ghost remembers.",
 ] as const;
 
 export function QueueGhost({ achievement = null, cover = null, variant = cover ? 'cover' : 'default', message: customMessage, onVanish }: QueueGhostProps) {
@@ -204,11 +220,12 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
       const prefix = COVER_GHOST_MESSAGES[Math.floor(Math.random() * COVER_GHOST_MESSAGES.length)];
       return `${prefix}\n${cover.title}`;
     }
-    const messages = VARIANT_MESSAGES[variant === 'sleepy' || variant === 'panic' || variant === 'midnight' ? variant : 'default'];
+    const messages = VARIANT_MESSAGES[variant as keyof typeof VARIANT_MESSAGES] ?? VARIANT_MESSAGES.default;
     return messages[Math.floor(Math.random() * messages.length)];
   }, [customMessage, achievement, cover, variant]);
   const [coverVisible, setCoverVisible] = useState(variant === 'cover' && Boolean(cover));
   const [coverRevealed, setCoverRevealed] = useState(false);
+  const [peekRevealed, setPeekRevealed] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<CSSProperties>({});
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -270,7 +287,19 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     setOpen(true);
   }
 
+  function revealPeek() {
+    if (variant !== 'peek' || peekRevealed) return;
+    cancelOpen();
+    setPeekRevealed(true);
+    computeTooltipStyle();
+    setOpen(true);
+  }
+
   function handleClick() {
+    if (variant === 'peek' && !peekRevealed) {
+      revealPeek();
+      return;
+    }
     if (cover && coverVisible && !coverRevealed) {
       revealCover();
       return;
@@ -320,6 +349,17 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     return () => clearTimeout(timer);
   }, [onVanish, variant]);
 
+  useEffect(() => {
+    if (variant !== 'peek' || peekRevealed) return;
+    const timer = setTimeout(() => { onVanish?.(); }, 10000);
+    return () => clearTimeout(timer);
+  }, [variant, peekRevealed, onVanish]);
+
+  useEffect(() => {
+    if (variant !== 'peek') return;
+    if (import.meta.env.DEV) console.debug('[QueueGhost] Peek Ghost spawned');
+  }, [variant]);
+
   useEffect(
     () => () => {
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -354,12 +394,14 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
         aria-expanded={open || coverRevealed}
         aria-haspopup="dialog"
         aria-label={variant === 'cover' && cover && coverVisible ? (coverRevealed ? 'Dismiss Queue Ghost' : `Reveal carried cover for ${cover.title}`) : 'Dismiss Queue Ghost'}
-        className={`block outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95 ${variant === 'sleepy' ? 'opacity-[0.64]' : 'opacity-[0.82]'}`}
+        className={`block outline-none transition-opacity hover:opacity-95 focus-visible:opacity-95 ${variant === 'sleepy' ? 'opacity-[0.64]' : variant === 'peek' && !peekRevealed ? 'opacity-[0.62]' : 'opacity-[0.82]'}`}
         type="button"
         onClick={handleClick}
         onMouseEnter={() => {
           cancelClose();
-          if (cover && coverVisible) {
+          if (variant === 'peek' && !peekRevealed) {
+            revealPeek();
+          } else if (cover && coverVisible) {
             revealCover();
           } else {
             scheduleOpen();
@@ -372,7 +414,7 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
       >
         <svg
           aria-hidden="true"
-          className={`queue-ghost queue-ghost--${variant} h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}`}
+          className={`queue-ghost queue-ghost--${variant} h-auto w-full${coverRevealed ? ' queue-ghost--cover-revealed' : ''}${variant === 'peek' && peekRevealed ? ' queue-ghost--peek-revealed' : ''}`}
           fill="none"
           style={{ '--queue-ghost-cover-rotation': `${coverRotation}deg` } as CSSProperties}
           viewBox="0 0 96 96"
