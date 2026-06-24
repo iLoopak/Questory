@@ -23,18 +23,24 @@ function ScreenshotLightbox({ screenshots, initialIndex, gameTitle, onClose }: L
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'ArrowLeft') { prev(); return; }
-      if (e.key === 'ArrowRight') { next(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); return; }
+      if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
 
   return createPortal(
     <div
       aria-label={`${gameTitle} screenshot ${idx + 1} of ${total}`}
       aria-modal="true"
+      data-lightbox="screenshot"
       className="fixed inset-0 z-[10002] flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm"
       role="dialog"
       onClick={onClose}
