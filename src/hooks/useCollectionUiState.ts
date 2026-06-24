@@ -35,8 +35,12 @@ export function useCollectionViewMode(collectionType: GameCollectionType) {
   const activeViewModeCollectionRef = useRef(collectionType);
 
   useEffect(() => {
-    saveCollectionViewMode(activeViewModeCollectionRef.current, viewMode);
-  }, [viewMode]);
+    if (activeViewModeCollectionRef.current !== collectionType) {
+      return;
+    }
+
+    saveCollectionViewMode(collectionType, viewMode);
+  }, [collectionType, viewMode]);
 
   useEffect(() => {
     activeViewModeCollectionRef.current = collectionType;

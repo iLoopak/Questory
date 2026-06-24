@@ -70,18 +70,21 @@ export function useQueueActions({
       description: formatMessageTemplate(t('app.removeFromPlatformBacklog'), { game: game.title, platform }),
     }, undefined, { actions: [getUndoAction(), getOpenQueueAction()] });
 
-    const platformTag = getPlatformTag(platformQueueState, platform);
-    if (platformTag && !game.tags.includes(platformTag)) {
-      setGames((currentGames) =>
-        currentGames.map((currentGame) =>
-          currentGame.id === game.id
-            ? touchGameRecord({ ...currentGame, tags: Array.from(new Set([...currentGame.tags, platformTag])) })
-            : currentGame,
-        ),
-      );
+    const isRemovingCurrentQueueEntry = game.status === 'Playing' && game.platform === platform;
+    if (!isRemovingCurrentQueueEntry) {
+      const platformTag = getPlatformTag(platformQueueState, platform);
+      if (platformTag && !game.tags.includes(platformTag)) {
+        setGames((currentGames) =>
+          currentGames.map((currentGame) =>
+            currentGame.id === game.id
+              ? touchGameRecord({ ...currentGame, tags: Array.from(new Set([...currentGame.tags, platformTag])) })
+              : currentGame,
+          ),
+        );
+      }
     }
 
-    setPlatformQueueState((currentState) => game.status === 'Playing' && game.platform === platform
+    setPlatformQueueState((currentState) => isRemovingCurrentQueueEntry
       ? removeGameFromPlatformQueue(currentState, game.id, platform)
       : addGameToPlatformQueue(currentState, game, platform));
     markOnboardingItemComplete('queue-game');
@@ -156,7 +159,19 @@ export function useQueueActions({
         actionType: 'remove-from-queue', affectedGameIds: [gameId], description: formatMessageTemplate(t('app.restoreToPlanPosition'), { game: game.title, position: entry.queuePosition }),
       }, undefined, { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
     }
-    setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, gameId, entry?.targetPlatform));
+    setPlatformQueueState((currentState) => {
+      const currentEntry = currentState.entries.find((queueEntry) => queueEntry.gameId === gameId && (!platform || queueEntry.targetPlatform === platform));
+      const targetPlatform = currentEntry?.targetPlatform;
+      const platformTag = targetPlatform ? getPlatformTag(currentState, targetPlatform) : '';
+
+      if (platformTag) {
+        setGames((currentGames) => currentGames.map((currentGame) => currentGame.id === gameId
+          ? touchGameRecord({ ...currentGame, tags: currentGame.tags.filter((tag) => tag !== platformTag) })
+          : currentGame));
+      }
+
+      return removeGameFromPlatformQueue(currentState, gameId, targetPlatform);
+    });
   }
 
   const updateQueueLimit = (platform: GamePlatform, maxActiveGames: number) => setPlatformQueueState((currentState) => updatePlatformQueueSetting(currentState, platform, maxActiveGames));
