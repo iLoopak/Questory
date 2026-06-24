@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useI18n, type TFunction } from '../i18n';
 import type { SteamAchievement } from '../types/game';
 import { Icon } from './Icon';
+import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 type Filter = 'all' | 'unlocked' | 'locked';
 
@@ -14,6 +15,8 @@ type SteamAchievementsPanelProps = {
 export function SteamAchievementsPanel({ achievements, gameTitle, onClose }: SteamAchievementsPanelProps) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<Filter>('all');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
 
   const unlocked = achievements.filter((a) => a.unlocked).length;
   const total = achievements.length;
@@ -45,10 +48,11 @@ export function SteamAchievementsPanel({ achievements, gameTitle, onClose }: Ste
       <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" onClick={onClose} />
       <div
         className="relative flex max-h-[85dvh] flex-col rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        style={{ paddingBottom: 'max(1rem, var(--qs-safe-bottom))' }}
+        ref={panelRef}
+        style={{ paddingBottom: 'max(1rem, var(--qs-safe-bottom))', ...dragStyle }}
       >
-        <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1.5 w-16 rounded-full bg-skyglass/35" />
+        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}>
+          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
         </div>
 
         <div className="shrink-0 px-5 pb-3 pt-1">

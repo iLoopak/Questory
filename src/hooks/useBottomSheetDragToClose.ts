@@ -88,12 +88,19 @@ export function useBottomSheetDragToClose({ panelRef, onClose }: BottomSheetDrag
     ? { transform: `translate3d(0, ${dragOffsetY}px, 0)`, transition: 'none' }
     : { transform: undefined };
 
+  const dragHandleStyle: CSSProperties = {
+    cursor: dragOffsetY > 0 ? 'grabbing' : 'grab',
+    touchAction: 'none',
+    userSelect: 'none',
+  };
+
   return {
     dragHandleProps: {
       onPointerCancel: cancelDrag,
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
       onPointerUp: finishDrag,
+      style: dragHandleStyle,
     },
     dragStyle,
   };
