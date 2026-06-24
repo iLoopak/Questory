@@ -189,8 +189,8 @@ export function useReviewModeActions({
     if (action === 'queue') {
       if (targetPlatform) {
         addGameToQueue(game, targetPlatform);
+        recordReviewDecision('queueCandidates');
       }
-      recordReviewDecision('queueCandidates');
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);
       return;

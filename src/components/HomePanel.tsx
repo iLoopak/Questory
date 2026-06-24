@@ -50,6 +50,7 @@ type HomePanelProps = {
 };
 
 type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
+type AchievementGhostCandidate = QueueGhostAchievement & { id: string; seenIds: string[] };
 
 const focusSelector = '[data-home-focus="true"]';
 
@@ -124,7 +125,7 @@ export function HomePanel({
           return getTime(b.importedAt ?? b.updatedAt) - getTime(a.importedAt ?? a.updatedAt);
         })[0] ?? null
     );
-  }, [games, ignoredReviewGameIds, reviewQueueOrder]);
+  }, [games, ignoredReviewGameIds, reviewModeState.reviewedGames, reviewQueueOrder]);
 
   const wishlistDeals = useMemo(() => {
     return games
@@ -233,6 +234,7 @@ export function HomePanel({
     });
   }, [games, queueState, reviewModeState]);
   const newlyUnlockedAchievement = useMemo(() => pickNewlyUnlockedAchievement(questShelfAchievements), [questShelfAchievements]);
+  const markedAchievementGhostIds = useRef<Set<string>>(new Set());
   const [queueGhostSlot] = useState(() => pickQueueGhostSlot('home'));
   const [showGhost, setShowGhost] = useState(() => Boolean(queueGhostSlot) && (Boolean(newlyUnlockedAchievement) || shouldShowQueueGhost()));
   const [queueGhostVariant, setQueueGhostVariant] = useState<QueueGhostVariant>(() =>
@@ -245,10 +247,14 @@ export function HomePanel({
     }),
   );
   useEffect(() => {
-    if (!newlyUnlockedAchievement) return;
+    if (!newlyUnlockedAchievement || !queueGhostSlot) return;
     setQueueGhostVariant('achievement');
     setShowGhost(true);
-  }, [newlyUnlockedAchievement]);
+
+    if (markedAchievementGhostIds.current.has(newlyUnlockedAchievement.id)) return;
+    markedAchievementGhostIds.current.add(newlyUnlockedAchievement.id);
+    setSeenAchievementGhostIds(newlyUnlockedAchievement.seenIds);
+  }, [newlyUnlockedAchievement, queueGhostSlot]);
 
   useEffect(() => () => releaseQueueGhostHabitat('home'), []);
 
@@ -2162,14 +2168,13 @@ function pickContextualMessage(ctx: HeroMessageContext): string {
   return pick(staticMessages);
 }
 
-function pickNewlyUnlockedAchievement(achievements: QuestShelfAchievementProgress[]): QueueGhostAchievement | null {
+function pickNewlyUnlockedAchievement(achievements: QuestShelfAchievementProgress[]): AchievementGhostCandidate | null {
   const unlocked = achievements.filter((achievement) => achievement.isUnlocked && !achievement.isMeta);
   if (unlocked.length === 0) return null;
   try {
     const seen = getSeenAchievementGhostIds();
     const fresh = unlocked.find((achievement) => !seen.has(achievement.id));
-    setSeenAchievementGhostIds(unlocked.map((achievement) => achievement.id));
-    return fresh ? { title: fresh.title, icon: fresh.icon } : null;
+    return fresh ? { id: fresh.id, title: fresh.title, icon: fresh.icon, seenIds: unlocked.map((achievement) => achievement.id) } : null;
   } catch {
     return null;
   }
