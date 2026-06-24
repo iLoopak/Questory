@@ -31,7 +31,7 @@ import type { Game } from '../../types/game';
 import type { SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishlistSyncState } from '../../types/steam';
 
 export type SettingsViewProps = {
-  activeCategory: SettingsCategory;
+  activeCategory: SettingsCategory | null;
   autoBackupSignal: string;
   completedOnboardingItemIds: Set<OnboardingItemId>;
   skippedOnboardingItemIds: Set<OnboardingItemId>;
@@ -194,7 +194,7 @@ export function SettingsView({
   const [isCategoryListOpen, setIsCategoryListOpen] = useState(false);
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
   const steamWishlistImportButtonRef = useRef<HTMLButtonElement | null>(null);
-  const activeCategoryMeta = getSettingsCategoryMeta(activeCategory);
+  const activeCategoryMeta = activeCategory ? getSettingsCategoryMeta(activeCategory) : null;
   const t = useMemo(() => createTranslator(language), [language]);
   const onboardingFinishedCount = onboardingItemIds.filter(
     (itemId) => completedOnboardingItemIds.has(itemId) || skippedOnboardingItemIds.has(itemId),
@@ -214,7 +214,7 @@ export function SettingsView({
             <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-slate-400">
               <span>{t('settings.title')}</span>
               <span className="text-slate-600">/</span>
-              <span className="truncate font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</span>
+              <span className="truncate font-semibold text-white">{activeCategoryMeta ? translateSettingsCategory(activeCategoryMeta.label, t) : t('settings.overview')}</span>
             </div>
           </div>
           <button
@@ -222,7 +222,7 @@ export function SettingsView({
             onClick={() => setIsCategoryListOpen((currentValue) => !currentValue)}
             type="button"
           >
-            {isCategoryListOpen ? t('settings.showDetail') : t('settings.backToCategories')}
+            {isCategoryListOpen || !activeCategory ? t('settings.showDetail') : t('settings.backToCategories')}
           </button>
         </div>
       </div>
@@ -245,20 +245,24 @@ export function SettingsView({
           </nav>
         </aside>
 
-        <div className={`qs-settings-detail p-3 sm:p-4 ${isCategoryListOpen ? 'hidden lg:block' : 'block'}`}>
-          <header className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-            <div className="flex items-start gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-mint/25 bg-mint/10 text-mint">
-                <SettingsCategoryIcon category={activeCategory} />
+        <div className={`qs-settings-detail p-3 sm:p-4 ${isCategoryListOpen && activeCategory ? 'hidden lg:block' : 'block'}`}>
+          {activeCategoryMeta ? (
+            <header className="mb-4 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-mint/25 bg-mint/10 text-mint">
+                  {activeCategory ? <SettingsCategoryIcon category={activeCategory} /> : null}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</h2>
+                  {activeCategoryMeta.description ? (
+                    <p className="mt-1 text-sm leading-5 text-slate-400">{activeCategoryMeta.description}</p>
+                  ) : null}
+                </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold text-white">{translateSettingsCategory(activeCategoryMeta.label, t)}</h2>
-                {activeCategoryMeta.description ? (
-                  <p className="mt-1 text-sm leading-5 text-slate-400">{activeCategoryMeta.description}</p>
-                ) : null}
-              </div>
-            </div>
-          </header>
+            </header>
+          ) : (
+            <SettingsOverview onSelect={selectCategory} />
+          )}
 
           {activeCategory === 'Integrations' ? (
             <div className="space-y-4">
@@ -407,6 +411,46 @@ export function SettingsView({
             </div>
           ) : null}
         </div>
+      </div>
+    </section>
+  );
+}
+
+
+function SettingsOverview({ onSelect }: { onSelect: (category: SettingsCategory) => void }) {
+  const { t } = useI18n();
+
+  return (
+    <section className="space-y-4" aria-labelledby="settings-overview-title">
+      <header className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+        <div className="qs-label-caps text-accent">{t('settings.overviewKicker')}</div>
+        <h2 id="settings-overview-title" className="mt-1 text-xl font-semibold text-white">
+          {t('settings.overviewTitle')}
+        </h2>
+        <p className="mt-1 text-sm leading-5 text-slate-400">
+          {t('settings.overviewDescription')}
+        </p>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {settingsCategories.map((category) => {
+          const meta = getSettingsCategoryMeta(category);
+
+          return (
+            <button
+              key={category}
+              className="group min-h-32 rounded-lg border border-skyglass/15 bg-ink-950/70 p-4 text-left transition hover:border-mint/40 hover:bg-mint/10 hover:shadow-glow"
+              onClick={() => onSelect(category)}
+              type="button"
+            >
+              <span className="grid h-11 w-11 place-items-center rounded-md border border-mint/25 bg-mint/10 text-mint transition group-hover:border-mint/50 group-hover:bg-mint group-hover:text-ink-950">
+                <SettingsCategoryIcon category={category} />
+              </span>
+              <span className="mt-3 block text-base font-semibold text-white">{translateSettingsCategory(meta.label, t)}</span>
+              <span className="mt-1 block text-sm leading-5 text-slate-400">{meta.description}</span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

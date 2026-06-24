@@ -10,7 +10,7 @@ import {
 
 export function useAppNavigation({ onSectionChange }: { onSectionChange?: () => void } = {}) {
   const [activeNavItem, setActiveNavItem] = useState<NavItem>('Home');
-  const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory>(() => loadSettingsCategory());
+  const [activeSettingsCategory, setActiveSettingsCategory] = useState<SettingsCategory | null>(null);
   const [navigationVisibility, setNavigationVisibility] = useState<NavigationVisibilityPreferences>(() =>
     loadNavigationVisibilityPreferences(),
   );
@@ -36,7 +36,9 @@ export function useAppNavigation({ onSectionChange }: { onSectionChange?: () => 
   }, [navigationVisibility]);
 
   useEffect(() => {
-    saveSettingsCategory(activeSettingsCategory);
+    if (activeSettingsCategory) {
+      saveSettingsCategory(activeSettingsCategory);
+    }
   }, [activeSettingsCategory]);
 
   useEffect(() => {
