@@ -22,6 +22,7 @@ import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ScreenshotStrip } from './ScreenshotStrip';
+import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 
 export type ReviewModeAction =
   | 'queue'
@@ -282,12 +283,7 @@ export function ReviewModePanel({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement
-      ) {
+      if (shouldIgnoreQuestQueueShortcut(event)) {
         return;
       }
 
@@ -398,7 +394,7 @@ export function ReviewModePanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeGame, highlightedActionIndex, isNoteOpen, isQueuePickerOpen, isReviewOptionsOpen, reviewHistory]);
 
-  const canReceiveControllerActions = !!activeGame && !isReviewOptionsOpen && !isQueuePickerOpen && !isNoteOpen;
+  const canReceiveControllerActions = !!activeGame && !isReviewOptionsOpen && !isQueuePickerOpen && !isNoteOpen && !isInteractiveOrOverlayActive();
 
   useControllerAction('pageNext', () => {
     if (activeGame) performAction(activeGame, 'skip');
