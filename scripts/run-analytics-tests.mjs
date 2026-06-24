@@ -23,6 +23,7 @@ const sharedConfig = {
 const testFiles = [
   { entry: 'scripts/analytics.test.ts', out: 'analytics.test.mjs' },
   { entry: 'scripts/retroTitleResolver.test.ts', out: 'retroTitleResolver.test.mjs' },
+  { entry: 'scripts/settingsEntrypoints.test.ts', out: 'settingsEntrypoints.test.mjs' },
 ];
 
 await Promise.all(
