@@ -1,265 +1,232 @@
 # QuestShelf
 
-QuestShelf is a local-first game library foundation built with React, Vite, TypeScript, and Tailwind CSS.
+**QuestShelf is a local-first gaming backlog planner for people with too many games, too many platforms, and not enough actual play time.**
+
+It is not trying to be a launcher, a social network, or a perfectly finished product yet. It is an early-alpha project focused on turning a messy pile of owned games, wishlist games, retro imports, and “I should play that someday” guilt into a more playful plan.
+
+## Screenshot / preview
+
+QuestShelf does not currently include full app screenshots in the repository. The existing checked-in images are app icons, splash art, and placeholder cover assets.
+
+Suggested screenshot locations for a public README update:
+
+```text
+docs/screenshots/home.png
+docs/screenshots/library.png
+docs/screenshots/quest-queue.png
+docs/screenshots/platform-plans.png
+docs/screenshots/playing-now.png
+```
+
+When screenshots are added, this section can become:
+
+```md
+![QuestShelf Home](docs/screenshots/home.png)
+![QuestShelf Library](docs/screenshots/library.png)
+```
+
+## What is QuestShelf?
+
+QuestShelf is a backlog-first game planning app. The main idea is simple:
+
+- collect your games in one local shelf,
+- import what you can from Steam or other sources,
+- triage the pile instead of staring at it,
+- keep active games visible,
+- plan by platform,
+- and make backlog maintenance feel a little more like a game.
+
+The app runs as a React/Vite web app, can be installed as a PWA, and includes Capacitor Android project support for APK builds. User data is stored locally in the browser/native app storage, with JSON backup/export tools for portability.
+
+## Why I built it / the backlog problem
+
+A lot of game tracking tools are great at cataloging, launching, reviewing, or social sharing. My problem was more specific:
+
+> I already own too many games. I keep buying more. I forget what I was playing. I bounce between Steam, handhelds, retro folders, wishlists, and notes. Then I spend my limited free time choosing instead of playing.
+
+QuestShelf is built around that feeling. It is meant to help answer:
+
+- What am I playing right now?
+- What should I play next on this platform?
+- Which imported games still need a quick yes/no decision?
+- What is worth keeping, dropping, wishlisting, or moving into a plan?
+- Which games are missing artwork, metadata, playtime context, or achievement progress?
 
 ## Features
 
-- Responsive dark app shell with placeholder navigation.
-- Typed local `Game` model.
-- Empty library by default for new users.
-- Optional development-only demo games.
-- First-run onboarding checklist for setup essentials.
-- Browser `localStorage` persistence.
-- Game cards with cover image, playtime, tags, notes, and last played date.
-- Manual game creation for non-Steam, physical, retro, Android, and custom-platform games.
-- Separate local Wishlist collection for platform-agnostic future games.
-- Compact Library and Wishlist toolbar with search, source, enrichment, platform, status, tag, quick filters, and sorting.
-- Recommended manual Steam Wishlist import assistant with bookmarklet-based appid/link collection.
-- Change game status directly from the library.
-- Steam connector foundation in Settings.
-- Local Steam Web API key and SteamID64 storage.
-- Steam connection test with raw debug output and mapped game previews.
-- Controlled Steam import with selectable games and duplicate protection.
-- Optional RAWG metadata enrichment for individual games.
-- Focused game detail view with editable local tracking and read-only Steam/RAWG metadata.
-- Metadata enrichment workflow for larger libraries with batch processing and manual match review.
-- Artwork Coverage audit for cover health, RAWG/Steam image application, and deterministic generated fallback covers.
-- Local Recommendation Engine v1 for choosing what to play next.
-- Local Stats dashboard for backlog progress, playtime, platform/source breakdowns, and metadata coverage.
-- Settings Data Management for portable JSON backup export/import, validated restore, and local reset.
-- File-based Sync Folder / Auto Backup foundation for user-owned synced folders.
-- Installable PWA foundation with app manifest, local app-shell offline support, and a small offline indicator.
-- Capacitor-ready Android handheld foundation with fullscreen status bar handling and mirrored native Preferences persistence.
-- QuestShelf visual branding with the official PNG app icon, favicon, PWA icons, and console-style dark theme.
+These are grouped honestly based on the current codebase. “Available now” means there is working UI/storage logic in the app today. “Experimental / WIP” means the feature exists but has limitations, depends on local/dev proxy behavior, or is still foundation-level.
 
-No PSN, IGDB, achievements, backend, accounts, auto-enrichment, auto-sync, or remote sync are included yet.
+### Available now
 
-## Screen Responsibility Rule
+- **Local-first Library and Wishlist** — manual game creation, separate Library/Wishlist collections, local persistence, backup/export/import, restore/merge validation, and reset tools.
+- **Library and Wishlist browsing** — search, platform/status/source/tag/enrichment filters, quick filters, sorting, visible counts, and multi-select/bulk actions.
+- **Steam owned-library import foundation** — local Steam API key + SteamID64 settings, connection test, selectable owned-game import, duplicate protection, ignored Steam App IDs, Steam artwork fallbacks, and local Steam metadata storage.
+- **Manual Steam Wishlist import** — bookmarklet/text/HTML/appid based import assistant for Steam wishlist pages, with duplicate protection and local Wishlist entries.
+- **Quest Queue / Review Mode** — a one-game-at-a-time triage flow for processing imported/backlog/recent games into status changes, Platform Plans, Wishlist, ignores, or other actions.
+- **Quest Queue batch review support** — review state, queue ordering, ignored review items, restore ignored items, and source switching for backlog/recent imports.
+- **Platform Plans** — platform-specific queues, active platform selection, per-platform limits, reordering, moving entries between platforms, and “play now” actions.
+- **Playing Now hub** — focused view for current/active games, quick notes, daily play logging, Steam playtime refresh hooks, and return navigation from the shelf profile/home flows.
+- **Recommendations** — local “What should I play?” recommendations based on status, playtime, last played date, HLTB/RAWG-style metadata when available, platform, mood, and session length.
+- **Stats dashboard** — local backlog totals, progress, playtime, platform/source breakdowns, metadata coverage, and useful lists.
+- **RAWG metadata enrichment** — user-provided RAWG API key, per-game search, suggested/manual matches, batch enrichment, local cache, and safe writes that avoid overwriting user-owned tracking fields.
+- **Metadata/artwork refresh tools** — artwork audit, missing-artwork buckets, Steam/RAWG/user artwork priority, generated fallback covers, bulk repair actions, and per-game artwork refresh paths.
+- **Steam achievements display/sync support** — Steam achievement fields are stored on games, shown in details/cards/widgets, and can be synced for eligible Steam games through app actions.
+- **QuestShelf achievements** — local achievement registry and progress display for QuestShelf milestones such as imports, queue activity, wishlist growth, retro support, Steam connection, and other app usage.
+- **Daily Quest and Achievement Quiz** — local mini-challenge/quiz modules with storage, modal/card UI, artwork reveal/guess components, and weekly summaries.
+- **Retro library import** — retro ROM import panel, platform detection/override, ROM metadata fields, Android folder picker support, and options to send imported retro games into Quest Queue.
+- **Data portability** — JSON backup download/import, merge/replace flows, integration-key exclusion by default, local reset protections, and sync-folder/auto-backup foundation where browser APIs allow it.
+- **Installable PWA foundation** — manifest, service worker registration for production builds, offline app-shell caching, install/status banner, icons, splash art, and iOS Add to Home Screen notes.
+- **Theme and Neon Deck UI** — dark/light/follow-device theme support, tokenized surfaces, accent personalization, handheld-friendly navigation, and console-style “Neon Deck” visual treatment.
+- **Android / Capacitor project support** — Capacitor config, Android project, native Preferences mirroring, status bar handling, launcher resources, backup export/folder picker plugins, and APK build flow.
 
-QuestShelf keeps analytics concentrated in the **Stats** section so handheld screens stay focused:
+### Experimental / WIP
 
-- **Stats** → analytics, trends, backlog progress, completion, playtime, platform/source breakdowns, and metadata coverage.
-- **Library** → collection management, filters, edits, status changes, and bulk actions.
-- **Platforms** → planning what to play next, active games, platform plan order, and platform limits.
-- **Quest Queue** → one-game-at-a-time decisions with artwork, title, platform, actions, and a lightweight progress indicator.
-- **Wishlist** → discovery and future-game planning.
-- **Settings** → app configuration, integrations, backups, appearance, and onboarding controls.
+- **Production Steam sync** — Steam works through the Vite dev proxy locally. A deployed public web app still needs a safe production proxy/backend for reliable Steam API calls and CORS handling.
+- **Automatic Steam Wishlist sync** — still present under advanced/experimental paths, but the recommended flow is the manual bookmarklet/text import because Steam can rate-limit or reject automatic wishlist endpoint requests.
+- **IsThereAnyDeal wishlist deals** — settings and deal sync logic exist for Wishlist pricing, but it depends on an API key/proxy/network and should be treated as early integration work.
+- **HowLongToBeat data** — HLTB fields, badges, caching, search helpers, and bulk sync hooks exist, but provider availability/proxy behavior may vary.
+- **SteamGridDB artwork** — settings and provider code exist for artwork lookup/testing, but it is still an optional integration path rather than required core functionality.
+- **Sync Folder / Auto Backup** — useful where the File System Access API is available, but browser/mobile support is uneven and Android may need more native file picker/storage work.
+- **Android handheld polish** — the Capacitor project exists and the app is APK-capable, but mobile/handheld behavior still needs real-device testing.
+- **Daily Quest / Achievement Quiz polish** — the local feature modules exist, but they should be considered playful early experiments until the UX is proven with users.
 
-Avoid adding persistent dashboard cards, global library totals, completion percentages, or repeated playtime summaries outside Stats unless the information directly supports the current action.
+### Planned / ideas
 
-## First-Run Onboarding
+Grounded in the current direction of the app:
 
-QuestShelf shows a compact checklist on first launch to guide initial setup without requiring accounts.
+- safer hosted Steam/RAWG/ITAD/HLTB proxy story for public deployments,
+- more screenshots and onboarding docs for early testers,
+- better multi-device backup/sync flows without requiring accounts,
+- more review-mode sources and triage shortcuts,
+- improved Platform Plans for handheld/console rotation,
+- stronger Android APK distribution notes,
+- more robust metadata/artwork matching and conflict handling,
+- better accessibility/gamepad testing,
+- richer QuestShelf achievement tuning,
+- and UX feedback loops for backlog-heavy players.
 
-- Users can skip the checklist and reopen it later from Settings.
-- Checklist progress is stored locally with the rest of QuestShelf data.
-- Items are completed when users add a manual game, configure Steam credentials, test Steam, import Steam games, configure RAWG, enrich metadata, create a Wishlist item, or export a backup.
-- The checklist links to the official Steam API key page, a SteamID64 lookup page, and RAWG API docs.
-- QuestShelf never stores real API keys in README files or source code. Keys are only entered by the user and saved locally in browser/native storage.
+## How it works
 
-## Data Management and Portable Backup
+1. **Start with an empty shelf.** QuestShelf does not create a fake library for normal users.
+2. **Add or import games.** Add games manually, import owned Steam games, import Steam wishlist entries manually, or import retro ROM lists.
+3. **Clean up the shelf.** Use filters, metadata enrichment, artwork repair, details editing, and bulk actions.
+4. **Triage the backlog.** Use Quest Queue / Review Mode to make quick decisions instead of endlessly scrolling.
+5. **Plan by platform.** Send games into Platform Plans, set active platforms, reorder queues, and keep active game limits realistic.
+6. **Play something.** Use Playing Now, Recommendations, Daily Quest, stats, and achievements to keep momentum.
+7. **Back up your data.** Export/import JSON backups or use the sync-folder foundation where supported.
 
-Open **Settings > Data Management** to export, import, or reset local QuestShelf data.
+## Why not just Playnite / Backloggd / spreadsheets?
 
-- **Download backup** exports QuestShelf user data to a portable JSON file.
-- Backups include app metadata: `appVersion`, `exportedAt`, and `schemaVersion`.
-- Steam and RAWG integration settings are excluded by default so API keys are not exported accidentally.
-- Enable **Include integration settings** only when you intentionally want Steam/RAWG settings and API keys in the backup.
-- Imported backups are validated before QuestShelf allows restore.
-- Restore requires typing `RESTORE` because it overwrites local Library, Wishlist, filters, RAWG cache, and ignored Steam games.
-- **Reset local data** requires typing `RESET` and removes only known QuestShelf local data from this device.
+### Playnite
 
-Recommended portable sync workflow:
+Playnite is excellent if your main need is a powerful launcher and PC library manager. QuestShelf is aiming at a different center of gravity: **planning, triage, and backlog decisions first**. It does not try to replace a launcher.
 
-1. Export a backup from the device with the newest QuestShelf data.
-2. Store the JSON file in a Google Drive, OneDrive, Dropbox, or similar synced folder.
-3. Open QuestShelf on another device.
-4. Import the backup JSON from that synced folder.
-5. Export a fresh backup after major edits so the synced folder stays current.
+### Backloggd
 
-This is account-free manual portability. The code keeps backup serialization separate from storage targets so a future provider can write the same validated backup format into a user-owned cloud-synced folder.
+Backloggd is great for social/review-style game tracking. QuestShelf is more personal and local-first: **what should I play, what should I drop, what belongs in the queue, and what am I actively playing now?**
 
-## Local Data Storage, Migration, and Recovery
+### Spreadsheets
 
-QuestShelf is local-first. Browser `localStorage` is the fast startup layer and Capacitor Preferences mirrors known persistent keys on Android when available. Stored data is normalized on read and write so older installs can keep working after new features are added.
+Spreadsheets are flexible, but they are manual and easy to abandon. QuestShelf tries to turn the same tracking work into a guided, playful workflow with queues, cards, artwork, filters, stats, and tiny achievement/review loops.
 
-Known storage keys:
+## Project status
 
-- `questshelf.games.v1`: Library and Wishlist game records.
-- `questshelf.rawgMetadataCache.v1`: Local RAWG metadata cache.
-- `questshelf.steamIgnoredGames.v1`: Steam App IDs skipped by import/sync.
-- `questshelf.libraryFilters.v1`: Library filters and sorting.
-- `questshelf.wishlistFilters.v1`: Wishlist filters and sorting.
-- `questshelf.onboarding.v1`: setup assistant progress.
-- `questshelf.platformQueues.v1`: platform queue entries, positions, priorities, notes, and active-game limits.
-- `questshelf.reviewMode.v1`: Quest Queue ignored games, last source, schema version, and stats.
-- `questshelf.rawgSettings.v1`: RAWG API key, excluded from normal backups.
-- `questshelf.steamSettings.v1`: Steam API key, SteamID64, and wishlist URL, excluded from normal backups.
-- `questshelf.syncFolderSettings.v1`: device-specific auto-backup settings.
-- `questshelf.installHintDismissed.v1`, `questshelf.landscapeLock.v1`, `questshelf.settingsCategory.v1`: UI/device preferences.
-- `questshelf.storageIssues.v1`: recovery warnings for unreadable local data.
+QuestShelf is **early alpha / work in progress**.
 
-Backup behavior:
+Expect rough edges:
 
-- Normal backups include core user data and exclude Steam/RAWG API keys by default.
-- Integration settings are included only when the user enables the option explicitly.
-- Device-only preferences and recovery warnings are not part of normal backup files.
-- Restore and merge validate backup sections before writing them to local storage.
-- Merge import avoids duplicates by ID, Steam App ID, RAWG ID, ROM path/URI, and normalized title plus platform fallback.
+- features may move or change,
+- local data shapes may evolve,
+- integrations may fail depending on API keys, privacy settings, proxies, CORS, or rate limits,
+- Android builds need more device testing,
+- and the README may be ahead of the public polish level while still being grounded in actual code.
 
-Migration behavior:
+Feedback is very welcome, especially from people with large backlogs across Steam, consoles, handhelds, retro libraries, and wishlists.
 
-- Missing `collectionType` safely defaults to `library`.
-- Older statuses such as `Completed` and `Backlog` migrate to current status values.
-- Missing notes, tags, playtime, cover art, wishlist fields, retro fields, queue fields, dropped/finished fields, and source fields receive safe defaults.
-- Valid user notes, tags, status, metadata, and tracking fields are preserved during migration.
-- Platform Queue and Quest Queue states include a local schema version and tolerate older objects without one.
+## Try it / install
 
-Recovery behavior:
+QuestShelf currently runs from source or a static deployment of the built web app.
 
-- Corrupted JSON or failed storage normalization falls back to safe defaults and records a warning instead of crashing the app.
-- QuestShelf never silently wipes unreadable local data.
-- Settings > Data & Backup shows recovery warnings and offers raw local data export before reset.
-- Reset local data removes only known QuestShelf keys from this device after explicit confirmation.
+Requirements:
 
-## Sync Folder / Auto Backup
+- Node.js / npm
+- Git
+- Optional: Android Studio for APK builds
+- Optional API keys for integrations:
+  - Steam Web API key for Steam owned-library features
+  - RAWG API key for metadata enrichment
+  - IsThereAnyDeal API key for wishlist deal checks
+  - SteamGridDB API key for optional artwork lookup
 
-QuestShelf can use a file-based backup workflow for simple multi-device use without accounts, backend services, real-time sync, or Google Drive/Dropbox APIs.
-
-Recommended synced-folder workflow:
-
-1. Create or choose a folder that is already synced by Google Drive, OneDrive, Dropbox, Syncthing, iCloud Drive, or a local shared folder.
-2. Open **Settings > Data Management > Sync Folder / Auto Backup**.
-3. Choose a backup JSON file inside that synced folder when the browser supports persistent file handles.
-4. Use **Save backup now** after setup, then enable **Auto-backup**.
-5. On another device, open QuestShelf and use **Load backup from file** or manual import to load the same JSON backup.
-6. Choose **Merge with local data** for normal multi-device use, or **Replace local data** when you intentionally want the backup to overwrite the device.
-
-Auto-backup stays local-first:
-
-- It writes the same QuestShelf JSON backup format to the selected file.
-- It debounces writes after meaningful local data changes to avoid excessive saving.
-- It shows the last backup timestamp.
-- Integration settings and API keys are excluded by default.
-- **Include integration settings in auto-backup** is optional and off by default.
-- If browser permission to the file is lost, QuestShelf disables auto-backup and asks you to reselect the backup file.
-
-Import conflict protection:
-
-- QuestShelf shows the backup `exportedAt`, `schemaVersion`, Library game count, and Wishlist count before import.
-- Replace mode requires typing `REPLACE`.
-- Merge mode requires typing `MERGE`.
-- Merge mode matches games by local ID, Steam App ID, RAWG ID, or ROM path/URI when available.
-- Merge mode avoids duplicates and keeps newer records when `updatedAt` or metadata timestamps are available.
-
-Browser and platform limitations:
-
-- Persistent backup-file selection uses the File System Access API, currently best supported in Chromium-based desktop browsers.
-- Firefox, Safari, many embedded WebViews, and some mobile browsers may not expose persistent file handles.
-- When File System Access is unavailable, manual **Download backup** and JSON import remain available.
-- Android/APK builds may need a later native file picker or Storage Access Framework bridge before auto-backup can write directly to a synced folder.
-- This is portable file sync, not live conflict-free cloud sync. Avoid editing on two devices at the same time before the synced backup file has propagated.
-
-## Local Library Data
-
-QuestShelf starts with an empty local library. It does not automatically insert placeholder games on startup.
-
-Use **Add game** in the Library or Wishlist to create a local manual game without Steam or RAWG credentials. Manual games support title, platform, status, playtime, cover URL, tags, and notes. If **Other** is selected as the platform, QuestShelf stores the custom platform text on that game.
-
-Manual games are stored in the same browser `localStorage` library as imported games with `externalSource: "manual"` and an import timestamp. They are never affected by Steam import, Steam duplicates, or the ignored Steam games list. RAWG metadata can still be added later from the Metadata workflow.
-
-For development and testing, optional demo games live in `src/data/mockGames.ts`. In Vite development mode, Settings includes a **Load demo data** action. Settings also includes **Remove demo games**, which removes only known placeholder IDs and preserves user-created games and Steam-imported games.
-
-## Wishlist
-
-QuestShelf has a separate **Wishlist** tab for games that are not owned or actively tracked yet. Wishlist entries use the same local `Game` model as library entries, with `collectionType: "wishlist"`.
-
-- Existing saved games without `collectionType` are safely migrated to `collectionType: "library"`.
-- Steam owned import always creates `library` games, not Wishlist items.
-- Wishlist items support title, platform, cover image, tags, notes, Steam App ID, RAWG metadata, and manual source data.
-- Optional Wishlist planning fields include priority, expected playtime, price target, release date, and store URL.
-- Library and Wishlist have separate search/filter state and separate counts.
-- Library cards can be copied into Wishlist with **Add to Wishlist**.
-- Wishlist cards can be promoted with **Move to Library** or deleted with **Remove Wishlist**.
-- RAWG enrichment works on Wishlist entries because the metadata workflow reads both collections.
-- **Import Steam Wishlist** is the recommended manual Steam Wishlist flow. It does not call Steam wishlist endpoints or require a Steam API key.
-
-The Wishlist view provides **Import Steam Wishlist** as a manual assistant:
-
-1. Open Steam Wishlist in the browser.
-2. Copy QuestShelf's generated bookmarklet into a browser bookmark URL.
-3. Run the bookmarklet on the Steam Wishlist page. It scrolls gradually because Steam lazy-loads wishlist entries in batches.
-4. Paste the collected Steam store links/appids into QuestShelf.
-5. Import the parsed appids into the local Wishlist.
-
-Manual Steam Wishlist import accepts Steam store URLs, `/app/{appid}/` paths, raw numeric appids, copied page HTML/text, and bookmarklet output. The import creates local Wishlist items with Steam App ID as the stable source id, preserves existing Wishlist items, skips Wishlist duplicates by Steam App ID, and uses a URL slug title fallback when available (otherwise `Steam App {appid}`). The bookmarklet only reads store links from the current Steam page, does not send data to any server, and does not click buy/remove buttons or modify Steam account data.
-
-The older automatic **Sync Steam Wishlist** endpoint-based path is no longer a primary Wishlist action. It remains under **Advanced / Experimental** in the manual import assistant with a warning because Steam may rate-limit or reject automatic wishlist endpoint requests. Failed automatic sync must not clear existing Wishlist data.
-
-## Library Filtering and Sorting
-
-Library and Wishlist each have their own compact toolbar for browsing larger collections. Filters can be combined across title search, platform, status, source, RAWG enrichment state, tags, and quick chips such as **Playing**, **Paused**, **Missing metadata**, and **Played > 0h**.
-
-Sort options include title, recently played, most or least playtime, recently imported, metadata missing first, and status. QuestShelf stores the last used Library and Wishlist filters locally in browser `localStorage`, so the view is restored on the next launch without sending anything to a server.
-
-The active summary shows how many games are visible out of the full collection. In multi-select mode, **Select all visible** applies only to the currently filtered result set.
-
-
-## Artwork Priority, Fallback Covers, and Audit Tools
-
-QuestShelf treats artwork as a first-class local library field because Library, Quest Queue, Shelf View, Platforms, Home, Recommendation, and Stats all use cover-forward layouts.
-
-Artwork is resolved in this priority order:
-
-1. User-provided `coverImage` marked with `artworkSource: "user"`.
-2. Steam artwork derived from `steamAppId` or stored with `artworkSource: "steam"`.
-3. RAWG `backgroundImage` / cover metadata stored with `artworkSource: "rawg"`.
-4. Imported source artwork from non-manual imports.
-5. A deterministic generated fallback cover.
-
-QuestShelf stores optional artwork metadata on game records with `artworkSource` and `artworkUpdatedAt`. Manual covers and Steam covers are protected: RAWG enrichment and bulk artwork repair do not overwrite user-provided artwork, and Steam artwork is not replaced by another source unless the user explicitly applies a different cover in a local edit flow.
-
-Generated fallback covers are local SVG data URLs, so they require no backend and no heavy image library. They are deterministic from the game ID, title, and platform, which means the same game always receives the same Steam Deck-style visual. Each fallback includes the game title, platform badge, subtle gradient background, QuestShelf ember-orange accent border/glow, and an initials mark so artwork-first screens stay polished even when no external cover exists.
-
-Open **Artwork** to use the Artwork Coverage / Metadata Health audit:
-
-- Summary cards show total games, games with artwork, missing artwork, coverage percentage, RAWG metadata without an applied cover, and Steam metadata without an applied cover.
-- Audit lists separate **Missing artwork**, **Poor / fallback artwork**, and **Enriched but cover not applied** buckets.
-- Bulk actions include **Fix missing artwork**, **Apply RAWG image where available**, **Refresh Steam artwork**, **Generate fallback covers**, and **Enrich missing metadata**.
-- Bulk actions report fixed, fallback generated, skipped, and failed counts.
-- **Find missing artwork** runs locally with progress and cancel support. It tries Steam artwork when `steamAppId` exists, then RAWG background artwork when available, then generates fallback covers for anything still missing.
-
-Quest Queue uses the same artwork resolver, so games without real covers show generated fallback covers instead of blank or single-letter placeholders. The Quest Queue details actions also include **Find Artwork**, which opens the artwork audit tools without uploading user data.
-
-## PWA Install and Offline Behavior
-
-QuestShelf is configured as an installable Progressive Web App for static hosting and iOS Safari **Add to Home Screen** installs. The PWA setup lives in Vite through `vite-plugin-pwa` with `registerType: "autoUpdate"`, while the app remains a normal Capacitor-compatible web build for Android APK packaging.
-
-To run and verify locally:
+Install dependencies:
 
 ```bash
 npm install
+```
+
+## Local development
+
+Run the Vite dev server:
+
+```bash
+npm run dev
+```
+
+Local development is the best place to test Steam/ITAD/HLTB-style proxied API calls because Vite can serve configured dev proxies.
+
+Steam development proxy notes:
+
+- Frontend base path: `/api/steam`
+- Proxy target: `https://api.steampowered.com`
+- Example rewrite: `/api/steam/IPlayerService/GetOwnedGames/v0001/` becomes `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/`
+- Steam Store wishlist proxy base path: `/api/steam-store`
+- Steam Store wishlist proxy target: `https://store.steampowered.com`
+
+If Steam test/import actions show proxy or CORS errors, restart the dev server and check `vite.config.ts`. A public deployed app will still need a safe proxy/backend before real production Steam sync can be considered reliable.
+
+## Build
+
+Create a production build:
+
+```bash
 npm run build
+```
+
+The static production output is written to `dist/`.
+
+Preview the production build locally:
+
+```bash
 npm run preview
 ```
 
-Then open the preview URL in a browser. Service worker registration is skipped in Vite development mode, so PWA install/offline checks should use `npm run preview` or a deployed HTTPS build.
+Use preview mode for PWA smoke tests because it serves the built app shell and service worker. Service worker registration is skipped in Vite development mode.
+
+Run the lightweight test command currently defined in `package.json`:
+
+```bash
+npm test
+```
+
+## PWA
+
+QuestShelf is configured as an installable Progressive Web App for static hosting and iOS Safari **Add to Home Screen** installs.
 
 The PWA manifest uses:
 
 - App name and short name: `QuestShelf`
 - Start URL and scope: `/`
 - Display mode: `standalone`
-- Dark/neon app colors: `theme_color` and `background_color` use the QuestShelf dark navy shell (`#030612`)
-- PNG app icons generated from the QuestShelf source icon: 180x180 Apple touch icon, 192x192 icon, 512x512 icon, and a 512x512 maskable icon
+- Dark/neon app colors using the QuestShelf dark navy shell
+- PNG app icons generated from the QuestShelf source icon
 
 Offline support is intentionally app-shell focused:
 
-- The app shell, manifest, icons, splash/brand image, and local placeholder covers are cached by the service worker after the app has loaded.
-- Built JS/CSS and same-origin assets are cached on first request so repeat launches can recover from a network miss.
-- The local library continues to work offline because game data is stored in browser `localStorage` and mirrored to Capacitor Preferences only when the native plugin is available.
-- Steam, RAWG, IsThereAnyDeal, and other remote actions require network access and will show their existing error states when offline or unavailable.
-- External Steam and RAWG images may depend on the browser cache and are not guaranteed to be available offline.
+- the app shell, manifest, icons, splash/brand image, and local placeholder covers are cached after the app has loaded,
+- built JS/CSS and same-origin assets are cached on first request,
+- the local library keeps working offline because game data is stored locally,
+- Steam, RAWG, IsThereAnyDeal, HLTB, SteamGridDB, and other remote actions still require network/API access,
+- external images may depend on browser cache and are not guaranteed offline.
 
 ### Add QuestShelf to iPhone Home Screen
 
@@ -267,24 +234,18 @@ Offline support is intentionally app-shell focused:
 2. Tap Safari's **Share** button.
 3. Choose **Add to Home Screen**.
 4. Confirm the name **QuestShelf** and tap **Add**.
-5. Launch QuestShelf from the new Home Screen icon; iOS should open it in standalone mode instead of a normal Safari tab.
+5. Launch QuestShelf from the new Home Screen icon.
 
 Known iOS PWA limitations:
 
-- iOS requires the user-driven Safari **Add to Home Screen** flow; the Chromium `beforeinstallprompt` install button is not exposed on iPhone.
-- Web push, background execution, storage persistence, and service worker behavior can vary by iOS version and device storage pressure.
-- The first offline launch is only reliable after the production app has been loaded at least once.
-- Remote integrations still need network access even when the app shell opens offline.
-- This PWA layer does not add cloud sync, accounts, or a backend.
+- iOS uses Safari's manual **Add to Home Screen** flow; Chromium's `beforeinstallprompt` install button is not exposed on iPhone.
+- Web push, background execution, storage persistence, and service worker behavior vary by iOS version and storage pressure.
+- First offline launch is only reliable after the production app has loaded at least once.
+- The PWA layer does not add cloud sync, accounts, or a backend.
 
-## Android Handheld / Capacitor Notes
+## Android / APK
 
-QuestShelf includes a lightweight Capacitor configuration for Android handheld packaging:
-
-- `capacitor.config.ts` points Capacitor at the Vite production build in `dist`.
-- `@capacitor/status-bar` is used to hide the Android status bar on native Android and re-apply the setting after focus/resume.
-- The app uses safe-area CSS variables so edge-to-edge screens, rounded corners, and display cutouts have padding available when the WebView exposes it.
-- System bar color is set to QuestShelf's dark navy background when Android briefly reveals system UI.
+QuestShelf includes a Capacitor Android project for handheld/APK packaging.
 
 Typical Android build flow:
 
@@ -294,186 +255,24 @@ npx cap sync android
 npx cap open android
 ```
 
-The app also mirrors local game data into Capacitor Preferences when the native plugin is available. Browser `localStorage` remains the fast startup/cache layer, while native Preferences provides a more durable Android storage layer for the saved library and user-owned game metadata such as status, notes, tags, playtime, ratings, favorites, and completion fields. Existing browser data is migrated into Preferences the first time the native app starts.
-
-Steam and RAWG API calls still require network access. The locally saved library, Wishlist, notes, tags, statuses, Stats, and recommendations remain usable offline after data has been loaded.
-
-## Visual Branding
-
-QuestShelf uses the provided PNG app icon as the source brand asset. The primary icon files live in `public/icons/`:
-
-- `questshelf-source.png` / `questshelf-icon.png` (1024x1024): source brand artwork used by the app header/logo path.
-- `favicon-16.png`, `favicon-32.png`, `favicon-48.png`: browser favicon outputs.
-- `questshelf-icon-180.png`: Apple touch icon output.
-- `questshelf-icon-192.png`, `questshelf-icon-512.png`, `questshelf-maskable-512.png`: PWA manifest outputs.
-- `public/brand/questshelf-splash.png`: PNG splash/brand image referenced by the PWA manifest.
-
-Android launcher resources are generated from the source PNG and live in `resources/android/` (adaptive-icon XML in `mipmap-anydpi-v26/` plus per-density `mipmap-*` rasters). The adaptive icon pairs the new foreground artwork with the `@color/questshelf_launcher_background` brand background. After `npx cap sync android`, run `npm run android:sync-icons` so the prepared resources overwrite the generated Android launcher icons before building the APK.
-
-The source PNG is also kept at `assets/icon.png`, `assets/icon-only.png`, `assets/icon-foreground.png`, and `assets/splash.png` for future Capacitor asset regeneration.
-
-The UI theme follows the icon with tokenized app surfaces, restrained ember-orange accents, warm charcoal borders, soft glow focus states, and glassy console-style panels. Ember orange is reserved for active states, primary actions, badges, and focus treatment so the app stays readable on handheld screens, while Light, Dark, and Follow Device can all transform the same screens without a reload.
-
-### Theme Coverage Checklist
-
-- Light, Dark, and Follow Device resolve through the shared CSS theme tokens in `src/styles.css` and Tailwind color aliases in `tailwind.config.js`.
-- App shell, top navigation, Home, Library, Wishlist, Platforms, Quest Queue, Artwork, Recommendation, Stats, Metadata, Settings, and Onboarding use tokenized surfaces, borders, text, shadows, and accents.
-- Cards, panels, modals, overlays, buttons, dropdowns, tooltips, detail dialogs, setup widgets, Platforms panels, and Quest Queue panels should be checked after any new UI change.
-- Switching between Light, Dark, and Follow Device should update the current screen, browser theme color, native color-scheme, focus rings, scrollbars, and transient UI without a page reload.
-- Theme audits should include a raw-color scan of source UI files so fixed dark colors do not leak into Light Theme.
-
-## Steam Integration Foundation
-
-QuestShelf includes a Settings section for an early Steam integration foundation. It stores the Steam Web API key and SteamID64 locally in the browser and can test the Steam API connection.
-
-In local development, Steam API calls go through the Vite dev proxy:
-
-- Frontend base path: `/api/steam`
-- Proxy target: `https://api.steampowered.com`
-- Example rewrite: `/api/steam/IPlayerService/GetOwnedGames/v0001/` becomes `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/`
-- Steam Store wishlist proxy base path: `/api/steam-store`
-- Steam Store wishlist proxy target: `https://store.steampowered.com`
-
-Run the app with `npm run dev` so Vite can serve that proxy. If the Steam test shows a proxy/CORS error, restart the dev server after checking `vite.config.ts`. The direct Steam API URL is kept only as a production placeholder; a deployed app will still need a safe proxy/backend before real production Steam sync.
-
-The test action calls:
-
-- `getOwnedGames()`
-- `getRecentlyPlayedGames()`
-
-The returned Steam games are mapped into the local `Game` model for preview in a debug panel, but they are not written into the local library yet.
-
-Steam import stays local-first:
-
-- Use **Test Steam connection** to load owned games.
-- Select individual Steam games, or use **Select all** and **Deselect all**.
-- Click **Import selected** to add selected games to the local library.
-- Games already in the library with the same Steam App ID are marked as **Already in library** and are not duplicated.
-- Steam games can be removed from the library and optionally ignored so the same Steam App ID is skipped during future imports.
-- Ignored Steam games are stored locally, listed in Settings, and can be restored from the ignored list.
-- Imported games default to platform `Steam`, status `Want to play`, and tags `imported` and `steam`.
-- Games with recent Steam playtime default to `Playing`.
-- QuestShelf stores Steam metadata locally on imported games, including Steam App ID, external source, Steam store URL, and import time.
-- Importing never overwrites manually edited local game fields.
-- Steam game covers prefer Steam library artwork, then fall back to header art, capsule art, and finally a local placeholder if images cannot load.
-
-To use the test connection:
-
-1. Get a Steam Web API key from <https://steamcommunity.com/dev/apikey>.
-2. Find your SteamID64 from your Steam profile URL or a Steam ID lookup tool.
-3. Open QuestShelf Settings.
-4. Enter the API key and SteamID64.
-5. Optionally paste your public Steam wishlist URL if Steam redirects your profile to a vanity URL such as `https://store.steampowered.com/wishlist/id/loopak/`.
-6. Click **Test Steam connection**.
-
-Steam profile privacy can prevent owned or recently played game data from being returned.
-
-During this foundation phase the Steam test runs directly from the browser. If the browser or Steam blocks the request, QuestShelf shows the API failure state instead of silently syncing.
-
-## RAWG Metadata Foundation
-
-QuestShelf includes an optional RAWG integration in Settings. The RAWG API key is stored locally in the browser.
-
-To enrich one game:
-
-1. Get a RAWG API key from <https://rawg.io/apidocs>.
-2. Open QuestShelf Settings and enter the RAWG API key.
-3. Open Metadata and click **Find metadata** on a game row.
-4. Pick the correct RAWG match.
-
-QuestShelf fetches details for the selected match and stores metadata locally on that game, including RAWG ID, genres, RAWG tags, developers, publishers, release date, Metacritic score, average playtime, background image, metadata source, and update time.
-
-RAWG enrichment does not overwrite manually edited fields such as status, notes, or custom tags. If a non-Steam game has no cover image, an empty cover image, or one of the generated local placeholder covers, QuestShelf can use the RAWG background image as a cover fallback. User-provided cover URLs and Steam artwork are preserved. The game detail view also includes **Use RAWG image as cover** when a RAWG background image is available and the current cover is safe to replace.
-
-## Game Detail View
-
-Open a game from the Library with **Details** to review one title in a focused view. The detail screen keeps local user tracking separate from imported metadata:
-
-- **My tracking** is editable and stores status, custom tags, and notes in local storage.
-- **Steam data** is read-only and shows Steam App ID, store URL, import source, and import time when available.
-- **RAWG metadata** is read-only and shows enriched fields such as genres, tags, developers, publishers, release date, Metacritic, average playtime, background image, and metadata update time when available.
-
-Imported and enriched metadata is not edited directly from this screen, except for the explicit **Use RAWG image as cover** action for manual/non-Steam games that still have an empty or generated placeholder cover.
-
-## Metadata Enrichment Workflow
-
-Open **Metadata** to review games that are missing RAWG metadata. The workflow stays local-first and only runs when started by the user.
-
-- Use **Find metadata** on one game to search RAWG and auto-save only high-confidence matches.
-- Use **Accept suggested match** for medium-confidence matches, or **Choose different match** to pick another RAWG result manually.
-- Use **Skip** for games to revisit later or **Mark as manually managed** for games that should not be enriched automatically.
-- Use **Enrich all** or **Enrich selected** to process a lightweight queue without freezing the UI.
-- Use **Stop enrichment** to halt an active batch after the current item finishes.
-
-Automatic confidence scoring considers normalized title similarity, platform similarity, and release year similarity when a release year is available. Title normalization lowercases names, removes punctuation/trademark marks, and strips common edition or platform suffixes such as GOTY, Deluxe Edition, Remastered, Complete Edition, Steam, Switch, PlayStation, and Xbox.
-
-Matching uses three tiers:
-
-- `90%+`: auto-applied during enrichment.
-- `70-89%`: shown as a suggested match that must be accepted or changed manually.
-- Below `70%`: requires manual selection.
-
-RAWG search tries the exact title first, then the normalized title, then the title without subtitle text after a colon or dash. Successful RAWG matches are cached locally in the browser and reused for the same normalized title. Enrichment only writes RAWG metadata fields and does not overwrite local user-owned fields such as status, tags, notes, or cover image.
-
-## Recommendation Engine v1
-
-Open **Recommendation** to get a local **What should I play?** pick. The engine does not call AI or any external API.
-
-Inputs:
-
-- Available time: 15 min, 30 min, 1 hour, or long session.
-- Mood: brain off, story, grind, challenge, or comfort.
-- Preferred platform: any platform or a specific local platform.
-- Include finished games: enabled or disabled.
-- Include Wishlist items: disabled by default.
-
-The recommendation score uses local status, last played date, playtime, RAWG average playtime, genres, RAWG tags, custom tags, and platform. It prefers games already marked `Playing`, games not played recently, mood matches, and games that fit the selected session length. It penalizes completed games unless enabled, dropped games, and missing RAWG metadata without excluding those games entirely.
-
-The main recommendation card shows the selected game, cover, platform, status, playtime, matching reasons, and confidence score. **Reroll** moves to the next best candidate, **Mark as Playing** updates local tracking, and **Open Detail** opens the focused game detail view.
-
-## Stats Dashboard
-
-Open **Stats** to review the local backlog dashboard. Stats use only the games saved in this browser and never call external APIs.
-
-The dashboard supports three scopes:
-
-- **Library only**
-- **Wishlist only**
-- **All**
-
-Stats include Library and Wishlist totals, status counts, total tracked playtime, finished percentage, active backlog count, played-but-unfinished games, never-played games, platform breakdown, source breakdown, and RAWG enrichment coverage.
-
-QuestShelf also shows useful local lists such as top played games, recently played games, longest paused games, recently imported games, and games missing metadata. Charts are intentionally lightweight CSS bars instead of a chart dependency so the dashboard stays fast on handheld screens and large libraries.
-
-## Install
+There is also a helper script that builds, syncs Capacitor, and refreshes Android launcher icons:
 
 ```bash
-npm install
+npm run android:prepare
 ```
 
-## Development
+Android notes:
 
-```bash
-npm run dev
-```
+- `capacitor.config.ts` points Capacitor at the Vite production build in `dist`.
+- `@capacitor/status-bar` is used to hide/re-apply the Android status bar on native Android.
+- Local game data is mirrored into Capacitor Preferences when the native plugin is available.
+- Browser `localStorage` remains the fast startup/cache layer.
+- Existing browser data is migrated into Preferences the first time the native app starts.
+- Steam and RAWG API calls still require network access.
+- The saved Library, Wishlist, notes, tags, statuses, Stats, recommendations, and local planning flows remain usable offline after data is loaded.
+- After `npx cap sync android`, run `npm run android:sync-icons` or `npm run android:prepare` so prepared resources overwrite generated Android launcher icons before building the APK.
 
-## Build
-
-```bash
-npm run build
-```
-
-The static production output is written to `dist/`.
-
-## Preview Production Build
-
-```bash
-npm run preview
-```
-
-Use the local preview for PWA smoke tests because it serves the built app shell and service worker.
-
-## Static Deploy
+## Deployment
 
 QuestShelf does not require a custom server for the app shell. Deploy the `dist/` folder produced by `npm run build` to any static host.
 
@@ -495,3 +294,58 @@ QuestShelf does not require a custom server for the app shell. Deploy the `dist/
 - Build output directory: `dist`
 
 After deploy, open the HTTPS production URL on iPhone Safari and use **Share → Add to Home Screen** to install the standalone PWA.
+
+Important deployment caveat: the static app shell can be hosted anywhere, but production API integrations such as Steam may need a secure proxy/backend. Do not put private API keys into source code or public README files.
+
+## Data storage, backup, and recovery
+
+QuestShelf is local-first.
+
+Known storage areas include:
+
+- Library and Wishlist game records
+- RAWG metadata cache
+- ignored Steam games
+- Library/Wishlist filters
+- onboarding progress
+- Platform Plans / queue state
+- Quest Queue review state
+- integration settings such as Steam, RAWG, IsThereAnyDeal, and SteamGridDB keys
+- theme/navigation/device preferences
+- achievement counters and play activity
+
+Backup behavior:
+
+- Normal backups include core user data.
+- Steam/RAWG/integration keys are excluded by default.
+- Integration settings are included only when explicitly enabled.
+- Imported backups are validated before restore.
+- Replace/restore flows require typed confirmation.
+- Merge import avoids duplicates by local ID, Steam App ID, RAWG ID, ROM path/URI, or normalized title/platform fallback.
+- Corrupted local JSON falls back to safe defaults and records warnings rather than silently wiping data.
+
+## Feedback / contributing
+
+Reddit feedback, issues, bug reports, and feature requests are welcome.
+
+Especially useful feedback:
+
+- “I have a giant backlog and this flow helped / did not help.”
+- “This triage step is confusing.”
+- “This would make Platform Plans more useful.”
+- “This import/sync failed with my real library.”
+- “This is too much friction before I can play something.”
+- “This would make the Android/handheld experience better.”
+
+If you open an issue, please include:
+
+- browser/device/OS,
+- whether you are using the web app, PWA, or Android build,
+- whether the problem involves Steam/RAWG/ITAD/HLTB/SteamGridDB,
+- and any safe, non-secret error text.
+
+Never paste real API keys into GitHub issues, Reddit comments, screenshots, or logs.
+
+## License
+
+No license file is currently included in this repository. Until a license is added, assume all rights are reserved by the project owner.
