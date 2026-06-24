@@ -1,4 +1,5 @@
 import {
+  forwardRef,
   useEffect,
   useMemo,
   useRef,
@@ -698,6 +699,7 @@ function FocusedReviewCard({
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [swipeState, setSwipeState] = useState<SwipeState>(emptySwipeState);
+  const [isGameActionsOpen, setIsGameActionsOpen] = useState(false);
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
   const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
@@ -706,6 +708,7 @@ function FocusedReviewCard({
     setCoverSourceIndex(0);
     setIsCoverLoaded(false);
     setSwipeState(emptySwipeState);
+    setIsGameActionsOpen(false);
     swipeStartRef.current = null;
   }, [game.id, game.coverImage, game.wideCoverImage, game.heroImage, game.backgroundImage, game.steamAppId, game.title, game.platform]);
 
@@ -823,6 +826,13 @@ function FocusedReviewCard({
     onAction(action);
   }
 
+  function handleSheetUtilityAction(action: ReviewModeAction) {
+    onAction(action);
+    if (action !== 'note') {
+      setIsGameActionsOpen(false);
+    }
+  }
+
   return (
     <article
       className={`qs-review-stage min-h-full ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
@@ -891,6 +901,15 @@ function FocusedReviewCard({
                 {getReviewActionLabel(activeSwipeAction, t)}
               </div>
             ) : null}
+            <button
+              aria-expanded={isGameActionsOpen}
+              aria-label={`Open Game Actions for ${game.title}`}
+              className="qs-game-actions-trigger absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-ink-950/85 text-2xl font-bold leading-none text-white shadow-panel backdrop-blur-md transition hover:border-mint/45 hover:text-mint focus-visible:border-mint"
+              onClick={(event) => { event.preventDefault(); event.stopPropagation(); setIsGameActionsOpen(true); }}
+              type="button"
+            >
+              ⋯
+            </button>
             <div className="qs-review-artwork-frame relative h-full w-full">
               {activeCoverSource ? (
                 <div className="relative h-full w-full">
@@ -973,7 +992,7 @@ function FocusedReviewCard({
         ) : null}
 
 
-        <div className="mt-3 grid w-full gap-2 px-2 sm:grid-cols-2">
+        <div className="qs-review-utility-actions mt-3 grid w-full gap-2 px-2 sm:grid-cols-2">
           <button
             className="min-h-11 rounded-xl border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:text-white focus-visible:border-mint"
             onClick={(event) => handleInlineUtilityClick(event, 'open-details')}
@@ -1017,6 +1036,15 @@ function FocusedReviewCard({
             </span>
           </button>
         </div>
+
+        {isGameActionsOpen ? (
+          <GameActionsSheet
+            game={game}
+            isRefreshingMetadata={isRefreshingMetadata}
+            onAction={handleSheetUtilityAction}
+            onClose={() => setIsGameActionsOpen(false)}
+          />
+        ) : null}
 
         {isNoteOpen ? (
           <div className="mt-3 w-full rounded-xl border border-mint/20 bg-ink-950/80 p-3">
@@ -1078,6 +1106,149 @@ function FocusedReviewCard({
   );
 }
 
+
+
+function GameActionsSheet({
+  game,
+  isRefreshingMetadata,
+  onAction,
+  onClose,
+}: {
+  game: Game;
+  isRefreshingMetadata: boolean;
+  onAction: (action: ReviewModeAction) => void;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const firstButtonRef = useRef<HTMLButtonElement | null>(null);
+  const externalLinks = getGameActionExternalLinks(game, t);
+
+  useEffect(() => {
+    firstButtonRef.current?.focus({ preventScroll: true });
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="qs-game-actions-sheet fixed inset-0 z-50 flex flex-col justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="qs-game-actions-title"
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerMove={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+    >
+      <button
+        aria-label="Close Game Actions"
+        className="absolute inset-0 cursor-default bg-ink-950/70 backdrop-blur-sm"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="relative max-h-[82dvh] overflow-y-auto rounded-t-3xl border-t border-skyglass/20 bg-ink-950 p-4 pb-[max(1rem,var(--qs-safe-bottom))] shadow-2xl">
+        <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-skyglass/35" aria-hidden="true" />
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 id="qs-game-actions-title" className="text-base font-bold text-white">Game Actions</h2>
+            <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{game.title}</p>
+          </div>
+          <button
+            aria-label="Close Game Actions"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-skyglass/15 text-slate-300 transition hover:bg-white/5 hover:text-white focus-visible:border-mint"
+            onClick={onClose}
+            type="button"
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
+          <GameActionsButton ref={firstButtonRef} icon="info" label={t('review.details')} onClick={() => onAction('open-details')} />
+          <GameActionsButton icon="pencil" label={t('review.quickNote')} onClick={() => onAction('note')} />
+          <GameActionsButton
+            disabled={isRefreshingMetadata}
+            icon="refresh-cw"
+            label={isRefreshingMetadata ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
+            onClick={() => onAction('enrich')}
+          />
+          <GameActionsButton
+            disabled={isRefreshingMetadata}
+            icon="image"
+            label={isRefreshingMetadata ? t('artwork.searching') : t('artwork.findArtwork')}
+            onClick={() => onAction('find-artwork')}
+          />
+        </div>
+
+        {externalLinks.length > 0 ? (
+          <div className="mt-4">
+            <div className="qs-label-caps mb-2 text-slate-500">External links</div>
+            <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
+              {externalLinks.map((link) => (
+                <a
+                  key={link.href}
+                  className="flex min-h-12 items-center gap-3 px-4 text-sm font-semibold text-slate-200 transition hover:bg-mint/[0.07] hover:text-white focus-visible:border-mint"
+                  href={link.href}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <Icon className="text-slate-400" name="external-link" size={17} />
+                  <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                  <Icon className="text-slate-500" name="chevrons-right" size={14} />
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const GameActionsButton = forwardRef<HTMLButtonElement, {
+  disabled?: boolean;
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+}>(({ disabled = false, icon, label, onClick }, ref) => (
+  <button
+    ref={ref}
+    className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-semibold text-slate-200 transition hover:bg-mint/[0.07] hover:text-white focus-visible:border-mint disabled:cursor-wait disabled:opacity-60"
+    disabled={disabled}
+    onClick={onClick}
+    type="button"
+  >
+    <Icon className="shrink-0 text-slate-400" name={icon} size={17} />
+    <span className="min-w-0 flex-1 truncate">{label}</span>
+    <Icon className="shrink-0 text-slate-500" name="chevrons-right" size={14} />
+  </button>
+));
+GameActionsButton.displayName = 'GameActionsButton';
+
+function getGameActionExternalLinks(game: Game, t: TFunction) {
+  const links: Array<{ href: string; label: string }> = [];
+
+  if (game.hltbSourceUrl) {
+    links.push({ href: game.hltbSourceUrl, label: t('hltb.howLongToBeat') });
+  }
+
+  if (game.externalUrl) {
+    links.push({ href: game.externalUrl, label: t('detail.externalUrl') });
+  }
+
+  if (typeof game.steamAppId === 'number') {
+    links.push({ href: `https://store.steampowered.com/app/${game.steamAppId}`, label: 'Steam' });
+  }
+
+  return links.filter((link, index, allLinks) => allLinks.findIndex((candidate) => candidate.href === link.href) === index);
+}
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'exiting';
 
