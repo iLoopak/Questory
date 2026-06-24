@@ -9,7 +9,7 @@ import type {
   SteamWishlistItem,
 } from '../types/steam';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
-import { postIntegration } from '../lib/integrationProxy';
+import { getIntegrationProxyBaseUrl, postIntegration } from '../lib/integrationProxy';
 
 const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
 const DEVELOPMENT_STEAM_STATS_API_BASE_URL = '/api/steam/ISteamUserStats';
@@ -185,6 +185,7 @@ function shouldUseSteamIntegrationProxy() {
 function getSteamProxyRoute(endpoint: string) {
   if (endpoint === 'GetOwnedGames') return 'owned-games';
   if (endpoint === 'GetPlayerSummaries') return 'player-summary';
+  if (endpoint === 'GetRecentlyPlayedGames') return 'recently-played';
   return null;
 }
 
@@ -202,13 +203,31 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
 
   const proxyRoute = getSteamProxyRoute(endpoint);
   if (proxyRoute && shouldUseSteamIntegrationProxy()) {
+    const safeRequestUrl = getSafeIntegrationProxyRequestUrl('steam', proxyRoute);
+
     try {
       const payload = await postIntegration<{ response: SteamApiResponse<T> }>('steam', proxyRoute, { apiKey: settings.apiKey.trim(), steamId64: settings.steamId64 });
       if (!payload.response.response) throw new SteamApiError('Steam returned no response object. The SteamID64 may be invalid or unavailable.', 'malformed-response');
+      recordSteamApiDebug({
+        endpoint,
+        httpStatus: 200,
+        parsedGameCount: getParsedGameCount(payload.response.response),
+        requestUrl: safeRequestUrl,
+        responseSummary: JSON.stringify(payload.response, null, 2),
+        steamId64: settings.steamId64,
+      });
       return payload.response.response;
     } catch (error) {
-      if (error instanceof SteamApiError) throw error;
-      throw mapSteamProxyError(error);
+      const mappedError = error instanceof SteamApiError ? error : mapSteamProxyError(error);
+      recordSteamApiDebug({
+        endpoint,
+        httpStatus: typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : null,
+        parsedGameCount: null,
+        requestUrl: safeRequestUrl,
+        responseSummary: mappedError.message,
+        steamId64: settings.steamId64,
+      });
+      throw mappedError;
     }
   }
 
@@ -937,17 +956,19 @@ async function fetchSteamWishlistResponse(proxyUrl: URL, directUrl: URL) {
       lastProxyError = proxyError;
     }
 
-    try {
-      logSteamApiRequest('wishlist:direct', directUrl);
-      const response = await fetch(directUrl, { redirect: 'manual' });
+    if (import.meta.env.DEV) {
+      try {
+        logSteamApiRequest('wishlist:direct', directUrl);
+        const response = await fetch(directUrl, { redirect: 'manual' });
 
-      if (attempt < STEAM_WISHLIST_MAX_TRANSIENT_RETRIES && isTransientWishlistStatus(response.status)) {
-        continue;
+        if (attempt < STEAM_WISHLIST_MAX_TRANSIENT_RETRIES && isTransientWishlistStatus(response.status)) {
+          continue;
+        }
+
+        return response;
+      } catch (directError) {
+        lastDirectError = directError;
       }
-
-      return response;
-    } catch (directError) {
-      lastDirectError = directError;
     }
   }
 
@@ -955,8 +976,9 @@ async function fetchSteamWishlistResponse(proxyUrl: URL, directUrl: URL) {
     throw new SteamWishlistError('Steam wishlist sync is unavailable right now. Check your connection and try again.', 'cors-proxy');
   }
 
+  const directErrorSummary = import.meta.env.DEV ? ` Direct error: ${formatFetchError(lastDirectError)}.` : ' Direct Steam browser fallback is disabled in production builds.';
   throw new SteamWishlistError(
-    `Steam wishlist request failed. Proxy error: ${formatFetchError(lastProxyError)}. Direct error: ${formatFetchError(lastDirectError)}.`,
+    `Steam wishlist request failed. Proxy error: ${formatFetchError(lastProxyError)}.${directErrorSummary}`,
     'endpoint-failure',
   );
 }
@@ -1072,6 +1094,10 @@ function recordSteamApiDebug(entry: SteamApiDebugEntry) {
     steamApiDebugEntries.shift();
   }
 
+}
+
+function getSafeIntegrationProxyRequestUrl(provider: string, route: string) {
+  return new URL(`${getIntegrationProxyBaseUrl()}/${provider}/${route}`, window.location.origin).toString();
 }
 
 function getSafeRequestUrl(url: URL) {
