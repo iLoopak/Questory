@@ -9,6 +9,7 @@ import type {
   SteamWishlistItem,
 } from '../types/steam';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { postIntegration } from '../lib/integrationProxy';
 
 const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
 const DEVELOPMENT_STEAM_STATS_API_BASE_URL = '/api/steam/ISteamUserStats';
@@ -176,8 +177,40 @@ function validateSettings(settings: SteamSettings) {
   }
 }
 
+
+function shouldUseSteamIntegrationProxy() {
+  return !import.meta.env.DEV || Boolean(import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL?.trim() || import.meta.env.VITE_STEAM_PROXY_BASE_URL?.trim());
+}
+
+function getSteamProxyRoute(endpoint: string) {
+  if (endpoint === 'GetOwnedGames') return 'owned-games';
+  if (endpoint === 'GetPlayerSummaries') return 'player-summary';
+  return null;
+}
+
+function mapSteamProxyError(error: unknown): SteamApiError {
+  const code = typeof (error as { code?: unknown })?.code === 'string' ? (error as { code: string }).code : '';
+  if (code === 'MISSING_API_KEY') return new SteamApiError('Add a Steam Web API key before testing the connection.', 'missing-api-key');
+  if (code === 'INVALID_API_KEY') return new SteamApiError('Steam rejected the API key. Check that your Steam Web API key is valid.', 'invalid-api-key');
+  if (code === 'RATE_LIMITED') return new SteamApiError('Steam is rate limiting requests. Try again later.', 'api-failure', { isTransient: true });
+  if (code === 'PROVIDER_TIMEOUT') return new SteamApiError('Steam request timed out.', 'timeout', { isTransient: true });
+  return new SteamApiError(error instanceof Error ? error.message : 'Steam integration proxy request failed.', 'proxy-unavailable', { isTransient: true });
+}
+
 async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings): Promise<T> {
   validateSettings(settings);
+
+  const proxyRoute = getSteamProxyRoute(endpoint);
+  if (proxyRoute && shouldUseSteamIntegrationProxy()) {
+    try {
+      const payload = await postIntegration<{ response: SteamApiResponse<T> }>('steam', proxyRoute, { apiKey: settings.apiKey.trim(), steamId64: settings.steamId64 });
+      if (!payload.response.response) throw new SteamApiError('Steam returned no response object. The SteamID64 may be invalid or unavailable.', 'malformed-response');
+      return payload.response.response;
+    } catch (error) {
+      if (error instanceof SteamApiError) throw error;
+      throw mapSteamProxyError(error);
+    }
+  }
 
   const baseUrl = endpoint === 'GetPlayerSummaries' ? STEAM_USER_API_BASE_URL : STEAM_API_BASE_URL;
   const version = endpoint === 'GetPlayerSummaries' ? 'v0002' : 'v0001';
@@ -291,6 +324,15 @@ async function requestSteamEndpoint<T>(endpoint: string, settings: SteamSettings
 
 async function requestSteamStatsEndpoint<T>(endpoint: 'GetPlayerAchievements' | 'GetSchemaForGame', settings: SteamSettings, appId: number): Promise<T> {
   validateSettings(settings);
+
+  if (shouldUseSteamIntegrationProxy()) {
+    try {
+      const payload = await postIntegration<{ schema: unknown; playerAchievements: unknown }>('steam', 'achievements', { apiKey: settings.apiKey.trim(), steamId64: settings.steamId64, appId });
+      return (endpoint === 'GetSchemaForGame' ? payload.schema : payload.playerAchievements) as T;
+    } catch (error) {
+      throw mapSteamProxyError(error);
+    }
+  }
 
   const version = endpoint === 'GetSchemaForGame' ? 'v2' : 'v0001';
   const url = new URL(`${STEAM_STATS_API_BASE_URL}/${endpoint}/${version}/`, window.location.origin);

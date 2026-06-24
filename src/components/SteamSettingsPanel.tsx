@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { getSteamArtworkUrls } from '../lib/steamArtwork';
+import { getIntegrationTransport } from '../lib/integrationProxy';
 import { ViewportModal } from './ViewportModal';
 import { SettingsSection } from './settings/SettingsSection';
 import { useI18n } from '../i18n';
@@ -430,6 +431,9 @@ export function SteamSettingsPanel({
         <details className="rounded-lg border border-white/10 bg-ink-950 p-4">
           <summary className="cursor-pointer font-semibold text-white">{t('steam.advancedConnectionDiagnostics')}</summary>
           <div className="mt-3">
+            <div className="mb-3 rounded-md border border-white/10 bg-ink-900/80 p-3 text-sm text-slate-300">
+              Active integration transport: <span className="font-semibold text-white">{getIntegrationTransport('steam')}</span>
+            </div>
             <SteamApiDebugSummary
               entries={apiDebugEntries}
               latestEntry={latestApiDebugEntry}
