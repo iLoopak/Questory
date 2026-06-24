@@ -8,7 +8,7 @@ import { ViewportModal } from '../../components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
 import { Icon } from '../../components/Icon';
 import { SteamWishlistHtmlImportModal } from '../../components/settings/WishlistSettingsPanel';
-import { QueueGhost, QUEUE_GHOST_HABITAT_PROBABILITY, pickQueueGhostSlot, pickSimpleVariant, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
+import { QueueGhost, pickQueueGhostSlot, pickSimpleVariant, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
 import { useI18n } from '../../i18n';
 import { translateOption } from '../../i18n';
 import {
@@ -160,10 +160,10 @@ export function CollectionPanel({
   const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
   const [wishlistGhostSlot] = useState(() => collectionType === 'wishlist' ? pickQueueGhostSlot('wishlist') : null);
   const [wishlistGhostVariant] = useState(() => collectionType === 'wishlist' ? pickSimpleVariant() : 'default' as const);
-  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length >= 1 && shouldShowQueueGhostInHabitat('wishlist', QUEUE_GHOST_HABITAT_PROBABILITY));
+  const [showWishlistGhost, setShowWishlistGhost] = useState(() => Boolean(wishlistGhostSlot) && collectionType === 'wishlist' && games.length >= 1 && shouldShowQueueGhostInHabitat('wishlist'));
   const [libraryGhostSlot] = useState(() => collectionType === 'library' ? pickQueueGhostSlot('library') : null);
   const [libraryGhostVariant] = useState(() => collectionType === 'library' ? pickSimpleVariant() : 'default' as const);
-  const [showLibraryGhost, setShowLibraryGhost] = useState(() => Boolean(libraryGhostSlot) && collectionType === 'library' && games.length >= 5 && shouldShowQueueGhostInHabitat('library', QUEUE_GHOST_HABITAT_PROBABILITY));
+  const [showLibraryGhost, setShowLibraryGhost] = useState(() => Boolean(libraryGhostSlot) && collectionType === 'library' && games.length >= 5 && shouldShowQueueGhostInHabitat('library'));
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);

@@ -65,10 +65,10 @@ export function hasAvailableQueueGhostSlot(habitat: QueueGhostHabitat): boolean 
   return getAvailableQueueGhostSlots(habitat).length > 0;
 }
 
-export function shouldShowQueueGhostInHabitat(habitat: QueueGhostHabitat, probability: number): boolean {
+export function shouldShowQueueGhostInHabitat(habitat: QueueGhostHabitat): boolean {
   if (activeQueueGhostHabitat) return false;
   if (!hasAvailableQueueGhostSlot(habitat)) return false;
-  if (Math.random() >= probability) return false;
+  if (Math.random() >= GHOST_P.habitat[habitat]) return false;
   activeQueueGhostHabitat = habitat;
   if (import.meta.env.DEV) console.debug(`[QueueGhost] activated habitat="${habitat}"`);
   return true;
@@ -80,20 +80,79 @@ export function releaseQueueGhostHabitat(habitat: QueueGhostHabitat) {
   }
 }
 
-export const QUEUE_GHOST_DEVELOPMENT_PROBABILITY = 0.95;
-export const QUEUE_GHOST_PRODUCTION_PROBABILITY = 0.05;
-export const QUEUE_GHOST_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : QUEUE_GHOST_PRODUCTION_PROBABILITY;
-export const QUEUE_GHOST_HABITAT_PROBABILITY = QUEUE_GHOST_PROBABILITY;
-export const QUEUE_GHOST_VARIANT_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.12;
+// ─── Probability configuration ────────────────────────────────────────────────
+// All Queue Ghost spawn and variant chances live here.
+//
+// DEV  (0.95): appears on almost every screen open — easy to test all variants.
+// PROD targets:
+//   habitat spawn  — ≤4 % on primary screens (Home, Quest Queue)
+//                    ≤2 % on secondary screens (Library, Wishlist, Plans, Detail)
+//   cover variant  — 30 % of ghost appearances  (target 25–40 %)
+//   peek variant   —  7 % of ghost appearances  (target  5–10 %)
+//   context variants — condition-gated; within-condition probability is higher
+//     because the triggering condition is itself rare.
+// ─────────────────────────────────────────────────────────────────────────────
 
-const CONTEXTUAL_VARIANT_PROBABILITIES: Record<'sleepy' | 'panic' | 'midnight' | 'achievement' | 'peek', number> = {
-  sleepy: QUEUE_GHOST_VARIANT_PROBABILITY,
-  panic: QUEUE_GHOST_VARIANT_PROBABILITY,
-  midnight: import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.03,
-  achievement: 1,
-  peek: import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : 0.05,
+type GhostProbabilityConfig = {
+  habitat: Record<QueueGhostHabitat, number>;
+  variant: {
+    cover: number;
+    peek: number;
+    sleepy: number;
+    panic: number;
+    midnight: number;
+    achievement: number;
+  };
 };
-const QUEUE_GHOST_COVER_PROBABILITY = import.meta.env.DEV ? QUEUE_GHOST_DEVELOPMENT_PROBABILITY : QUEUE_GHOST_VARIANT_PROBABILITY;
+
+const _DEV_P = 0.95;
+
+const QUEUE_GHOST_PROBABILITIES = {
+  dev: {
+    habitat: {
+      home:          _DEV_P,
+      questQueue:    _DEV_P,
+      achievements:  _DEV_P,
+      library:       _DEV_P,
+      wishlist:      _DEV_P,
+      platformPlans: _DEV_P,
+      gameDetail:    _DEV_P,
+    },
+    variant: {
+      cover:       _DEV_P,
+      peek:        _DEV_P,
+      sleepy:      _DEV_P,
+      panic:       _DEV_P,
+      midnight:    _DEV_P,
+      achievement: _DEV_P,
+    },
+  } satisfies GhostProbabilityConfig,
+  prod: {
+    habitat: {
+      home:          0.04, // primary:   ~1-in-25 opens
+      questQueue:    0.04, // primary:   ~1-in-25 opens
+      achievements:  0.03, // secondary with achievement context
+      library:       0.02, // secondary: ~1-in-50 opens
+      wishlist:      0.02,
+      platformPlans: 0.02,
+      gameDetail:    0.02,
+    },
+    variant: {
+      cover:       0.30, // 30 % of appearances carry a game cover
+      peek:        0.07, //  7 % of appearances use the peek variant
+      // Context-gated — only evaluated when the condition is true.
+      sleepy:      0.55, // 55 % when user hasn't played in ≥7 days
+      panic:       0.55, // 55 % when queue exceeds 1 000 games
+      midnight:    0.50, // 50 % during the midnight hour
+      achievement: 0.90, // 90 % when a newly unlocked achievement is available
+    },
+  } satisfies GhostProbabilityConfig,
+} as const;
+
+// Active config — swapped at compile time.
+const GHOST_P: GhostProbabilityConfig = import.meta.env.DEV
+  ? QUEUE_GHOST_PROBABILITIES.dev
+  : QUEUE_GHOST_PROBABILITIES.prod;
 
 export type QueueGhostCover = {
   title: string;
@@ -116,7 +175,7 @@ type QueueGhostVariantContext = {
 export function shouldShowQueueGhost(): boolean {
   if (activeQueueGhostHabitat) return false;
   if (!hasAvailableQueueGhostSlot('home')) return false;
-  const show = getSessionRandomFlag(GHOST_SESSION_KEY, QUEUE_GHOST_PROBABILITY);
+  const show = getSessionRandomFlag(GHOST_SESSION_KEY, GHOST_P.habitat.home);
   if (show) activeQueueGhostHabitat = 'home';
   return show;
 }
@@ -128,17 +187,17 @@ export function getQueueGhostVariant({
   isMidnight = false,
   hasCover = false,
 }: QueueGhostVariantContext): QueueGhostVariant {
-  if (achievement && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.achievement) return 'achievement';
-  if (hasNoPlayTodaySessionForSevenDays && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.sleepy) return 'sleepy';
-  if (queueSize > 1000 && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.panic) return 'panic';
-  if (isMidnight && Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.midnight) return 'midnight';
-  if (hasCover && Math.random() < QUEUE_GHOST_COVER_PROBABILITY) return 'cover';
-  if (Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.peek) return 'peek';
+  if (achievement && Math.random() < GHOST_P.variant.achievement) return 'achievement';
+  if (hasNoPlayTodaySessionForSevenDays && Math.random() < GHOST_P.variant.sleepy) return 'sleepy';
+  if (queueSize > 1000 && Math.random() < GHOST_P.variant.panic) return 'panic';
+  if (isMidnight && Math.random() < GHOST_P.variant.midnight) return 'midnight';
+  if (hasCover && Math.random() < GHOST_P.variant.cover) return 'cover';
+  if (Math.random() < GHOST_P.variant.peek) return 'peek';
   return 'default';
 }
 
 export function pickSimpleVariant(): QueueGhostVariant {
-  if (Math.random() < CONTEXTUAL_VARIANT_PROBABILITIES.peek) return 'peek';
+  if (Math.random() < GHOST_P.variant.peek) return 'peek';
   return 'default';
 }
 
