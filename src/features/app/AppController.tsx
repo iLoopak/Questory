@@ -658,6 +658,7 @@ export function AppController() {
     setActiveUtilityView(null);
     setPlayingNowReturnContext(null);
     setActiveNavItem('Settings');
+    setActiveSettingsCategory(null);
     setSelectedGameId(null);
   });
 
