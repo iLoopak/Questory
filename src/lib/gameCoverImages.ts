@@ -3,9 +3,10 @@ import type { RawgMetadata } from '../types/rawg';
 import { getSteamArtworkUrls } from './steamArtwork';
 
 export const artworkSourcePriority = [
+  'custom',
   'user',
-  'steam',
   'steamgriddb',
+  'steam',
   'rawg',
   'imported',
   'generated-fallback',
@@ -35,7 +36,7 @@ export function getPreferredArtworkSources(game: Game, usage: ArtworkUsage): str
 
   const standard = getGameCoverSources(game);
 
-  if (usage === 'portrait' || getStoredArtworkSource(game) === 'user') {
+  if (usage === 'portrait' || getStoredArtworkSource(game) === 'custom' || getStoredArtworkSource(game) === 'user') {
     return standard;
   }
 
@@ -68,8 +69,8 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
   const currentSource = getStoredArtworkSource(game);
   const currentCover = game.coverImage?.trim();
 
-  if (currentCover && currentSource === 'user') {
-    candidates.push({ source: 'user', url: currentCover });
+  if (currentCover && (currentSource === 'custom' || currentSource === 'user')) {
+    candidates.push({ source: currentSource === 'custom' ? 'custom' : 'user', url: currentCover });
   }
 
   if (currentCover && currentSource === 'steamgriddb') {
@@ -159,7 +160,7 @@ export function hasRealArtwork(game: Game) {
 export function hasProtectedArtwork(game: Game) {
   const source = getStoredArtworkSource(game);
 
-  return source === 'user' || source === 'steam' || (typeof game.steamAppId === 'number' && hasRealArtwork(game));
+  return source === 'custom' || source === 'user';
 }
 
 export function hasFallbackArtwork(game: Game): boolean {

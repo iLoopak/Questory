@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { createTranslator } from '../i18n';
 import type { NavItem } from '../config/navigation';
+import { hasRealArtwork, getStoredArtworkSource } from '../lib/gameCoverImages';
 import { mergeRawgMetadataIntoGame } from '../lib/metadataMerge';
 import { formatGameToastMessage, getLinkRawgGameAction, type NotificationDraft } from '../lib/notifications';
 import { refreshRawgMetadataForGame } from '../lib/rawgMetadataEnrichment';
@@ -60,7 +61,7 @@ export function useMetadataArtworkActions({
         }
 
         return touchGameRecord({
-          ...mergeRawgMetadataIntoGame(game, metadata),
+          ...mergeRawgMetadataIntoGame(game, metadata, { preserveArtwork: true }),
           metadataSkippedAt: undefined,
           metadataManualManagedAt: undefined,
         });
@@ -118,6 +119,22 @@ export function useMetadataArtworkActions({
       return 'error';
     }
 
+    if (isArtworkRefresh && hasRealArtwork(targetGame)) {
+      console.info('[Questory artwork] preserved-existing-artwork', {
+        gameId: targetGame.id,
+        title: targetGame.title,
+        previousArtworkSource: getStoredArtworkSource(targetGame) ?? 'none',
+        newArtworkSource: 'unchanged',
+        reason: 'Find Artwork only downloads automatically when the game has no valid cover artwork',
+      });
+      addToastNotification({
+        category: 'info',
+        dedupeKey: toastKey,
+        message: formatGameToastMessage(t('toast.noArtworkFound'), targetGame),
+      });
+      return 'no-match';
+    }
+
     setRefreshingMetadataGameIds((currentGameIds) => new Set(currentGameIds).add(targetGame.id));
     addToastNotification({
       category: 'info',
@@ -148,13 +165,15 @@ export function useMetadataArtworkActions({
       }
 
       const sgdbArtwork = isArtworkRefresh ? await fetchSteamGridDbArtworkForGame(targetGame) : null;
+      let appliedArtwork = false;
       setGames((currentGames) => currentGames.map((game) => {
         if (game.id !== targetGame.id) {
           return game;
         }
 
-        let nextGame = mergeRawgMetadataIntoGame(game, result.metadata, { preserveArtwork: !isArtworkRefresh });
+        let nextGame = mergeRawgMetadataIntoGame(game, result.metadata, { preserveArtwork: true });
         nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
+        appliedArtwork = appliedArtwork || nextGame !== game;
         // Persist the winning retro search title so future lookups skip candidate iteration
         if (result.winningSearchTitle && result.winningSearchTitle !== game.metadataSearchTitle && result.winningSearchTitle !== game.title) {
           nextGame = { ...nextGame, metadataSearchTitle: result.winningSearchTitle };
@@ -163,7 +182,7 @@ export function useMetadataArtworkActions({
       }));
       markOnboardingItemComplete('metadata-enriched');
 
-      const foundArtwork = Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim() || sgdbArtwork);
+      const foundArtwork = isArtworkRefresh ? appliedArtwork : Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim() || sgdbArtwork);
       addToastNotification({
         category: foundArtwork || !isArtworkRefresh ? 'success' : 'info',
         dedupeKey: toastKey,

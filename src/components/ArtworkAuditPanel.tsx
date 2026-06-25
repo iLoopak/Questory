@@ -350,15 +350,17 @@ function canApplyArtwork(game: Game, source: ArtworkSource) {
     return !hasProtectedArtwork(game);
   }
 
-  if (getStoredArtworkSource(game) === 'user') {
+  const currentSource = getStoredArtworkSource(game);
+
+  if (currentSource === 'custom' || currentSource === 'user') {
     return false;
   }
 
-  if (getStoredArtworkSource(game) === 'steam' && source !== 'steam') {
+  if (currentSource === 'steam' && source !== 'steam') {
     return false;
   }
 
-  return !hasRealArtwork(game) || getStoredArtworkSource(game) === source;
+  return !hasRealArtwork(game) || currentSource === source;
 }
 
 function runBulk(games: Game[], applyGame: (game: Game) => ArtworkBulkSummary) {

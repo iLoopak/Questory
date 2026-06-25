@@ -96,7 +96,7 @@ export function SteamGridDbArtworkPickerModal({
       if (tabConfig) changes[tabConfig.gameField] = url;
     }
     if (Object.keys(changes).length > 0) {
-      changes.artworkSource = 'user';
+      changes.artworkSource = 'steamgriddb';
       changes.artworkUpdatedAt = new Date().toISOString();
       onSave(changes);
     }
