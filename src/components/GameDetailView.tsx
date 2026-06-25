@@ -139,12 +139,9 @@ export function GameDetailView({
   }
 
   function saveArtworkFromPicker(changes: Partial<Game>) {
-    onGameEdit?.(game.id, {
-      notes: game.notes,
-      status: game.status,
-      tags: game.tags,
-      ...changes,
-    });
+    const artworkChanges = pickArtworkChanges(changes);
+    if (Object.keys(artworkChanges).length === 0) return;
+    onGameEdit?.(game.id, artworkChanges);
   }
 
 
@@ -642,6 +639,21 @@ type GameEditDraft = {
   hltbMainExtraHours: string;
   hltbCompletionistHours: string;
 };
+
+function pickArtworkChanges(changes: Partial<Game>): Partial<Game> {
+  const artworkChanges: Partial<Game> = {};
+
+  if (changes.coverImage !== undefined) artworkChanges.coverImage = changes.coverImage;
+  if (changes.wideCoverImage !== undefined) artworkChanges.wideCoverImage = changes.wideCoverImage;
+  if (changes.heroImage !== undefined) artworkChanges.heroImage = changes.heroImage;
+  if (changes.logoImage !== undefined) artworkChanges.logoImage = changes.logoImage;
+  if (changes.iconImage !== undefined) artworkChanges.iconImage = changes.iconImage;
+  if (changes.artworkSource !== undefined) artworkChanges.artworkSource = changes.artworkSource;
+  if (changes.artworkSourceMetadata !== undefined) artworkChanges.artworkSourceMetadata = changes.artworkSourceMetadata;
+  if (changes.artworkUpdatedAt !== undefined) artworkChanges.artworkUpdatedAt = changes.artworkUpdatedAt;
+
+  return artworkChanges;
+}
 
 function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game) => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
   return (
