@@ -1176,8 +1176,14 @@ export function AppController() {
                 setActiveNavItem('Wishlist');
               }}
               onPlayToday={(game) => {
+                if (game.status === 'Playing') {
+                  logPlayedToday(game);
+                  addToastNotification({ category: 'success', dedupeKey: `play-today:${game.id}`, message: `${game.title} is already in Playing Now.` });
+                  return;
+                }
+                const targetPlatform = platformQueueState.entries.find((e) => e.gameId === game.id)?.targetPlatform ?? game.platform;
+                playQueueGameNow(game.id, targetPlatform);
                 logPlayedToday(game);
-                addToastNotification({ category: 'success', dedupeKey: `play-today:${game.id}`, message: `${game.title} tracked for today.` });
               }}
               onQuickNote={(gameId, notes) => {
                 const target = games.find((g) => g.id === gameId);
