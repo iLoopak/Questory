@@ -15,57 +15,69 @@ export const artworkSourcePriority = [
 export type ArtworkSource = (typeof artworkSourcePriority)[number];
 
 export type ArtworkUsage = 'portrait' | 'landscape' | 'hero' | 'logo' | 'icon' | 'background' | 'micro';
+export type ArtworkCandidate = { source: ArtworkSource; url: string };
+export type ResolvedArtwork = {
+  candidates: ArtworkCandidate[];
+  fallbackReason?: string;
+  source: ArtworkSource | null;
+  url: string | null;
+};
 
 const generatedPlaceholderMarkers = ['placeholder', 'placehold.co', 'data:image/svg+xml'];
 const generatedFallbackMarker = 'data:image/svg+xml';
 const generatedFallbackCoverCache = new Map<string, string>();
 
 export function getGameCoverSources(game: Game, options: { includeGeneratedFallback?: boolean } = {}) {
-  return getArtworkCandidates(game, options).map((candidate) => candidate.url);
+  return resolveGameArtwork(game, 'portrait', options).candidates.map((candidate) => candidate.url);
 }
 
 export function getPreferredArtworkSources(game: Game, usage: ArtworkUsage): string[] {
+  return resolveGameArtwork(game, usage).candidates.map((candidate) => candidate.url);
+}
+
+export function resolveGameArtwork(game: Game, usage: ArtworkUsage = 'portrait', options: { includeGeneratedFallback?: boolean } = {}): ResolvedArtwork {
   if (usage === 'logo') {
-    return game.logoImage?.trim() ? [game.logoImage.trim()] : [];
+    const logoImage = game.logoImage?.trim();
+    return createResolvedArtwork(logoImage ? [{ source: getStoredArtworkSource(game) ?? 'steamgriddb', url: logoImage }] : [], game, options);
   }
 
   // micro: portrait priority without generated SVG fallback — for sub-50px slots where the fallback is unreadable
   if (usage === 'micro') {
-    return getGameCoverSources(game, { includeGeneratedFallback: false });
+    return createResolvedArtwork(getArtworkCandidates(game, { includeGeneratedFallback: false }), game, { includeGeneratedFallback: false });
   }
 
-  const standard = getGameCoverSources(game);
+  const standard = getArtworkCandidates(game, options);
+  const storedSource = getStoredArtworkSource(game);
 
-  if (usage === 'portrait' || getStoredArtworkSource(game) === 'custom' || getStoredArtworkSource(game) === 'user') {
-    return standard;
+  if (usage === 'portrait' || storedSource === 'custom' || storedSource === 'user') {
+    return createResolvedArtwork(standard, game, options);
   }
 
-  const usagePriority: string[] = [];
+  const usagePriority: ArtworkCandidate[] = [];
 
   if (usage === 'landscape') {
-    if (game.wideCoverImage?.trim()) usagePriority.push(game.wideCoverImage.trim());
-    if (game.heroImage?.trim()) usagePriority.push(game.heroImage.trim());
+    if (game.wideCoverImage?.trim()) usagePriority.push({ source: 'steamgriddb', url: game.wideCoverImage.trim() });
+    if (game.heroImage?.trim()) usagePriority.push({ source: 'steamgriddb', url: game.heroImage.trim() });
   } else if (usage === 'hero' || usage === 'background') {
     // background shares hero field order; callers distinguish ambient backdrop vs focal art
-    if (game.heroImage?.trim()) usagePriority.push(game.heroImage.trim());
-    if (game.wideCoverImage?.trim()) usagePriority.push(game.wideCoverImage.trim());
-    if (game.backgroundImage?.trim()) usagePriority.push(game.backgroundImage.trim());
+    if (game.heroImage?.trim()) usagePriority.push({ source: 'steamgriddb', url: game.heroImage.trim() });
+    if (game.wideCoverImage?.trim()) usagePriority.push({ source: 'steamgriddb', url: game.wideCoverImage.trim() });
+    if (game.backgroundImage?.trim()) usagePriority.push({ source: 'rawg', url: game.backgroundImage.trim() });
   } else if (usage === 'icon') {
-    if (game.iconImage?.trim()) usagePriority.push(game.iconImage.trim());
+    if (game.iconImage?.trim()) usagePriority.push({ source: 'steamgriddb', url: game.iconImage.trim() });
   }
 
-  if (usagePriority.length === 0) return standard;
+  if (usagePriority.length === 0) return createResolvedArtwork(standard, game, options);
 
-  const usageSet = new Set(usagePriority);
-  return [...usagePriority, ...standard.filter((url) => !usageSet.has(url))];
+  return createResolvedArtwork([...usagePriority, ...standard], game, options);
 }
 
 export function getPreferredLogoUrl(game: Game): string | null {
   return game.logoImage?.trim() || null;
 }
 
-export function getArtworkCandidates(game: Game, options: { includeGeneratedFallback?: boolean } = {}): Array<{ source: ArtworkSource; url: string }> {
-  const candidates: Array<{ source: ArtworkSource; url: string }> = [];
+export function getArtworkCandidates(game: Game, options: { includeGeneratedFallback?: boolean } = {}): ArtworkCandidate[] {
+  const candidates: ArtworkCandidate[] = [];
   const currentSource = getStoredArtworkSource(game);
   const currentCover = game.coverImage?.trim();
 
@@ -98,6 +110,10 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
     candidates.push({ source: 'imported', url: currentCover });
   }
 
+  if (currentCover && currentSource === undefined && !isMissingOrGeneratedCover(currentCover)) {
+    candidates.push({ source: 'user', url: currentCover });
+  }
+
   // SteamGridDB wide/hero variants as portrait fallbacks (iconImage excluded — wrong aspect ratio)
   if (game.wideCoverImage?.trim()) {
     candidates.push({ source: 'steamgriddb', url: game.wideCoverImage });
@@ -111,6 +127,46 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
   }
 
   return dedupeCandidates(candidates);
+}
+
+function createResolvedArtwork(candidates: ArtworkCandidate[], game: Game, options: { includeGeneratedFallback?: boolean } = {}): ResolvedArtwork {
+  const resolvedCandidates = dedupeCandidates(candidates);
+  const resolved = resolvedCandidates[0] ?? null;
+  return {
+    candidates: resolvedCandidates,
+    fallbackReason: resolved?.source === 'generated-fallback' ? getArtworkFallbackReason(game, resolvedCandidates, options) : undefined,
+    source: resolved?.source ?? null,
+    url: resolved?.url ?? null,
+  };
+}
+
+export function getArtworkFallbackReason(game: Game, candidates: ArtworkCandidate[], options: { includeGeneratedFallback?: boolean } = {}) {
+  if (options.includeGeneratedFallback === false) {
+    return 'Generated fallback disabled for this artwork usage.';
+  }
+  if (candidates.some((candidate) => candidate.source !== 'generated-fallback')) {
+    return 'All higher-priority artwork candidates failed to load in this render.';
+  }
+  const fields = Object.entries(getAvailableArtworkFields(game))
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim())
+    .map(([field]) => field);
+  return fields.length > 0
+    ? `Only generated or invalid artwork fields are available: ${fields.join(', ')}.`
+    : 'No custom, SteamGridDB, Steam, RAWG, imported, or other remote cover fields are available.';
+}
+
+export function getAvailableArtworkFields(game: Game): Record<string, string | number | null | undefined> {
+  return {
+    artworkSource: game.artworkSource,
+    backgroundImage: game.backgroundImage,
+    coverImage: game.coverImage,
+    externalSource: game.externalSource,
+    heroImage: game.heroImage,
+    iconImage: game.iconImage,
+    logoImage: game.logoImage,
+    steamAppId: game.steamAppId,
+    wideCoverImage: game.wideCoverImage,
+  };
 }
 
 export function canUseRawgImageAsCover(game: Game) {
