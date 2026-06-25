@@ -26,7 +26,7 @@ public class BackupExportPlugin extends Plugin {
     @PluginMethod
     public void exportBackup(PluginCall call) {
         String contents = call.getString("contents", "");
-        String requestedFilename = call.getString("filename", "questshelf-backup.json");
+        String requestedFilename = call.getString("filename", "questory-backup.json");
         String filename = sanitizeJsonFilename(requestedFilename);
 
         if (contents == null || contents.trim().isEmpty()) {
@@ -110,7 +110,7 @@ public class BackupExportPlugin extends Plugin {
         String sanitized = filename == null ? "" : filename.replaceAll("[^A-Za-z0-9._-]", "-");
 
         if (sanitized.trim().isEmpty()) {
-            sanitized = "questshelf-backup.json";
+            sanitized = "questory-backup.json";
         }
 
         if (!sanitized.toLowerCase(Locale.ROOT).endsWith(".json")) {
