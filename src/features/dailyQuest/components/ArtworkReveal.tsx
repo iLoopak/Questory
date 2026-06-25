@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Game } from '../../../types/game';
-import { getPreferredArtworkSources } from '../../../lib/gameCoverImages';
+import { GameCoverImage } from '../../../components/GameCoverImage';
 import { getRevealedTileIndices } from '../logic';
 import type { RevealStage } from '../types';
 
@@ -18,18 +18,16 @@ const ROWS = 5;
 export function ArtworkReveal({ game, stage, date, className = '' }: ArtworkRevealProps) {
   const revealed = useMemo(() => getRevealedTileIndices(date, stage), [date, stage]);
 
-  const artSrc = useMemo(() => {
-    const srcs = getPreferredArtworkSources(game, 'portrait');
-    return srcs[0] ?? game.coverImage;
-  }, [game]);
-
   return (
     <div className={`relative overflow-hidden rounded-xl bg-ink-950 ${className}`}>
-      <img
-        src={artSrc}
+      <GameCoverImage
+        game={game}
+        usage="portrait"
         alt=""
         aria-hidden="true"
         className="block h-full w-full object-cover"
+        decoding="async"
+        loading="eager"
         draggable={false}
       />
       {/* Tile overlay: unrevealed tiles are dark, revealed tiles are transparent */}

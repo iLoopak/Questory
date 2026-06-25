@@ -1,5 +1,5 @@
 import type { Game } from '../../types/game';
-import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
+import { hasFallbackArtwork } from '../../lib/gameCoverImages';
 import type { DailyQuestSession, RevealStage, WeeklyStats } from './types';
 
 // ─── Date utilities ──────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export function getEligibleGames(games: Game[]): Game[] {
       g.collectionType === 'library' &&
       g.status !== 'Finished' &&
       g.status !== 'Dropped' &&
-      !isMissingOrGeneratedCover(g.coverImage),
+      !hasFallbackArtwork(g),
   );
 }
 
