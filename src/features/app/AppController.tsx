@@ -39,7 +39,7 @@ import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import { loadLanguagePreference } from '../../lib/languagePreference';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
-import type { PlatformQueueState } from '../../lib/platformQueueStorage';
+import { addGameToPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
 import { formatLocalDate, loadPlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
@@ -88,8 +88,31 @@ import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
 import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGhost';
 import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
 import { useControllerAction } from '../../lib/controllerActions';
+import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../../services/steamApi';
 
 const appLogo = '/icons/questshelf-icon.png';
+
+function normalizeImportMatchTitle(title: string) {
+  return title.trim().toLocaleLowerCase().replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getSafeWishlistTitleMatches(games: Game[]) {
+  const titleCounts = new Map<string, number>();
+  const titleIds = new Map<string, string>();
+
+  games
+    .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId !== 'number')
+    .forEach((game) => {
+      const title = normalizeImportMatchTitle(game.title);
+      if (!title) return;
+      titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
+      titleIds.set(title, game.id);
+    });
+
+  return new Map(
+    Array.from(titleIds.entries()).filter(([title]) => titleCounts.get(title) === 1),
+  );
+}
 
 
 
@@ -115,6 +138,7 @@ export function AppController() {
   const [playingNowReturnContext, setPlayingNowReturnContext] = useState<{ activeNavItem: NavItem; selectedGameId: string | null } | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isImportingNewSteamGames, setIsImportingNewSteamGames] = useState(false);
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
   const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
   const [isRawgApiKeySet, setIsRawgApiKeySet] = useState(() => Boolean(loadRawgSettings().apiKey.trim()));
@@ -750,6 +774,126 @@ export function AppController() {
     return createdGames;
   }
 
+  async function importNewSteamGames() {
+    if (isImportingNewSteamGames) return;
+
+    setIsImportingNewSteamGames(true);
+
+    try {
+      const settings = loadSteamSettings();
+      const [ownedGames, recentlyPlayedGames] = await Promise.all([
+        getOwnedGames(settings),
+        getRecentlyPlayedGames(settings).catch(() => []),
+      ]);
+      const importedAt = new Date().toISOString();
+      const librarySteamAppIds = new Set(
+        games
+          .filter((game) => game.collectionType === 'library')
+          .map((game) => game.steamAppId)
+          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+      );
+      const wishlistSteamAppIds = new Set(
+        games
+          .filter((game) => game.collectionType === 'wishlist')
+          .map((game) => game.steamAppId)
+          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+      );
+      const existingTitleMatches = getSafeWishlistTitleMatches(games);
+      const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
+      const newOwnedGames = ownedGames.filter(
+        (game) => !librarySteamAppIds.has(game.appid) && !ignoredSteamAppIds.has(game.appid),
+      );
+      const mappedGames = mapSteamGamesToLocalGames(newOwnedGames, recentlyPlayedGames, importedAt).map((game) =>
+        touchGameRecord({
+          ...game,
+          collectionType: 'library' as const,
+          notes: game.notes.replace('Imported from Steam API test results. Not saved to local library yet.', 'Imported from Steam owned games. Queued for triage.'),
+        }),
+      );
+      const mappedGamesByAppId = new Map(mappedGames.map((game) => [game.steamAppId, game]));
+      const mappedGameTitles = new Set(mappedGames.map((game) => normalizeImportMatchTitle(game.title)).filter(Boolean));
+      const removedWishlistIds = new Set(
+        games
+          .filter((game) => {
+            if (game.collectionType !== 'wishlist') return false;
+            if (typeof game.steamAppId === 'number') return newOwnedGames.some((ownedGame) => ownedGame.appid === game.steamAppId);
+            const normalizedTitle = normalizeImportMatchTitle(game.title);
+            return mappedGameTitles.has(normalizedTitle) && existingTitleMatches.get(normalizedTitle) === game.id;
+          })
+          .map((game) => game.id),
+      );
+      const createdGames = mappedGames;
+
+      setGames((currentGames) => {
+        const currentLibrarySteamAppIds = new Set(
+          currentGames
+            .filter((game) => game.collectionType === 'library')
+            .map((game) => game.steamAppId)
+            .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+        );
+
+        const nextLibraryGames: Game[] = [];
+
+        for (const ownedGame of newOwnedGames) {
+          if (currentLibrarySteamAppIds.has(ownedGame.appid)) continue;
+          const mappedGame = mappedGamesByAppId.get(ownedGame.appid);
+          if (!mappedGame) continue;
+          nextLibraryGames.push(mappedGame);
+          currentLibrarySteamAppIds.add(ownedGame.appid);
+        }
+
+        const nextGames = currentGames.filter((game) => {
+          if (game.collectionType !== 'wishlist') return true;
+          if (typeof game.steamAppId === 'number' && nextLibraryGames.some((newGame) => newGame.steamAppId === game.steamAppId)) {
+            return false;
+          }
+
+          const matchingNewGame = nextLibraryGames.find((newGame) => normalizeImportMatchTitle(newGame.title) === normalizeImportMatchTitle(game.title));
+          if (!game.steamAppId && matchingNewGame && existingTitleMatches.get(normalizeImportMatchTitle(game.title)) === game.id) {
+            return false;
+          }
+
+          return true;
+        });
+
+        return [...nextGames, ...nextLibraryGames];
+      });
+
+      if (createdGames.length > 0) {
+        setPlatformQueueState((currentState) =>
+          createdGames.reduce((nextState, game) => addGameToPlatformQueue(nextState, game, game.platform), currentState),
+        );
+        trackMinimalAnalyticsEvent('import_completed', 'steam');
+      }
+
+      const duplicateCount = ownedGames.filter((game) => librarySteamAppIds.has(game.appid)).length;
+      const wishlistRemovedByAppIdCount = newOwnedGames.filter((game) => wishlistSteamAppIds.has(game.appid)).length;
+      const removedWishlistCount = Math.max(removedWishlistIds.size, wishlistRemovedByAppIdCount);
+      const message = [
+        `${createdGames.length} new Steam games imported`,
+        `${duplicateCount} already in library`,
+        `${removedWishlistCount} removed from Wishlist / marked owned`,
+        `${createdGames.length} added to Quest Queue`,
+      ].join(' · ');
+
+      addToastNotification({
+        actions: createdGames.length > 0 ? [getOpenQueueAction()] : undefined,
+        category: createdGames.length > 0 ? 'success' : 'info',
+        dedupeKey: 'steam-import-new-games',
+        message,
+      });
+    } catch (error) {
+      const isCredentialError = error instanceof SteamApiError && ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
+      addToastNotification({
+        category: isCredentialError ? 'warning' : 'error',
+        dedupeKey: 'steam-import-new-games:error',
+        message: error instanceof Error ? error.message : 'Steam owned games import failed. Check Steam credentials, profile privacy, and connection.',
+      });
+    } finally {
+      setIsImportingNewSteamGames(false);
+    }
+  }
+
   function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
     const summary = importSteamWishlistHtmlItems(...args);
     if (summary.addedCount > 0) {
@@ -1164,6 +1308,7 @@ export function AppController() {
               itadDealSyncState={itadDealSyncState}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+              isImportingNewSteamGames={isImportingNewSteamGames}
               onOpenDetails={openGameFromHome}
               onOpenLibrary={() => {
                 setSelectedGameId(null);
@@ -1195,6 +1340,9 @@ export function AppController() {
               onSyncItadDeals={() => {
                 const wishlistIds = games.filter((g) => g.collectionType === 'wishlist').map((g) => g.id);
                 void syncWishlistDeals(wishlistIds);
+              }}
+              onImportNewSteamGames={() => {
+                void importNewSteamGames();
               }}
               onSyncSteamAchievements={() => {
                 void syncSteamAchievements(homeSteamSyncGameIds, {
