@@ -674,6 +674,26 @@ img {
   scrollbar-gutter: stable;
 }
 
+.qs-queue-entry {
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 20%, rgb(255 255 255 / 0.06));
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.qs-queue-entry:hover,
+.qs-queue-entry:focus-within {
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 42%, rgb(255 255 255 / 0.1));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--platform-accent, var(--accent)) 14%, transparent);
+}
+.qs-platform-options-button {
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 30%, rgb(255 255 255 / 0.08));
+  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 60%, rgb(148 163 184));
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.qs-platform-options-button:hover {
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 50%, rgb(255 255 255 / 0.1));
+  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 85%, rgb(255 255 255));
+}
+
 .qs-platform-playing-panel {
   border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 38%, var(--border));
   background:
@@ -742,12 +762,13 @@ img {
 
 .qs-platform-playing-action,
 .qs-platform-playing-chip {
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 34%, var(--border));
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 52%, var(--border));
 }
 
 .qs-platform-playing-chip {
-  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 9%, transparent);
-  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 82%, var(--text-primary));
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 18%, transparent);
+  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 90%, var(--text-primary));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--platform-accent, var(--accent)) 12%, transparent);
 }
 
 .qs-platform-playing-action:hover,
