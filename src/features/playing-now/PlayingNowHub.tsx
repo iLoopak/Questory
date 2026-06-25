@@ -123,10 +123,9 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onFindArt
                 return (
                 <section key={platform} className="rounded-xl border border-skyglass/15 bg-ink-900/45 p-3 shadow-panel" style={platformStyle}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="playing-now-platform-icon grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-mint/20 bg-mint/10 text-mint"><Icon name={getPlayingNowPlatformIcon(platform)} size={16} /></span>
-                      <h3 className="truncate text-sm font-semibold uppercase tracking-caps text-slate-200" title={platform}>{platform}</h3>
-                    </div>
+                    <h3>
+                      <PlatformIdentityBadge className="rounded-full px-3 py-1.5 text-sm font-semibold" platform={platform} queueState={queue ?? undefined} />
+                    </h3>
                     <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-xs font-semibold text-slate-400">{platformGames.length}</span>
                   </div>
                   <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-2.5 lg:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] 2xl:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
@@ -158,24 +157,6 @@ export function PlayingNowHub({ activity, featuredGame, games, onBack, onFindArt
       ) : null}
       </section>
   );
-}
-
-function getPlayingNowPlatformIcon(platform: GamePlatform): IconName {
-  const normalizedPlatform = platform.toLowerCase();
-
-  if (normalizedPlatform.includes('steam') || normalizedPlatform.includes('pc')) {
-    return 'steam';
-  }
-
-  if (normalizedPlatform.includes('switch') || normalizedPlatform.includes('deck') || normalizedPlatform.includes('handheld') || normalizedPlatform.includes('portable')) {
-    return 'handheld';
-  }
-
-  if (normalizedPlatform.includes('arcade') || normalizedPlatform.includes('retro')) {
-    return 'joystick';
-  }
-
-  return 'gamepad-2';
 }
 
 function PlayingNowCover({ game, onFindArtwork }: { game: Game; onFindArtwork?: (game: Game) => void }) {
@@ -252,7 +233,7 @@ function PlayingNowCard({ context, game, isMenuOpen, onFindArtwork, onOpenDetail
             />
           ) : null}
           <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
-          <PlatformIdentityBadge compact className="mt-1 max-w-full rounded-full px-2 py-0.5 text-xs font-semibold" platform={game.platform} queueState={queueState} />
+          <PlatformIdentityBadge className="mt-1 max-w-full rounded-full px-2 py-0.5 text-xs font-semibold" platform={game.platform} queueState={queueState} />
         </div>
         <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
         <div className="mt-auto flex items-center gap-2 pt-3">

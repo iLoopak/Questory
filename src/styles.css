@@ -941,11 +941,6 @@ img {
   white-space: nowrap;
 }
 
-.platform-badge__icon {
-  flex: 0 0 auto;
-  margin-right: 0.35rem;
-  color: var(--platform-badge-accent);
-}
 
 .qs-status-badge {
   display: inline-flex;
@@ -2045,33 +2040,12 @@ textarea,
   line-height: 1.25;
 }
 
-.qs-game-action-platform {
-  display: inline-flex;
-  max-width: 100%;
-  margin: 0.45rem 0 0;
-  padding: 0.18rem 0.55rem;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--text-secondary);
-  font-size: var(--font-xs);
-  font-weight: var(--weight-bold);
-  line-height: var(--leading-snug);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .qs-game-action-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.5rem;
   margin-top: 0.5rem;
-}
-
-.qs-game-action-meta .qs-game-action-platform {
-  margin: 0;
 }
 
 .qs-game-action-close {
@@ -3522,12 +3496,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
   text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.36);
 }
 
-.playing-now-platform-icon {
-  border-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 42%, rgb(var(--skyglass-rgb) / 0.35));
-  background: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 14%, transparent);
-  color: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 82%, white);
-}
-
 .playing-now-card {
   border-left-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 72%, rgb(var(--skyglass-rgb) / 0.45));
   border-left-width: 3px;
@@ -3558,12 +3526,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
   background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 78%, var(--qs-accent-primary));
   color: var(--accent-contrast);
   box-shadow: 0 0 18px color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 28%, transparent);
-}
-
-:root[data-theme='light'] .playing-now-platform-icon {
-  border-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 28%, rgb(var(--skyglass-rgb) / 0.38));
-  background: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 10%, white);
-  color: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 58%, var(--text-primary));
 }
 
 :root[data-theme='light'] .playing-now-card::before {
