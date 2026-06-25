@@ -2,9 +2,8 @@ import type { Game } from '../types/game';
 import type { ItadMatchConfidence } from '../types/itad';
 import { postIntegration } from './integrationProxy';
 
-const directItadApiBaseUrl = 'https://api.isthereanydeal.com';
 const developmentItadApiBaseUrl = '/api/itad';
-const itadApiBaseUrl = import.meta.env.VITE_ITAD_API_BASE_URL?.trim() || (import.meta.env.DEV ? developmentItadApiBaseUrl : directItadApiBaseUrl);
+const itadApiBaseUrl = import.meta.env.VITE_ITAD_API_BASE_URL?.trim() || developmentItadApiBaseUrl;
 const itadCorsProxyMessage = 'IsThereAnyDeal sync failed. The API may require a proxy in browser/PWA mode.';
 const defaultCountry = 'US';
 const maxOverviewBatchSize = 200;

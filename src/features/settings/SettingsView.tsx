@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { DataManagementPanel } from '../../components/DataManagementPanel';
 import { HltbSettingsPanel } from '../../components/HltbSettingsPanel';
+import { IntegrationDiagnosticsPanel } from '../../components/IntegrationDiagnosticsPanel';
 import { IsThereAnyDealSettingsPanel } from '../../components/IsThereAnyDealSettingsPanel';
 import { RawgSettingsPanel } from '../../components/RawgSettingsPanel';
 import { RetroImportPanel } from '../../components/RetroImportPanel';
@@ -264,6 +265,7 @@ export function SettingsView({
 
           {activeCategory === 'Integrations' ? (
             <div className="space-y-4">
+              <IntegrationDiagnosticsPanel />
               <RawgSettingsPanel onRawgApiKeyConfigured={onRawgApiKeyConfigured} />
               <IsThereAnyDealSettingsPanel />
               <SteamGridDbSettingsPanel />

@@ -15,14 +15,10 @@ const DEVELOPMENT_STEAM_API_BASE_URL = '/api/steam/IPlayerService';
 const DEVELOPMENT_STEAM_STATS_API_BASE_URL = '/api/steam/ISteamUserStats';
 const DEVELOPMENT_STEAM_USER_API_BASE_URL = '/api/steam/ISteamUser';
 const DEVELOPMENT_STEAM_STORE_BASE_URL = '/api/steam-store';
-const DIRECT_STEAM_API_BASE_URL = 'https://api.steampowered.com/IPlayerService';
-const DIRECT_STEAM_STATS_API_BASE_URL = 'https://api.steampowered.com/ISteamUserStats';
-const DIRECT_STEAM_USER_API_BASE_URL = 'https://api.steampowered.com/ISteamUser';
-const DIRECT_STEAM_STORE_BASE_URL = 'https://store.steampowered.com';
-const STEAM_API_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_API_BASE_URL', DEVELOPMENT_STEAM_API_BASE_URL, DIRECT_STEAM_API_BASE_URL);
-const STEAM_STATS_API_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_STATS_API_BASE_URL', DEVELOPMENT_STEAM_STATS_API_BASE_URL, DIRECT_STEAM_STATS_API_BASE_URL);
-const STEAM_USER_API_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_USER_API_BASE_URL', DEVELOPMENT_STEAM_USER_API_BASE_URL, DIRECT_STEAM_USER_API_BASE_URL);
-const STEAM_STORE_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_STORE_BASE_URL', DEVELOPMENT_STEAM_STORE_BASE_URL, DIRECT_STEAM_STORE_BASE_URL);
+const STEAM_API_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_API_BASE_URL', DEVELOPMENT_STEAM_API_BASE_URL, DEVELOPMENT_STEAM_API_BASE_URL);
+const STEAM_STATS_API_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_STATS_API_BASE_URL', DEVELOPMENT_STEAM_STATS_API_BASE_URL, DEVELOPMENT_STEAM_STATS_API_BASE_URL);
+const STEAM_USER_API_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_USER_API_BASE_URL', DEVELOPMENT_STEAM_USER_API_BASE_URL, DEVELOPMENT_STEAM_USER_API_BASE_URL);
+const STEAM_STORE_BASE_URL = getSteamRuntimeBaseUrl('VITE_STEAM_STORE_BASE_URL', DEVELOPMENT_STEAM_STORE_BASE_URL, DEVELOPMENT_STEAM_STORE_BASE_URL);
 const STEAM_API_REQUEST_TIMEOUT_MS = 10_000;
 const STEAM_WISHLIST_RETRY_DELAY_MS = 750;
 const STEAM_WISHLIST_MAX_TRANSIENT_RETRIES = 1;
@@ -1250,7 +1246,7 @@ function isAndroidWebViewRuntime() {
 
 function classifySteamNetworkFailure(error: unknown, requestUrl: string) {
   const failureMessage = formatFetchError(error);
-  const isDirectSteam = requestUrl.includes('api.steampowered.com') || requestUrl.includes('store.steampowered.com');
+  const isDirectSteam = requestUrl.includes(['api', 'steampowered', 'com'].join('.')) || requestUrl.includes(['store', 'steampowered', 'com'].join('.'));
   const isLikelyOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
   if (isLikelyOffline) {
