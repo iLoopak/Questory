@@ -914,7 +914,6 @@ function GameDetailOverflowMenu({
               className="mt-2 rounded-full px-2 py-0.5 text-xs font-semibold"
               compact
               platform={game.platform}
-              queueState={platformQueueState}
             />
           </div>
           <button
