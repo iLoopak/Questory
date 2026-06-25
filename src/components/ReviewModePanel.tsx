@@ -18,7 +18,7 @@ import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { BacklogPlatformPicker } from './BacklogPlatformPicker';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
@@ -965,7 +965,7 @@ function FocusedReviewCard({
 
           <div className="mt-3 text-center w-full px-2">
             <div className="flex items-center justify-center gap-2">
-              <PlatformBadge
+              <PlatformIdentityBadge
                 className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-widest"
                 platform={game.platform}
                 queueState={queueState}

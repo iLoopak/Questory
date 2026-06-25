@@ -9,7 +9,7 @@ import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
-import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { HltbBadge } from './HltbBadge';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
@@ -721,7 +721,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
         )}
         <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
         <span className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5">
-          <PlatformBadge
+          <PlatformIdentityBadge
             className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
             platform={platformLabel}
             queueState={platformQueueState}
@@ -908,7 +908,7 @@ const CompactGameRow = memo(function CompactGameRow({
             <span className="line-clamp-1 text-sm font-semibold text-white sm:text-base">{game.title}</span>
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-            <PlatformBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
+            <PlatformIdentityBadge compact className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
             {shouldShowStatusBadge ? <span className="platform-badge rounded-full px-2 py-0.5 font-semibold">{translateOption(game.status, t)}</span> : null}
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
 

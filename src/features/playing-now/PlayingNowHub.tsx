@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { ArtworkRecoveryButton } from '../../components/ArtworkRecoveryButton';
-import { PlatformBadge } from '../../components/PlatformBadge';
+import { PlatformIdentityBadge } from '../../components/PlatformIdentityBadge';
 import { formatLocalDate, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { getPreferredArtworkSources, getPreferredLogoUrl } from '../../lib/gameCoverImages';
 import { useI18n, type TFunction } from '../../i18n';
@@ -252,7 +252,7 @@ function PlayingNowCard({ context, game, isMenuOpen, onFindArtwork, onOpenDetail
             />
           ) : null}
           <h4 className="truncate text-sm font-semibold text-white" title={game.title}>{game.title}</h4>
-          <PlatformBadge accentColor={platformAccentColor} className="mt-1 max-w-full rounded-full px-2 py-0.5 text-xs font-semibold" platform={game.platform} queueState={queueState} />
+          <PlatformIdentityBadge compact className="mt-1 max-w-full rounded-full px-2 py-0.5 text-xs font-semibold" platform={game.platform} queueState={queueState} />
         </div>
         <span className={`mt-2 w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadge.tone}`}>{statusBadge.label}</span>
         <div className="mt-auto flex items-center gap-2 pt-3">

@@ -5,7 +5,7 @@ import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import { GameActionMenu } from './GameActionMenu';
-import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { translateOption, useI18n } from '../i18n';
 
@@ -197,7 +197,7 @@ function GameCardComponent({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-transparent" />
         <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5">
-          <PlatformBadge
+          <PlatformIdentityBadge
             className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
             platform={platformLabel ?? game.platform}
             queueState={platformQueueState}

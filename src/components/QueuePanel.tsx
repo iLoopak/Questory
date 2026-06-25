@@ -30,7 +30,7 @@ export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remov
 import { getPreferredArtworkSources } from '../lib/gameCoverImages';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { CollectionToolbar } from './CollectionToolbar';
-import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { PlatformIdentityFields } from './PlatformIdentityFields';
 import { HltbBadge } from './HltbBadge';
 import { ViewportModal } from './ViewportModal';
@@ -1335,7 +1335,7 @@ function QueueEntryRow({
             {game.title}
           </button>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            <PlatformBadge accentColor={platformAccentColor} className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} />
+            <PlatformIdentityBadge compact accentColor={platformAccentColor} className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} />
             <AchievementProgressBadge game={game} />
             <HltbBadge game={game} />
           </div>
