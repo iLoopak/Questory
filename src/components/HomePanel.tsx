@@ -21,6 +21,7 @@ import { Icon } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
+import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -456,17 +457,6 @@ export function HomePanel({
       <div className="lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4">
         {/* Left: main content */}
         <div className="space-y-4">
-          <JourneyProgressCard
-            importedCount={libraryGames.length}
-            platformPlanCount={activePlatformCount}
-            reviewedCount={reviewedCount}
-            reviewStats={reviewModeState.stats}
-            startedAdventureCount={startedAdventureCount}
-            unratedFinishedCount={unratedFinishedCount}
-            nextReviewTarget={nextReviewTarget}
-            onOpenReviewMode={() => onOpenReviewMode('backlog')}
-          />
-
           {/* Continue Playing */}
           <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
@@ -497,6 +487,18 @@ export function HomePanel({
               />
             )}
           </HomeSection>
+
+          {/* Questory Journey */}
+          <JourneyProgressCard
+            importedCount={libraryGames.length}
+            platformPlanCount={activePlatformCount}
+            reviewedCount={reviewedCount}
+            reviewStats={reviewModeState.stats}
+            startedAdventureCount={startedAdventureCount}
+            unratedFinishedCount={unratedFinishedCount}
+            nextReviewTarget={nextReviewTarget}
+            onOpenReviewMode={() => onOpenReviewMode('backlog')}
+          />
 
           {/* Next Adventure — top candidate per active Platform Plan */}
           <HomeSection title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
@@ -854,6 +856,17 @@ function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+function formatPlaytimeHours(hours: number): string {
+  if (hours < 1) return '<1h';
+  const rounded = Math.round(hours * 10) / 10;
+  return `${Number.isInteger(rounded) ? Math.round(rounded) : rounded}h`;
+}
+
+function formatHomeAchievementProgress(game: Game): string | null {
+  if (!hasSteamAchievementSummary(game)) return null;
+  return `${game.steamAchievementsUnlocked}/${game.steamAchievementsTotal} achievements`;
+}
+
 function GamePosterButton({
   game,
   eyebrow,
@@ -872,11 +885,13 @@ function GamePosterButton({
   const { t } = useI18n();
   const ambientSource = getPreferredArtworkSources(game, 'landscape')[0] ?? null;
   const logoUrl = getPreferredLogoUrl(game);
-  const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
+  const platform = getGamePlatformLabel(game, queueState);
+  const playtime = game.playtimeHours > 0 ? `${platform} playtime: ${formatPlaytimeHours(game.playtimeHours)}` : null;
+  const achievementSummary = formatHomeAchievementProgress(game);
 
   return (
     <button
-      className="group relative flex w-full gap-3 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950 p-3 text-left shadow-panel transition hover:border-mint/40 hover:shadow-glow"
+      className={`group relative flex w-full gap-4 overflow-hidden rounded-2xl border border-mint/25 bg-gradient-to-br from-mint/[0.12] via-ink-950 to-ink-950 p-3.5 text-left shadow-panel ring-1 ring-mint/10 transition hover:-translate-y-0.5 hover:border-mint/55 hover:bg-mint/[0.08] hover:shadow-glow focus-visible:border-mint/70 focus-visible:ring-2 focus-visible:ring-mint/40 ${hero ? 'min-h-[9.5rem] sm:p-4' : 'min-h-[8rem]'}`}
       data-home-focus="true"
       onClick={onClick}
       type="button"
@@ -886,58 +901,61 @@ function GamePosterButton({
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <img
             alt=""
-            className="h-full w-full scale-105 object-cover opacity-[0.12] blur-sm"
+            className="h-full w-full scale-105 object-cover opacity-[0.16] blur-sm transition group-hover:opacity-[0.22]"
             decoding="async"
             loading="lazy"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             src={ambientSource}
           />
-          <div className="absolute inset-0 bg-ink-950/60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/92 via-ink-950/78 to-ink-950/52" />
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-mint/[0.10] to-transparent" />
         </div>
       ) : null}
 
       {/* Portrait cover */}
-      <span className={`relative shrink-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-800 ${hero ? 'h-24 w-16' : 'h-20 w-[3.25rem]'}`}>
+      <span className={`relative shrink-0 overflow-hidden rounded-xl border border-mint/25 bg-ink-800 shadow-lg transition group-hover:border-mint/45 ${hero ? 'h-32 w-24 sm:h-36 sm:w-28' : 'h-28 w-20'}`}>
         <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
       </span>
 
       {/* Text + metadata */}
-      <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-2">
+      <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-3">
         <div className="min-w-0">
-          {eyebrow ? (
-            <span className="mb-1.5 inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
-              {eyebrow}
-            </span>
-          ) : null}
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <PlatformIdentityBadge
+              className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm"
+              platform={platform}
+              queueState={queueState}
+            />
+            {eyebrow ? (
+              <span className="inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
+                {eyebrow}
+              </span>
+            ) : null}
+          </div>
           {logoUrl ? (
             <img
               alt=""
               aria-hidden="true"
-              className="mb-1 block max-h-6 max-w-[110px] object-contain object-left drop-shadow"
+              className="mb-1.5 block max-h-7 max-w-[140px] object-contain object-left drop-shadow"
               decoding="async"
               loading="lazy"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               src={logoUrl}
             />
           ) : null}
-          <span className={`line-clamp-2 block font-semibold leading-tight text-white drop-shadow ${hero ? 'text-base' : 'text-sm'}`}>
+          <span className={`line-clamp-2 block font-bold leading-tight text-white drop-shadow ${hero ? 'text-xl sm:text-2xl' : 'text-base'}`}>
             {game.title}
           </span>
         </div>
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <PlatformIdentityBadge
-              className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold"
-              platform={getGamePlatformLabel(game, queueState)}
-              queueState={queueState}
-            />
-            {playtime ? <span className="text-xs text-slate-400">{playtime}</span> : null}
+          <div className="grid gap-1.5 text-xs text-slate-300">
+            {activitySignal ? <span className="font-medium text-slate-200">{activitySignal}</span> : null}
+            {playtime ? <span>{playtime}</span> : null}
+            {achievementSummary ? <span>{achievementSummary}</span> : null}
           </div>
-          {activitySignal ? (
-            <div className="mt-1 text-xs leading-none text-slate-400">
-              {activitySignal}
-            </div>
-          ) : null}
+          <span className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-mint px-4 text-sm font-bold text-ink-950 shadow-glow transition group-hover:bg-mint/90">
+            {t('home.openDetails')}
+          </span>
         </div>
       </div>
     </button>
@@ -963,7 +981,7 @@ function NextAdventureCard({
 
   return (
     <button
-      className="qs-home-next-adventure-card relative w-full overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
+      className="qs-home-next-adventure-card relative w-full overflow-hidden rounded-xl border border-skyglass/12 bg-ink-950/55 text-left transition hover:border-skyglass/30 hover:bg-ink-950/75 focus-visible:border-mint/45"
       data-home-focus="true"
       onClick={onOpenPlan}
       type="button"
@@ -972,7 +990,7 @@ function NextAdventureCard({
         <div className="absolute inset-0">
           <img
             alt=""
-            className="h-full w-full object-cover opacity-15"
+            className="h-full w-full object-cover opacity-10"
             decoding="async"
             loading="lazy"
             src={coverSource}
@@ -980,7 +998,7 @@ function NextAdventureCard({
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 to-transparent" />
         </div>
       ) : null}
-      <div className="relative flex h-full flex-col gap-3 p-4">
+      <div className="relative flex h-full flex-col gap-2.5 p-3">
         <PlatformIdentityBadge
           className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
           platform={entry.targetPlatform}
@@ -988,11 +1006,11 @@ function NextAdventureCard({
         />
         <div>
           <div className="qs-home-next-candidate-label text-xs text-slate-500">{t('home.nextCandidate')}</div>
-          <h3 className="mt-0.5 text-lg font-bold leading-snug text-white">{game.title}</h3>
+          <h3 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-white">{game.title}</h3>
         </div>
         <div className="mt-auto">
           <button
-            className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+            className="flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
             data-home-focus="true"
             onClick={(e) => { e.stopPropagation(); onPlay(); }}
             type="button"
@@ -1634,8 +1652,8 @@ function getGameActivitySignal(
       if (streak >= 2) return `🔥 ${streak}-day streak`;
 
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      if (dates[0] === todayStr) return 'Played today';
-      return 'Played yesterday';
+      if (dates[0] === todayStr) return 'Last played today';
+      return 'Last played yesterday';
     }
   }
 
@@ -1644,8 +1662,8 @@ function getGameActivitySignal(
     const parsed = parseLocalDateStr(lastPlayedAt);
     if (isNaN(parsed.getTime())) return null;
     const days = localDayDiff(parsed, now);
-    if (days === 0) return 'Played today';
-    if (days === 1) return 'Played yesterday';
+    if (days === 0) return 'Last played today';
+    if (days === 1) return 'Last played yesterday';
     if (days <= 6) return `Last played ${days} days ago`;
     if (days <= 14) return 'Last played last week';
     if (days <= 30) return 'Last played this month';
