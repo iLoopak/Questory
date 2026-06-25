@@ -97,8 +97,7 @@ export function HomePanel({
   const continuePlayingGames = useMemo(() => {
     return libraryGames
       .filter((game) => game.status === 'Playing')
-      .sort((a, b) => getActivityTime(b) - getActivityTime(a))
-      .slice(0, 4);
+      .sort((a, b) => getActivityTime(b) - getActivityTime(a));
   }, [libraryGames]);
 
   const nextAdventureEntries = useMemo<NextAdventureEntry[]>(() => {
@@ -460,7 +459,7 @@ export function HomePanel({
           {/* Continue Playing */}
           <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
-              <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : continuePlayingGames.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              <div className="qs-home-continue-playing-grid">
                 {continuePlayingGames.map((game) => (
                   <GamePosterButton
                     key={game.id}
