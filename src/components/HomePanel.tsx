@@ -18,7 +18,7 @@ import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../ty
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
-import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
@@ -920,7 +920,7 @@ function GamePosterButton({
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <PlatformBadge
+            <PlatformIdentityBadge
               className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold"
               platform={getGamePlatformLabel(game, queueState)}
               queueState={queueState}
@@ -975,7 +975,7 @@ function NextAdventureCard({
         </div>
       ) : null}
       <div className="relative flex h-full flex-col gap-3 p-4">
-        <PlatformBadge
+        <PlatformIdentityBadge
           className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
           platform={entry.targetPlatform}
           queueState={queueState}

@@ -3,7 +3,7 @@ import type { Game, GamePlatform, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { GameCoverImage } from './GameCoverImage';
 import { Icon, type IconName } from './Icon';
-import { PlatformBadge } from './PlatformBadge';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 export type QSActionSheetProps = {
@@ -135,7 +135,7 @@ export function QSActionSheet({
               <div className="min-w-0 flex-1 py-0.5">
                 <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>
                 <div className="mt-1.5">
-                  <PlatformBadge
+                  <PlatformIdentityBadge
                     className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
                     platform={platformLabel}
                     queueState={queueState}

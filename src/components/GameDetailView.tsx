@@ -16,6 +16,7 @@ import { RawgLinkDialog } from './RawgLinkDialog';
 import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
 import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 
 type GameDetailViewProps = {
@@ -909,7 +910,12 @@ function GameDetailOverflowMenu({
           <div className="min-w-0">
             <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
             <h3 className="qs-game-action-title">{game.title}</h3>
-            <p className="qs-game-action-platform">{game.platform}</p>
+            <PlatformIdentityBadge
+              className="mt-2 rounded-full px-2 py-0.5 text-xs font-semibold"
+              compact
+              platform={game.platform}
+              queueState={platformQueueState}
+            />
           </div>
           <button
             aria-label={t('action.close')}
