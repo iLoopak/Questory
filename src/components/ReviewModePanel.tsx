@@ -585,7 +585,7 @@ export function ReviewModePanel({
         </div>
       </div>
 
-      <div className="flex flex-col">
+      <div className="qs-review-body flex flex-col">
         {showReviewHint && (
           <div className="relative mx-2 mt-12 mb-1 rounded-xl border border-mint/20 bg-mint/5 p-3 text-xs">
             <button
@@ -1350,7 +1350,7 @@ function BatchCelebrationCovers({ games }: { games: Game[] }) {
   if (tiles.length === 0) return null;
 
   return (
-    <div aria-hidden="true" className="mt-5 flex items-end justify-center gap-1.5 overflow-hidden" style={{ height: '5.5rem' }}>
+    <div aria-hidden="true" className="qs-batch-celebration-strip mt-5 flex items-end justify-center gap-1.5 overflow-hidden" style={{ height: '5.5rem' }}>
       {tiles.map((game, index) => {
         const rotation = TILE_ROTATIONS[index] ?? 0;
         const variant = TILE_FLOAT_VARIANTS[index] ?? 'a';
