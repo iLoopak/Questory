@@ -26,17 +26,6 @@ export function AboutSettingsPanel({
             <span className="mt-1 block text-slate-500">Built with ❤️ by iLoopak</span>
           </>
         }
-        actions={(
-          <a
-            aria-label="Questory on GitHub (opens in new tab)"
-            className="inline-flex h-10 items-center rounded-md border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
-            href="https://github.com/iLoopak/Questory/"
-            rel="noreferrer"
-            target="_blank"
-          >
-            GitHub Repository
-          </a>
-        )}
       />
 
       <SettingsSection
