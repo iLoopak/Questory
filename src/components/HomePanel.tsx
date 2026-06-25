@@ -487,17 +487,6 @@ export function HomePanel({
             )}
           </HomeSection>
 
-          {/* Questory Journey */}
-          <JourneyProgressCard
-            importedCount={libraryGames.length}
-            platformPlanCount={activePlatformCount}
-            reviewedCount={reviewedCount}
-            reviewStats={reviewModeState.stats}
-            startedAdventureCount={startedAdventureCount}
-            unratedFinishedCount={unratedFinishedCount}
-            nextReviewTarget={nextReviewTarget}
-            onOpenReviewMode={() => onOpenReviewMode('backlog')}
-          />
 
           {/* Next Adventure — top candidate per active Platform Plan */}
           <HomeSection title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
@@ -582,6 +571,18 @@ export function HomePanel({
 
           {/* Achievement Quiz */}
           <AchievementQuizCard games={games} />
+
+          {/* Questory Journey */}
+          <JourneyProgressCard
+            importedCount={libraryGames.length}
+            platformPlanCount={activePlatformCount}
+            reviewedCount={reviewedCount}
+            reviewStats={reviewModeState.stats}
+            startedAdventureCount={startedAdventureCount}
+            unratedFinishedCount={unratedFinishedCount}
+            nextReviewTarget={nextReviewTarget}
+            onOpenReviewMode={() => onOpenReviewMode('backlog')}
+          />
 
           {/* Quest Queue Remaining */}
           <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
@@ -708,10 +709,10 @@ function JourneyProgressCard({
 
   return (
     <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-spread text-mint">Your Questory Journey</div>
-          <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2 text-sm text-slate-300">
             <span>✓ Imported <strong className="text-white">{importedCount}</strong> games</span>
             <span>✓ Reviewed <strong className="text-white">{reviewedCount}</strong> games</span>
             <span>✓ Created <strong className="text-white">{platformPlanCount}</strong> Platform Plans</span>
@@ -729,7 +730,7 @@ function JourneyProgressCard({
           ) : null}
         </div>
         <button
-          className="rounded-xl border border-mint/30 bg-mint/10 px-4 py-3 text-left text-sm text-mint transition hover:bg-mint/20"
+          className="w-full rounded-xl border border-mint/30 bg-mint/10 px-4 py-3 text-left text-sm text-mint transition hover:bg-mint/20"
           data-home-focus="true"
           onClick={onOpenReviewMode}
           type="button"
