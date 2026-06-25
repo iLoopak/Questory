@@ -9,6 +9,7 @@ import type { Game, GameStatus } from '../types/game';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { GameCoverImage } from './GameCoverImage';
+import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 
 type GameActionMenuProps = {
   game: Game;
@@ -274,7 +275,7 @@ function GameActionMenuOverlay({
             <p className="qs-game-action-eyebrow">{t('action.gameActions')}</p>
             <h3 className="qs-game-action-title">{game.title}</h3>
             <div className="qs-game-action-meta">
-              <span className="qs-game-action-platform">{game.platform}</span>
+              <PlatformIdentityBadge className="rounded-full px-2 py-0.5 text-xs font-semibold" platform={game.platform} />
               <span className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                   game.status === 'Playing' ? 'bg-mint' :

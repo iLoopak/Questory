@@ -912,7 +912,6 @@ function GameDetailOverflowMenu({
             <h3 className="qs-game-action-title">{game.title}</h3>
             <PlatformIdentityBadge
               className="mt-2 rounded-full px-2 py-0.5 text-xs font-semibold"
-              compact
               platform={game.platform}
             />
           </div>

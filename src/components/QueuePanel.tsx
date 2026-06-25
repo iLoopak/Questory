@@ -1335,7 +1335,7 @@ function QueueEntryRow({
             {game.title}
           </button>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            <PlatformIdentityBadge compact accentColor={platformAccentColor} className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} />
+            <PlatformIdentityBadge accentColor={platformAccentColor} className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" platform={entry.targetPlatform} />
             <AchievementProgressBadge game={game} />
             <HltbBadge game={game} />
           </div>

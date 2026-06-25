@@ -908,7 +908,7 @@ const CompactGameRow = memo(function CompactGameRow({
             <span className="line-clamp-1 text-sm font-semibold text-white sm:text-base">{game.title}</span>
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-            <PlatformIdentityBadge compact className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
+            <PlatformIdentityBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
             {shouldShowStatusBadge ? <span className="platform-badge rounded-full px-2 py-0.5 font-semibold">{translateOption(game.status, t)}</span> : null}
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
 
