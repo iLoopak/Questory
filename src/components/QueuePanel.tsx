@@ -223,6 +223,10 @@ export function QueuePanel({
     setShowQueueHint(false);
   }
 
+  const summaryAccentColor = selectedPlatformSummary
+    ? getPlatformAccentColor(queueState, platformFilter as GamePlatform)
+    : '';
+
   return (
     <section className="qs-queue-shell flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
       <CollectionToolbar
@@ -353,19 +357,25 @@ export function QueuePanel({
       </div>
 
       {selectedPlatformSummary ? (
-        <div className="mb-3 rounded-xl border border-skyglass/15 bg-ink-950/60 px-4 py-3">
+        <div
+          className="mb-3 rounded-xl border px-4 py-3"
+          style={{
+            borderColor: `color-mix(in srgb, ${summaryAccentColor} 32%, rgb(255 255 255 / 0.06))`,
+            backgroundColor: `color-mix(in srgb, ${summaryAccentColor} 7%, rgb(2 6 23 / 0.6))`,
+          }}
+        >
           <div className="text-sm font-semibold text-white">{platformFilter} {t('queue.platformSummary')}</div>
           <div className="mt-2 flex gap-6">
             <div>
-              <div className="text-xl font-bold text-mint">{selectedPlatformSummary.playing}</div>
+              <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.playing}</div>
               <div className="mt-0.5 text-xs text-slate-400">{t('nav.playingNow')}</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-mint">{selectedPlatformSummary.planned}</div>
+              <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.planned}</div>
               <div className="mt-0.5 text-xs text-slate-400">{t('queue.planned')}</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-mint">{selectedPlatformSummary.wishlist}</div>
+              <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.wishlist}</div>
               <div className="mt-0.5 text-xs text-slate-400">{t('nav.wishlist')}</div>
             </div>
           </div>
@@ -373,16 +383,31 @@ export function QueuePanel({
       ) : activeQueuePlatforms.length > 0 ? (
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
           {activeQueuePlatforms.map((platform) => {
-            const count = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
+            const planned = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
+            const playing = playingGamesByPlatform.get(platform)?.length ?? 0;
+            const cardAccent = getPlatformAccentColor(queueState, platform);
             return (
               <button
                 key={platform}
-                className="min-w-[8rem] rounded-xl border border-skyglass/15 bg-ink-950/60 px-3 py-2 text-left transition hover:border-mint/30 hover:bg-mint/10"
+                className="min-w-[8rem] rounded-xl border px-3 py-2 text-left transition"
+                style={{
+                  borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
+                  backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
+                }}
                 onClick={() => setPlatformFilter(platform)}
                 type="button"
               >
-                <div className="truncate text-sm font-semibold text-white">{platform} Plan</div>
-                <div className="mt-1 text-xs text-slate-400"><span className="text-lg font-bold text-mint">{count}</span> {count === 1 ? 'game' : 'games'}</div>
+                <div className="truncate text-sm font-semibold text-white">{platform}</div>
+                <div className="mt-1.5 flex gap-3 text-xs">
+                  <span>
+                    <span className="font-bold" style={{ color: cardAccent }}>{playing}</span>
+                    <span className="ml-1 text-slate-500">Playing</span>
+                  </span>
+                  <span>
+                    <span className="font-bold" style={{ color: cardAccent }}>{planned}</span>
+                    <span className="ml-1 text-slate-500">{t('queue.planned')}</span>
+                  </span>
+                </div>
               </button>
             );
           })}
@@ -799,7 +824,7 @@ function PlatformOptionsMenu({ children, label }: PlatformOptionsMenuProps) {
         ref={buttonRef}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10"
+        className="qs-platform-options-button rounded-md border px-3 py-2 text-xs font-semibold"
         onClick={toggleMenu}
         type="button"
       >
@@ -893,7 +918,16 @@ function PlatformQueueColumn({
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
   const platformAccentColor = accentColor || 'var(--accent)';
   const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
-  const accentStyle = { '--platform-accent': platformAccentColor, borderColor: isHighlighted || hasGames ? platformAccentColor : undefined } as CSSProperties;
+  const accentStyle = {
+    '--platform-accent': platformAccentColor,
+    borderColor: `color-mix(in srgb, ${platformAccentColor} ${isHighlighted ? 55 : hasGames ? 32 : 18}%, rgb(255 255 255 / 0.04))`,
+    backgroundImage: `radial-gradient(ellipse at 50% 0%, color-mix(in srgb, ${platformAccentColor} ${hasGames || isHighlighted ? 10 : 5}%, transparent) 0%, transparent 65%)`,
+    boxShadow: isHighlighted
+      ? `0 0 0 1px color-mix(in srgb, ${platformAccentColor} 38%, transparent), 0 0 32px color-mix(in srgb, ${platformAccentColor} 18%, transparent)`
+      : hasGames
+      ? `0 0 16px color-mix(in srgb, ${platformAccentColor} 8%, transparent)`
+      : 'none',
+  } as CSSProperties;
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -917,7 +951,7 @@ function PlatformQueueColumn({
 
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'shadow-glow' : hasGames ? '' : 'border-skyglass/10 opacity-80'}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
           <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
@@ -1034,13 +1068,17 @@ function PlatformQueueColumn({
           </div>
         ) : (
           <div
-            className="qs-queue-planned-empty rounded-md border border-dashed px-3 py-3 text-sm"
+            className="qs-queue-planned-empty rounded-md border border-dashed px-3 py-4 text-sm"
             style={{
               borderColor: `color-mix(in srgb, ${platformAccentColor} 22%, rgb(255 255 255 / 0.06))`,
               color: `color-mix(in srgb, ${platformAccentColor} 45%, rgb(100 116 139))`,
             }}
           >
-            {t('queue.noQueue')}
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
+              <Icon name="library" size={13} />
+              <span>{platform}</span>
+            </div>
+            <p>{t('queue.noQueuePlatform').replace('{platform}', platform)}</p>
           </div>
         )}
       </div> : null}
@@ -1284,7 +1322,7 @@ function QueueEntryRow({
   return (
     <article
       aria-label={`${game.title} ${t('queue.entryA11y')}`}
-      className="rounded-md border border-skyglass/15 bg-ink-950 p-2"
+      className="qs-queue-entry rounded-md border bg-ink-950 p-2"
       onKeyDown={handleQueueEntryKeyDown}
       role="group"
       tabIndex={0}
