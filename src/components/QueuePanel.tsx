@@ -481,6 +481,7 @@ export function QueuePanel({
                 })
                 .sort(compareQueueEntries)}
               onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
+              onIdentityChange={(changes) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, changes))}
               onLimitChange={onLimitChange}
               onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
               onRemovePlatform={(platform) => onQueueStateChange(removeQueuePlatform(queueState, platform))}
@@ -837,6 +838,7 @@ function PlatformQueueColumn({
   statusFilter,
   onFindArtwork,
   onHidePlatform,
+  onIdentityChange,
   onLimitChange,
   onMovePlatform,
   onRemovePlatform,
@@ -863,6 +865,7 @@ function PlatformQueueColumn({
   statusFilter: 'All Statuses' | 'Planned' | 'Playing';
   onFindArtwork?: (game: Game) => void;
   onHidePlatform: (platform: GamePlatform) => void;
+  onIdentityChange: (changes: { accentColor: string; artworkUrl: string; platformTag: string }) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
   onMovePlatform: (platform: GamePlatform, direction: 'up' | 'down') => void;
   onRemovePlatform: (platform: GamePlatform) => void;
@@ -910,6 +913,7 @@ function PlatformQueueColumn({
   }, [platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
 
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
 
   return (
     <>
@@ -919,16 +923,41 @@ function PlatformQueueColumn({
           <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
-            <h3 className="max-w-full truncate rounded-full border border-white/10 bg-ink-950/80 px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm">
-              {platform}
+            <h3
+              className="flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              style={{
+                borderColor: `color-mix(in srgb, ${platformAccentColor} 40%, rgb(255 255 255 / 0.1))`,
+                backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.85))`,
+              }}
+            >
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
+              <span className="min-w-0 truncate">{platform}</span>
             </h3>
           </div>
         </div>
       ) : null}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          {!displayArtworkUrl ? <h3 className="truncate text-base font-semibold leading-tight text-white" style={{ color: platformAccentColor }}>{platform}</h3> : null}
-          {platformTag ? <div className="mt-1 text-xs text-slate-500">Tag: {platformTag}</div> : null}
+          {!displayArtworkUrl ? (
+            <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight">
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
+              <span className="min-w-0 truncate" style={{ color: platformAccentColor }}>{platform}</span>
+            </h3>
+          ) : null}
+          {platformTag ? (
+            <div className="mt-1.5">
+              <span
+                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
+                style={{
+                  borderColor: `color-mix(in srgb, ${platformAccentColor} 30%, transparent)`,
+                  color: `color-mix(in srgb, ${platformAccentColor} 75%, rgb(148 163 184))`,
+                  backgroundColor: `color-mix(in srgb, ${platformAccentColor} 10%, transparent)`,
+                }}
+              >
+                {platformTag}
+              </span>
+            </div>
+          ) : null}
         </div>
         <PlatformOptionsMenu label={t('queue.options')}>
           {({ closeMenu }) => (
@@ -944,6 +973,7 @@ function PlatformQueueColumn({
                   onChange={(event) => onLimitChange(platform, Number(event.target.value))}
                 />
               </label>
+              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
               <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
               <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
               <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
@@ -1003,7 +1033,13 @@ function PlatformQueueColumn({
             })}
           </div>
         ) : (
-          <div className="qs-queue-planned-empty rounded-md border border-dashed border-white/10 px-3 py-3 text-sm text-slate-500">
+          <div
+            className="qs-queue-planned-empty rounded-md border border-dashed px-3 py-3 text-sm"
+            style={{
+              borderColor: `color-mix(in srgb, ${platformAccentColor} 22%, rgb(255 255 255 / 0.06))`,
+              color: `color-mix(in srgb, ${platformAccentColor} 45%, rgb(100 116 139))`,
+            }}
+          >
             {t('queue.noQueue')}
           </div>
         )}
@@ -1015,6 +1051,16 @@ function PlatformQueueColumn({
         platform={platform}
         onRename={(nextPlatform) => { setIsRenameModalOpen(false); onRenamePlatform(platform, nextPlatform); }}
         onClose={() => setIsRenameModalOpen(false)}
+      />
+    ) : null}
+    {isIdentityModalOpen ? (
+      <PlatformIdentityModal
+        platform={platform}
+        accentColor={accentColor}
+        artworkUrl={artworkUrl}
+        platformTag={platformTag}
+        onSave={onIdentityChange}
+        onClose={() => setIsIdentityModalOpen(false)}
       />
     ) : null}
     </>
@@ -1071,6 +1117,88 @@ function QueuePlatformRenameModal({
             type="button"
           >
             {t('settings.rename')}
+          </button>
+        </div>
+      </div>
+    </ViewportModal>
+  );
+}
+
+function PlatformIdentityModal({
+  platform,
+  accentColor: initialAccentColor,
+  artworkUrl: initialArtworkUrl,
+  platformTag: initialPlatformTag,
+  onSave,
+  onClose,
+}: {
+  platform: GamePlatform;
+  accentColor: string;
+  artworkUrl: string;
+  platformTag: string;
+  onSave: (changes: { accentColor: string; artworkUrl: string; platformTag: string }) => void;
+  onClose: () => void;
+}) {
+  const [accentColor, setAccentColor] = useState(initialAccentColor);
+  const [artworkUrl, setArtworkUrl] = useState(initialArtworkUrl);
+  const [platformTag, setPlatformTag] = useState(initialPlatformTag);
+  const previewArtworkUrl = artworkUrl || createPlatformArtworkPreset(platform, accentColor, 'Aurora');
+
+  function handleSave() {
+    onSave({ accentColor, artworkUrl, platformTag: platformTag.trim() });
+    onClose();
+  }
+
+  return (
+    <ViewportModal ariaLabel="Edit platform identity" placement="center" onClose={onClose}>
+      <div className="max-h-[85vh] overflow-y-auto overscroll-contain p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="qs-label-caps text-accent">Platform Identity</div>
+            <h2 className="mt-1 text-lg font-semibold text-white">{platform}</h2>
+          </div>
+          <button className="shrink-0 rounded-md border border-white/10 px-2 py-1 text-sm text-slate-300 hover:bg-white/10" onClick={onClose} type="button">
+            <Icon name="x" />
+          </button>
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-ink-950/70">
+          <div className="relative h-20">
+            <img alt="" className="h-full w-full object-cover" src={previewArtworkUrl} />
+            <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 to-ink-950/15" />
+            <div className="absolute inset-x-0 bottom-0 p-3">
+              <div
+                className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold text-white"
+                style={{
+                  borderColor: `color-mix(in srgb, ${accentColor} 40%, rgb(255 255 255 / 0.1))`,
+                  backgroundColor: `color-mix(in srgb, ${accentColor} 15%, rgb(2 6 23 / 0.85))`,
+                }}
+              >
+                <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
+                {platform}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-white/10 bg-ink-950/60 p-3">
+          <PlatformIdentityFields
+            accentColor={accentColor}
+            artworkUrl={artworkUrl}
+            platformTag={platformTag}
+            onAccentColorChange={setAccentColor}
+            onArtworkUrlChange={setArtworkUrl}
+            onPlatformTagChange={setPlatformTag}
+            onPresetArtwork={(preset) => setArtworkUrl(createPlatformArtworkPreset(platform, accentColor, preset))}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 hover:bg-mint/10 hover:text-white" onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={handleSave} type="button">
+            Save
           </button>
         </div>
       </div>
