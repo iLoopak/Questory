@@ -44,7 +44,25 @@ function hasAcceptedArtworkUrl(metadata: RawgMetadata, mergedGame: Game) {
   });
 }
 
-export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata): Game {
+type MergeRawgMetadataOptions = {
+  /**
+   * Metadata-only refreshes must not change artwork state. RAWG may return
+   * background images that are useful artwork candidates, but Quest Queue's
+   * Refresh Metadata action should only update descriptive metadata.
+   */
+  preserveArtwork?: boolean;
+};
+
+const preservedArtworkFields = [
+  ...artworkUrlFields,
+  'wideCoverImage',
+  'heroImage',
+  'logoImage',
+  'iconImage',
+  'artworkSourceMetadata',
+] as const;
+
+export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata, options: MergeRawgMetadataOptions = {}): Game {
   const metadataRecord = metadata as Record<string, unknown>;
   const mergedGame = {
     ...game,
@@ -53,6 +71,24 @@ export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata): G
   const mergedRecord = mergedGame as Record<string, unknown>;
   const existingRecord = game as Record<string, unknown>;
   const protectsCoverImage = hasProtectedArtwork(game);
+
+  if (options.preserveArtwork) {
+    preservedArtworkFields.forEach((field) => {
+      if (hasOwnValue(game, field)) {
+        mergedRecord[field] = existingRecord[field];
+      } else {
+        delete mergedRecord[field];
+      }
+    });
+    artworkMetadataFields.forEach((field) => {
+      if (hasOwnValue(game, field)) {
+        mergedRecord[field] = existingRecord[field];
+      } else {
+        delete mergedRecord[field];
+      }
+    });
+    return mergedGame;
+  }
 
   artworkUrlFields.forEach((field) => {
     if (!hasOwnValue(metadata, field)) {

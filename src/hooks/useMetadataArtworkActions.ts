@@ -133,7 +133,7 @@ export function useMetadataArtworkActions({
           const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
           const enrichedGame = mergeSteamGridDbArtworkIntoGame(targetGame, sgdbArtwork);
           if (enrichedGame !== targetGame) {
-            setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(enrichedGame) : game)));
+            setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork)) : game)));
             addToastNotification({ category: 'success', dedupeKey: toastKey, message: formatGameToastMessage(t('toast.artworkUpdated'), targetGame) });
             return 'updated';
           }
@@ -148,13 +148,19 @@ export function useMetadataArtworkActions({
       }
 
       const sgdbArtwork = isArtworkRefresh ? await fetchSteamGridDbArtworkForGame(targetGame) : null;
-      let nextGame = mergeRawgMetadataIntoGame(targetGame, result.metadata);
-      nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
-      // Persist the winning retro search title so future lookups skip candidate iteration
-      if (result.winningSearchTitle && result.winningSearchTitle !== targetGame.metadataSearchTitle && result.winningSearchTitle !== targetGame.title) {
-        nextGame = { ...nextGame, metadataSearchTitle: result.winningSearchTitle };
-      }
-      setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord({ ...nextGame, metadataSkippedAt: undefined, metadataManualManagedAt: undefined }) : game)));
+      setGames((currentGames) => currentGames.map((game) => {
+        if (game.id !== targetGame.id) {
+          return game;
+        }
+
+        let nextGame = mergeRawgMetadataIntoGame(game, result.metadata, { preserveArtwork: !isArtworkRefresh });
+        nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
+        // Persist the winning retro search title so future lookups skip candidate iteration
+        if (result.winningSearchTitle && result.winningSearchTitle !== game.metadataSearchTitle && result.winningSearchTitle !== game.title) {
+          nextGame = { ...nextGame, metadataSearchTitle: result.winningSearchTitle };
+        }
+        return touchGameRecord({ ...nextGame, metadataSkippedAt: undefined, metadataManualManagedAt: undefined });
+      }));
       markOnboardingItemComplete('metadata-enriched');
 
       const foundArtwork = Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim() || sgdbArtwork);
@@ -175,7 +181,7 @@ export function useMetadataArtworkActions({
         const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
         const enrichedGame = mergeSteamGridDbArtworkIntoGame(targetGame, sgdbArtwork);
         if (enrichedGame !== targetGame) {
-          setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(enrichedGame) : game)));
+          setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork)) : game)));
           addToastNotification({ category: 'success', dedupeKey: toastKey, message: formatGameToastMessage(t('toast.artworkUpdated'), targetGame) });
           return 'updated';
         }
