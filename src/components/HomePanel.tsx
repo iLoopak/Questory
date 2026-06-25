@@ -45,8 +45,10 @@ type HomePanelProps = {
   onQuickNote: (gameId: string, note: string) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncItadDeals?: () => void;
+  onImportNewSteamGames?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
+  isImportingNewSteamGames?: boolean;
 };
 
 type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
@@ -77,8 +79,10 @@ export function HomePanel({
   onQuickNote,
   onStatusChange,
   onSyncItadDeals,
+  onImportNewSteamGames,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
+  isImportingNewSteamGames = false,
 }: HomePanelProps) {
   const { t } = useI18n();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
@@ -177,8 +181,8 @@ export function HomePanel({
 
   const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
   const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
-  const isSteamSyncing = isSteamAchievementSyncing || isSteamPlaytimeSyncing;
-  const hasSyncActions = (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
+  const isSteamSyncing = isSteamAchievementSyncing || isSteamPlaytimeSyncing || isImportingNewSteamGames;
+  const hasSyncActions = !!onImportNewSteamGames || (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
   const isAnySyncing = isSteamSyncing || itadDealSyncState?.status === 'loading';
 
   const wishlistGames = useMemo(() => games.filter((g) => g.collectionType === 'wishlist'), [games]);
@@ -634,12 +638,14 @@ export function HomePanel({
           hasSteamGames={hasSteamGames}
           isSteamAchievementSyncing={isSteamAchievementSyncing}
           isSteamPlaytimeSyncing={isSteamPlaytimeSyncing}
+          isImportingNewSteamGames={isImportingNewSteamGames}
           itadDealSyncState={itadDealSyncState}
           lastAchievementSyncAt={lastAchievementSyncAt}
           lastItadSyncAt={lastItadSyncAt}
           lastPlaytimeSyncAt={lastPlaytimeSyncAt}
           onClose={() => setSyncSheetOpen(false)}
           onSyncItadDeals={onSyncItadDeals}
+          onImportNewSteamGames={onImportNewSteamGames}
           onSyncSteamAchievements={onSyncSteamAchievements}
           onSyncSteamPlaytime={onSyncSteamPlaytime}
         />
@@ -1732,8 +1738,10 @@ function SyncMaintenanceSheet({
   lastPlaytimeSyncAt,
   onClose,
   onSyncItadDeals,
+  onImportNewSteamGames,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
+  isImportingNewSteamGames = false,
 }: {
   hasSteamGames: boolean;
   isSteamAchievementSyncing: boolean;
@@ -1744,8 +1752,10 @@ function SyncMaintenanceSheet({
   lastPlaytimeSyncAt: Date | null;
   onClose: () => void;
   onSyncItadDeals?: () => void;
+  onImportNewSteamGames?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
+  isImportingNewSteamGames?: boolean;
 }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -1768,6 +1778,9 @@ function SyncMaintenanceSheet({
         <div className="px-4 pb-2 pt-1">
           <h3 className="mb-4 text-base font-bold text-white">{t('home.syncMaintenance')}</h3>
           <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
+            {onImportNewSteamGames ? (
+              <SyncSheetButton icon="steam" label="Import new Steam games" syncingLabel="Finding newly owned Steam games…" isSyncing={isImportingNewSteamGames} lastSyncAt={null} subtitle="Find newly owned Steam games" onClick={onImportNewSteamGames} neverLabel={t('home.neverSynced')} />
+            ) : null}
             {hasSteamGames && onSyncSteamAchievements ? (
               <SyncSheetButton icon="trophy" label="Sync Achievements" syncingLabel="Syncing achievements…" isSyncing={isSteamAchievementSyncing} lastSyncAt={lastAchievementSyncAt} onClick={onSyncSteamAchievements} neverLabel={t('home.neverSynced')} />
             ) : null}
@@ -1790,13 +1803,13 @@ function SyncMaintenanceSheet({
   );
 }
 
-function SyncSheetButton({ icon, isSyncing, label, lastSyncAt, neverLabel, onClick, syncingLabel }: { icon: Parameters<typeof Icon>[0]['name']; isSyncing: boolean; label: string; lastSyncAt: Date | string | null; neverLabel: string; onClick: () => void; syncingLabel: string }) {
+function SyncSheetButton({ icon, isSyncing, label, lastSyncAt, neverLabel, onClick, syncingLabel, subtitle }: { icon: Parameters<typeof Icon>[0]['name']; isSyncing: boolean; label: string; lastSyncAt: Date | string | null; neverLabel: string; onClick: () => void; syncingLabel: string; subtitle?: string }) {
   return (
     <button className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50" disabled={isSyncing} onClick={onClick} type="button">
       <Icon name={isSyncing ? 'refresh-cw' : icon} size={18} strokeWidth={2} className={`shrink-0 text-slate-400 ${isSyncing ? 'animate-spin' : ''}`} />
       <div className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-slate-200">{label}</span>
-        <span className={`block text-xs ${isSyncing ? 'text-mint' : 'text-slate-500'}`}>{isSyncing ? syncingLabel : lastSyncAt ? formatRelativeTime(lastSyncAt, neverLabel) : neverLabel}</span>
+        <span className={`block text-xs ${isSyncing ? 'text-mint' : 'text-slate-500'}`}>{isSyncing ? syncingLabel : subtitle ?? (lastSyncAt ? formatRelativeTime(lastSyncAt, neverLabel) : neverLabel)}</span>
       </div>
       {!isSyncing ? <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" /> : null}
     </button>
