@@ -1,4 +1,4 @@
-import { isMissingOrGeneratedCover, getStoredArtworkSource } from './gameCoverImages';
+import { hasRealArtwork, isMissingOrGeneratedCover, getStoredArtworkSource } from './gameCoverImages';
 import { getMetadataSearchTitle } from './rawgMetadataEnrichment';
 import type { Game } from '../types/game';
 import { loadSteamGridDbSettings } from './steamGridDbSettingsStorage';
@@ -176,34 +176,57 @@ export function normalizeSteamGridDbApiKey(value: string | undefined | null) {
 export function mergeSteamGridDbArtworkIntoGame(game: Game, artwork: SteamGridDbArtwork | null): Game {
   if (!artwork) return game;
   const source = getStoredArtworkSource(game);
-  const protectsManualCover = source === 'user';
+  const previousSource = source ?? 'none';
+
+  if (hasRealArtwork(game)) {
+    logArtworkDecision('preserved-existing-artwork', {
+      gameId: game.id,
+      title: game.title,
+      previousArtworkSource: previousSource,
+      newArtworkSource: artwork.artworkSource ?? 'steamgriddb',
+      reason: 'automatic SteamGridDB artwork is only applied when the game has no valid cover artwork',
+    });
+    return game;
+  }
+
+  if (source === 'custom' || source === 'user') {
+    logArtworkDecision('preserved-custom-artwork', {
+      gameId: game.id,
+      title: game.title,
+      previousArtworkSource: previousSource,
+      newArtworkSource: artwork.artworkSource ?? 'steamgriddb',
+      reason: 'custom artwork cannot be overwritten automatically',
+    });
+    return game;
+  }
+
   const now = new Date().toISOString();
   const next: Game = { ...game };
   let changed = false;
 
-  if (artwork.coverImage && !protectsManualCover && (isMissingOrGeneratedCover(game.coverImage) || source === 'steamgriddb')) {
+  if (artwork.coverImage && isMissingOrGeneratedCover(game.coverImage)) {
     next.coverImage = artwork.coverImage;
     changed = true;
   }
-  if (artwork.wideCoverImage && shouldApplyVariant(game.wideCoverImage, source)) {
+  if (artwork.wideCoverImage && shouldApplyVariant(game.wideCoverImage)) {
     next.wideCoverImage = artwork.wideCoverImage;
     changed = true;
   }
-  if (artwork.heroImage && shouldApplyVariant(game.heroImage, source)) {
+  if (artwork.heroImage && shouldApplyVariant(game.heroImage)) {
     next.heroImage = artwork.heroImage;
     changed = true;
   }
-  if (artwork.logoImage && shouldApplyVariant(game.logoImage, source)) {
+  if (artwork.logoImage && shouldApplyVariant(game.logoImage)) {
     next.logoImage = artwork.logoImage;
     changed = true;
   }
-  if (artwork.iconImage && shouldApplyVariant(game.iconImage, source)) {
+  if (artwork.iconImage && shouldApplyVariant(game.iconImage)) {
     next.iconImage = artwork.iconImage;
     changed = true;
   }
 
   if (!changed) return game;
-  next.artworkSource = protectsManualCover && next.coverImage === game.coverImage ? game.artworkSource : 'steamgriddb';
+  next.artworkSource = 'steamgriddb';
   next.artworkUpdatedAt = now;
   next.artworkSourceMetadata = {
     ...game.artworkSourceMetadata,
@@ -213,11 +236,22 @@ export function mergeSteamGridDbArtworkIntoGame(game: Game, artwork: SteamGridDb
       refreshedAt: now,
     },
   };
+  logArtworkDecision('applied-artwork', {
+    gameId: game.id,
+    title: game.title,
+    previousArtworkSource: previousSource,
+    newArtworkSource: 'steamgriddb',
+    reason: 'game had no valid cover artwork',
+  });
   return next;
 }
 
-function shouldApplyVariant(currentUrl: string | undefined | null, coverSource: string | undefined) {
-  return !currentUrl?.trim() || coverSource === 'steamgriddb';
+function shouldApplyVariant(currentUrl: string | undefined | null) {
+  return !currentUrl?.trim();
+}
+
+function logArtworkDecision(label: string, details: Record<string, unknown>) {
+  console.info(`[Questory artwork] ${label}`, details);
 }
 
 function sanitizeArtworkResponse(response: SteamGridDbArtwork) {
