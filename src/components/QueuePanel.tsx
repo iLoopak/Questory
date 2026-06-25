@@ -469,7 +469,7 @@ export function QueuePanel({
         </div>
       ) : null}
 
-      <div ref={queueListRef} className="qs-queue-list min-w-0 overflow-x-hidden pr-1">
+      <div ref={queueListRef} className="qs-queue-list min-w-0 pr-1">
         <div className={
           displayedQueuePlatforms.length === 1
             ? 'qs-platform-grid grid min-w-0 gap-2'
@@ -948,9 +948,9 @@ function PlatformQueueColumn({
 
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
-        <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
+        <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden rounded-t-lg border-b border-white/10">
           <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
@@ -1034,9 +1034,9 @@ function PlatformQueueColumn({
         </div>
       ) : null}
 
-      {showPlannedSection ? <div ref={queueEntriesVirtualizerRef} className="relative" style={{ height: virtualQueueEntries.totalSize }}>
+      {showPlannedSection ? <div ref={queueEntriesVirtualizerRef} className="qs-queue-virtual-window relative min-w-0" style={{ minHeight: queueEntries.length > 0 ? virtualQueueEntries.totalSize : undefined }}>
         {queueEntries.length > 0 ? (
-          <div className="absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
+          <div className="qs-queue-virtual-items absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
             {renderedQueueEntries.map((entry) => {
               const game = gamesById.get(entry.gameId);
               const isFirstEntry = entry.queuePosition <= 1;
@@ -1443,14 +1443,14 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
   return (
     <span
       aria-hidden="true"
-      className={`relative block shrink-0 overflow-hidden rounded-md border bg-ink-800 ${
+      className={`qs-queue-cover-thumb relative block shrink-0 overflow-hidden rounded-md border bg-ink-800 ${
         isPlayingSize ? 'qs-platform-playing-cover h-20 w-[3.75rem] shadow-panel' : 'h-11 w-[2.0625rem] border-skyglass/15'
       }`}
     >
       {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
       <GameCoverImage
         alt=""
-        className={`h-full w-full object-cover transition-opacity duration-200 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className="relative z-[1] h-full w-full object-cover"
         diagnosticsContext="quest-queue"
         game={game}
         height={isPlayingSize ? 80 : 44}

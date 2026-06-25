@@ -4227,3 +4227,78 @@ body.qs-controller-active .qs-compact-card:focus-within {
     box-shadow: none;
   }
 }
+
+/* Platform Plans regression guardrails: keep the route on the app shell's single
+   vertical scroller, reserve stable card/cover geometry, and make decorative
+   identity layers transparent to wheel/touch hit testing. */
+.qs-queue-shell,
+.qs-queue-list,
+.qs-platform-grid,
+.qs-platform-column,
+.qs-queue-virtual-window {
+  overflow: visible;
+  min-width: 0;
+}
+
+.qs-queue-shell {
+  touch-action: pan-y pinch-zoom;
+}
+
+.qs-queue-list {
+  overflow-x: clip;
+  touch-action: pan-y pinch-zoom;
+}
+
+.qs-platform-column {
+  isolation: isolate;
+  contain: layout style;
+}
+
+.qs-platform-column::before,
+.qs-platform-column::after,
+.qs-platform-artwork-header img,
+.qs-platform-artwork-header .bg-gradient-to-r,
+.qs-platform-artwork-title::before,
+.qs-platform-artwork-title::after,
+.qs-queue-cover-thumb::before,
+.qs-queue-cover-thumb > span {
+  pointer-events: none;
+}
+
+.qs-queue-entry {
+  min-height: 7.25rem;
+}
+
+.qs-queue-entry > .grid {
+  grid-template-columns: 2rem 2.0625rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.qs-queue-cover-thumb {
+  inline-size: 2.0625rem;
+  block-size: 2.75rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--platform-accent, var(--accent)) 18%, transparent), transparent 48%),
+    rgb(15 23 42);
+}
+
+.qs-platform-playing-cover.qs-queue-cover-thumb {
+  inline-size: 3.75rem;
+  block-size: 5rem;
+}
+
+.qs-queue-cover-thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--platform-accent, var(--accent)) 34%, transparent), transparent 35%),
+    linear-gradient(180deg, transparent, rgb(0 0 0 / 0.28));
+}
+
+@media (min-width: 640px) {
+  .qs-queue-entry > .grid {
+    grid-template-columns: 2rem 2.0625rem minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
