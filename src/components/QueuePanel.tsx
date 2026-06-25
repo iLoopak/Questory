@@ -358,14 +358,14 @@ export function QueuePanel({
 
       {selectedPlatformSummary ? (
         <div
-          className="mb-3 rounded-xl border px-4 py-3"
+          className="qs-platform-summary mb-3 rounded-xl border px-4 py-3"
           style={{
             borderColor: `color-mix(in srgb, ${summaryAccentColor} 32%, rgb(255 255 255 / 0.06))`,
             backgroundColor: `color-mix(in srgb, ${summaryAccentColor} 7%, rgb(2 6 23 / 0.6))`,
           }}
         >
           <div className="text-sm font-semibold text-white">{platformFilter} {t('queue.platformSummary')}</div>
-          <div className="mt-2 flex gap-6">
+          <div className="mt-2 flex flex-wrap gap-6">
             <div>
               <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.playing}</div>
               <div className="mt-0.5 text-xs text-slate-400">{t('action.playingNow')}</div>
@@ -381,7 +381,7 @@ export function QueuePanel({
           </div>
         </div>
       ) : activeQueuePlatforms.length > 0 ? (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
+        <div className="qs-platform-progress mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
           {activeQueuePlatforms.map((platform) => {
             const planned = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
             const playing = playingGamesByPlatform.get(platform)?.length ?? 0;
@@ -389,7 +389,7 @@ export function QueuePanel({
             return (
               <button
                 key={platform}
-                className="min-w-[8rem] rounded-xl border px-3 py-2 text-left transition"
+                className="min-w-[8rem] max-w-[11rem] shrink-0 rounded-xl border px-3 py-2 text-left transition"
                 style={{
                   borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
                   backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
@@ -469,13 +469,13 @@ export function QueuePanel({
         </div>
       ) : null}
 
-      <div ref={queueListRef} className="qs-queue-list pr-1">
+      <div ref={queueListRef} className="qs-queue-list min-w-0 overflow-x-hidden pr-1">
         <div className={
           displayedQueuePlatforms.length === 1
-            ? 'grid gap-2'
+            ? 'qs-platform-grid grid min-w-0 gap-2'
             : displayedQueuePlatforms.length === 2
-            ? 'grid grid-cols-2 gap-2'
-            : 'grid gap-2 xl:grid-cols-2'
+            ? 'qs-platform-grid grid min-w-0 grid-cols-2 gap-2'
+            : 'qs-platform-grid grid min-w-0 gap-2 xl:grid-cols-2'
         }>
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
@@ -920,13 +920,10 @@ function PlatformQueueColumn({
   const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
   const accentStyle = {
     '--platform-accent': platformAccentColor,
+    '--platform-column-border-strength': `${isHighlighted ? 55 : hasGames ? 32 : 18}%`,
+    '--platform-column-glow-strength': `${isHighlighted ? 18 : hasGames ? 8 : 0}%`,
     borderColor: `color-mix(in srgb, ${platformAccentColor} ${isHighlighted ? 55 : hasGames ? 32 : 18}%, rgb(255 255 255 / 0.04))`,
     backgroundImage: `radial-gradient(ellipse at 50% 0%, color-mix(in srgb, ${platformAccentColor} ${hasGames || isHighlighted ? 10 : 5}%, transparent) 0%, transparent 65%)`,
-    boxShadow: isHighlighted
-      ? `0 0 0 1px color-mix(in srgb, ${platformAccentColor} 38%, transparent), 0 0 32px color-mix(in srgb, ${platformAccentColor} 18%, transparent)`
-      : hasGames
-      ? `0 0 16px color-mix(in srgb, ${platformAccentColor} 8%, transparent)`
-      : 'none',
   } as CSSProperties;
 
   useEffect(() => {
@@ -951,14 +948,14 @@ function PlatformQueueColumn({
 
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
           <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
             <h3
-              className="flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
               style={{
                 borderColor: `color-mix(in srgb, ${platformAccentColor} 40%, rgb(255 255 255 / 0.1))`,
                 backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.85))`,
