@@ -79,7 +79,6 @@ import { usePlatformQueueController } from '../queue/usePlatformQueueController'
 import { useAppPreferencesController } from '../settings/useAppPreferencesController';
 import { useSyncController } from '../integrations/useSyncController';
 import { useMetadataController } from '../metadata/useMetadataController';
-import { PlayingNowHub } from '../playing-now/PlayingNowHub';
 import { AppGameDetailsView } from './AppGameDetailsView';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { SettingsView } from '../settings/SettingsView';
@@ -134,8 +133,6 @@ export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [playActivity, setPlayActivity] = useState<PlayActivityRecord[]>(() => loadPlayActivity());
-  const [activeUtilityView, setActiveUtilityView] = useState<'playing-now' | null>(null);
-  const [playingNowReturnContext, setPlayingNowReturnContext] = useState<{ activeNavItem: NavItem; selectedGameId: string | null } | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isImportingNewSteamGames, setIsImportingNewSteamGames] = useState(false);
@@ -202,7 +199,6 @@ export function AppController() {
     isShelfProfileOpen,
     libraryOwnerNickname,
     personalizedQuestShelfTitle,
-    playingNowGame,
     setIsShelfProfileOpen,
     setLibraryOwnerNickname,
     setShelfIdentity,
@@ -569,12 +565,6 @@ export function AppController() {
   }, [activeNavItem, analyticsCounts]);
 
   useEffect(() => {
-    if (activeUtilityView === 'playing-now') {
-      trackSessionAnalyticsEvent('playing_now_opened');
-    }
-  }, [activeUtilityView, analyticsCounts]);
-
-  useEffect(() => {
     if (activeNavItem === 'Settings' && activeSettingsCategory === 'Platforms') {
       trackSessionAnalyticsEvent('platform_plans_opened');
     }
@@ -682,8 +672,6 @@ export function AppController() {
   }, [lastRetroImportedGames, libraryFilters]);
 
   useControllerAction('openMenu', () => {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
     setActiveNavItem('Settings');
     setActiveSettingsCategory(null);
     setSelectedGameId(null);
@@ -1073,25 +1061,6 @@ export function AppController() {
     setActiveNavItem('Queue');
   }
 
-  function openPlayingNowHubFromShelfProfile() {
-    setPlayingNowReturnContext({ activeNavItem, selectedGameId });
-    setSelectedGameId(null);
-    setIsShelfProfileOpen(false);
-    setActiveUtilityView('playing-now');
-  }
-
-  function closePlayingNowHub() {
-    setActiveUtilityView(null);
-    if (playingNowReturnContext) {
-      setActiveNavItem(playingNowReturnContext.activeNavItem);
-      setSelectedGameId(playingNowReturnContext.selectedGameId);
-      setPlayingNowReturnContext(null);
-      return;
-    }
-    setActiveNavItem('Library');
-    setSelectedGameId(null);
-  }
-
   function logPlayedToday(game: Game) {
     const now = new Date();
     setPlayActivity((currentActivity) => upsertPlayedTodayActivity(currentActivity, game.id, now));
@@ -1107,16 +1076,7 @@ export function AppController() {
     );
   }
 
-  function openDetailsFromPlayingNow(gameId: string) {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
-    setSelectedGameId(gameId);
-    setActiveNavItem('Library');
-  }
-
   function openSettingsFromShelfProfile() {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
     setIsShelfProfileOpen(false);
     setSelectedGameId(null);
     setActiveNavItem('Settings');
@@ -1124,8 +1084,6 @@ export function AppController() {
   }
 
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
     setDetailReturnSection(null);
     setSelectedGameId(null);
     setActiveNavItem(item);
@@ -1187,8 +1145,6 @@ export function AppController() {
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
                 featuredGame={resolvedFeaturedGame}
                 onOpenSettings={openSettingsFromShelfProfile}
-                onOpenPlayingNow={openPlayingNowHubFromShelfProfile}
-                playingNowGame={playingNowGame}
                 shelfName={personalizedQuestShelfTitle}
                 shelfOverview={shelfOverview}
                 t={t}
@@ -1256,25 +1212,7 @@ export function AppController() {
         </header>
 
         <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
-          {activeUtilityView === 'playing-now' ? (
-            <div className="qs-playing-now-scroll overflow-y-auto overscroll-contain pb-8 pr-1">
-              <PlayingNowHub
-                activity={playActivity}
-                featuredGame={resolvedFeaturedGame}
-                games={games}
-                onBack={closePlayingNowHub}
-                onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-                onOpenDetails={openDetailsFromPlayingNow}
-                onPlayToday={logPlayedToday}
-                onRefreshSteamActivity={(gameIds) => { void refreshSteamPlaytime(gameIds, { showToast: false }); }}
-                onStatusChange={updateGameStatusWithCompletion}
-                queue={platformQueueState}
-                queueSummary={queueSummary}
-                shelfNickname={shelfIdentity.shelfName}
-                t={t}
-              />
-            </div>
-          ) : activeNavItem === 'Review Mode' && selectedGame ? (
+          {activeNavItem === 'Review Mode' && selectedGame ? (
             <AppGameDetailsView
               game={selectedGame}
               playActivity={playActivity}
@@ -1700,8 +1638,6 @@ export function AppController() {
         onOpenQueue={openQueueFromToast}
         onLinkRawgGame={openRawgRecoveryDialog}
         onOpenSteamSettings={() => {
-          setActiveUtilityView(null);
-          setPlayingNowReturnContext(null);
           setActiveNavItem('Settings');
           setActiveSettingsCategory('Integrations');
           setSelectedGameId(null);
