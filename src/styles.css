@@ -2783,10 +2783,6 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.qs-playing-now-scroll {
-  height: 100%;
-  -webkit-overflow-scrolling: touch;
-}
 
 .qs-queue-list,
 .qs-game-action-scroll,
@@ -3510,48 +3506,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
   text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.36);
 }
 
-.playing-now-card {
-  border-left-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 72%, rgb(var(--skyglass-rgb) / 0.45));
-  border-left-width: 3px;
-}
-
-.playing-now-card::before {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  content: '';
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 16%, transparent), transparent 38%),
-    radial-gradient(circle at 0 0, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 12%, transparent), transparent 42%);
-  opacity: 0.72;
-}
-
-.playing-now-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.playing-now-card > .playing-now-hero-bg {
-  position: absolute;
-  z-index: 0;
-}
-
-.playing-now-play-button {
-  background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 78%, var(--qs-accent-primary));
-  color: var(--accent-contrast);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 28%, transparent);
-}
-
-:root[data-theme='light'] .playing-now-card::before {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 9%, transparent), transparent 34%),
-    radial-gradient(circle at 0 0, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 8%, transparent), transparent 42%);
-  opacity: 0.58;
-}
-
-:root[data-theme='light'] .playing-now-play-button {
-  background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 70%, var(--qs-accent-primary));
-}
 
 .qs-sheet-drag-region {
   touch-action: none;

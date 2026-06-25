@@ -368,7 +368,7 @@ export function QueuePanel({
           <div className="mt-2 flex gap-6">
             <div>
               <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.playing}</div>
-              <div className="mt-0.5 text-xs text-slate-400">{t('nav.playingNow')}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{t('action.playingNow')}</div>
             </div>
             <div>
               <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.planned}</div>
@@ -903,7 +903,7 @@ function PlatformQueueColumn({
   onRemoveEntry: (gameId: string, platform: GamePlatform) => void;
 }) {
   const { t } = useI18n();
-  const playingNowLabel = t('nav.playingNow');
+  const playingNowLabel = t('action.playingNow');
   const queueEntriesVirtualizerRef = useRef<HTMLDivElement | null>(null);
   const virtualQueueEntries = useVirtualWindow({
     itemCount: queueEntries.length,
