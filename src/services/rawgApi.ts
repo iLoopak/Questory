@@ -2,7 +2,6 @@ import { postIntegration } from '../lib/integrationProxy';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 import type { RawgGameDetails, RawgMetadata, RawgScreenshotList, RawgSearchResult } from '../types/rawg';
 
-const RAWG_API_BASE_URL = 'https://api.rawg.io/api';
 
 type RawgSearchResponse = {
   results?: RawgSearchResult[];
@@ -42,15 +41,20 @@ async function requestRawg<T>(path: string, params: Record<string, string> = {})
     }
   }
 
-  const url = new URL(`${RAWG_API_BASE_URL}${path}`);
-  url.searchParams.set('key', apiKey);
-  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-  let response: Response;
-  try { response = await fetch(url); } catch { throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure'); }
-  if (response.status === 429 || response.status === 503) throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
-  if (response.status === 401 || response.status === 403) throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
-  if (!response.ok) throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
-  return (await response.json()) as T;
+  if (import.meta.env.DEV) {
+    const rawgApiBaseUrl = 'https://api.rawg.io/api';
+    const url = new URL(`${rawgApiBaseUrl}${path}`);
+    url.searchParams.set('key', apiKey);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    let response: Response;
+    try { response = await fetch(url); } catch { throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure'); }
+    if (response.status === 429 || response.status === 503) throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
+    if (response.status === 401 || response.status === 403) throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
+    if (!response.ok) throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
+    return (await response.json()) as T;
+  }
+
+  throw new RawgApiError('RAWG production requests must use the integration proxy.', 'api-failure');
 }
 
 function mapRawgProxyError(error: unknown): RawgApiError {
