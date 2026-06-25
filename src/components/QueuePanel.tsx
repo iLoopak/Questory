@@ -27,7 +27,7 @@ import {
 import type { Game, GamePlatform } from '../types/game';
 
 export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
-import { getPreferredArtworkSources } from '../lib/gameCoverImages';
+import { GameCoverImage } from './GameCoverImage';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
@@ -1435,16 +1435,13 @@ function QueueGameRow({
 }
 
 function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'tiny' }) {
-  const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const activeCoverSource = coverSources[coverSourceIndex];
+  const [activeCoverSource, setActiveCoverSource] = useState<string | null>(null);
   const isPlayingSize = size === 'playing';
 
   useEffect(() => {
-    setCoverSourceIndex(0);
     setIsCoverLoaded(false);
-  }, [coverSources]);
+  }, [activeCoverSource]);
 
   return (
     <span
@@ -1453,29 +1450,19 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
         isPlayingSize ? 'qs-platform-playing-cover h-20 w-[3.75rem] shadow-panel' : 'h-11 w-[2.0625rem] border-skyglass/15'
       }`}
     >
-      {activeCoverSource ? (
-        <>
-          {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-          <img
-            alt=""
-            className={`h-full w-full object-cover transition-opacity duration-200 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
-            decoding="async"
-            height={isPlayingSize ? 80 : 44}
-            loading="lazy"
-            onError={() => {
-              setIsCoverLoaded(false);
-              setCoverSourceIndex((currentIndex) => currentIndex + 1);
-            }}
-            onLoad={() => setIsCoverLoaded(true)}
-            src={activeCoverSource}
-            width={isPlayingSize ? 60 : 33}
-          />
-        </>
-      ) : (
-        <span className={`grid h-full w-full place-items-center font-semibold ${isPlayingSize ? 'qs-platform-playing-cover-fallback text-xl' : 'text-mint/80 text-xs'}`}>
-          {game.title.slice(0, 1).toUpperCase()}
-        </span>
-      )}
+      {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+      <GameCoverImage
+        alt=""
+        className={`h-full w-full object-cover transition-opacity duration-200 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
+        diagnosticsContext="quest-queue"
+        game={game}
+        height={isPlayingSize ? 80 : 44}
+        loading="lazy"
+        onLoad={() => setIsCoverLoaded(true)}
+        onResolvedSourceChange={setActiveCoverSource}
+        usage="portrait"
+        width={isPlayingSize ? 60 : 33}
+      />
     </span>
   );
 }
