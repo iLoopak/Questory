@@ -1228,7 +1228,7 @@ export function AppController() {
               onSyncSteamData={syncSteamDataForGame}
               onStatusChange={updateGameStatusWithCompletion}
               onTrackingChange={updateGameTracking}
-              onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
+              onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
               onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
             />
           ) : activeNavItem === 'Home' ? (
@@ -1314,7 +1314,7 @@ export function AppController() {
                     onSyncSteamData={syncSteamDataForGame}
                     onStatusChange={updateGameStatusWithCompletion}
                     onTrackingChange={updateGameTracking}
-                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
+                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
                   />
                 </div>
@@ -1399,7 +1399,7 @@ export function AppController() {
                     onSyncSteamData={syncSteamDataForGame}
                     onStatusChange={updateGameStatusWithCompletion}
                     onTrackingChange={updateGameTracking}
-                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
+                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
                   />
                 </div>
