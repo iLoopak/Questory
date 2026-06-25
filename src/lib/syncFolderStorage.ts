@@ -77,7 +77,7 @@ export function saveSyncFolderSettings(settings: SyncFolderSettings) {
 export async function chooseBackupFileHandle() {
   const currentWindow = window as FileSystemWindow;
   const handle = await currentWindow.showSaveFilePicker?.({
-    suggestedName: 'questshelf-backup.json',
+    suggestedName: 'questory-backup.json',
     types: [
       {
         description: 'QuestShelf backup JSON',

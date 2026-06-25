@@ -23,7 +23,7 @@ export const portableSyncProviders: PortableSyncProvider[] = [
 ];
 
 export function createPortableBackupFilename(backup: Pick<QuestShelfBackup, 'metadata'>) {
-  return `questshelf-backup-${backup.metadata.exportedAt.slice(0, 10)}.json`;
+  return `questory-backup-${backup.metadata.exportedAt.slice(0, 10)}.json`;
 }
 
 export function serializePortableBackup(backup: QuestShelfBackup) {
