@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../../types/game';
-import { getPreferredArtworkSources } from '../../../lib/gameCoverImages';
 import type { TFunction } from '../../../i18n';
+import { GameCoverImage } from '../../../components/GameCoverImage';
 
 interface GuessInputProps {
   games: Game[];
@@ -149,8 +149,6 @@ function DropdownItem({
   onSelect: () => void;
   onMouseEnter: () => void;
 }) {
-  const cover = useMemo(() => getPreferredArtworkSources(game, 'micro')[0] ?? game.coverImage, [game]);
-
   return (
     <li
       id={id}
@@ -164,8 +162,8 @@ function DropdownItem({
       }}
       onMouseEnter={onMouseEnter}
     >
-      <div className="h-9 w-6 shrink-0 overflow-hidden rounded">
-        <img src={cover} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+      <div className="h-9 w-6 shrink-0 overflow-hidden rounded bg-ink-950/80">
+        <GameCoverImage alt="" aria-hidden="true" className="h-full w-full object-cover" game={game} loading="lazy" usage="portrait" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{game.title}</div>
