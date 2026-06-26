@@ -715,6 +715,8 @@ function FocusedReviewCard({
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
   const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
+  const metacriticScore = formatReviewMetacriticScore(game.metacriticScore);
+  const rawgPlaytime = formatReviewRawgPlaytime(game.rawgPlaytimeHours);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -971,6 +973,12 @@ function FocusedReviewCard({
                   </div>
                 </div>
               )}
+              {metacriticScore || rawgPlaytime ? (
+                <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-1">
+                  {metacriticScore ? <span className="rounded-full border border-white/15 bg-ink-950/75 px-2 py-0.5 text-[0.65rem] font-extrabold leading-none text-slate-100 shadow-panel backdrop-blur-md">MC {metacriticScore}</span> : null}
+                  {rawgPlaytime ? <span className="rounded-full border border-white/15 bg-ink-950/75 px-2 py-0.5 text-[0.65rem] font-extrabold leading-none text-slate-100 shadow-panel backdrop-blur-md">~{rawgPlaytime}</span> : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -1641,6 +1649,14 @@ function matchesReviewSource(game: Game, source: ReviewSource) {
   }
 
   return game.collectionType === 'library' && game.playtimeHours === 0 && !game.lastPlayedAt;
+}
+
+function formatReviewMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+}
+
+function formatReviewRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
 }
 
 function hasPositiveNumber(value: unknown) {
