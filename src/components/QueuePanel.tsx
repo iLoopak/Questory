@@ -1479,7 +1479,7 @@ const platformPlanGhostMessages = [
 ] as const;
 
 function formatQueueMetacriticScore(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}%` : null;
 }
 
 function formatQueueRawgPlaytime(value: unknown) {
