@@ -116,8 +116,6 @@ export function GameDetailView({
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
   const logoUrl = getPreferredLogoUrl(game);
-  const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
-  const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
     ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
     : undefined;
@@ -125,6 +123,8 @@ export function GameDetailView({
     ? formatDealPrice(game.itadHistoricalLowPrice, game.itadHistoricalLowCurrency)
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
+  const metacriticScore = formatMetacriticScore(game.metacriticScore ?? game.metacritic);
+  const rawgPlaytime = formatRawgPlaytime(game.rawgPlaytimeHours ?? game.averagePlaytime);
   const canEditGame = isGameEditable(game);
   const recentSteamActivity = useMemo(() => getRecentSteamActivityForGame(activity, game.id), [activity, game.id]);
   const lastSteamActivityAt = recentSteamActivity?.detectedAt ?? game.lastSteamActivityAt;
@@ -306,7 +306,7 @@ export function GameDetailView({
                     <h2 className="mt-1 min-w-0 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:max-w-4xl">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(6.75rem,1fr))] gap-1.5 xl:max-w-4xl">
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
                     <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
@@ -317,7 +317,9 @@ export function GameDetailView({
                         onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
                       />
                     ) : null}
-{hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+                    {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+                    {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
+                    {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                   </div>
                 </div>
               </div>
@@ -348,10 +350,8 @@ export function GameDetailView({
                 <GameDetailOverflowMenu
                   anchorRef={overflowButtonRef}
                   canEditGame={canEditGame}
-                  canFindArtwork={canFindArtwork}
                   currentItadPrice={currentItadPrice}
                   game={game}
-                  isArtworkMissing={isArtworkMissing}
                   isFindingArtwork={isFindingArtwork}
                   isSteamDataSyncing={isSteamDataSyncing}
                   isSteamLibraryGame={isSteamLibraryGame}
@@ -550,10 +550,10 @@ export function GameDetailView({
                       <button
                         className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={isFindingArtwork}
-                        onClick={() => void onFindArtwork(game)}
+                        onClick={() => void onFindArtwork(game, 'metadata')}
                         type="button"
                       >
-                        {isFindingArtwork ? t('artwork.searching') : t('artwork.enrichMetadata')}
+                        {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
                       </button>
                     ) : null}
                   </div>
@@ -655,7 +655,7 @@ function pickArtworkChanges(changes: Partial<Game>): Partial<Game> {
   return artworkChanges;
 }
 
-function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game) => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
+function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
   return (
     <DetailSection kicker="Edit mode" title="Edit game details" description="Update user-managed display data. Source IDs, Steam fields, and ROM paths stay read-only.">
       {error ? <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div> : null}
@@ -684,7 +684,7 @@ function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindAr
       <div className="flex flex-wrap gap-2">
         <button className="min-h-10 rounded-xl border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-bold text-mint" onClick={onSave} type="button">Save</button>
         <button className="min-h-10 rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200" onClick={onCancel} type="button">Cancel</button>
-        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game)} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh metadata'}</button> : null}
+        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh Metadata'}</button> : null}
       </div>
     </DetailSection>
   );
@@ -698,11 +698,19 @@ function EditSelect({ label, onChange, options, value }: { label: string; onChan
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
+function formatMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}%` : null;
+}
+
+function formatRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
+}
+
 function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {
-  const className = `rounded-xl border px-3 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
+  const className = `rounded-xl border px-2.5 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
   const content = (
     <>
-      <div className="qs-label-caps text-muted">{label}</div>
+      <div className="qs-label-caps truncate text-muted">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
     </>
   );
@@ -746,10 +754,8 @@ function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
 type GameDetailOverflowMenuProps = {
   anchorRef: RefObject<HTMLButtonElement | null>;
   canEditGame: boolean;
-  canFindArtwork: boolean;
   currentItadPrice?: string;
   game: Game;
-  isArtworkMissing: boolean;
   isFindingArtwork: boolean;
   isSteamDataSyncing: boolean;
   isSteamLibraryGame: boolean;
@@ -767,10 +773,8 @@ type GameDetailOverflowMenuProps = {
 function GameDetailOverflowMenu({
   anchorRef,
   canEditGame,
-  canFindArtwork,
   currentItadPrice,
   game,
-  isArtworkMissing,
   isFindingArtwork,
   isSteamDataSyncing,
   isSteamLibraryGame,
@@ -848,16 +852,18 @@ function GameDetailOverflowMenu({
     });
   }
 
-  if (canFindArtwork) {
+  if (onFindArtwork) {
+    toolItems.push({
+      icon: 'refresh-cw',
+      label: isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata'),
+      disabled: isFindingArtwork,
+      onClick: () => closeAndRun(() => { void onFindArtwork(game, 'metadata'); }),
+    });
     toolItems.push({
       icon: 'image',
-      label: isFindingArtwork
-        ? t('artwork.searching')
-        : isArtworkMissing
-          ? t('artwork.findArtwork')
-          : t('artwork.enrichMetadata'),
-      disabled: !onFindArtwork || isFindingArtwork,
-      onClick: () => closeAndRun(() => { void onFindArtwork?.(game); }),
+      label: isFindingArtwork ? t('artwork.searching') : t('artwork.refreshArtwork'),
+      disabled: isFindingArtwork,
+      onClick: () => closeAndRun(() => { void onFindArtwork(game, 'artwork'); }),
     });
   }
 

@@ -476,6 +476,7 @@ export function AppController() {
   const {
     metadataSelectionRequest,
     refreshingMetadataGameIds,
+    ensureRawgMetadataForGame,
     refreshGameMetadataFromActions,
     startMetadataWorkflow,
     updateGameArtwork,
@@ -1478,6 +1479,7 @@ export function AppController() {
               confirmCancelConvention={confirmCancelConvention}
               source={activeReviewSource}
               onAction={handleReviewAction}
+              onEnsureRawgMetadata={ensureRawgMetadataForGame}
               onAddPlatform={addQueuePlatform}
               onOpenQueue={() => setActiveNavItem('Queue')}
               onRestoreIgnored={restoreReviewIgnoredGames}

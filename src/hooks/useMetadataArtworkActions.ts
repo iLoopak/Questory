@@ -1,7 +1,7 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { createTranslator } from '../i18n';
 import type { NavItem } from '../config/navigation';
-import { hasRealArtwork, getStoredArtworkSource } from '../lib/gameCoverImages';
+import { hasProtectedArtwork, hasRealArtwork, getStoredArtworkSource, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { mergeRawgMetadataIntoGame } from '../lib/metadataMerge';
 import { formatGameToastMessage, getLinkRawgGameAction, type NotificationDraft } from '../lib/notifications';
 import { refreshRawgMetadataForGame } from '../lib/rawgMetadataEnrichment';
@@ -44,6 +44,52 @@ export function useMetadataArtworkActions({
   setSelectedGameId,
   t,
 }: UseMetadataArtworkActionsOptions) {
+  const automaticRawgRefreshIdsRef = useRef<Set<string>>(new Set());
+
+  const ensureRawgMetadataForGame = useCallback(async (game: Game) => {
+    if (hasPositiveNumber(game.metacriticScore) && hasPositiveNumber(game.rawgPlaytimeHours)) {
+      return;
+    }
+
+    if (refreshingMetadataGameIds.has(game.id) || automaticRawgRefreshIdsRef.current.has(game.id)) {
+      return;
+    }
+
+    automaticRawgRefreshIdsRef.current.add(game.id);
+    setRefreshingMetadataGameIds((currentGameIds) => new Set(currentGameIds).add(game.id));
+
+    try {
+      const result = await refreshRawgMetadataForGame(game);
+      if (result.status !== 'updated') {
+        return;
+      }
+
+      setGames((currentGames) => currentGames.map((currentGame) => {
+        if (currentGame.id !== game.id) {
+          return currentGame;
+        }
+
+        return touchGameRecord({
+          ...mergeRawgMetadataIntoGame(currentGame, result.metadata, { preserveArtwork: true }),
+          metadataSkippedAt: undefined,
+          metadataManualManagedAt: undefined,
+        });
+      }));
+    } catch (error) {
+      console.debug('[Quest Queue RAWG metadata] skipped automatic metadata fetch', {
+        gameId: game.id,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      automaticRawgRefreshIdsRef.current.delete(game.id);
+      setRefreshingMetadataGameIds((currentGameIds) => {
+        const nextGameIds = new Set(currentGameIds);
+        nextGameIds.delete(game.id);
+        return nextGameIds;
+      });
+    }
+  }, [refreshingMetadataGameIds, setGames, setRefreshingMetadataGameIds]);
+
   function startMetadataWorkflow(gameIds: string[]) {
     setMetadataSelectionRequest({
       ids: gameIds,
@@ -164,16 +210,34 @@ export function useMetadataArtworkActions({
         return 'no-match';
       }
 
-      const sgdbArtwork = isArtworkRefresh ? await fetchSteamGridDbArtworkForGame(targetGame) : null;
-      let appliedArtwork = false;
+      if (isArtworkRefresh) {
+        const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
+        let appliedArtwork = false;
+        setGames((currentGames) => currentGames.map((game) => {
+          if (game.id !== targetGame.id) {
+            return game;
+          }
+
+          let nextGame = mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork);
+          nextGame = applyRawgArtworkOnly(nextGame, result.metadata);
+          appliedArtwork = appliedArtwork || nextGame !== game;
+          return nextGame !== game ? touchGameRecord(nextGame) : game;
+        }));
+
+        addToastNotification({
+          category: appliedArtwork ? 'success' : 'info',
+          dedupeKey: toastKey,
+          message: formatGameToastMessage(appliedArtwork ? t('toast.artworkUpdated') : t('toast.noArtworkFound'), targetGame),
+        });
+        return appliedArtwork ? 'updated' : 'no-match';
+      }
+
       setGames((currentGames) => currentGames.map((game) => {
         if (game.id !== targetGame.id) {
           return game;
         }
 
         let nextGame = mergeRawgMetadataIntoGame(game, result.metadata, { preserveArtwork: true });
-        nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
-        appliedArtwork = appliedArtwork || nextGame !== game;
         // Persist the winning retro search title so future lookups skip candidate iteration
         if (result.winningSearchTitle && result.winningSearchTitle !== game.metadataSearchTitle && result.winningSearchTitle !== game.title) {
           nextGame = { ...nextGame, metadataSearchTitle: result.winningSearchTitle };
@@ -182,19 +246,13 @@ export function useMetadataArtworkActions({
       }));
       markOnboardingItemComplete('metadata-enriched');
 
-      const foundArtwork = isArtworkRefresh ? appliedArtwork : Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim() || sgdbArtwork);
       addToastNotification({
-        category: foundArtwork || !isArtworkRefresh ? 'success' : 'info',
+        category: 'success',
         dedupeKey: toastKey,
-        message: formatGameToastMessage(
-          isArtworkRefresh
-            ? (foundArtwork ? t('toast.artworkUpdated') : t('toast.noArtworkFound'))
-            : t('toast.metadataUpdated'),
-          targetGame,
-        ),
+        message: formatGameToastMessage(t('toast.metadataUpdated'), targetGame),
       });
 
-      return foundArtwork || !isArtworkRefresh ? 'updated' : 'no-match';
+      return 'updated';
     } catch (error) {
       if (isArtworkRefresh) {
         const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
@@ -225,12 +283,31 @@ export function useMetadataArtworkActions({
   }
 
   return {
+    ensureRawgMetadataForGame,
     refreshGameMetadataFromActions,
     startMetadataWorkflow,
     updateGameArtwork,
     updateGameMetadata,
     updateGameMetadataManagement,
   };
+}
+
+function applyRawgArtworkOnly(game: Game, metadata: RawgMetadata): Game {
+  const coverImage = metadata.coverImage?.trim() || metadata.backgroundImage?.trim();
+  if (!coverImage || hasProtectedArtwork(game) || !isMissingOrGeneratedCover(game.coverImage)) {
+    return game;
+  }
+
+  return {
+    ...game,
+    artworkSource: 'rawg',
+    artworkUpdatedAt: metadata.artworkUpdatedAt ?? new Date().toISOString(),
+    coverImage,
+  };
+}
+
+function hasPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function touchGameRecord(game: Game): Game {

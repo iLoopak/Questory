@@ -53,6 +53,7 @@ type ReviewModePanelProps = {
   reviewModeState: ReviewModeState;
   source: ReviewSource;
   onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform, context?: ReviewModeActionContext) => void;
+  onEnsureRawgMetadata?: (game: Game) => void;
   onAddPlatform: (platform: GamePlatform) => void;
   onOpenQueue: () => void;
   onReturnToLibrary: () => void;
@@ -148,6 +149,7 @@ export function ReviewModePanel({
   reviewModeState,
   source,
   onAction,
+  onEnsureRawgMetadata,
   onAddPlatform,
   onOpenQueue,
   onReturnToLibrary,
@@ -177,6 +179,7 @@ export function ReviewModePanel({
   const [retainedUtilityGameIds, setRetainedUtilityGameIds] = useState<Set<string>>(() => new Set());
   const [showReviewHint, setShowReviewHint] = useState(() => localStorage.getItem('qs-review-hint-v1') !== 'dismissed');
   const queueButtonRef = useRef<HTMLButtonElement | null>(null);
+  const attemptedRawgTriageGameIdsRef = useRef<Set<string>>(new Set());
 
   const reviewedGameIds = useMemo(() => new Set(Object.keys(reviewModeState.reviewedGames)), [reviewModeState.reviewedGames]);
   const queueOrderPositions = useMemo(() => new Map(reviewModeState.queueOrder.map((gameId, index) => [gameId, index])), [reviewModeState.queueOrder]);
@@ -247,6 +250,14 @@ export function ReviewModePanel({
   }, [games]);
 
   const activeGame = reviewQueue[0] ?? null;
+
+  useEffect(() => {
+    if (!activeGame) return;
+    if (attemptedRawgTriageGameIdsRef.current.has(activeGame.id)) return;
+    if (hasPositiveNumber(activeGame.metacriticScore) && hasPositiveNumber(activeGame.rawgPlaytimeHours)) return;
+    attemptedRawgTriageGameIdsRef.current.add(activeGame.id);
+    onEnsureRawgMetadata?.(activeGame);
+  }, [activeGame?.id, onEnsureRawgMetadata]);
   const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = sessionGameIds.filter((gameId) => processedGameIds.has(gameId)).length;
@@ -704,6 +715,8 @@ function FocusedReviewCard({
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
   const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
+  const metacriticScore = formatReviewMetacriticScore(game.metacriticScore);
+  const rawgPlaytime = formatReviewRawgPlaytime(game.rawgPlaytimeHours);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -960,6 +973,12 @@ function FocusedReviewCard({
                   </div>
                 </div>
               )}
+              {metacriticScore || rawgPlaytime ? (
+                <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-1.5">
+                  {metacriticScore ? <span className="rounded-full border border-mint/35 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-mint shadow-glow backdrop-blur-md">Metacritic {metacriticScore}</span> : null}
+                  {rawgPlaytime ? <span className="rounded-full border border-skyglass/30 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-white shadow-panel backdrop-blur-md">~{rawgPlaytime}</span> : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -1630,6 +1649,18 @@ function matchesReviewSource(game: Game, source: ReviewSource) {
   }
 
   return game.collectionType === 'library' && game.playtimeHours === 0 && !game.lastPlayedAt;
+}
+
+function formatReviewMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+}
+
+function formatReviewRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
+}
+
+function hasPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function compareReviewGames(firstGame: Game, secondGame: Game) {

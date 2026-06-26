@@ -63,6 +63,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     lastSteamActivityAt: typeof game.lastSteamActivityAt === 'string' ? game.lastSteamActivityAt : undefined,
     lastSteamActivityDeltaMinutes: getOptionalNonNegativeNumber(game.lastSteamActivityDeltaMinutes),
     metadataSearchTitle: typeof game.metadataSearchTitle === 'string' ? game.metadataSearchTitle : undefined,
+    metacriticScore: getOptionalPositiveNumber(game.metacriticScore ?? game.metacritic),
     notes: typeof game.notes === 'string' ? game.notes : '',
     originalImportedTitle: typeof game.originalImportedTitle === 'string' ? game.originalImportedTitle : undefined,
     platform: normalizeLoadedPlatform(game.platform),
@@ -70,6 +71,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     rawgId: getOptionalNonNegativeNumber(game.rawgId),
     rawgSlug: typeof game.rawgSlug === 'string' ? game.rawgSlug : undefined,
     rawgTitle: typeof game.rawgTitle === 'string' ? game.rawgTitle : undefined,
+    rawgPlaytimeHours: getOptionalPositiveNumber(game.rawgPlaytimeHours ?? game.averagePlaytime),
     steamPlaytimeMinutes: getOptionalNonNegativeNumber(game.steamPlaytimeMinutes),
     priority: normalizeWishlistPriority(game.priority),
     romFiles: normalizeRomFiles(game.romFiles),
@@ -147,6 +149,10 @@ function getNonNegativeNumber(value: unknown) {
 }
 function getOptionalNonNegativeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function getOptionalPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 function normalizeRomFiles(value: unknown): Game['romFiles'] {
