@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { createTranslator } from '../i18n';
 import type { NavItem } from '../config/navigation';
 import { hasRealArtwork, getStoredArtworkSource } from '../lib/gameCoverImages';
@@ -44,6 +44,52 @@ export function useMetadataArtworkActions({
   setSelectedGameId,
   t,
 }: UseMetadataArtworkActionsOptions) {
+  const automaticRawgRefreshIdsRef = useRef<Set<string>>(new Set());
+
+  const ensureRawgMetadataForGame = useCallback(async (game: Game) => {
+    if (hasPositiveNumber(game.metacriticScore) && hasPositiveNumber(game.rawgPlaytimeHours)) {
+      return;
+    }
+
+    if (refreshingMetadataGameIds.has(game.id) || automaticRawgRefreshIdsRef.current.has(game.id)) {
+      return;
+    }
+
+    automaticRawgRefreshIdsRef.current.add(game.id);
+    setRefreshingMetadataGameIds((currentGameIds) => new Set(currentGameIds).add(game.id));
+
+    try {
+      const result = await refreshRawgMetadataForGame(game);
+      if (result.status !== 'updated') {
+        return;
+      }
+
+      setGames((currentGames) => currentGames.map((currentGame) => {
+        if (currentGame.id !== game.id) {
+          return currentGame;
+        }
+
+        return touchGameRecord({
+          ...mergeRawgMetadataIntoGame(currentGame, result.metadata, { preserveArtwork: true }),
+          metadataSkippedAt: undefined,
+          metadataManualManagedAt: undefined,
+        });
+      }));
+    } catch (error) {
+      console.debug('[Quest Queue RAWG metadata] skipped automatic metadata fetch', {
+        gameId: game.id,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      automaticRawgRefreshIdsRef.current.delete(game.id);
+      setRefreshingMetadataGameIds((currentGameIds) => {
+        const nextGameIds = new Set(currentGameIds);
+        nextGameIds.delete(game.id);
+        return nextGameIds;
+      });
+    }
+  }, [refreshingMetadataGameIds, setGames, setRefreshingMetadataGameIds]);
+
   function startMetadataWorkflow(gameIds: string[]) {
     setMetadataSelectionRequest({
       ids: gameIds,
@@ -225,12 +271,17 @@ export function useMetadataArtworkActions({
   }
 
   return {
+    ensureRawgMetadataForGame,
     refreshGameMetadataFromActions,
     startMetadataWorkflow,
     updateGameArtwork,
     updateGameMetadata,
     updateGameMetadataManagement,
   };
+}
+
+function hasPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function touchGameRecord(game: Game): Game {
