@@ -975,7 +975,7 @@ function FocusedReviewCard({
               )}
               {metacriticScore || rawgPlaytime ? (
                 <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-1.5">
-                  {metacriticScore ? <span className="rounded-full border border-mint/35 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-mint shadow-glow backdrop-blur-md">MC {metacriticScore}</span> : null}
+                  {metacriticScore ? <span className="rounded-full border border-mint/35 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-mint shadow-glow backdrop-blur-md">Metacritic {metacriticScore}</span> : null}
                   {rawgPlaytime ? <span className="rounded-full border border-skyglass/30 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-white shadow-panel backdrop-blur-md">~{rawgPlaytime}</span> : null}
                 </div>
               ) : null}
