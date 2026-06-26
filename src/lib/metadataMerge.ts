@@ -32,6 +32,32 @@ function hasExistingArtworkValue(game: Game, key: string) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function getPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function preservePositiveExternalNumber(
+  metadataRecord: Record<string, unknown>,
+  existingRecord: Record<string, unknown>,
+  mergedRecord: Record<string, unknown>,
+  targetField: 'metacriticScore' | 'rawgPlaytimeHours',
+  legacyField: 'metacritic' | 'averagePlaytime',
+) {
+  const nextValue = getPositiveNumber(metadataRecord[targetField] ?? metadataRecord[legacyField]);
+
+  if (nextValue) {
+    mergedRecord[targetField] = nextValue;
+    return;
+  }
+
+  const existingValue = getPositiveNumber(existingRecord[targetField]);
+  if (existingValue) {
+    mergedRecord[targetField] = existingValue;
+  } else {
+    delete mergedRecord[targetField];
+  }
+}
+
 function hasAcceptedArtworkUrl(metadata: RawgMetadata, mergedGame: Game) {
   const metadataRecord = metadata as Record<string, unknown>;
 
@@ -70,6 +96,8 @@ export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata, op
   };
   const mergedRecord = mergedGame as Record<string, unknown>;
   const existingRecord = game as Record<string, unknown>;
+  preservePositiveExternalNumber(metadataRecord, existingRecord, mergedRecord, 'metacriticScore', 'metacritic');
+  preservePositiveExternalNumber(metadataRecord, existingRecord, mergedRecord, 'rawgPlaytimeHours', 'averagePlaytime');
   const protectsCoverImage = hasProtectedArtwork(game);
 
   if (options.preserveArtwork) {

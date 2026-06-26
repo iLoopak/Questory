@@ -95,7 +95,13 @@ export async function getGameScreenshots(rawgId: number): Promise<string[]> {
   return data.results.map((s) => s.image);
 }
 
+function getPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {
+  const metacriticScore = getPositiveNumber(details.metacritic);
+  const rawgPlaytimeHours = getPositiveNumber(details.playtime);
   return {
     rawgId: details.id,
     rawgSlug: details.slug,
@@ -107,6 +113,8 @@ export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata
     released: details.released,
     metacritic: details.metacritic,
     averagePlaytime: details.playtime ?? null,
+    ...(metacriticScore ? { metacriticScore } : {}),
+    ...(rawgPlaytimeHours ? { rawgPlaytimeHours } : {}),
     backgroundImage: details.background_image,
     metadataSource: 'rawg',
     metadataUpdatedAt: new Date().toISOString(),

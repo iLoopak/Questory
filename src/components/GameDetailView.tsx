@@ -125,6 +125,8 @@ export function GameDetailView({
     ? formatDealPrice(game.itadHistoricalLowPrice, game.itadHistoricalLowCurrency)
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
+  const metacriticScore = formatMetacriticScore(game.metacriticScore ?? game.metacritic);
+  const rawgPlaytime = formatRawgPlaytime(game.rawgPlaytimeHours ?? game.averagePlaytime);
   const canEditGame = isGameEditable(game);
   const recentSteamActivity = useMemo(() => getRecentSteamActivityForGame(activity, game.id), [activity, game.id]);
   const lastSteamActivityAt = recentSteamActivity?.detectedAt ?? game.lastSteamActivityAt;
@@ -317,7 +319,9 @@ export function GameDetailView({
                         onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
                       />
                     ) : null}
-{hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+                    {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+                    {rawgPlaytime ? <HeroStat label="RAWG Avg" value={rawgPlaytime} /> : null}
+                    {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
                   </div>
                 </div>
               </div>
@@ -696,6 +700,14 @@ function EditText({ inputMode, label, onChange, value }: { inputMode?: 'decimal'
 
 function EditSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: readonly string[]; value: string }) {
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+}
+
+function formatMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+}
+
+function formatRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
 }
 
 function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {

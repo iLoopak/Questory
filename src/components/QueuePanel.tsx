@@ -1435,6 +1435,8 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [activeCoverSource, setActiveCoverSource] = useState<string | null>(null);
   const isPlayingSize = size === 'playing';
+  const metacriticScore = formatQueueMetacriticScore(game.metacriticScore ?? game.metacritic);
+  const rawgPlaytime = formatQueueRawgPlaytime(game.rawgPlaytimeHours ?? game.averagePlaytime);
 
   useEffect(() => {
     setIsCoverLoaded(false);
@@ -1460,6 +1462,12 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
         usage="portrait"
         width={isPlayingSize ? 60 : 33}
       />
+      {metacriticScore || rawgPlaytime ? (
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex flex-wrap items-end gap-0.5 bg-gradient-to-t from-ink-950/90 via-ink-950/55 to-transparent p-0.5">
+          {metacriticScore ? <span className="rounded bg-ink-950/85 px-1 py-0.5 text-[0.55rem] font-black leading-none text-mint ring-1 ring-mint/30">MC {metacriticScore}</span> : null}
+          {rawgPlaytime ? <span className="rounded bg-ink-950/85 px-1 py-0.5 text-[0.55rem] font-black leading-none text-slate-100 ring-1 ring-white/15">~{rawgPlaytime}</span> : null}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -1469,6 +1477,14 @@ const platformPlanGhostMessages = [
   'Queue Ghost recommends adding an adventure.',
   'The future awaits.',
 ] as const;
+
+function formatQueueMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+}
+
+function formatQueueRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
+}
 
 function pickQueueGhostMessage(messages: readonly string[]) {
   return messages[Math.floor(Math.random() * messages.length)];

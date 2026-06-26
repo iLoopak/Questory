@@ -54,6 +54,8 @@ export type RawgMetadata = Pick<
   | 'released'
   | 'metacritic'
   | 'averagePlaytime'
+  | 'metacriticScore'
+  | 'rawgPlaytimeHours'
   | 'backgroundImage'
   | 'metadataSource'
   | 'metadataUpdatedAt'
