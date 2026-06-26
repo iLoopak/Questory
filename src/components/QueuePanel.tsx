@@ -1435,8 +1435,8 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [activeCoverSource, setActiveCoverSource] = useState<string | null>(null);
   const isPlayingSize = size === 'playing';
-  const metacriticScore = formatQueueMetacriticScore(game.metacriticScore ?? game.metacritic);
-  const rawgPlaytime = formatQueueRawgPlaytime(game.rawgPlaytimeHours ?? game.averagePlaytime);
+  const metacriticScore = formatQueueMetacriticScore(game.metacriticScore);
+  const rawgPlaytime = formatQueueRawgPlaytime(game.rawgPlaytimeHours);
 
   useEffect(() => {
     setIsCoverLoaded(false);
@@ -1463,9 +1463,9 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
         width={isPlayingSize ? 60 : 33}
       />
       {metacriticScore || rawgPlaytime ? (
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex flex-wrap items-end gap-0.5 bg-gradient-to-t from-ink-950/90 via-ink-950/55 to-transparent p-0.5">
-          {metacriticScore ? <span className="rounded bg-ink-950/85 px-1 py-0.5 text-[0.55rem] font-black leading-none text-mint ring-1 ring-mint/30">MC {metacriticScore}</span> : null}
-          {rawgPlaytime ? <span className="rounded bg-ink-950/85 px-1 py-0.5 text-[0.55rem] font-black leading-none text-slate-100 ring-1 ring-white/15">~{rawgPlaytime}</span> : null}
+        <span className="pointer-events-none absolute bottom-0 left-0 z-[2] flex max-w-full flex-wrap items-end gap-0.5 bg-gradient-to-tr from-ink-950/85 via-ink-950/45 to-transparent p-0.5 pr-2 pt-2">
+          {metacriticScore ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">MC {metacriticScore}</span> : null}
+          {rawgPlaytime ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">~{rawgPlaytime}</span> : null}
         </span>
       ) : null}
     </span>
@@ -1479,7 +1479,7 @@ const platformPlanGhostMessages = [
 ] as const;
 
 function formatQueueMetacriticScore(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}%` : null;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
 }
 
 function formatQueueRawgPlaytime(value: unknown) {
