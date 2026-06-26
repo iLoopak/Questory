@@ -308,7 +308,7 @@ export function GameDetailView({
                     <h2 className="mt-1 min-w-0 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:max-w-4xl">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(6.75rem,1fr))] gap-1.5 xl:max-w-4xl">
                     <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
                     <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
                     {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
@@ -711,10 +711,10 @@ function formatRawgPlaytime(value: unknown) {
 }
 
 function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {
-  const className = `rounded-xl border px-3 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
+  const className = `rounded-xl border px-2.5 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
   const content = (
     <>
-      <div className="qs-label-caps text-muted">{label}</div>
+      <div className="qs-label-caps truncate text-muted">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
     </>
   );
