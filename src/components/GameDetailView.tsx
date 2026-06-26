@@ -116,8 +116,6 @@ export function GameDetailView({
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
   const logoUrl = getPreferredLogoUrl(game);
-  const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
-  const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
     ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
     : undefined;
@@ -352,10 +350,8 @@ export function GameDetailView({
                 <GameDetailOverflowMenu
                   anchorRef={overflowButtonRef}
                   canEditGame={canEditGame}
-                  canFindArtwork={canFindArtwork}
                   currentItadPrice={currentItadPrice}
                   game={game}
-                  isArtworkMissing={isArtworkMissing}
                   isFindingArtwork={isFindingArtwork}
                   isSteamDataSyncing={isSteamDataSyncing}
                   isSteamLibraryGame={isSteamLibraryGame}
@@ -554,10 +550,10 @@ export function GameDetailView({
                       <button
                         className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={isFindingArtwork}
-                        onClick={() => void onFindArtwork(game)}
+                        onClick={() => void onFindArtwork(game, 'metadata')}
                         type="button"
                       >
-                        {isFindingArtwork ? t('artwork.searching') : t('artwork.enrichMetadata')}
+                        {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
                       </button>
                     ) : null}
                   </div>
@@ -659,7 +655,7 @@ function pickArtworkChanges(changes: Partial<Game>): Partial<Game> {
   return artworkChanges;
 }
 
-function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game) => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
+function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
   return (
     <DetailSection kicker="Edit mode" title="Edit game details" description="Update user-managed display data. Source IDs, Steam fields, and ROM paths stay read-only.">
       {error ? <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div> : null}
@@ -688,7 +684,7 @@ function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindAr
       <div className="flex flex-wrap gap-2">
         <button className="min-h-10 rounded-xl border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-bold text-mint" onClick={onSave} type="button">Save</button>
         <button className="min-h-10 rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200" onClick={onCancel} type="button">Cancel</button>
-        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game)} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh metadata'}</button> : null}
+        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh Metadata'}</button> : null}
       </div>
     </DetailSection>
   );
@@ -758,10 +754,8 @@ function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
 type GameDetailOverflowMenuProps = {
   anchorRef: RefObject<HTMLButtonElement | null>;
   canEditGame: boolean;
-  canFindArtwork: boolean;
   currentItadPrice?: string;
   game: Game;
-  isArtworkMissing: boolean;
   isFindingArtwork: boolean;
   isSteamDataSyncing: boolean;
   isSteamLibraryGame: boolean;
@@ -779,10 +773,8 @@ type GameDetailOverflowMenuProps = {
 function GameDetailOverflowMenu({
   anchorRef,
   canEditGame,
-  canFindArtwork,
   currentItadPrice,
   game,
-  isArtworkMissing,
   isFindingArtwork,
   isSteamDataSyncing,
   isSteamLibraryGame,
@@ -860,16 +852,18 @@ function GameDetailOverflowMenu({
     });
   }
 
-  if (canFindArtwork) {
+  if (onFindArtwork) {
+    toolItems.push({
+      icon: 'refresh-cw',
+      label: isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata'),
+      disabled: isFindingArtwork,
+      onClick: () => closeAndRun(() => { void onFindArtwork(game, 'metadata'); }),
+    });
     toolItems.push({
       icon: 'image',
-      label: isFindingArtwork
-        ? t('artwork.searching')
-        : isArtworkMissing
-          ? t('artwork.findArtwork')
-          : t('artwork.enrichMetadata'),
-      disabled: !onFindArtwork || isFindingArtwork,
-      onClick: () => closeAndRun(() => { void onFindArtwork?.(game); }),
+      label: isFindingArtwork ? t('artwork.searching') : t('artwork.refreshArtwork'),
+      disabled: isFindingArtwork,
+      onClick: () => closeAndRun(() => { void onFindArtwork(game, 'artwork'); }),
     });
   }
 

@@ -1,7 +1,7 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { createTranslator } from '../i18n';
 import type { NavItem } from '../config/navigation';
-import { hasRealArtwork, getStoredArtworkSource } from '../lib/gameCoverImages';
+import { hasProtectedArtwork, hasRealArtwork, getStoredArtworkSource, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { mergeRawgMetadataIntoGame } from '../lib/metadataMerge';
 import { formatGameToastMessage, getLinkRawgGameAction, type NotificationDraft } from '../lib/notifications';
 import { refreshRawgMetadataForGame } from '../lib/rawgMetadataEnrichment';
@@ -210,16 +210,34 @@ export function useMetadataArtworkActions({
         return 'no-match';
       }
 
-      const sgdbArtwork = isArtworkRefresh ? await fetchSteamGridDbArtworkForGame(targetGame) : null;
-      let appliedArtwork = false;
+      if (isArtworkRefresh) {
+        const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
+        let appliedArtwork = false;
+        setGames((currentGames) => currentGames.map((game) => {
+          if (game.id !== targetGame.id) {
+            return game;
+          }
+
+          let nextGame = mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork);
+          nextGame = applyRawgArtworkOnly(nextGame, result.metadata);
+          appliedArtwork = appliedArtwork || nextGame !== game;
+          return nextGame !== game ? touchGameRecord(nextGame) : game;
+        }));
+
+        addToastNotification({
+          category: appliedArtwork ? 'success' : 'info',
+          dedupeKey: toastKey,
+          message: formatGameToastMessage(appliedArtwork ? t('toast.artworkUpdated') : t('toast.noArtworkFound'), targetGame),
+        });
+        return appliedArtwork ? 'updated' : 'no-match';
+      }
+
       setGames((currentGames) => currentGames.map((game) => {
         if (game.id !== targetGame.id) {
           return game;
         }
 
         let nextGame = mergeRawgMetadataIntoGame(game, result.metadata, { preserveArtwork: true });
-        nextGame = mergeSteamGridDbArtworkIntoGame(nextGame, sgdbArtwork);
-        appliedArtwork = appliedArtwork || nextGame !== game;
         // Persist the winning retro search title so future lookups skip candidate iteration
         if (result.winningSearchTitle && result.winningSearchTitle !== game.metadataSearchTitle && result.winningSearchTitle !== game.title) {
           nextGame = { ...nextGame, metadataSearchTitle: result.winningSearchTitle };
@@ -228,19 +246,13 @@ export function useMetadataArtworkActions({
       }));
       markOnboardingItemComplete('metadata-enriched');
 
-      const foundArtwork = isArtworkRefresh ? appliedArtwork : Boolean(result.metadata.coverImage?.trim() || result.metadata.backgroundImage?.trim() || sgdbArtwork);
       addToastNotification({
-        category: foundArtwork || !isArtworkRefresh ? 'success' : 'info',
+        category: 'success',
         dedupeKey: toastKey,
-        message: formatGameToastMessage(
-          isArtworkRefresh
-            ? (foundArtwork ? t('toast.artworkUpdated') : t('toast.noArtworkFound'))
-            : t('toast.metadataUpdated'),
-          targetGame,
-        ),
+        message: formatGameToastMessage(t('toast.metadataUpdated'), targetGame),
       });
 
-      return foundArtwork || !isArtworkRefresh ? 'updated' : 'no-match';
+      return 'updated';
     } catch (error) {
       if (isArtworkRefresh) {
         const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
@@ -277,6 +289,20 @@ export function useMetadataArtworkActions({
     updateGameArtwork,
     updateGameMetadata,
     updateGameMetadataManagement,
+  };
+}
+
+function applyRawgArtworkOnly(game: Game, metadata: RawgMetadata): Game {
+  const coverImage = metadata.coverImage?.trim() || metadata.backgroundImage?.trim();
+  if (!coverImage || hasProtectedArtwork(game) || !isMissingOrGeneratedCover(game.coverImage)) {
+    return game;
+  }
+
+  return {
+    ...game,
+    artworkSource: 'rawg',
+    artworkUpdatedAt: metadata.artworkUpdatedAt ?? new Date().toISOString(),
+    coverImage,
   };
 }
 
