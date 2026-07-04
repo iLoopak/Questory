@@ -14,12 +14,14 @@ type HomeSteamAchievementsWidgetProps = {
   games: Game[];
   isSteamAchievementSyncing?: boolean;
   onSyncSteamAchievements?: () => void;
+  onOpenTimeline?: () => void;
 };
 
 export function HomeSteamAchievementsWidget({
   games,
   isSteamAchievementSyncing = false,
   onSyncSteamAchievements,
+  onOpenTimeline,
 }: HomeSteamAchievementsWidgetProps) {
   const { t } = useI18n();
 
@@ -46,16 +48,27 @@ export function HomeSteamAchievementsWidget({
           <Icon name="steam" size={15} className="shrink-0 text-slate-400" />
           <h3 className="qs-home-section-title text-lg font-semibold text-white">{t('home.steamAchievements')}</h3>
         </div>
-        {onSyncSteamAchievements ? (
-          <button
-            className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 qs-label-caps text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isSteamAchievementSyncing}
-            type="button"
-            onClick={onSyncSteamAchievements}
-          >
-            {isSteamAchievementSyncing ? t('home.steamAchievementsSyncing') : t('home.steamAchievementsSync')}
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {onOpenTimeline && recent.length > 0 ? (
+            <button
+              className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 qs-label-caps text-slate-400 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
+              type="button"
+              onClick={onOpenTimeline}
+            >
+              Timeline
+            </button>
+          ) : null}
+          {onSyncSteamAchievements ? (
+            <button
+              className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 qs-label-caps text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSteamAchievementSyncing}
+              type="button"
+              onClick={onSyncSteamAchievements}
+            >
+              {isSteamAchievementSyncing ? t('home.steamAchievementsSyncing') : t('home.steamAchievementsSync')}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {isSteamAchievementSyncing ? (
