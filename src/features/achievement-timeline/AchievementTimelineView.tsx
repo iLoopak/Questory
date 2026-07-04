@@ -222,12 +222,11 @@ function TimelineMonthGroup({
       {/* Timeline entries */}
       <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
         <div className="relative pl-4 border-l-2 border-slate-800/60 space-y-0">
-          {monthGroup.events.map((event, index) => (
+          {monthGroup.events.map((event) => (
             <TimelineEntry
               key={event.id}
               event={event}
               game={gameMap.get(event.gameId)}
-              isLast={index === monthGroup.events.length - 1}
             />
           ))}
         </div>
@@ -241,11 +240,9 @@ function TimelineMonthGroup({
 function TimelineEntry({
   event,
   game,
-  isLast,
 }: {
   event: TimelineEvent;
   game: Game | undefined;
-  isLast: boolean;
 }) {
   const d = new Date(event.timestamp * 1000);
   const dateLabel = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -256,7 +253,7 @@ function TimelineEntry({
   const { achievement } = event;
 
   return (
-    <div className={`relative flex gap-3 py-2 ${!isLast ? 'border-b border-skyglass/8' : ''}`}>
+    <div className="relative flex gap-3 py-2">
       {/* Timeline dot */}
       <span
         className="absolute -left-[5px] top-[18px] h-2 w-2 shrink-0 rounded-full bg-mint/80 ring-2 ring-ink-950"
