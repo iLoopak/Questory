@@ -12,10 +12,12 @@ import { ControlsSettingsPanel } from '../../components/settings/ControlsSetting
 import { NavigationVisibilitySettingsPanel } from '../../components/settings/NavigationVisibilitySettingsPanel';
 import { PersonalizationSettingsPanel } from '../../components/settings/PersonalizationSettingsPanel';
 import { QueuePlatformsSettingsPanel } from '../../components/settings/PlatformsSettingsPanel';
+import { SetupCenterPanel } from '../../components/settings/SetupCenterPanel';
 import { SettingsSection } from '../../components/settings/SettingsSection';
 import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from '../../components/settings/WishlistSettingsPanel';
 import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } from '../../config/settings';
 import { createTranslator, translateSettingsCategory, useI18n, type AppLanguage } from '../../i18n';
+import { getSetupProgress, type SetupTask } from '../../lib/setupTasks';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import { type ControllerProfileId } from '../../lib/controllerProfiles';
 import { getQuestShelfAchievements } from '../../lib/questShelfAchievements';
@@ -66,6 +68,9 @@ export type SettingsViewProps = {
   platformQueueState: PlatformQueueState;
   steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
   steamWishlistSyncState: SteamWishlistSyncState;
+  setupTasks: SetupTask[];
+  onAddGame?: () => void;
+  onSyncAchievements?: () => void;
   onAddRetroImportedToQueue: (gameIds: string[]) => void;
   onBackupExported: () => void;
   onBackupImported: () => void;
@@ -147,6 +152,9 @@ export function SettingsView({
   platformQueueState,
   steamPlaytimeRefreshState,
   steamWishlistSyncState,
+  setupTasks,
+  onAddGame,
+  onSyncAchievements,
   onAddRetroImportedToQueue,
   onBackupExported,
   onBackupImported,
@@ -259,7 +267,12 @@ export function SettingsView({
               </div>
             </header>
           ) : (
-            <SettingsOverview onSelect={selectCategory} />
+            <SettingsOverview
+              onSelect={selectCategory}
+              setupTasks={setupTasks}
+              onSyncAchievements={onSyncAchievements}
+              onAddGame={onAddGame}
+            />
           )}
 
           {activeCategory === 'Integrations' ? (
@@ -416,17 +429,35 @@ export function SettingsView({
 }
 
 
-function SettingsOverview({ onSelect }: { onSelect: (category: SettingsCategory) => void }) {
+function SettingsOverview({
+  onSelect,
+  setupTasks,
+  onSyncAchievements,
+  onAddGame,
+}: {
+  onSelect: (category: SettingsCategory) => void;
+  setupTasks: SetupTask[];
+  onSyncAchievements?: () => void;
+  onAddGame?: () => void;
+}) {
   const { t } = useI18n();
+  const progress = getSetupProgress(setupTasks);
 
   return (
     <section className="space-y-4" aria-labelledby="settings-overview-title">
+      <SetupCenterPanel
+        progress={progress}
+        tasks={setupTasks}
+        onNavigateToCategory={onSelect}
+        onSyncAchievements={onSyncAchievements}
+        onAddGame={onAddGame}
+      />
+
       <header className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-        <div className="qs-label-caps text-accent">{t('settings.overviewKicker')}</div>
-        <h2 id="settings-overview-title" className="mt-1 text-xl font-semibold text-white">
+        <h2 id="settings-overview-title" className="text-base font-semibold text-white">
           {t('settings.overviewTitle')}
         </h2>
-        <p className="mt-1 text-sm leading-5 text-slate-400">
+        <p className="mt-0.5 text-sm leading-5 text-slate-500">
           {t('settings.overviewDescription')}
         </p>
       </header>

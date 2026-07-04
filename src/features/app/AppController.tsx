@@ -83,6 +83,7 @@ import { AppGameDetailsView } from './AppGameDetailsView';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { AchievementTimelineView } from '../achievement-timeline/AchievementTimelineView';
 import { SettingsView } from '../settings/SettingsView';
+import { buildSetupTasks } from '../../lib/setupTasks';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
 import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGhost';
@@ -325,6 +326,20 @@ export function AppController() {
     [games, platformQueueState, shelfIdentity.selectedActiveBadgeId, achievementCtx],
   );
   const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
+
+  const setupTasks = useMemo(
+    () => buildSetupTasks({
+      accentColorPreference,
+      games,
+      isRawgApiKeySet,
+      platformQueueState,
+      steamSettings: steamSettingsSnapshot,
+      themePreference,
+    }),
+    [accentColorPreference, games, isRawgApiKeySet, platformQueueState, steamSettingsSnapshot, themePreference],
+  );
+  const hasIncompleteSetupTasks = setupTasks.some((t) => t.status !== 'completed');
+
   const isAppMountedRef = useRef(true);
 
   // ── Achievement counter tracking ──────────────────────────────────────────
@@ -1131,6 +1146,12 @@ export function AppController() {
       <div className="qs-handheld-shell mx-auto flex w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass shrink-0 flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="relative min-w-0 shrink-0" ref={shelfProfileRef}>
+            {hasIncompleteSetupTasks ? (
+              <span
+                className="pointer-events-none absolute right-0.5 top-0.5 z-10 h-2 w-2 rounded-full bg-mint ring-2 ring-ink-950"
+                aria-label="Setup incomplete"
+              />
+            ) : null}
             <button
               aria-expanded={isShelfProfileOpen}
               aria-haspopup="menu"
@@ -1551,6 +1572,14 @@ export function AppController() {
             <SettingsView
               activeCategory={activeSettingsCategory}
               autoBackupSignal={autoBackupSignal}
+              setupTasks={setupTasks}
+              onAddGame={() => setIsAddGameOpen(true)}
+              onSyncAchievements={() => {
+                const allSteamGameIds = games
+                  .filter((g) => g.collectionType === 'library' && typeof g.steamAppId === 'number')
+                  .map((g) => g.id);
+                void syncSteamAchievements(allSteamGameIds, { showToast: true });
+              }}
               completedOnboardingItemIds={completedOnboardingItemIds}
               skippedOnboardingItemIds={skippedOnboardingItemIds}
               games={games}
