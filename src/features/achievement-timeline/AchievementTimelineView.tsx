@@ -3,6 +3,7 @@ import { buildAchievementTimeline, countTimelineStats, groupEventsByYearMonth } 
 import { GameCoverImage } from '../../components/GameCoverImage';
 import { Icon } from '../../components/Icon';
 import type { Game } from '../../types/game';
+import type { SteamAchievementSyncState } from '../../types/steam';
 import type { TimelineEvent, TimelineMonth, TimelineYear } from '../../types/timeline';
 
 const INITIAL_COUNT = 60;
@@ -14,10 +15,9 @@ const MONTH_NAMES = [
 ];
 
 // Deterministic sticky heights — month header top must match year header height.
-const YEAR_HEADER_H = 32; // px  (h-8 in Tailwind)
-const MONTH_HEADER_TOP = YEAR_HEADER_H; // px
+const YEAR_HEADER_H = 32; // px (h-8)
+const MONTH_HEADER_TOP = YEAR_HEADER_H;
 
-// Shared inline styles reused across sticky headers so they share CSS layout
 const yearStickyStyle: React.CSSProperties = {
   background: 'rgb(var(--ink-950-rgb) / 0.96)',
   backdropFilter: 'blur(10px)',
@@ -36,9 +36,11 @@ const monthStickyStyle: React.CSSProperties = {
 type Props = {
   games: Game[];
   onClose: () => void;
+  steamAchievementSyncState?: SteamAchievementSyncState;
+  onSyncFullHistory?: () => void;
 };
 
-export function AchievementTimelineView({ games, onClose }: Props) {
+export function AchievementTimelineView({ games, onClose, steamAchievementSyncState, onSyncFullHistory }: Props) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const gameMap = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
@@ -48,6 +50,23 @@ export function AchievementTimelineView({ games, onClose }: Props) {
   const visibleEvents = useMemo(() => allEvents.slice(0, visibleCount), [allEvents, visibleCount]);
   const groups = useMemo(() => groupEventsByYearMonth(visibleEvents), [visibleEvents]);
   const hasMore = visibleCount < allEvents.length;
+
+  // How many Steam library games have never had achievements fetched and are not marked unsupported.
+  // This drives the "complete your history" prompt.
+  const unsyncedCount = useMemo(
+    () =>
+      games.filter(
+        (g) =>
+          g.collectionType === 'library' &&
+          typeof g.steamAppId === 'number' &&
+          !Array.isArray(g.steamAchievements) &&
+          g.steamAchievementsUnsupported !== true,
+      ).length,
+    [games],
+  );
+
+  const isSyncing = steamAchievementSyncState?.status === 'loading';
+  const syncProgress = isSyncing ? steamAchievementSyncState?.progress : undefined;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -98,30 +117,35 @@ export function AchievementTimelineView({ games, onClose }: Props) {
           )}
         </div>
 
-        {/* Filter slot — wired up in a future iteration */}
+        {/* Filter slot — reserved for a future iteration */}
         <div className="h-9 w-9 shrink-0" aria-hidden="true" />
       </header>
 
       {/* ── Scrollable timeline ─────────────────────────────────────────── */}
-      {/*
-        Sticky headers are full-bleed direct children of this container so that
-        position:sticky works relative to this single scrolling ancestor.
-        Inner content is centered via mx-auto max-w-2xl px-4 in each section.
-      */}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {allEvents.length === 0 ? (
-          <EmptyState />
+          <EmptyState
+            unsyncedCount={unsyncedCount}
+            isSyncing={isSyncing}
+            syncProgress={syncProgress}
+            onSyncFullHistory={onSyncFullHistory}
+          />
         ) : (
           <>
-            {/* Initial top spacing — header not sticky until user starts scrolling */}
             <div className="h-4" aria-hidden="true" />
 
-            {groups.map((yearGroup) => (
-              <TimelineYearGroup
-                key={yearGroup.year}
-                yearGroup={yearGroup}
-                gameMap={gameMap}
+            {/* Partial-history banner — shown when some library games haven't been synced */}
+            {unsyncedCount > 0 && onSyncFullHistory ? (
+              <SyncHistoryBanner
+                unsyncedCount={unsyncedCount}
+                isSyncing={isSyncing}
+                syncProgress={syncProgress}
+                onSync={onSyncFullHistory}
               />
+            ) : null}
+
+            {groups.map((yearGroup) => (
+              <TimelineYearGroup key={yearGroup.year} yearGroup={yearGroup} gameMap={gameMap} />
             ))}
 
             {hasMore && (
@@ -138,10 +162,44 @@ export function AchievementTimelineView({ games, onClose }: Props) {
               </div>
             )}
 
-            {/* Bottom breathing room */}
             <div className="h-8" aria-hidden="true" />
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Sync history banner (partial data) ────────────────────────────────────
+
+function SyncHistoryBanner({
+  unsyncedCount,
+  isSyncing,
+  syncProgress,
+  onSync,
+}: {
+  unsyncedCount: number;
+  isSyncing: boolean;
+  syncProgress: { completed: number; total: number } | undefined;
+  onSync: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-2xl px-4 pb-4">
+      <div className="flex items-center gap-3 rounded-xl border border-skyglass/15 bg-ink-900/60 px-4 py-3">
+        <Icon name="steam" size={14} className="shrink-0 text-slate-600" />
+        <p className="min-w-0 flex-1 text-xs text-slate-500">
+          <span className="font-medium text-slate-300">{unsyncedCount} game{unsyncedCount !== 1 ? 's' : ''}</span> not yet included
+        </p>
+        <button
+          type="button"
+          disabled={isSyncing}
+          onClick={onSync}
+          className="shrink-0 rounded-lg border border-skyglass/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSyncing && syncProgress
+            ? `Syncing… ${syncProgress.completed} / ${syncProgress.total}`
+            : 'Complete timeline'}
+        </button>
       </div>
     </div>
   );
@@ -158,15 +216,7 @@ function TimelineYearGroup({
 }) {
   return (
     <div>
-      {/*
-        Sticky year label — compact, muted. Acts as the outermost sticky layer.
-        Height is exactly YEAR_HEADER_H (h-8 = 32px) so the month header can
-        anchor at top: MONTH_HEADER_TOP without overlap.
-      */}
-      <div
-        className="sticky top-0 z-20 h-8 w-full flex items-center"
-        style={yearStickyStyle}
-      >
+      <div className="sticky top-0 z-20 h-8 w-full flex items-center" style={yearStickyStyle}>
         <div className="mx-auto w-full max-w-2xl px-4 flex items-center gap-3">
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600 select-none">
             {yearGroup.year}
@@ -183,7 +233,6 @@ function TimelineYearGroup({
         />
       ))}
 
-      {/* Spacing between year groups */}
       <div className="h-4" aria-hidden="true" />
     </div>
   );
@@ -200,14 +249,7 @@ function TimelineMonthGroup({
 }) {
   return (
     <div>
-      {/*
-        Sticky month header — sits immediately below the year header.
-        `top` is set via inline style (= YEAR_HEADER_H px) to match precisely.
-      */}
-      <div
-        className="sticky z-10 w-full flex items-center"
-        style={monthStickyStyle}
-      >
+      <div className="sticky z-10 w-full flex items-center" style={monthStickyStyle}>
         <div className="mx-auto w-full max-w-2xl px-4 flex items-center gap-3 py-2">
           <h3 className="text-sm font-semibold text-slate-200 shrink-0">
             {MONTH_NAMES[monthGroup.month]}
@@ -219,15 +261,10 @@ function TimelineMonthGroup({
         </div>
       </div>
 
-      {/* Timeline entries */}
       <div className="mx-auto max-w-2xl px-4 pt-2 pb-3">
         <div className="relative pl-4 border-l-2 border-slate-800/60 space-y-0">
           {monthGroup.events.map((event) => (
-            <TimelineEntry
-              key={event.id}
-              event={event}
-              game={gameMap.get(event.gameId)}
-            />
+            <TimelineEntry key={event.id} event={event} game={gameMap.get(event.gameId)} />
           ))}
         </div>
       </div>
@@ -237,30 +274,21 @@ function TimelineMonthGroup({
 
 // ── Individual event card ───────────────────────────────────────────────────
 
-function TimelineEntry({
-  event,
-  game,
-}: {
-  event: TimelineEvent;
-  game: Game | undefined;
-}) {
+function TimelineEntry({ event, game }: { event: TimelineEvent; game: Game | undefined }) {
   const d = new Date(event.timestamp * 1000);
   const dateLabel = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   const timeLabel = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  // Type guard — ready for future event types (completed game, etc.)
   if (event.type !== 'achievement') return null;
   const { achievement } = event;
 
   return (
     <div className="relative flex gap-3 py-2">
-      {/* Timeline dot */}
       <span
         className="absolute -left-[5px] top-[18px] h-2 w-2 shrink-0 rounded-full bg-mint/80 ring-2 ring-ink-950"
         aria-hidden="true"
       />
 
-      {/* Achievement icon */}
       <div className="shrink-0 mt-0.5">
         {achievement.iconUrl ? (
           <img
@@ -277,7 +305,6 @@ function TimelineEntry({
         )}
       </div>
 
-      {/* Main content */}
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-white leading-snug line-clamp-2">
@@ -294,7 +321,6 @@ function TimelineEntry({
           </p>
         ) : null}
 
-        {/* Game row */}
         <div className="flex items-center gap-1.5 pt-1">
           {game ? (
             <div className="h-5 w-4 shrink-0 overflow-hidden rounded">
@@ -310,18 +336,55 @@ function TimelineEntry({
 
 // ── Empty state ─────────────────────────────────────────────────────────────
 
-function EmptyState() {
+function EmptyState({
+  unsyncedCount,
+  isSyncing,
+  syncProgress,
+  onSyncFullHistory,
+}: {
+  unsyncedCount: number;
+  isSyncing: boolean;
+  syncProgress: { completed: number; total: number } | undefined;
+  onSyncFullHistory?: () => void;
+}) {
+  // Two variants: library has unsynced Steam games → prompt to build history.
+  // Otherwise → generic "no data" message.
+  const canSync = unsyncedCount > 0 && Boolean(onSyncFullHistory);
+
   return (
-    <div className="flex flex-col items-center justify-center gap-4 px-8 py-24 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-skyglass/20 bg-ink-900 text-slate-700">
+    <div className="flex flex-col items-center justify-center gap-5 px-8 py-24 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-skyglass/20 bg-ink-900 text-slate-600">
         <Icon name="trophy" size={28} />
       </div>
-      <div className="space-y-2">
-        <p className="text-base font-semibold text-slate-300">No achievement history yet</p>
-        <p className="text-sm text-slate-600 max-w-xs leading-relaxed">
-          Sync Steam achievements from the Home screen to see your unlocks here.
-        </p>
-      </div>
+
+      {canSync ? (
+        <>
+          <div className="space-y-2 max-w-xs">
+            <p className="text-base font-semibold text-slate-200">Build your achievement history</p>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Sync your full Steam library to populate the timeline — including games you haven't played in years.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isSyncing}
+            onClick={onSyncFullHistory}
+            className="flex items-center gap-2 rounded-xl border border-skyglass/20 bg-ink-900/80 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Icon name="steam" size={15} className="shrink-0 text-slate-500" />
+            {isSyncing && syncProgress
+              ? `Syncing… ${syncProgress.completed} / ${syncProgress.total}`
+              : `Sync full history (${unsyncedCount} game${unsyncedCount !== 1 ? 's' : ''})`}
+          </button>
+        </>
+      ) : (
+        <div className="space-y-2 max-w-xs">
+          <p className="text-base font-semibold text-slate-300">No achievement history yet</p>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Sync Steam achievements from the Home screen to see your unlocks here.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
