@@ -104,6 +104,15 @@ export async function fetchSuggestedGames(rawgId: number): Promise<RawgSearchRes
   }
 }
 
+export async function fetchGameSeries(rawgId: number): Promise<RawgSearchResult[]> {
+  try {
+    const data = await requestRawg<{ results?: RawgSearchResult[] }>(`/games/${rawgId}/game-series`, { page_size: '10' });
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
 function getPositiveNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
