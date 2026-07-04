@@ -27,5 +27,8 @@ export interface DiscoveryCandidate {
   libraryStatus: DiscoveryCandidateStatus;
   excluded: boolean;
   exclusionReason: DiscoveryExclusionReason | null;
+  /** Composite score used for ranking. Higher = shown first. */
   score: number;
+  /** Human-readable explanation set by the personal recommendations engine. */
+  reason?: string;
 }

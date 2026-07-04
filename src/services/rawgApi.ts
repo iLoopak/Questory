@@ -113,6 +113,33 @@ export async function fetchGameSeries(rawgId: number): Promise<RawgSearchResult[
   }
 }
 
+export interface RecommendedGamesParams {
+  /** Comma-separated RAWG genre slugs, e.g. "action,role-playing-games-rpg" */
+  genres: string;
+  /** Optional lower bound for metacritic filter */
+  metacriticMin?: number;
+  pageSize?: number;
+}
+
+export async function fetchRecommendedGames(
+  params: RecommendedGamesParams,
+): Promise<RawgSearchResult[]> {
+  try {
+    const queryParams: Record<string, string> = {
+      page_size: String(params.pageSize ?? 24),
+      ordering: '-rating',
+      genres: params.genres,
+    };
+    if (params.metacriticMin != null) {
+      queryParams.metacritic = `${params.metacriticMin},100`;
+    }
+    const data = await requestRawg<{ results?: RawgSearchResult[] }>('/games', queryParams);
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
 function getPositiveNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }

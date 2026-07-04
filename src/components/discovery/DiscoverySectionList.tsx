@@ -42,7 +42,13 @@ export function DiscoverySectionList({
   // Apply library-aware filtering and ranking on every userGames change so
   // adding a game from a discovery card immediately updates the list.
   const candidates = useMemo(
-    () => (rawSections ? buildDiscoveryCandidates(rawSections, userGames) : null),
+    () =>
+      rawSections
+        ? buildDiscoveryCandidates(
+            rawSections.flatMap((s) => s.games),
+            userGames,
+          )
+        : null,
     [rawSections, userGames],
   );
 
