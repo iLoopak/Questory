@@ -440,126 +440,25 @@ export function GameDetailView({
               </div>
             </DetailSection>
 
-            <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
-              <div className="px-1 text-xs font-semibold uppercase tracking-spread text-slate-500">{t('detail.importedMetadata')}</div>
-
-              {game.collectionType === 'wishlist' ? (
-                <MetadataAccordion title={t('detail.wishlistPlanning')} summary={t('detail.wishlistPlanningSummary')}>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label={t('detail.priority')} value={t(`priority.${game.priority ?? 'medium'}` as 'priority.low' | 'priority.medium' | 'priority.high')} />
-                    <ReadOnlyField label={t('detail.expectedPlaytime')} value={formatHours(game.expectedPlaytime, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.priceTarget')} value={game.priceTarget || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.releaseDate')} value={game.releaseDate || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.steamPrice')} value={game.steamPriceInfo || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.steamDiscount')} value={game.steamDiscountInfo || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.steamReviews')} value={game.steamReviewInfo || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.dealStore')} value={game.itadCurrentBestShop || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.discount')} value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.historicalLowStatus')} value={game.itadIsHistoricalLow ? t('itad.historicalLow') : t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.wishlistImported')} value={formatDateTime(game.wishlistImportedAt, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.wishlistSynced')} value={formatDateTime(game.wishlistSyncedAt, t('detail.notAvailable'))} />
-                    <ReadOnlyLink label={t('detail.storeUrl')} value={game.storeUrl} />
-                    <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
-                  </div>
-                </MetadataAccordion>
-              ) : null}
-
-              {isRetroGame(game) ? (
-                <MetadataAccordion title="Retro ROM source" summary="Original import files preserved read-only">
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label="Original imported title" value={game.originalImportedTitle ?? game.romFileName ?? game.title} />
-                    <ReadOnlyField label="ROM file name" value={game.romFileName ?? t('detail.notAvailable')} />
-                    <ReadOnlyField label="ROM path" value={game.romPath ?? t('detail.notAvailable')} />
-                    {(game.romFiles ?? []).map((file, index) => (
-                      <ReadOnlyField key={`${file.path}-${index}`} label={`ROM file ${index + 1}${file.role ? ` · ${file.role}` : ''}`} value={file.path} />
-                    ))}
-                  </div>
-                </MetadataAccordion>
-              ) : null}
-
-              <MetadataAccordion title={t('detail.steamData')} summary={t('detail.steamDataSummary')}>
-                {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.imported')} value={formatDateTime(game.importedAt, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.source')} value={game.externalSource ?? t('detail.notAvailable')} />
-                    {achievementSummary ? (
-                      <ReadOnlyField
-                        label={t('collection.achievements')}
-                        value={achievementSummary}
-                        onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
-                      />
-                    ) : null}
-                    {game.steamLastAchievementUnlockTime ? (
-                      <ReadOnlyField label={t('detail.lastAchievementUnlock')} value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString(), t('detail.notAvailable'))} />
-                    ) : null}
-                    <ReadOnlyLink label={t('detail.externalUrl')} value={game.externalUrl} />
-                  </div>
-                ) : (
-                  <EmptyState text={t('detail.noSteamMetadata')} />
-                )}
-              </MetadataAccordion>
-
-
-              {hasHltbData(game) ? (
-                <MetadataAccordion title="HowLongToBeat" summary={t('hltb.estimatedTime')}>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.matchedTitle')} value={game.hltbTitle ?? t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.matchConfidence')} value={formatConfidence(game.hltbMatchConfidence, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.lastSynced')} value={formatDateTime(game.hltbLastSyncedAt, t('detail.notAvailable'))} />
-                    {game.hltbSourceUrl ? <ReadOnlyLink label={t('detail.source')} value={game.hltbSourceUrl} /> : null}
-                  </div>
-                </MetadataAccordion>
-              ) : null}
-
-              <MetadataSourceSection game={game} isFindingArtwork={isFindingArtwork} onChangeLink={() => setIsRawgLinkOpen(true)} onFindArtwork={onFindArtwork} />
-
-              <MetadataAccordion title={t('detail.rawgMetadata')} summary={t('detail.rawgSummary')}>
-                {game.metadataSource === 'rawg' ? (
-                  <div className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <ReadOnlyField label={t('detail.released')} value={game.released ?? t('detail.unknown')} />
-                      <ReadOnlyField label="Metacritic" value={game.metacritic?.toString() ?? t('detail.notAvailable')} />
-                      <ReadOnlyField label={t('detail.averagePlaytime')} value={formatHours(game.averagePlaytime, t('detail.notAvailable'))} />
-                      <ReadOnlyField label={t('detail.updated')} value={formatDateTime(game.metadataUpdatedAt, t('detail.notAvailable'))} />
-                      <ReadOnlyField label={t('detail.developers')} value={formatList(game.developers, t('detail.notAvailable'))} />
-                      <ReadOnlyField label={t('detail.publishers')} value={formatList(game.publishers, t('detail.notAvailable'))} />
-                    </div>
-
-                    <ChipGroup label={t('detail.genres')} values={game.genres} accent="mint" />
-                    <ChipGroup label={t('detail.rawgTags')} values={game.rawgTags} />
-                    {canApplyRawgCover ? (
-                      <button
-                        className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
-                        onClick={useRawgImageAsCover}
-                        type="button"
-                      >
-                        {t('detail.useRawgCover')}
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <EmptyState text={t('detail.noRawgMetadata')} />
-                    {onFindArtwork ? (
-                      <button
-                        className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={isFindingArtwork}
-                        onClick={() => void onFindArtwork(game, 'metadata')}
-                        type="button"
-                      >
-                        {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </MetadataAccordion>
-            </section>
+            <GameInformationSection
+              game={game}
+              metacriticScore={metacriticScore}
+              rawgPlaytime={rawgPlaytime}
+              t={t}
+            />
+            <DeveloperToolsSection
+              achievementSummary={achievementSummary}
+              canApplyRawgCover={canApplyRawgCover}
+              currentItadPrice={currentItadPrice}
+              game={game}
+              historicalItadPrice={historicalItadPrice}
+              isFindingArtwork={isFindingArtwork}
+              onChangeLink={() => setIsRawgLinkOpen(true)}
+              onFindArtwork={onFindArtwork}
+              onUseRawgCover={useRawgImageAsCover}
+              onViewAchievements={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
+              t={t}
+            />
           </div>
         </div>
       </div>
@@ -567,59 +466,233 @@ export function GameDetailView({
   );
 }
 
-function MetadataSourceSection({
+function GameInformationSection({
   game,
+  metacriticScore,
+  rawgPlaytime,
+  t,
+}: {
+  game: Game;
+  metacriticScore: string | null;
+  rawgPlaytime: string | null;
+  t: TFunction;
+}) {
+  const hasInfo =
+    game.released ||
+    (game.developers?.length ?? 0) > 0 ||
+    (game.publishers?.length ?? 0) > 0 ||
+    metacriticScore ||
+    rawgPlaytime ||
+    (game.genres?.length ?? 0) > 0 ||
+    (game.rawgTags?.length ?? 0) > 0;
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-ink-900/40 p-4 space-y-4" aria-label="Game Information">
+      <h3 className="text-base font-semibold text-white">Game Information</h3>
+      {hasInfo ? (
+        <div className="space-y-5">
+          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+            <InfoCard label="Released" value={game.released ?? t('detail.notAvailable')} />
+            <InfoCard label={t('detail.developers')} value={formatList(game.developers, t('detail.notAvailable'))} />
+            <InfoCard label={t('detail.publishers')} value={formatList(game.publishers, t('detail.notAvailable'))} />
+            {metacriticScore ? <InfoCard label="Metacritic" value={metacriticScore} /> : null}
+            {rawgPlaytime ? <InfoCard label="Average playtime" value={rawgPlaytime} /> : null}
+          </div>
+          <ChipGroup label={t('detail.genres')} values={game.genres} accent="mint" />
+          <ChipGroup label={t('detail.rawgTags')} values={game.rawgTags} />
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600">{t('detail.noRawgMetadata')}</p>
+      )}
+    </section>
+  );
+}
+
+function DeveloperToolsSection({
+  achievementSummary,
+  canApplyRawgCover,
+  currentItadPrice,
+  game,
+  historicalItadPrice,
   isFindingArtwork,
   onChangeLink,
   onFindArtwork,
+  onUseRawgCover,
+  onViewAchievements,
+  t,
 }: {
+  achievementSummary: string | null;
+  canApplyRawgCover: boolean;
+  currentItadPrice?: string;
   game: Game;
+  historicalItadPrice?: string;
   isFindingArtwork: boolean;
   onChangeLink: () => void;
   onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>;
+  onUseRawgCover: () => void;
+  onViewAchievements?: () => void;
+  t: TFunction;
 }) {
   const rawgUrl = getRawgUrl(game);
   const linkedTitle = game.rawgTitle?.trim() || game.metadataSearchTitle?.trim() || game.title;
+  const hasSteamData = game.externalSource === 'steam' || typeof game.steamAppId === 'number' || Boolean(game.externalUrl);
 
   return (
-    <MetadataAccordion title="Metadata Source" summary={game.rawgId ? `RAWG #${game.rawgId}` : 'Not linked'}>
-      {typeof game.rawgId === 'number' ? (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <ReadOnlyField label="Linked RAWG title" value={linkedTitle} />
-            <ReadOnlyField label="RAWG ID" value={game.rawgId.toString()} />
-            <ReadOnlyField label="RAWG slug" value={game.rawgSlug || 'Optional'} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {onFindArtwork ? (
-              <>
-                <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">
-                  {isFindingArtwork ? 'Refreshing…' : 'Refresh Metadata'}
-                </button>
-                <button className="h-10 rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'artwork')} type="button">
-                  {isFindingArtwork ? 'Refreshing…' : 'Refresh Artwork'}
-                </button>
-              </>
-            ) : null}
-            {rawgUrl ? (
-              <a className="grid h-10 place-items-center rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" href={rawgUrl} rel="noreferrer" target="_blank">
-                Open RAWG
-              </a>
-            ) : null}
-            <button className="h-10 rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={onChangeLink} type="button">
-              Change Link
-            </button>
-          </div>
+    <details className="group rounded-2xl border border-white/10 bg-ink-950/65 text-slate-300">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
+        <Icon className="shrink-0 text-slate-600 transition group-open:rotate-90" name="chevrons-right" />
+        <div className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-400">Developer Tools</span>
+          <span className="block text-xs text-slate-600 truncate">Steam · RAWG · Artwork</span>
         </div>
-      ) : (
-        <div className="space-y-3">
-          <EmptyState text="Not linked" />
-          <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20" onClick={onChangeLink} type="button">
-            Link RAWG Game
-          </button>
-        </div>
-      )}
-    </MetadataAccordion>
+      </summary>
+
+      <div className="border-t border-white/10 p-4 space-y-6">
+        {hasSteamData ? (
+          <DevToolsSubSection title="Steam">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.source')} value={game.externalSource ?? t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.imported')} value={formatDateTime(game.importedAt, t('detail.notAvailable'))} />
+              {achievementSummary ? (
+                <ReadOnlyField
+                  label={t('collection.achievements')}
+                  value={achievementSummary}
+                  onClick={onViewAchievements}
+                />
+              ) : null}
+              {game.steamLastAchievementUnlockTime ? (
+                <ReadOnlyField
+                  label={t('detail.lastAchievementUnlock')}
+                  value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString(), t('detail.notAvailable'))}
+                />
+              ) : null}
+              <ReadOnlyLink label={t('detail.externalUrl')} value={game.externalUrl} />
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+
+        <DevToolsSubSection title="RAWG">
+          {typeof game.rawgId === 'number' ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <ReadOnlyField label="Linked title" value={linkedTitle} />
+                <ReadOnlyField label="RAWG ID" value={game.rawgId.toString()} />
+                <ReadOnlyField label="RAWG slug" value={game.rawgSlug ?? t('detail.notAvailable')} />
+                <ReadOnlyField label={t('detail.updated')} value={formatDateTime(game.metadataUpdatedAt, t('detail.notAvailable'))} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {onFindArtwork ? (
+                  <>
+                    <button className="h-9 rounded-lg border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">
+                      {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
+                    </button>
+                    <button className="h-9 rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'artwork')} type="button">
+                      {isFindingArtwork ? t('artwork.searching') : t('artwork.refreshArtwork')}
+                    </button>
+                  </>
+                ) : null}
+                {rawgUrl ? (
+                  <a className="grid h-9 place-items-center rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" href={rawgUrl} rel="noreferrer" target="_blank">
+                    Open RAWG
+                  </a>
+                ) : null}
+                <button className="h-9 rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={onChangeLink} type="button">
+                  Change Link
+                </button>
+                {canApplyRawgCover ? (
+                  <button className="h-9 rounded-lg border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20" onClick={onUseRawgCover} type="button">
+                    {t('detail.useRawgCover')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <EmptyState text={t('detail.noRawgMetadata')} />
+              <div className="flex flex-wrap gap-2">
+                <button className="h-9 rounded-lg border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20" onClick={onChangeLink} type="button">
+                  Link RAWG Game
+                </button>
+                {onFindArtwork ? (
+                  <button className="h-9 rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">
+                    {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </DevToolsSubSection>
+
+        {hasHltbData(game) ? (
+          <DevToolsSubSection title="HowLongToBeat">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.matchedTitle')} value={game.hltbTitle ?? t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.matchConfidence')} value={formatConfidence(game.hltbMatchConfidence, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.lastSynced')} value={formatDateTime(game.hltbLastSyncedAt, t('detail.notAvailable'))} />
+              {game.hltbSourceUrl ? <ReadOnlyLink label={t('detail.source')} value={game.hltbSourceUrl} /> : null}
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+
+        {game.collectionType === 'wishlist' ? (
+          <DevToolsSubSection title={t('detail.wishlistPlanning')}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label={t('detail.priority')} value={t(`priority.${game.priority ?? 'medium'}` as 'priority.low' | 'priority.medium' | 'priority.high')} />
+              <ReadOnlyField label={t('detail.expectedPlaytime')} value={formatHours(game.expectedPlaytime, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.priceTarget')} value={game.priceTarget || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.releaseDate')} value={game.releaseDate || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.steamPrice')} value={game.steamPriceInfo || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.steamDiscount')} value={game.steamDiscountInfo || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.steamReviews')} value={game.steamReviewInfo || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.dealStore')} value={game.itadCurrentBestShop || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.discount')} value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : t('detail.notAvailable')} />
+              <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.historicalLowStatus')} value={game.itadIsHistoricalLow ? t('itad.historicalLow') : t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.wishlistImported')} value={formatDateTime(game.wishlistImportedAt, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.wishlistSynced')} value={formatDateTime(game.wishlistSyncedAt, t('detail.notAvailable'))} />
+              <ReadOnlyLink label={t('detail.storeUrl')} value={game.storeUrl} />
+              <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+
+        {isRetroGame(game) ? (
+          <DevToolsSubSection title="Retro ROM">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label="Original imported title" value={game.originalImportedTitle ?? game.romFileName ?? game.title} />
+              <ReadOnlyField label="ROM file name" value={game.romFileName ?? t('detail.notAvailable')} />
+              <ReadOnlyField label="ROM path" value={game.romPath ?? t('detail.notAvailable')} />
+              {(game.romFiles ?? []).map((file, index) => (
+                <ReadOnlyField key={`${file.path}-${index}`} label={`ROM file ${index + 1}${file.role ? ` · ${file.role}` : ''}`} value={file.path} />
+              ))}
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function InfoCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs font-medium uppercase tracking-caps text-slate-600">{label}</div>
+      <div className="mt-0.5 text-sm text-slate-200 leading-snug">{value}</div>
+    </div>
+  );
+}
+
+function DevToolsSubSection({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-semibold uppercase tracking-spread text-slate-600">{title}</div>
+      {children}
+    </div>
   );
 }
 
@@ -1038,30 +1111,6 @@ function PersonalStatField({ label, value }: { label: string; value: string }) {
   );
 }
 
-type MetadataAccordionProps = {
-  children: ReactNode;
-  summary: string;
-  title: string;
-};
-
-function MetadataAccordion({ children, summary, title }: MetadataAccordionProps) {
-  return (
-    <details className="group rounded-xl border border-white/10 bg-ink-950/65 text-slate-300">
-      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
-        <Icon className="text-slate-500 transition group-open:rotate-90" name="chevrons-right" />
-        <Icon className="text-slate-500" name="lock" />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold text-slate-200">{title}</span>
-          <span className="block truncate text-xs text-slate-500">{summary}</span>
-        </span>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 qs-label-caps text-muted">
-          Read-only
-        </span>
-      </summary>
-      <div className="border-t border-white/10 p-4">{children}</div>
-    </details>
-  );
-}
 
 type ReadOnlyFieldProps = {
   label: string;
