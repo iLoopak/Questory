@@ -1743,6 +1743,13 @@ export function AppController() {
         <AchievementTimelineView
           games={games}
           onClose={() => setIsAchievementTimelineOpen(false)}
+          steamAchievementSyncState={steamAchievementSyncState}
+          onSyncFullHistory={() => {
+            const allSteamGameIds = games
+              .filter((g) => g.collectionType === 'library' && typeof g.steamAppId === 'number')
+              .map((g) => g.id);
+            void syncSteamAchievements(allSteamGameIds, { showToast: true });
+          }}
         />
       ) : null}
     </main>
