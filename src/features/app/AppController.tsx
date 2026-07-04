@@ -81,6 +81,7 @@ import { useSyncController } from '../integrations/useSyncController';
 import { useMetadataController } from '../metadata/useMetadataController';
 import { AppGameDetailsView } from './AppGameDetailsView';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
+import { AchievementTimelineView } from '../achievement-timeline/AchievementTimelineView';
 import { SettingsView } from '../settings/SettingsView';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
@@ -294,6 +295,7 @@ export function AppController() {
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
   const [pendingAchievementGhost, setPendingAchievementGhost] = useState<QueueGhostAchievement | null>(null);
+  const [isAchievementTimelineOpen, setIsAchievementTimelineOpen] = useState(false);
   const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
   const achievementCountersRef = useRef(achievementCounters);
   achievementCountersRef.current = achievementCounters;
@@ -1283,6 +1285,7 @@ export function AppController() {
               onImportNewSteamGames={() => {
                 void importNewSteamGames();
               }}
+              onOpenAchievementTimeline={() => setIsAchievementTimelineOpen(true)}
               onSyncSteamAchievements={() => {
                 void syncSteamAchievements(homeSteamSyncGameIds, {
                   emptyToastMessage: 'No Playing Now or Platform Plan Steam games are eligible for achievement sync.',
@@ -1734,6 +1737,13 @@ export function AppController() {
             onVanish={() => setPendingAchievementGhost(null)}
           />
         </div>
+      ) : null}
+
+      {isAchievementTimelineOpen ? (
+        <AchievementTimelineView
+          games={games}
+          onClose={() => setIsAchievementTimelineOpen(false)}
+        />
       ) : null}
     </main>
     </I18nProvider>

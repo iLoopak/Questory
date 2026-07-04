@@ -47,6 +47,7 @@ type HomePanelProps = {
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncItadDeals?: () => void;
   onImportNewSteamGames?: () => void;
+  onOpenAchievementTimeline?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
   isImportingNewSteamGames?: boolean;
@@ -81,6 +82,7 @@ export function HomePanel({
   onStatusChange,
   onSyncItadDeals,
   onImportNewSteamGames,
+  onOpenAchievementTimeline,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
   isImportingNewSteamGames = false,
@@ -529,6 +531,7 @@ export function HomePanel({
             <HomeSteamAchievementsWidget
               games={games}
               isSteamAchievementSyncing={isSteamAchievementSyncing}
+              onOpenTimeline={onOpenAchievementTimeline}
               onSyncSteamAchievements={onSyncSteamAchievements}
             />
           </HomeWidgetErrorBoundary>
