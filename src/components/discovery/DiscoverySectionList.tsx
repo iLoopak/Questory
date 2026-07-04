@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { DiscoveryGame, DiscoverySection } from '../../lib/discovery';
 import { fetchDiscoverySections } from '../../services/discoveryService';
@@ -14,19 +14,21 @@ type Props = {
 
 export function DiscoverySectionList({ rawgId, userGames, onSelectGame }: Props) {
   const [sections, setSections] = useState<DiscoverySection[] | null>(null);
-  const fetchedForId = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!rawgId) {
       setSections([]);
       return;
     }
-    if (fetchedForId.current === rawgId) return;
-    fetchedForId.current = rawgId;
+
+    let cancelled = false;
     setSections(null);
+
     fetchDiscoverySections(rawgId)
-      .then(setSections)
-      .catch(() => setSections([]));
+      .then((result) => { if (!cancelled) setSections(result); })
+      .catch(() => { if (!cancelled) setSections([]); });
+
+    return () => { cancelled = true; };
   }, [rawgId]);
 
   if (sections !== null && sections.length === 0) return null;

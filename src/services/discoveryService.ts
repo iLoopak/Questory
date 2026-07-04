@@ -1,4 +1,4 @@
-import { fetchSuggestedGames } from './rawgApi';
+import { fetchSuggestedGames, fetchGameSeries } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
 import type { DiscoveryGame, DiscoverySection } from '../lib/discovery';
 
@@ -21,7 +21,6 @@ function abbreviatePlatform(name: string): string {
 function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
   const platforms = (result.platforms ?? [])
     .map((p) => abbreviatePlatform(p.platform.name))
-    // deduplicate after abbreviation
     .filter((name, i, arr) => arr.indexOf(name) === i)
     .slice(0, 4);
   return {
@@ -51,12 +50,24 @@ export async function fetchDiscoverySections(
     return cached.sections;
   }
 
-  const results = await fetchSuggestedGames(rawgId);
+  // Fetch both endpoints in parallel; either may return empty.
+  const [suggested, series] = await Promise.all([
+    fetchSuggestedGames(rawgId),
+    fetchGameSeries(rawgId),
+  ]);
 
-  const games: DiscoveryGame[] = results
-    .filter((r) => r.id !== rawgId)
-    .slice(0, 6)
-    .map(mapRawgResult);
+  // Merge, deduplicate by rawgId, exclude the current game, take up to 6.
+  const seen = new Set<number>([rawgId]);
+  const merged: RawgSearchResult[] = [];
+  for (const result of [...suggested, ...series]) {
+    if (!seen.has(result.id)) {
+      seen.add(result.id);
+      merged.push(result);
+    }
+    if (merged.length === 6) break;
+  }
+
+  const games: DiscoveryGame[] = merged.map(mapRawgResult);
 
   const sections: DiscoverySection[] =
     games.length > 0
