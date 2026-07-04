@@ -1,12 +1,14 @@
 import type { ReactNode, SVGProps } from 'react';
 
 export type IconName =
+  | 'alert-triangle'
   | 'archive'
   | 'arrow-left'
   | 'badge-100'
   | 'bookmark-pen'
   | 'check'
   | 'check-circle'
+  | 'circle'
   | 'chevron-left'
   | 'chevron-right'
   | 'chevrons-right'
@@ -74,12 +76,14 @@ export function Icon({ name, size = 16, strokeWidth = 2, className = '', ...prop
 }
 
 const iconPaths: Record<IconName, ReactNode> = {
+  'alert-triangle': <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
   archive: <><path d="M4 7h16" /><path d="M5 7l1 13h12l1-13" /><path d="M8 4h8l1 3H7l1-3Z" /><path d="M9 11h6" /><path d="M9 15h4" /></>,
   'badge-100': <><path d="m12 2 2.1 3 3.6-.8.8 3.6 3 2.1-1.8 3.3 1.8 3.3-3 2.1-.8 3.6-3.6-.8-2.1 3-2.1-3-3.6.8-.8-3.6-3-2.1 1.8-3.3L2.5 9.9l3-2.1.8-3.6 3.6.8L12 2Z" /><path d="M8 10v4" /><path d="M10.5 10h1.25a1.25 1.25 0 0 1 0 2.5H10.5V14H13" /><path d="M16 10a1.5 2 0 0 0 0 4 1.5 2 0 0 0 0-4Z" /></>,
   'bookmark-pen': <><path d="M6 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18l-6-3-6 3V4Z" /><path d="m9.5 13.5 4.8-4.8a1.4 1.4 0 0 1 2 2l-4.8 4.8-2 .5.5-2.5Z" /></>,
   'arrow-left': <><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></>,
   check: <path d="m20 6-11 11-5-5" />,
   'check-circle': <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>,
+  circle: <circle cx="12" cy="12" r="10" />,
   'chevron-left': <path d="m15 18-6-6 6-6" />,
   'chevron-right': <path d="m9 18 6-6-6-6" />,
   'chevrons-right': <><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></>,
