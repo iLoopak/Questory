@@ -1,5 +1,5 @@
 import { endpoint, requireString, upstreamJson } from '../_shared/proxy.js';
-const allowed = new Set(['/games','/games/{id}','/games/{id}/screenshots']);
+const allowed = new Set(['/games','/games/{id}','/games/{id}/screenshots','/games/{id}/suggested','/games/{id}/game-series']);
 export default (req,res)=>endpoint(req,res,'rawg',async(body)=>{
  const apiKey=requireString(body,'apiKey','rawg','RAWG API key'); const route=requireString(body,'route','rawg','RAWG route');
  if(!allowed.has(route)) throw Object.assign(new Error('Unsupported RAWG proxy route.'),{status:400,code:'UNSUPPORTED_ROUTE'});

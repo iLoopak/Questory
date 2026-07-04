@@ -2,10 +2,12 @@ import type { Game, GameStatus } from '../../types/game';
 import type { PlayActivityRecord } from '../../lib/playActivityStorage';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../../types/steam';
+import type { DiscoveryGame } from '../../lib/discovery';
 import { GameDetailsView } from '../game-details/GameDetailsView';
 
 export type AppGameDetailsViewProps = {
   game: Game;
+  allGames: Game[];
   playActivity: PlayActivityRecord[];
   refreshingMetadataGameIds: Set<string>;
   steamAchievementSyncState: SteamAchievementSyncState;
@@ -21,10 +23,12 @@ export type AppGameDetailsViewProps = {
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
   onGameEdit: (gameId: string, changes: Partial<Game>) => void;
   onGameEditSaved: (game: Game) => void;
+  onSelectDiscoveryGame: (game: DiscoveryGame) => void;
 };
 
 export function AppGameDetailsView({
   game,
+  allGames,
   playActivity,
   refreshingMetadataGameIds,
   steamAchievementSyncState,
@@ -40,11 +44,13 @@ export function AppGameDetailsView({
   onTrackingChange,
   onGameEdit,
   onGameEditSaved,
+  onSelectDiscoveryGame,
 }: AppGameDetailsViewProps) {
   return (
     <GameDetailsView
       activity={playActivity}
       game={game}
+      allGames={allGames}
       onAddToQueue={onAddToQueue}
       onAddToWishlist={onAddToWishlist}
       onBack={onBack}
@@ -57,6 +63,7 @@ export function AppGameDetailsView({
       onTrackingChange={onTrackingChange}
       onGameEdit={onGameEdit}
       onGameEditSaved={onGameEditSaved}
+      onSelectDiscoveryGame={onSelectDiscoveryGame}
       platformQueueState={platformQueueState}
     />
   );
