@@ -24,6 +24,8 @@ export type AppGameDetailsViewProps = {
   onGameEdit: (gameId: string, changes: Partial<Game>) => void;
   onGameEditSaved: (game: Game) => void;
   onSelectDiscoveryGame: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToWishlist: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToLibrary: (game: DiscoveryGame) => void;
 };
 
 export function AppGameDetailsView({
@@ -45,6 +47,8 @@ export function AppGameDetailsView({
   onGameEdit,
   onGameEditSaved,
   onSelectDiscoveryGame,
+  onAddDiscoveryGameToWishlist,
+  onAddDiscoveryGameToLibrary,
 }: AppGameDetailsViewProps) {
   return (
     <GameDetailsView
@@ -64,6 +68,8 @@ export function AppGameDetailsView({
       onGameEdit={onGameEdit}
       onGameEditSaved={onGameEditSaved}
       onSelectDiscoveryGame={onSelectDiscoveryGame}
+      onAddDiscoveryGameToWishlist={onAddDiscoveryGameToWishlist}
+      onAddDiscoveryGameToLibrary={onAddDiscoveryGameToLibrary}
       platformQueueState={platformQueueState}
     />
   );

@@ -38,6 +38,8 @@ type GameDetailViewProps = {
   onGameEdit?: (gameId: string, changes: Partial<Game>) => void;
   onGameEditSaved?: (game: Game) => void;
   onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToWishlist?: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToLibrary?: (game: DiscoveryGame) => void;
   platformQueueState?: PlatformQueueState;
 };
 
@@ -67,6 +69,8 @@ export function GameDetailView({
   onGameEditSaved,
   allGames = [],
   onSelectDiscoveryGame,
+  onAddDiscoveryGameToWishlist,
+  onAddDiscoveryGameToLibrary,
 }: GameDetailViewProps) {
   const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -470,6 +474,8 @@ export function GameDetailView({
                 rawgId={game.rawgId}
                 userGames={allGames}
                 onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
+                onAddToWishlist={onAddDiscoveryGameToWishlist}
+                onAddToLibrary={onAddDiscoveryGameToLibrary}
               />
             ) : null}
           </div>
