@@ -32,7 +32,7 @@ async function requestRawg<T>(path: string, params: Record<string, string> = {})
   const apiKey = getRawgApiKey();
   if (!import.meta.env.DEV || import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL?.trim()) {
     try {
-      const route = path === '/games' ? '/games' : path.endsWith('/screenshots') ? '/games/{id}/screenshots' : '/games/{id}';
+      const route = path === '/games' ? '/games' : path.endsWith('/screenshots') ? '/games/{id}/screenshots' : path.endsWith('/suggested') ? '/games/{id}/suggested' : path.endsWith('/game-series') ? '/games/{id}/game-series' : '/games/{id}';
       const rawgId = path.match(/^\/games\/(\d+)/)?.[1];
       const payload = await postIntegration<{ response: T }>('rawg', 'request', { apiKey, route, rawgId, params });
       return payload.response;
@@ -93,6 +93,15 @@ export async function getGameScreenshots(rawgId: number): Promise<string[]> {
     page_size: '5',
   });
   return data.results.map((s) => s.image);
+}
+
+export async function fetchSuggestedGames(rawgId: number): Promise<RawgSearchResult[]> {
+  try {
+    const data = await requestRawg<{ results?: RawgSearchResult[] }>(`/games/${rawgId}/suggested`, { page_size: '10' });
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function getPositiveNumber(value: unknown) {

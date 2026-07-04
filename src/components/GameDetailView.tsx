@@ -18,10 +18,13 @@ import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { DiscoverySectionList } from './discovery/DiscoverySectionList';
+import type { DiscoveryGame } from '../lib/discovery';
 
 type GameDetailViewProps = {
   activity?: PlayActivityRecord[];
   game: Game;
+  allGames?: Game[];
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
   onBack: () => void;
@@ -34,6 +37,7 @@ type GameDetailViewProps = {
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
   onGameEdit?: (gameId: string, changes: Partial<Game>) => void;
   onGameEditSaved?: (game: Game) => void;
+  onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
   platformQueueState?: PlatformQueueState;
 };
 
@@ -61,6 +65,8 @@ export function GameDetailView({
   platformQueueState,
   onGameEdit,
   onGameEditSaved,
+  allGames = [],
+  onSelectDiscoveryGame,
 }: GameDetailViewProps) {
   const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -459,6 +465,13 @@ export function GameDetailView({
               onViewAchievements={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
               t={t}
             />
+            {game.rawgId ? (
+              <DiscoverySectionList
+                rawgId={game.rawgId}
+                userGames={allGames}
+                onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
+              />
+            ) : null}
           </div>
         </div>
       </div>

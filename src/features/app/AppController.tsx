@@ -1073,6 +1073,11 @@ export function AppController() {
     setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
 
+  function handleSelectDiscoveryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const found = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    if (found) setSelectedGameId(found.id);
+  }
+
   function openQueue(platform?: GamePlatform) {
     setTargetQueuePlatform(platform);
     setSelectedGameId(null);
@@ -1239,6 +1244,7 @@ export function AppController() {
           {activeNavItem === 'Review Mode' && selectedGame ? (
             <AppGameDetailsView
               game={selectedGame}
+              allGames={games}
               playActivity={playActivity}
               refreshingMetadataGameIds={refreshingMetadataGameIds}
               steamAchievementSyncState={steamAchievementSyncState}
@@ -1254,6 +1260,7 @@ export function AppController() {
               onTrackingChange={updateGameTracking}
               onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
               onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
+              onSelectDiscoveryGame={handleSelectDiscoveryGame}
             />
           ) : activeNavItem === 'Home' ? (
             <HomePanel
@@ -1326,6 +1333,7 @@ export function AppController() {
                 <div className="absolute inset-0 z-10">
                   <AppGameDetailsView
                     game={selectedGame}
+                    allGames={games}
                     playActivity={playActivity}
                     refreshingMetadataGameIds={refreshingMetadataGameIds}
                     steamAchievementSyncState={steamAchievementSyncState}
@@ -1341,6 +1349,7 @@ export function AppController() {
                     onTrackingChange={updateGameTracking}
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
+                    onSelectDiscoveryGame={handleSelectDiscoveryGame}
                   />
                 </div>
               )}
@@ -1411,6 +1420,7 @@ export function AppController() {
                 <div className="absolute inset-0 z-10">
                   <AppGameDetailsView
                     game={selectedGame}
+                    allGames={games}
                     playActivity={playActivity}
                     refreshingMetadataGameIds={refreshingMetadataGameIds}
                     steamAchievementSyncState={steamAchievementSyncState}
@@ -1426,6 +1436,7 @@ export function AppController() {
                     onTrackingChange={updateGameTracking}
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
+                    onSelectDiscoveryGame={handleSelectDiscoveryGame}
                   />
                 </div>
               )}
