@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { getPreferredArtworkSources } from '../lib/gameCoverImages';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
@@ -21,13 +21,28 @@ type GameCardProps = {
   onFindMetadata?: (game: Game) => void;
   onMoveToLibrary?: (game: Game) => void;
   onOpenDetails: () => void;
-  onRemove: (gameId: string) => void;
-  onRemoveAndIgnore: (game: Game) => void;
-  onStatusChange: (gameId: string, status: GameStatus) => void;
+  onRemove?: (gameId: string) => void;
+  onRemoveAndIgnore?: (game: Game) => void;
+  onStatusChange?: (gameId: string, status: GameStatus) => void;
   onToggleSelected?: () => void;
   platformQueueState?: PlatformQueueState;
   platformLabel?: string;
   suppressWantToPlayStatus?: boolean;
+  /**
+   * When provided, renders an amber primary action button before "Details" in
+   * the card footer. Designed for Discover-mode cards ("Review Later").
+   */
+  primaryAction?: { label: string; onClick: () => void };
+  /**
+   * Element rendered inside the cover area — caller must include `absolute`
+   * positioning classes. Designed for Discover-mode metacritic badges.
+   */
+  coverBadgeTopRight?: ReactNode;
+  /**
+   * Small italic context line rendered between the title and the card footer.
+   * Designed for Discover-mode reason text ("Trending", "Hidden Gem", …).
+   */
+  discoveryContext?: string;
 };
 
 function GameCardComponent({
@@ -49,6 +64,9 @@ function GameCardComponent({
   platformQueueState,
   platformLabel,
   suppressWantToPlayStatus = false,
+  primaryAction,
+  coverBadgeTopRight,
+  discoveryContext,
 }: GameCardProps) {
   const { t } = useI18n();
   const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
@@ -210,6 +228,7 @@ function GameCardComponent({
         </div>
         <DealCoverBadges game={game} variant="grid" />
         {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} /> : null}
+        {coverBadgeTopRight}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-3 sm:gap-3 sm:p-3.5">
@@ -225,12 +244,27 @@ function GameCardComponent({
               {'★'.repeat(game.rating)}{'☆'.repeat(5 - game.rating)}
             </div>
           ) : null}
+          {discoveryContext ? (
+            <p className="mt-1 line-clamp-2 text-xs italic leading-snug text-slate-500">{discoveryContext}</p>
+          ) : null}
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-2.5 sm:pt-3">
           <div className="flex items-center gap-2">
+            {primaryAction ? (
+              <button
+                className="h-10 flex-1 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 text-sm font-medium text-amber-400 transition hover:bg-amber-400/20 hover:shadow-glow focus-visible:bg-amber-400 focus-visible:text-ink-950 focus-visible:outline-none"
+                onClick={(event) => {
+                  stopCardAction(event);
+                  primaryAction.onClick();
+                }}
+                type="button"
+              >
+                {primaryAction.label}
+              </button>
+            ) : null}
             <button
-              className="qs-game-card-details-button h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow"
+              className={`qs-game-card-details-button h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 hover:shadow-glow${primaryAction ? '' : ' flex-1'}`}
               onClick={(event) => {
                 stopCardAction(event);
                 onOpenDetails();
