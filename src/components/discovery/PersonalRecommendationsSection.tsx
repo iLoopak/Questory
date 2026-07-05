@@ -96,7 +96,10 @@ function PersonalRecommendationsLoaded({
 
   return (
     <section aria-label="Recommended For You" className="space-y-3">
-      <h3 className="text-sm font-semibold text-white">Recommended For You</h3>
+      <div>
+        <h3 className="text-sm font-semibold text-white">Recommended For You</h3>
+        <p className="mt-0.5 text-xs text-slate-500">Tap a game to save it to your Discovery Inbox</p>
+      </div>
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {candidates === null ? (
           Array.from({ length: SKELETON_COUNT }, (_, i) => <DiscoveryCompactCardSkeleton key={i} />)
