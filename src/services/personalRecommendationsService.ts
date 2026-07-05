@@ -91,7 +91,7 @@ function applyDiversityFilter(
   for (const item of scored) {
     const primaryGenre = item.result.genres?.[0]?.name ?? '';
     const count = genreCounts.get(primaryGenre) ?? 0;
-    if (count < 2) {
+    if (count < 3) {
       output.push(item);
       genreCounts.set(primaryGenre, count + 1);
     }
@@ -124,7 +124,13 @@ export async function fetchPersonalRecommendations(
   // Return cached result if fingerprint and TTL are still valid.
   if (cache && cache.fingerprint === fp && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
     // Re-apply library/inbox status from current state (may have changed without profile change).
-    return applyLibraryStatus(cache.candidates.map((c) => c.game), userGames, undefined, inboxRawgIds);
+    // Preserve original reason strings from the cached pool.
+    return applyLibraryStatus(
+      cache.candidates.map((c) => c.game),
+      userGames,
+      cache.candidates.map((c) => c.reason),
+      inboxRawgIds,
+    );
   }
 
   if (profile.topGenres.length === 0) return [];
@@ -144,7 +150,7 @@ export async function fetchPersonalRecommendations(
   const rawResults = await fetchRecommendedGames({
     genres: genreSlugs,
     metacriticMin,
-    pageSize: 24,
+    pageSize: 40,
   });
 
   if (rawResults.length === 0) {
@@ -161,8 +167,9 @@ export async function fetchPersonalRecommendations(
     })
     .sort((a, b) => b.score.total - a.score.total);
 
-  // Diversity + cap.
-  const diverse = applyDiversityFilter(scored, 12); // over-fetch to leave room after library filter
+  // Diversity filter — allow up to 3 per primary genre so the pool stays wide
+  // enough that ownership filtering (library/wishlist) leaves plenty visible.
+  const diverse = applyDiversityFilter(scored, 30);
 
   // Map to DiscoveryGame.
   const games = diverse.map(({ result }) => mapRawgResult(result));
@@ -170,11 +177,12 @@ export async function fetchPersonalRecommendations(
   // Build candidates with library+inbox status.
   const candidates = applyLibraryStatus(games, userGames, diverse.map(({ reason }) => reason), inboxRawgIds);
 
-  // Filter and cap at 6.
-  const visible = candidates.filter((c) => !c.excluded).slice(0, 6);
+  // Cache the full non-excluded pool — no hard cap. The consumer filters
+  // library/wishlist games so the pool drains gracefully as the user adds games.
+  const pool = candidates.filter((c) => !c.excluded);
 
-  cache = { candidates: visible, fingerprint: fp, fetchedAt: Date.now() };
-  return visible;
+  cache = { candidates: pool, fingerprint: fp, fetchedAt: Date.now() };
+  return pool;
 }
 
 // ---------------------------------------------------------------------------
