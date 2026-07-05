@@ -27,6 +27,8 @@ export type DiscoveryExclusionReason = 'finished' | 'dropped';
 export interface DiscoveryCandidate {
   game: DiscoveryGame;
   libraryStatus: DiscoveryCandidateStatus;
+  /** True when the game is waiting in the Discovery Inbox. */
+  inboxStatus: boolean;
   excluded: boolean;
   exclusionReason: DiscoveryExclusionReason | null;
   /** Composite score used for ranking. Higher = shown first. */

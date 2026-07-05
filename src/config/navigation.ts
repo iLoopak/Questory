@@ -1,7 +1,7 @@
 import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
-export const navItems = ['Home', 'Library', 'Review Mode', 'Queue', 'Wishlist'] as const;
+export const navItems = ['Home', 'Library', 'Review Mode', 'Discovery Inbox', 'Queue', 'Wishlist'] as const;
 export const moreNavItems = ['Recommendation', 'Stats', 'Artwork', 'Quest Runner'] as const;
 export const alwaysVisibleNavItems = ['Home', 'Library'] as const;
 
@@ -10,6 +10,7 @@ export type MoreNavItem = (typeof moreNavItems)[number];
 
 export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Parameters<TFunction>[0]> = {
   Artwork: 'nav.artwork',
+  'Discovery Inbox': 'nav.discoveryInbox',
   Home: 'nav.home',
   Library: 'nav.library',
   Queue: 'nav.queue',
@@ -23,6 +24,7 @@ export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Par
 
 export const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, Parameters<TFunction>[0]> = {
   Artwork: 'nav.artwork',
+  'Discovery Inbox': 'nav.discoveryInbox',
   Queue: 'settings.navigation.platformsQueue',
   'Review Mode': 'settings.navigation.questQueueReviewMode',
   Stats: 'nav.stats',
@@ -51,6 +53,10 @@ export function getNavDescription(activeNavItem: NavItem) {
 
   if (activeNavItem === 'Recommendation') {
     return 'Local picks based on your library.';
+  }
+
+  if (activeNavItem === 'Discovery Inbox') {
+    return 'Games saved from recommendations to triage later — add to library, wishlist, plans, or ignore.';
   }
 
   if (activeNavItem === 'Queue') {

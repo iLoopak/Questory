@@ -116,15 +116,15 @@ const CACHE_TTL_MS = 20 * 60 * 1000;
 
 export async function fetchPersonalRecommendations(
   userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
 ): Promise<DiscoveryCandidate[]> {
   const profile = buildUserProfile(userGames);
   const fp = profileFingerprint(userGames);
 
   // Return cached result if fingerprint and TTL are still valid.
   if (cache && cache.fingerprint === fp && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    // Re-apply library status from current games (wishlist/library state may have changed
-    // without triggering a fingerprint change).
-    return applyLibraryStatus(cache.candidates.map((c) => c.game), userGames);
+    // Re-apply library/inbox status from current state (may have changed without profile change).
+    return applyLibraryStatus(cache.candidates.map((c) => c.game), userGames, undefined, inboxRawgIds);
   }
 
   if (profile.topGenres.length === 0) return [];
@@ -167,8 +167,8 @@ export async function fetchPersonalRecommendations(
   // Map to DiscoveryGame.
   const games = diverse.map(({ result }) => mapRawgResult(result));
 
-  // Build candidates with library status.
-  const candidates = applyLibraryStatus(games, userGames, diverse.map(({ reason }) => reason));
+  // Build candidates with library+inbox status.
+  const candidates = applyLibraryStatus(games, userGames, diverse.map(({ reason }) => reason), inboxRawgIds);
 
   // Filter and cap at 6.
   const visible = candidates.filter((c) => !c.excluded).slice(0, 6);
@@ -185,11 +185,13 @@ function applyLibraryStatus(
   games: DiscoveryCandidate['game'][],
   userGames: Game[],
   reasons?: string[],
+  inboxRawgIds: Set<number> = new Set(),
 ): DiscoveryCandidate[] {
   return games.map((game, i) => {
     const match = userGames.find((g) => g.rawgId === game.rawgId);
     const libraryStatus =
       match == null ? null : match.collectionType === 'wishlist' ? 'wishlist' : 'library';
+    const inboxStatus = inboxRawgIds.has(game.rawgId);
 
     let excluded = false;
     let exclusionReason: DiscoveryExclusionReason | null = null;
@@ -204,6 +206,7 @@ function applyLibraryStatus(
     return {
       game,
       libraryStatus,
+      inboxStatus,
       excluded,
       exclusionReason,
       score,

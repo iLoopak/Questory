@@ -137,7 +137,7 @@ export function buildDiscoveryCandidates(
       // Non-owned games rank first; owned/wishlisted rank lower.
       const score = libraryStatus === null ? 0 : -1;
 
-      return { game, libraryStatus, excluded, exclusionReason, score };
+      return { game, libraryStatus, inboxStatus: false, excluded, exclusionReason, score };
     })
     .filter((c) => !c.excluded)
     .sort((a, b) => b.score - a.score)

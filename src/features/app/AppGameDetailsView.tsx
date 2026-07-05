@@ -13,6 +13,7 @@ export type AppGameDetailsViewProps = {
   steamAchievementSyncState: SteamAchievementSyncState;
   steamPlaytimeRefreshState: SteamPlaytimeRefreshState;
   platformQueueState: PlatformQueueState;
+  discoveryInboxRawgIds: Set<number>;
   onAddToQueue: (game: Game) => void;
   onAddToWishlist: (game: Game) => void;
   onBack: () => void;
@@ -24,8 +25,7 @@ export type AppGameDetailsViewProps = {
   onGameEdit: (gameId: string, changes: Partial<Game>) => void;
   onGameEditSaved: (game: Game) => void;
   onSelectDiscoveryGame: (game: DiscoveryGame) => void;
-  onAddDiscoveryGameToWishlist: (game: DiscoveryGame) => void;
-  onAddDiscoveryGameToLibrary: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToInbox: (game: DiscoveryGame, reason: string) => void;
 };
 
 export function AppGameDetailsView({
@@ -36,6 +36,7 @@ export function AppGameDetailsView({
   steamAchievementSyncState,
   steamPlaytimeRefreshState,
   platformQueueState,
+  discoveryInboxRawgIds,
   onAddToQueue,
   onAddToWishlist,
   onBack,
@@ -47,8 +48,7 @@ export function AppGameDetailsView({
   onGameEdit,
   onGameEditSaved,
   onSelectDiscoveryGame,
-  onAddDiscoveryGameToWishlist,
-  onAddDiscoveryGameToLibrary,
+  onAddDiscoveryGameToInbox,
 }: AppGameDetailsViewProps) {
   return (
     <GameDetailsView
@@ -68,8 +68,8 @@ export function AppGameDetailsView({
       onGameEdit={onGameEdit}
       onGameEditSaved={onGameEditSaved}
       onSelectDiscoveryGame={onSelectDiscoveryGame}
-      onAddDiscoveryGameToWishlist={onAddDiscoveryGameToWishlist}
-      onAddDiscoveryGameToLibrary={onAddDiscoveryGameToLibrary}
+      onAddDiscoveryGameToInbox={onAddDiscoveryGameToInbox}
+      discoveryInboxRawgIds={discoveryInboxRawgIds}
       platformQueueState={platformQueueState}
     />
   );

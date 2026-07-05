@@ -10,16 +10,14 @@ type Props = {
   rawgId: number | undefined;
   userGames: Game[];
   onSelectGame: (game: DiscoveryGame) => void;
-  onAddToWishlist?: (game: DiscoveryGame) => void;
-  onAddToLibrary?: (game: DiscoveryGame) => void;
+  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
 };
 
 export function DiscoverySectionList({
   rawgId,
   userGames,
   onSelectGame,
-  onAddToWishlist,
-  onAddToLibrary,
+  onAddToInbox,
 }: Props) {
   const [rawSections, setRawSections] = useState<DiscoverySection[] | null>(null);
 
@@ -39,8 +37,6 @@ export function DiscoverySectionList({
     return () => { cancelled = true; };
   }, [rawgId]);
 
-  // Apply library-aware filtering and ranking on every userGames change so
-  // adding a game from a discovery card immediately updates the list.
   const candidates = useMemo(
     () =>
       rawSections
@@ -70,8 +66,7 @@ export function DiscoverySectionList({
                   ? () => onSelectGame(candidate.game)
                   : undefined
               }
-              onAddToWishlist={onAddToWishlist}
-              onAddToLibrary={onAddToLibrary}
+              onAddToInbox={onAddToInbox}
             />
           ))
         )}

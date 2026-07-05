@@ -42,24 +42,21 @@ function ColdStart({ progress }: { progress: number }) {
 
 type LoadedProps = {
   userGames: Game[];
+  inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
-  onAddToWishlist?: (game: DiscoveryGame) => void;
-  onAddToLibrary?: (game: DiscoveryGame) => void;
+  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
 };
 
 function PersonalRecommendationsLoaded({
   userGames,
+  inboxRawgIds,
   onSelectGame,
-  onAddToWishlist,
-  onAddToLibrary,
+  onAddToInbox,
 }: LoadedProps) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
 
-  // Track the fingerprint so we only re-fetch when the profile meaningfully changes.
   const lastFingerprintRef = useRef<string | null>(null);
 
-  // A lightweight fingerprint derived from the games array — cheaper than
-  // re-deriving the full profile on every render.
   const fingerprint = useMemo(() => {
     const finished = userGames.filter((g) => g.status === 'Finished').length;
     const withGenres = userGames.filter((g) => (g.genres?.length ?? 0) > 0).length;
@@ -73,31 +70,27 @@ function PersonalRecommendationsLoaded({
     if (fingerprint !== lastFingerprintRef.current) setCandidates(null);
     lastFingerprintRef.current = fingerprint;
 
-    fetchPersonalRecommendations(userGames).then((result) => {
+    fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
       if (!cancelled) setCandidates(result);
     });
 
     return () => {
       cancelled = true;
     };
-    // userGames deliberately omitted — we key off the stable fingerprint instead
-    // so adding a single library/wishlist game without changing the profile doesn't
-    // trigger a full RAWG re-fetch. Library status is re-applied inside the service.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprint]);
 
-  // After a quick-add action, userGames changes but the fingerprint may not.
-  // Re-run fetchPersonalRecommendations (which re-applies library status from cache)
-  // to update badge display without a new RAWG request.
+  // Re-apply library/inbox status when userGames or inboxRawgIds changes without a
+  // fingerprint change (e.g., adding a game to wishlist or inbox).
   useEffect(() => {
     if (candidates === null) return;
     let cancelled = false;
-    fetchPersonalRecommendations(userGames).then((result) => {
+    fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
       if (!cancelled) setCandidates(result);
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userGames]);
+  }, [userGames, inboxRawgIds]);
 
   if (candidates !== null && candidates.length === 0) return null;
 
@@ -117,8 +110,7 @@ function PersonalRecommendationsLoaded({
                   ? () => onSelectGame(candidate.game)
                   : undefined
               }
-              onAddToWishlist={onAddToWishlist}
-              onAddToLibrary={onAddToLibrary}
+              onAddToInbox={onAddToInbox}
             />
           ))
         )}
@@ -133,16 +125,16 @@ function PersonalRecommendationsLoaded({
 
 type Props = {
   userGames: Game[];
+  inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
-  onAddToWishlist?: (game: DiscoveryGame) => void;
-  onAddToLibrary?: (game: DiscoveryGame) => void;
+  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
 };
 
 export function PersonalRecommendationsSection({
   userGames,
+  inboxRawgIds,
   onSelectGame,
-  onAddToWishlist,
-  onAddToLibrary,
+  onAddToInbox,
 }: Props) {
   const readiness = useMemo(() => getUserProfileReadiness(userGames), [userGames]);
 
@@ -153,9 +145,9 @@ export function PersonalRecommendationsSection({
   return (
     <PersonalRecommendationsLoaded
       userGames={userGames}
+      inboxRawgIds={inboxRawgIds}
       onSelectGame={onSelectGame}
-      onAddToWishlist={onAddToWishlist}
-      onAddToLibrary={onAddToLibrary}
+      onAddToInbox={onAddToInbox}
     />
   );
 }

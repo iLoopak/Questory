@@ -80,6 +80,8 @@ import { useAppPreferencesController } from '../settings/useAppPreferencesContro
 import { useSyncController } from '../integrations/useSyncController';
 import { useMetadataController } from '../metadata/useMetadataController';
 import { AppGameDetailsView } from './AppGameDetailsView';
+import { DiscoveryInboxPanel } from '../../components/DiscoveryInboxPanel';
+import { loadDiscoveryInbox, saveDiscoveryInbox, type DiscoveryInboxItem } from '../../lib/discoveryInboxStorage';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { AchievementTimelineView } from '../achievement-timeline/AchievementTimelineView';
 import { SettingsView } from '../settings/SettingsView';
@@ -298,6 +300,11 @@ export function AppController() {
   const [pendingAchievementGhost, setPendingAchievementGhost] = useState<QueueGhostAchievement | null>(null);
   const [isAchievementTimelineOpen, setIsAchievementTimelineOpen] = useState(false);
   const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
+  const [discoveryInboxItems, setDiscoveryInboxItems] = useState<DiscoveryInboxItem[]>(() => loadDiscoveryInbox());
+  const discoveryInboxRawgIds = useMemo(
+    () => new Set(discoveryInboxItems.map((i) => i.rawgId)),
+    [discoveryInboxItems],
+  );
   const achievementCountersRef = useRef(achievementCounters);
   achievementCountersRef.current = achievementCounters;
 
@@ -1078,16 +1085,61 @@ export function AppController() {
     if (found) setSelectedGameId(found.id);
   }
 
-  function handleAddDiscoveryGameToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
-    const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(discoveryGame, existingIds);
-    addToWishlist(base);
+  function handleAddToDiscoveryInbox(discoveryGame: import('../../lib/discovery').DiscoveryGame, reason: string) {
+    if (discoveryInboxItems.some((i) => i.rawgId === discoveryGame.rawgId)) {
+      addToastNotification({ category: 'info', dedupeKey: `inbox-dup:${discoveryGame.rawgId}`, message: `${discoveryGame.title} is already in your Discovery Inbox.` });
+      return;
+    }
+    if (games.some((g) => g.rawgId === discoveryGame.rawgId)) {
+      addToastNotification({ category: 'info', dedupeKey: `inbox-owned:${discoveryGame.rawgId}`, message: `${discoveryGame.title} is already in your library.` });
+      return;
+    }
+    const newItem: DiscoveryInboxItem = {
+      id: `inbox-${Date.now()}-${discoveryGame.rawgId}`,
+      rawgId: discoveryGame.rawgId,
+      game: discoveryGame,
+      source: 'similar',
+      reason,
+      createdAt: Date.now(),
+    };
+    const updated = [...discoveryInboxItems, newItem];
+    saveDiscoveryInbox(updated);
+    setDiscoveryInboxItems(updated);
+    addToastNotification({ category: 'success', dedupeKey: `inbox-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Discovery Inbox.` });
   }
 
-  function handleAddDiscoveryGameToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+  function removeFromDiscoveryInbox(id: string) {
+    setDiscoveryInboxItems((prev) => {
+      const updated = prev.filter((i) => i.id !== id);
+      saveDiscoveryInbox(updated);
+      return updated;
+    });
+  }
+
+  function handleInboxAddToLibrary(item: DiscoveryInboxItem) {
     const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(discoveryGame, existingIds);
+    const base = createGameFromDiscovery(item.game, existingIds);
     importGames([base]);
+    removeFromDiscoveryInbox(item.id);
+  }
+
+  function handleInboxAddToWishlist(item: DiscoveryInboxItem) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(item.game, existingIds);
+    addToWishlist({ ...base, collectionType: 'wishlist' });
+    removeFromDiscoveryInbox(item.id);
+  }
+
+  function handleInboxAddToPlans(item: DiscoveryInboxItem) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(item.game, existingIds);
+    importGames([base]);
+    removeFromDiscoveryInbox(item.id);
+    openBacklogPicker(base);
+  }
+
+  function handleInboxIgnore(item: DiscoveryInboxItem) {
+    removeFromDiscoveryInbox(item.id);
   }
 
   function openQueue(platform?: GamePlatform) {
@@ -1206,7 +1258,16 @@ export function AppController() {
                 title={getNavDescription(item)}
                 type="button"
               >
-                {t(navItemLabelKeys[item])}
+                {item === 'Discovery Inbox' && discoveryInboxItems.length > 0 ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    {t(navItemLabelKeys[item])}
+                    <span className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-bold leading-none text-ink-950">
+                      {discoveryInboxItems.length > 99 ? '99+' : discoveryInboxItems.length}
+                    </span>
+                  </span>
+                ) : (
+                  t(navItemLabelKeys[item])
+                )}
               </button>
             ))}
           </nav>
@@ -1273,8 +1334,8 @@ export function AppController() {
               onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
               onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
               onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToWishlist={handleAddDiscoveryGameToWishlist}
-              onAddDiscoveryGameToLibrary={handleAddDiscoveryGameToLibrary}
+              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
             />
           ) : activeNavItem === 'Home' ? (
             <HomePanel
@@ -1341,8 +1402,8 @@ export function AppController() {
                 });
               }}
               onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToWishlist={handleAddDiscoveryGameToWishlist}
-              onAddDiscoveryGameToLibrary={handleAddDiscoveryGameToLibrary}
+              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
             />
           ) : activeNavItem === 'Library' ? (
             <div className="relative h-full">
@@ -1367,8 +1428,8 @@ export function AppController() {
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
                     onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToWishlist={handleAddDiscoveryGameToWishlist}
-              onAddDiscoveryGameToLibrary={handleAddDiscoveryGameToLibrary}
+              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
                   />
                 </div>
               )}
@@ -1456,8 +1517,8 @@ export function AppController() {
                     onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
                     onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
                     onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToWishlist={handleAddDiscoveryGameToWishlist}
-              onAddDiscoveryGameToLibrary={handleAddDiscoveryGameToLibrary}
+              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
                   />
                 </div>
               )}
@@ -1541,6 +1602,14 @@ export function AppController() {
               onRestoreIgnored={restoreReviewIgnoredGames}
               onReturnToLibrary={() => setActiveNavItem('Library')}
               onSourceChange={setReviewSource}
+            />
+          ) : activeNavItem === 'Discovery Inbox' ? (
+            <DiscoveryInboxPanel
+              items={discoveryInboxItems}
+              onAddToLibrary={handleInboxAddToLibrary}
+              onAddToWishlist={handleInboxAddToWishlist}
+              onAddToPlans={handleInboxAddToPlans}
+              onIgnore={handleInboxIgnore}
             />
           ) : activeNavItem === 'Metadata' ? (
             <MetadataEnrichmentPanel
