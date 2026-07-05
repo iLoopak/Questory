@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useI18n } from '../i18n';
 import { SettingsSection } from './settings/SettingsSection';
 import { loadIsThereAnyDealSettings, saveIsThereAnyDealSettings } from '../lib/isThereAnyDealSettingsStorage';
@@ -9,9 +9,11 @@ export function IsThereAnyDealSettingsPanel() {
   const [settings, setSettings] = useState<IsThereAnyDealSettings>(() => loadIsThereAnyDealSettings());
   const isConfigured = settings.apiKey.trim().length > 0;
 
-  useEffect(() => {
-    saveIsThereAnyDealSettings(settings);
-  }, [settings]);
+  function handleApiKeyChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const newSettings: IsThereAnyDealSettings = { apiKey: event.target.value };
+    setSettings(newSettings);
+    saveIsThereAnyDealSettings(newSettings);
+  }
 
   return (
     <SettingsSection
@@ -32,7 +34,7 @@ export function IsThereAnyDealSettingsPanel() {
         <input
           className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
           value={settings.apiKey}
-          onChange={(event) => setSettings({ apiKey: event.target.value })}
+          onChange={handleApiKeyChange}
           placeholder={t('integrations.pasteApiKey')}
           spellCheck={false}
           type="password"
