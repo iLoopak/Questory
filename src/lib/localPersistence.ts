@@ -92,6 +92,25 @@ export async function hydrateLocalStorageFromPreferences(keys: string[]) {
         const storedLocalValue = window.localStorage.getItem(key);
 
         if (storedPreference.value) {
+          // Guard against stale Capacitor entries (e.g. {"apiKey":""}) overwriting a valid
+          // localStorage value. This can happen when a previous app version wrote an empty
+          // settings object to Capacitor on mount before the user had entered any key.
+          // If Capacitor has an empty apiKey but localStorage has a real one, trust localStorage
+          // and sync it back to Capacitor so future launches are consistent.
+          if (storedLocalValue && storedPreference.value !== storedLocalValue) {
+            try {
+              const capData = JSON.parse(storedPreference.value) as Record<string, unknown>;
+              const lsData = JSON.parse(storedLocalValue) as Record<string, unknown>;
+              const capKey = typeof capData.apiKey === 'string' ? capData.apiKey : '';
+              const lsKey = typeof lsData.apiKey === 'string' ? lsData.apiKey : '';
+              if (!capKey.trim() && lsKey.trim()) {
+                await preferences.Preferences.set({ key, value: storedLocalValue });
+                return;
+              }
+            } catch {
+              // Fall through: Capacitor wins by default
+            }
+          }
           window.localStorage.setItem(key, storedPreference.value);
           return;
         }
