@@ -29,6 +29,10 @@ export function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
     .filter((n, i, arr) => arr.indexOf(n) === i)
     .slice(0, 4);
   const genres = (result.genres ?? []).map((g) => g.name);
+  // Tag slugs for semantic similarity scoring. RAWG returns these in list results.
+  const tags = (result.tags ?? [])
+    .map((t) => t.slug ?? t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''))
+    .filter(Boolean);
 
   return {
     rawgId: result.id,
@@ -38,6 +42,7 @@ export function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
     platforms,
     hasSteamVersion,
     genres,
+    tags,
     released: result.released,
     slug: result.slug ?? null,
   };

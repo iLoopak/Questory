@@ -15,11 +15,15 @@ export type RawgSearchResult = {
   platforms?: Array<{
     platform: RawgListItem;
   }>;
+  /** RAWG returns tags in list results — includes slug for comparison. */
+  tags?: RawgListItem[];
 };
 
 export type RawgListItem = {
   id: number;
   name: string;
+  /** Present on tag items and genre items in list results. */
+  slug?: string;
 };
 
 export type RawgGameDetails = RawgSearchResult & {

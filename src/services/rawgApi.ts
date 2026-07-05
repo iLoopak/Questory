@@ -115,7 +115,9 @@ export async function fetchGameSeries(rawgId: number): Promise<RawgSearchResult[
 
 export interface RecommendedGamesParams {
   /** Comma-separated RAWG genre slugs, e.g. "action,role-playing-games-rpg" */
-  genres: string;
+  genres?: string;
+  /** Comma-separated RAWG tag slugs, e.g. "deckbuilding,roguelite" */
+  tags?: string;
   /** Optional lower bound for metacritic filter */
   metacriticMin?: number;
   pageSize?: number;
@@ -128,8 +130,9 @@ export async function fetchRecommendedGames(
     const queryParams: Record<string, string> = {
       page_size: String(params.pageSize ?? 24),
       ordering: '-rating',
-      genres: params.genres,
     };
+    if (params.genres) queryParams.genres = params.genres;
+    if (params.tags) queryParams.tags = params.tags;
     if (params.metacriticMin != null) {
       queryParams.metacritic = `${params.metacriticMin},100`;
     }
