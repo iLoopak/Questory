@@ -285,9 +285,9 @@ function GameCardComponent({
                 onMoveToLibrary={onMoveToLibrary}
                 onOpenChange={setIsActionMenuOpen}
                 onOpenDetails={onOpenDetails}
-                onRemove={onRemove}
-                onRemoveAndIgnore={onRemoveAndIgnore}
-                onStatusChange={onStatusChange}
+                onRemove={onRemove ?? (() => {})}
+                onRemoveAndIgnore={onRemoveAndIgnore ?? (() => {})}
+                onStatusChange={onStatusChange ?? (() => {})}
               />
             </div>
           </div>
