@@ -8,6 +8,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
+import { GameCardShell } from './GameCardShell';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { DealCoverBadges } from './DealCoverBadges';
@@ -672,32 +673,29 @@ const ShelfGameCard = memo(function ShelfGameCard({
   }
 
   return (
-    <div
-      ref={refCallback}
-      aria-label={`${isMultiSelectMode ? t('collection.select') : 'Open'} ${game.title}`}
-      aria-posinset={index + 1}
-      aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-shelf-card group relative flex w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center flex-col rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
+    <GameCardShell
+      ariaLabel={`${isMultiSelectMode ? t('collection.select') : 'Open'} ${game.title}`}
+      ariaPosinset={index + 1}
+      ariaSelected={isMultiSelectMode ? isSelected : undefined}
+      className={`qs-shelf-card snap-center ${
         isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : 'border-skyglass/18'
       }`}
       onClick={isMultiSelectMode ? toggleSelected : openDetails}
       onKeyDown={handleShelfCardKeyDown}
-      role="button"
-      tabIndex={0}
-    >
-      {isMultiSelectMode ? (
-        <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
-          {isSelected ? <Icon name="check" /> : null}
-        </span>
-      ) : null}
-
-      {highlightLabel ? (
-        <span className="absolute right-4 top-4 z-20 rounded-full border border-amber-300/40 bg-amber-300 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-glow">
-          {highlightLabel}
-        </span>
-      ) : null}
-
-      <span className="relative block aspect-[3/4] overflow-hidden rounded-lg bg-ink-700">
+      refCallback={refCallback}
+      cardOverlays={<>
+        {isMultiSelectMode ? (
+          <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
+            {isSelected ? <Icon name="check" /> : null}
+          </span>
+        ) : null}
+        {highlightLabel ? (
+          <span className="absolute right-4 top-4 z-20 rounded-full border border-amber-300/40 bg-amber-300 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-glow">
+            {highlightLabel}
+          </span>
+        ) : null}
+      </>}
+      coverContent={<>
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
@@ -719,33 +717,31 @@ const ShelfGameCard = memo(function ShelfGameCard({
         ) : (
           <MissingCover title={game.title} />
         )}
-        <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <span className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5">
-          <PlatformIdentityBadge
-            className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
-            platform={platformLabel}
-            queueState={platformQueueState}
-          />
-          {shouldShowStatusBadge ? (
-            <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
-              <span className="platform-badge__label">{translateOption(game.status, t)}</span>
-            </span>
-          ) : null}
-        </span>
-        {game.status === 'Playing' || game.status === 'Paused' ? (
-          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
+      </>}
+      coverBadgesBottom={<>
+        <PlatformIdentityBadge
+          className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+          platform={platformLabel}
+          queueState={platformQueueState}
+        />
+        {shouldShowStatusBadge ? (
+          <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
+            <span className="platform-badge__label">{translateOption(game.status, t)}</span>
+          </span>
         ) : null}
+      </>}
+      coverBadgeTopRight={
+        (game.status === 'Playing' || game.status === 'Paused') ? (
+          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
+        ) : null
+      }
+      coverOverlays={<>
         <DealCoverBadges game={game} variant="shelf" />
         {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} compact /> : null}
-      </span>
-
-      <span className="mt-2.5 block min-h-[2.75rem]">
-        <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
-
-      </span>
-
-      {!isMultiSelectMode ? (
-        <span className="mt-2.5 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+      </>}
+      title={game.title}
+      action={!isMultiSelectMode ? (
+        <>
           {onAddToQueue ? (
             <button
               className="min-h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow focus-visible:bg-mint focus-visible:text-ink-950"
@@ -772,9 +768,9 @@ const ShelfGameCard = memo(function ShelfGameCard({
             onStatusChange={onStatusChange}
             variant="shelf"
           />
-        </span>
+        </>
       ) : null}
-    </div>
+    />
   );
 }, areVirtualCardPropsEqual);
 
