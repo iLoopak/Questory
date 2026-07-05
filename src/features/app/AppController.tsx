@@ -15,6 +15,7 @@ import { ShelfProfilePopover } from '../shelf-profile/ShelfProfilePopover';
 import { PwaStatusBanner } from '../../components/PwaStatusBanner';
 import { QueuePanel } from '../../components/QueuePanel';
 import { DiscoverPanel } from '../../components/DiscoverPanel';
+import { DiscoveryPreviewPanel } from '../../components/discovery/DiscoveryPreviewPanel';
 import { ReviewModePanel } from '../../components/ReviewModePanel';
 import { StatsPanel } from '../../components/StatsPanel';
 import { QuestRunnerGame } from '../../components/QuestRunnerGame';
@@ -301,6 +302,7 @@ export function AppController() {
   const [isAchievementTimelineOpen, setIsAchievementTimelineOpen] = useState(false);
   const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
   const [discoveryInboxItems, setDiscoveryInboxItems] = useState<DiscoveryInboxItem[]>(() => loadDiscoveryInbox());
+  const [previewCandidate, setPreviewCandidate] = useState<import('../../lib/discovery').DiscoveryCandidate | null>(null);
   const discoveryInboxRawgIds = useMemo(
     () => new Set(discoveryInboxItems.map((i) => i.rawgId)),
     [discoveryInboxItems],
@@ -1108,6 +1110,26 @@ export function AppController() {
     addToastNotification({ category: 'success', dedupeKey: `inbox-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Discovery Inbox.` });
   }
 
+  function handleDiscoverOpenGame(candidate: import('../../lib/discovery').DiscoveryCandidate) {
+    setPreviewCandidate(candidate);
+  }
+
+  function handlePreviewAddToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(discoveryGame, existingIds);
+    addToWishlist({ ...base, collectionType: 'wishlist' });
+    setPreviewCandidate(null);
+    addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Wishlist.` });
+  }
+
+  function handlePreviewAddToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(discoveryGame, existingIds);
+    importGames([base]);
+    setPreviewCandidate(null);
+    addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Library.` });
+  }
+
   function removeFromDiscoveryInbox(id: string) {
     setDiscoveryInboxItems((prev) => {
       const updated = prev.filter((i) => i.id !== id);
@@ -1638,6 +1660,7 @@ export function AppController() {
               games={games}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
               onAddToInbox={handleAddToDiscoveryInbox}
+              onOpenGame={handleDiscoverOpenGame}
             />
           ) : activeNavItem === 'Stats' ? (
             <StatsPanel
@@ -1798,6 +1821,18 @@ export function AppController() {
           onAddPlatform={addQueuePlatform}
           onClose={() => setBacklogPickerGame(null)}
           onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
+        />
+      ) : null}
+
+      {previewCandidate ? (
+        <DiscoveryPreviewPanel
+          candidate={previewCandidate}
+          userGames={games}
+          discoveryInboxRawgIds={discoveryInboxRawgIds}
+          onClose={() => setPreviewCandidate(null)}
+          onAddToInbox={handleAddToDiscoveryInbox}
+          onAddToWishlist={handlePreviewAddToWishlist}
+          onAddToLibrary={handlePreviewAddToLibrary}
         />
       ) : null}
 

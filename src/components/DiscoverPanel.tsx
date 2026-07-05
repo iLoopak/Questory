@@ -13,6 +13,7 @@ type DiscoverPanelProps = {
   games: Game[];
   discoveryInboxRawgIds: Set<number>;
   onAddToInbox: (game: DiscoveryGame, reason: string) => void;
+  onOpenGame: (candidate: DiscoveryCandidate) => void;
 };
 
 // ── Type adapter ──────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ function DiscoverGridSkeleton() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox }: DiscoverPanelProps) {
+export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame }: DiscoverPanelProps) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
 
   useEffect(() => {
@@ -162,7 +163,8 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox }: Di
                 key={game.id}
                 game={game}
                 suppressWantToPlayStatus={candidate.libraryStatus === null}
-                onOpenDetails={() => {}}
+                detailsLabel="Preview"
+                onOpenDetails={() => onOpenGame(candidate)}
                 onRemove={() => {}}
                 onStatusChange={() => {}}
                 onRemoveAndIgnore={() => {}}

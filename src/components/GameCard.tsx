@@ -43,6 +43,8 @@ type GameCardProps = {
    * Designed for Discover-mode reason text ("Trending", "Hidden Gem", …).
    */
   discoveryContext?: string;
+  /** Override the label of the "Details" button. Pass "Preview" for Discover cards. */
+  detailsLabel?: string;
 };
 
 function GameCardComponent({
@@ -67,6 +69,7 @@ function GameCardComponent({
   primaryAction,
   coverBadgeTopRight,
   discoveryContext,
+  detailsLabel,
 }: GameCardProps) {
   const { t } = useI18n();
   const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
@@ -271,7 +274,7 @@ function GameCardComponent({
               }}
               type="button"
             >
-              {t('action.details')}
+              {detailsLabel ?? t('action.details')}
             </button>
             <div onClick={stopCardAction}>
               <GameActionMenu
