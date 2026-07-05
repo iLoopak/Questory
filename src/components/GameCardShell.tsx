@@ -1,8 +1,8 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 
 /**
- * Pure visual shell shared by ShelfGameCard, DiscoveryGameCard and any future
- * card variant that appears in a horizontal scroll strip.
+ * Pure visual shell for ShelfGameCard and any future card variant that
+ * appears in a horizontal scroll strip.
  *
  * Provides the card root (border, shadow, hover lift, focus ring), the 3:4
  * cover area with gradient and two badge slots, the title area, an optional

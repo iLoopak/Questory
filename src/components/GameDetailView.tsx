@@ -19,7 +19,7 @@ import { Icon, type IconName } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ContextualRecommendationsSection } from './discovery/ContextualRecommendationsSection';
-import type { DiscoveryGame } from '../lib/discovery';
+import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type GameDetailViewProps = {
   activity?: PlayActivityRecord[];
@@ -40,6 +40,7 @@ type GameDetailViewProps = {
   onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
   onAddDiscoveryGameToInbox?: (game: DiscoveryGame, reason: string) => void;
   discoveryInboxRawgIds?: Set<number>;
+  onOpenDiscoveryPreview?: (candidate: DiscoveryCandidate) => void;
   platformQueueState?: PlatformQueueState;
 };
 
@@ -71,6 +72,7 @@ export function GameDetailView({
   onSelectDiscoveryGame,
   onAddDiscoveryGameToInbox,
   discoveryInboxRawgIds = new Set(),
+  onOpenDiscoveryPreview,
 }: GameDetailViewProps) {
   const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
@@ -475,6 +477,7 @@ export function GameDetailView({
               inboxRawgIds={discoveryInboxRawgIds}
               onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
               onAddToInbox={onAddDiscoveryGameToInbox}
+              onOpenPreview={onOpenDiscoveryPreview}
             />
           </div>
         </div>

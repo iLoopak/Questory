@@ -2,7 +2,7 @@ import type { Game, GameStatus } from '../../types/game';
 import type { PlayActivityRecord } from '../../lib/playActivityStorage';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../../types/steam';
-import type { DiscoveryGame } from '../../lib/discovery';
+import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { GameDetailsView } from '../game-details/GameDetailsView';
 
 export type AppGameDetailsViewProps = {
@@ -26,6 +26,7 @@ export type AppGameDetailsViewProps = {
   onGameEditSaved: (game: Game) => void;
   onSelectDiscoveryGame: (game: DiscoveryGame) => void;
   onAddDiscoveryGameToInbox: (game: DiscoveryGame, reason: string) => void;
+  onOpenDiscoveryPreview?: (candidate: DiscoveryCandidate) => void;
 };
 
 export function AppGameDetailsView({
@@ -49,6 +50,7 @@ export function AppGameDetailsView({
   onGameEditSaved,
   onSelectDiscoveryGame,
   onAddDiscoveryGameToInbox,
+  onOpenDiscoveryPreview,
 }: AppGameDetailsViewProps) {
   return (
     <GameDetailsView
@@ -70,6 +72,7 @@ export function AppGameDetailsView({
       onSelectDiscoveryGame={onSelectDiscoveryGame}
       onAddDiscoveryGameToInbox={onAddDiscoveryGameToInbox}
       discoveryInboxRawgIds={discoveryInboxRawgIds}
+      onOpenDiscoveryPreview={onOpenDiscoveryPreview}
       platformQueueState={platformQueueState}
     />
   );

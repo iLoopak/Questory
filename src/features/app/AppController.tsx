@@ -1358,6 +1358,7 @@ export function AppController() {
               onSelectDiscoveryGame={handleSelectDiscoveryGame}
               onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
+              onOpenDiscoveryPreview={handleDiscoverOpenGame}
             />
           ) : activeNavItem === 'Home' ? (
             <HomePanel
@@ -1452,6 +1453,7 @@ export function AppController() {
                     onSelectDiscoveryGame={handleSelectDiscoveryGame}
               onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
+              onOpenDiscoveryPreview={handleDiscoverOpenGame}
                   />
                 </div>
               )}
@@ -1541,6 +1543,7 @@ export function AppController() {
                     onSelectDiscoveryGame={handleSelectDiscoveryGame}
               onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
+              onOpenDiscoveryPreview={handleDiscoverOpenGame}
                   />
                 </div>
               )}
