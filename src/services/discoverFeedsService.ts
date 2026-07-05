@@ -24,7 +24,7 @@ export async function fetchTrendingGames(
     const results = await fetchRecommendedGames({
       ordering: '-added',
       metacriticMin: 70,
-      pageSize: 16,
+      pageSize: 40,
     });
     trendingCache = { games: results.map(mapRawgResult), fetchedAt: Date.now() };
   }
@@ -47,7 +47,7 @@ export async function fetchHiddenGems(
       tags: 'indie',
       metacriticMin: 65,
       metacriticMax: 84,
-      pageSize: 16,
+      pageSize: 40,
     });
     hiddenGemsCache = { games: results.map(mapRawgResult), fetchedAt: Date.now() };
   }
@@ -74,7 +74,7 @@ export async function fetchRecentlyReleasedGames(
       ordering: '-released',
       dates: dateRange,
       metacriticMin: 60,
-      pageSize: 16,
+      pageSize: 40,
     });
     recentlyReleasedCache = { games: results.map(mapRawgResult), fetchedAt: Date.now() };
     recentlyReleasedDateRange = dateRange;
