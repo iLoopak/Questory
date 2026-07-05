@@ -7,6 +7,7 @@ import type {
   DiscoveryGame,
   DiscoverySection,
 } from '../lib/discovery';
+// DiscoverySection kept in import for fetchDiscoverySections return type.
 
 const PLATFORM_ABBREV: Record<string, string> = {
   'PlayStation 5': 'PS5',
@@ -20,7 +21,7 @@ const PLATFORM_ABBREV: Record<string, string> = {
   'macOS': 'Mac',
 };
 
-function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
+export function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
   const rawPlatformNames = (result.platforms ?? []).map((p) => p.platform.name);
   const hasSteamVersion = rawPlatformNames.some((n) => n === 'PC');
   const platforms = rawPlatformNames
@@ -101,13 +102,13 @@ export interface CandidateFilterOptions {
 }
 
 export function buildDiscoveryCandidates(
-  sections: DiscoverySection[],
+  games: DiscoveryGame[],
   userGames: Game[],
   options: CandidateFilterOptions = {},
 ): DiscoveryCandidate[] {
   const { excludeDropped = false } = options;
 
-  const allGames = sections.flatMap((s) => s.games);
+  const allGames = games;
 
   return allGames
     .map((game): DiscoveryCandidate => {

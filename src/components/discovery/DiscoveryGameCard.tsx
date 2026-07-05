@@ -183,6 +183,11 @@ export function DiscoveryGameCard({
           </div>
         ) : null}
 
+        {/* Recommendation reason */}
+        {candidate.reason ? (
+          <p className="text-[9px] italic leading-snug text-slate-600">{candidate.reason}</p>
+        ) : null}
+
         {/* Library badges */}
         {libraryStatus ? (
           <div className="mt-auto flex flex-wrap gap-1 pt-0.5">

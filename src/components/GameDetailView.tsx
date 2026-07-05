@@ -19,6 +19,7 @@ import { Icon, type IconName } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { DiscoverySectionList } from './discovery/DiscoverySectionList';
+import { PersonalRecommendationsSection } from './discovery/PersonalRecommendationsSection';
 import type { DiscoveryGame } from '../lib/discovery';
 
 type GameDetailViewProps = {
@@ -478,6 +479,12 @@ export function GameDetailView({
                 onAddToLibrary={onAddDiscoveryGameToLibrary}
               />
             ) : null}
+            <PersonalRecommendationsSection
+              userGames={allGames}
+              onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
+              onAddToWishlist={onAddDiscoveryGameToWishlist}
+              onAddToLibrary={onAddDiscoveryGameToLibrary}
+            />
           </div>
         </div>
       </div>
