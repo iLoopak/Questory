@@ -71,7 +71,7 @@ function PersonalRecommendationsLoaded({
     lastFingerprintRef.current = fingerprint;
 
     fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
-      if (!cancelled) setCandidates(result);
+      if (!cancelled) setCandidates(result.filter((c) => c.libraryStatus === null));
     });
 
     return () => {
@@ -86,7 +86,7 @@ function PersonalRecommendationsLoaded({
     if (candidates === null) return;
     let cancelled = false;
     fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
-      if (!cancelled) setCandidates(result);
+      if (!cancelled) setCandidates(result.filter((c) => c.libraryStatus === null));
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
