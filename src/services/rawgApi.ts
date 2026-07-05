@@ -120,6 +120,12 @@ export interface RecommendedGamesParams {
   tags?: string;
   /** Optional lower bound for metacritic filter */
   metacriticMin?: number;
+  /** Optional upper bound for metacritic filter */
+  metacriticMax?: number;
+  /** RAWG ordering param, e.g. "-rating", "-added", "-released". Defaults to "-rating". */
+  ordering?: string;
+  /** RAWG dates range filter, e.g. "2025-01-01,2025-12-31" */
+  dates?: string;
   pageSize?: number;
 }
 
@@ -129,13 +135,14 @@ export async function fetchRecommendedGames(
   try {
     const queryParams: Record<string, string> = {
       page_size: String(params.pageSize ?? 24),
-      ordering: '-rating',
+      ordering: params.ordering ?? '-rating',
     };
     if (params.genres) queryParams.genres = params.genres;
     if (params.tags) queryParams.tags = params.tags;
-    if (params.metacriticMin != null) {
-      queryParams.metacritic = `${params.metacriticMin},100`;
+    if (params.metacriticMin != null || params.metacriticMax != null) {
+      queryParams.metacritic = `${params.metacriticMin ?? 0},${params.metacriticMax ?? 100}`;
     }
+    if (params.dates) queryParams.dates = params.dates;
     const data = await requestRawg<{ results?: RawgSearchResult[] }>('/games', queryParams);
     return data.results ?? [];
   } catch {

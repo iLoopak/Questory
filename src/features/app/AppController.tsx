@@ -14,7 +14,7 @@ import { ShelfAvatar } from '../../components/ShelfIdentity';
 import { ShelfProfilePopover } from '../shelf-profile/ShelfProfilePopover';
 import { PwaStatusBanner } from '../../components/PwaStatusBanner';
 import { QueuePanel } from '../../components/QueuePanel';
-import { RecommendationPanel } from '../../components/RecommendationPanel';
+import { DiscoverPanel } from '../../components/DiscoverPanel';
 import { ReviewModePanel } from '../../components/ReviewModePanel';
 import { StatsPanel } from '../../components/StatsPanel';
 import { QuestRunnerGame } from '../../components/QuestRunnerGame';
@@ -1300,7 +1300,7 @@ export function AppController() {
                       type="button"
                     >
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
-                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Recommendation' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : 'image-frame'} size={15} strokeWidth={2.2} />
+                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Discover' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : 'image-frame'} size={15} strokeWidth={2.2} />
                       </span>
                       <span className="whitespace-nowrap">{t(navItemLabelKeys[item])}</span>
                     </button>
@@ -1633,26 +1633,11 @@ export function AppController() {
                 setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
               }}
             />
-          ) : activeNavItem === 'Recommendation' ? (
-            <RecommendationPanel
+          ) : activeNavItem === 'Discover' ? (
+            <DiscoverPanel
               games={games}
-              contentScrollRef={mainContentRef}
-              queueState={platformQueueState}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Recommendation');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
-              onStartReview={startReviewMode}
-              onStatusChange={updateGameStatusWithCompletion}
-              onAddToQueue={openBacklogPicker}
-              onAddToWishlist={addToWishlist}
-              onMoveToLibrary={moveToLibrary}
-              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
-              onRemove={removeGame}
-              onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
+              onAddToInbox={handleAddToDiscoveryInbox}
             />
           ) : activeNavItem === 'Stats' ? (
             <StatsPanel

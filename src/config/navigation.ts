@@ -2,7 +2,7 @@ import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
 export const navItems = ['Home', 'Library', 'Review Mode', 'Discovery Inbox', 'Queue', 'Wishlist'] as const;
-export const moreNavItems = ['Recommendation', 'Stats', 'Artwork', 'Quest Runner'] as const;
+export const moreNavItems = ['Discover', 'Stats', 'Artwork', 'Quest Runner'] as const;
 export const alwaysVisibleNavItems = ['Home', 'Library'] as const;
 
 export type TopNavItem = (typeof navItems)[number];
@@ -15,7 +15,7 @@ export const navItemLabelKeys: Record<TopNavItem | MoreNavItem | 'Settings', Par
   Library: 'nav.library',
   Queue: 'nav.queue',
   'Quest Runner': 'nav.questRunner',
-  Recommendation: 'nav.recommendations',
+  Discover: 'nav.discover',
   'Review Mode': 'nav.reviewMode',
   Settings: 'nav.settings',
   Stats: 'nav.stats',
@@ -51,8 +51,8 @@ export function getNavDescription(activeNavItem: NavItem) {
     return 'Wishlist items are separate from owned library games.';
   }
 
-  if (activeNavItem === 'Recommendation') {
-    return 'Local picks based on your library.';
+  if (activeNavItem === 'Discover') {
+    return 'Find great games you haven\'t played yet.';
   }
 
   if (activeNavItem === 'Discovery Inbox') {

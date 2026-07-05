@@ -15,6 +15,7 @@ const en = {
   'nav.queue': 'Platform Plans',
   'nav.wishlist': 'Wishlist',
   'nav.recommendations': 'Recommendations',
+  'nav.discover': 'Discover',
   'nav.reviewMode': 'Quest Queue',
   'nav.stats': 'Stats',
   'nav.settings': 'Settings',
