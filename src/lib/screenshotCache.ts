@@ -59,3 +59,21 @@ export function clearCachedScreenshots(game: Game): void {
   delete store[entryKey(game)];
   writeStore(store);
 }
+
+// ── rawgId-based helpers (for DiscoveryGame which has rawgId but not the full Game type) ──
+
+/** Returns cached screenshots by rawgId, or null if absent/expired. */
+export function getCachedScreenshotsByRawgId(rawgId: number): string[] | null {
+  const store = readStore();
+  const entry = store[`rawg:${rawgId}`];
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > TTL_MS) return null;
+  return entry.urls;
+}
+
+/** Persists screenshots by rawgId into the shared cache. */
+export function setCachedScreenshotsByRawgId(rawgId: number, urls: string[]): void {
+  const store = readStore();
+  store[`rawg:${rawgId}`] = { urls, provider: 'rawg', cachedAt: Date.now() };
+  writeStore(store);
+}
