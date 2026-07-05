@@ -18,8 +18,7 @@ import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
-import { DiscoverySectionList } from './discovery/DiscoverySectionList';
-import { PersonalRecommendationsSection } from './discovery/PersonalRecommendationsSection';
+import { ContextualRecommendationsSection } from './discovery/ContextualRecommendationsSection';
 import type { DiscoveryGame } from '../lib/discovery';
 
 type GameDetailViewProps = {
@@ -470,16 +469,8 @@ export function GameDetailView({
               onViewAchievements={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
               t={t}
             />
-            {game.rawgId ? (
-              <DiscoverySectionList
-                rawgId={game.rawgId}
-                userGames={allGames}
-                onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
-                onAddToWishlist={onAddDiscoveryGameToWishlist}
-                onAddToLibrary={onAddDiscoveryGameToLibrary}
-              />
-            ) : null}
-            <PersonalRecommendationsSection
+            <ContextualRecommendationsSection
+              game={game}
               userGames={allGames}
               onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
               onAddToWishlist={onAddDiscoveryGameToWishlist}

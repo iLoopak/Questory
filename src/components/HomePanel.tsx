@@ -22,6 +22,8 @@ import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
+import { PersonalRecommendationsSection } from './discovery/PersonalRecommendationsSection';
+import type { DiscoveryGame } from '../lib/discovery';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -51,6 +53,9 @@ type HomePanelProps = {
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
   isImportingNewSteamGames?: boolean;
+  onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToWishlist?: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToLibrary?: (game: DiscoveryGame) => void;
 };
 
 type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
@@ -86,6 +91,9 @@ export function HomePanel({
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
   isImportingNewSteamGames = false,
+  onSelectDiscoveryGame,
+  onAddDiscoveryGameToWishlist,
+  onAddDiscoveryGameToLibrary,
 }: HomePanelProps) {
   const { t } = useI18n();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
@@ -621,6 +629,15 @@ export function HomePanel({
               </p>
             )}
           </section>
+
+          {onSelectDiscoveryGame ? (
+            <PersonalRecommendationsSection
+              userGames={games}
+              onSelectGame={onSelectDiscoveryGame}
+              onAddToWishlist={onAddDiscoveryGameToWishlist}
+              onAddToLibrary={onAddDiscoveryGameToLibrary}
+            />
+          ) : null}
 
         </div>
       </div>
