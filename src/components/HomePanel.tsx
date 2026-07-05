@@ -1000,11 +1000,20 @@ function NextAdventureCard({
   const coverSource = getPreferredArtworkSources(game, 'background')[0];
 
   return (
-    <button
-      className="qs-home-next-adventure-card relative w-full overflow-hidden rounded-xl border border-skyglass/12 bg-ink-950/55 text-left transition hover:border-skyglass/30 hover:bg-ink-950/75 focus-visible:border-mint/45"
+    // Outer card is a div, not a button, because the inner "Play today" CTA is a real
+    // button. Nested <button> inside <button> is invalid HTML and triggers a React warning.
+    <div
+      className="qs-home-next-adventure-card relative w-full cursor-pointer overflow-hidden rounded-xl border border-skyglass/12 bg-ink-950/55 text-left transition hover:border-skyglass/30 hover:bg-ink-950/75 focus-visible:border-mint/45 focus-visible:outline-none"
       data-home-focus="true"
+      role="button"
+      tabIndex={0}
       onClick={onOpenPlan}
-      type="button"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpenPlan();
+        }
+      }}
     >
       {coverSource ? (
         <div className="absolute inset-0">
@@ -1040,7 +1049,7 @@ function NextAdventureCard({
           </button>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
