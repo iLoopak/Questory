@@ -28,6 +28,32 @@ window.addEventListener('beforeunload', removeAndroidGamepadShortcuts, { once: t
 void startApp();
 
 async function startApp() {
+  // In dev mode, any previously-registered service worker (e.g. from a past preview build
+  // or from when devOptions.enabled was temporarily set in VitePWA config) will serve all
+  // same-origin assets cache-first. That means old, pre-fix JS runs after every dev-server
+  // restart — the root cause of dev-only persistence bugs. Unregister all SWs before React
+  // mounts so the Vite dev server always wins.
+  if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    if (registrations.length > 0) {
+      console.debug('[Dev] Unregistering', registrations.length, 'stale service worker(s) to prevent cached-JS persistence bugs.');
+      await Promise.all(registrations.map((r) => r.unregister()));
+    }
+  }
+
+  // Boot-time persistence diagnostics (dev only). Logged before React renders so we can see
+  // exactly what is (or is not) in localStorage before any app code runs.
+  if (import.meta.env.DEV) {
+    const raw = window.localStorage.getItem('questshelf.games.v1');
+    let gamesLoadedCount = 0;
+    try { gamesLoadedCount = Array.isArray(JSON.parse(raw ?? 'null')) ? (JSON.parse(raw!) as unknown[]).length : 0; } catch { /* */ }
+    console.debug('[Persistence:boot] gamesLoadedCount:', gamesLoadedCount);
+    console.debug('[Persistence:boot] persistedRawLength:', raw?.length ?? 0);
+    console.debug('[Persistence:boot] localStorageKeyUsed: questshelf.games.v1');
+    console.debug('[Persistence:boot] environment:', import.meta.env.MODE);
+    console.debug('[Persistence:boot] origin:', window.location.origin);
+  }
+
   await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
 
   // First-launch detection: if the template key has never been written, this is a clean
