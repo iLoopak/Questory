@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { SettingsSection } from './settings/SettingsSection';
 import { loadIsThereAnyDealSettings, saveIsThereAnyDealSettings } from '../lib/isThereAnyDealSettingsStorage';
@@ -9,10 +9,17 @@ export function IsThereAnyDealSettingsPanel() {
   const [settings, setSettings] = useState<IsThereAnyDealSettings>(() => loadIsThereAnyDealSettings());
   const isConfigured = settings.apiKey.trim().length > 0;
 
+  useEffect(() => {
+    const persisted = loadIsThereAnyDealSettings();
+    console.debug('[ITAD] hasItadKeyInPersistedSettings:', Boolean(persisted.apiKey.trim()));
+  }, []);
+
   function handleApiKeyChange(event: React.ChangeEvent<HTMLInputElement>) {
     const newSettings: IsThereAnyDealSettings = { apiKey: event.target.value };
+    console.debug('[ITAD] hasItadKeyInInput:', Boolean(event.target.value.trim()));
     setSettings(newSettings);
     saveIsThereAnyDealSettings(newSettings);
+    console.debug('[ITAD] hasItadKeyInSettingsState:', Boolean(newSettings.apiKey.trim()));
   }
 
   return (

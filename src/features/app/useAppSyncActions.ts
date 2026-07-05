@@ -483,6 +483,7 @@ export function useAppSyncActions({
     }
 
     const settings = loadIsThereAnyDealSettings();
+    console.debug('[ITAD] hasItadKeyWhenSyncStarts:', Boolean(settings.apiKey.trim()));
     const targetGames = games.filter((game) => game.collectionType === 'wishlist' && gameIds.includes(game.id));
 
     if (targetGames.length === 0) {
