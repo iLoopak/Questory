@@ -32,6 +32,7 @@ export type RawgGameDetails = RawgSearchResult & {
   developers?: RawgListItem[];
   publishers?: RawgListItem[];
   playtime?: number;
+  description_raw?: string;
 };
 
 export type RawgScreenshot = {
