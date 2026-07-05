@@ -3,7 +3,7 @@ import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { getUserProfileReadiness } from '../../lib/userProfile';
 import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
-import { DiscoveryGameCard, DiscoveryGameCardSkeleton } from './DiscoveryGameCard';
+import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from './DiscoveryGameCard';
 
 const SKELETON_COUNT = 5;
 
@@ -99,18 +99,19 @@ function PersonalRecommendationsLoaded({
       <h3 className="text-sm font-semibold text-white">Recommended For You</h3>
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {candidates === null ? (
-          Array.from({ length: SKELETON_COUNT }, (_, i) => <DiscoveryGameCardSkeleton key={i} />)
+          Array.from({ length: SKELETON_COUNT }, (_, i) => <DiscoveryCompactCardSkeleton key={i} />)
         ) : (
           candidates.map((candidate) => (
-            <DiscoveryGameCard
+            <DiscoveryCompactCard
               key={candidate.game.rawgId}
               candidate={candidate}
-              onOpenDetail={
-                candidate.libraryStatus === 'library'
-                  ? () => onSelectGame(candidate.game)
-                  : undefined
-              }
-              onAddToInbox={onAddToInbox}
+              onClick={(game, reason) => {
+                if (!candidate.libraryStatus && !candidate.inboxStatus && onAddToInbox) {
+                  onAddToInbox(game, reason);
+                } else if (candidate.libraryStatus === 'library') {
+                  onSelectGame(game);
+                }
+              }}
             />
           ))
         )}
