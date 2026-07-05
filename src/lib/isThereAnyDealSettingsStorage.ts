@@ -1,7 +1,8 @@
 import type { IsThereAnyDealSettings } from '../types/itad';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 
-const STORAGE_KEY = 'questshelf.isThereAnyDealSettings.v1';
+export const ITAD_SETTINGS_STORAGE_KEY = 'questshelf.isThereAnyDealSettings.v1';
+const STORAGE_KEY = ITAD_SETTINGS_STORAGE_KEY;
 
 const emptySettings: IsThereAnyDealSettings = {
   apiKey: '',
