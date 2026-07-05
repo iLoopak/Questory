@@ -14,6 +14,8 @@ type Props = {
   onSelectGame: (game: DiscoveryGame) => void;
   onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
   onOpenPreview?: (candidate: DiscoveryCandidate) => void;
+  /** Section heading — defaults to the Game Hub's "Because You Liked This". */
+  title?: string;
 };
 
 function candidateToGame(candidate: DiscoveryCandidate, userGames: Game[]): Game {
@@ -66,6 +68,7 @@ export function ContextualRecommendationsSection({
   onSelectGame,
   onAddToInbox,
   onOpenPreview,
+  title = 'Because You Liked This',
 }: Props) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
   const fetchKeyRef = useRef<string | null>(null);
@@ -113,8 +116,8 @@ export function ContextualRecommendationsSection({
   if (candidates !== null && candidates.length === 0) return null;
 
   return (
-    <section aria-label="Because You Liked This" className="space-y-3">
-      <h3 className="text-sm font-semibold text-white">Because You Liked This</h3>
+    <section aria-label={title} className="space-y-3">
+      <h3 className="text-sm font-semibold text-white">{title}</h3>
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {candidates === null ? (
           Array.from({ length: SKELETON_COUNT }, (_, i) => <CarouselSkeleton key={i} />)
