@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { canUseRawgImageAsCover, getGameCoverSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
+import { canUseRawgImageAsCover } from '../lib/gameCoverImages';
+import { GameHero, HeroStat, getDisplayTitle } from './game-detail/GameHero';
+import { DetailSection } from './game-detail/DetailSection';
+import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from './game-detail/GameDetailActions';
+import { GameInformationSection, formatMetacriticScore, formatRawgPlaytime } from './game-detail/GameInformationSection';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
@@ -44,14 +48,6 @@ type GameDetailViewProps = {
   platformQueueState?: PlatformQueueState;
 };
 
-type GameDetailAction = {
-  icon: IconName;
-  label: string;
-  onClick: () => void;
-  tone: 'accent' | 'neutral' | 'danger';
-  disabled?: boolean;
-};
-
 export function GameDetailView({
   activity = [],
   game,
@@ -75,9 +71,6 @@ export function GameDetailView({
   onOpenDiscoveryPreview,
 }: GameDetailViewProps) {
   const { t } = useI18n();
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const [heroBgSourceIndex, setHeroBgSourceIndex] = useState(0);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
@@ -92,18 +85,6 @@ export function GameDetailView({
   const [pausedGhostSlot] = useState(() => pickQueueGhostSlot('gameDetail'));
   const [showPausedGhost, setShowPausedGhost] = useState(() => Boolean(pausedGhostSlot) && isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail'));
 
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
-
-  const heroBgSources = useMemo(() => {
-    const candidates = [
-      game.heroImage?.trim(),
-      game.wideCoverImage?.trim(),
-      game.backgroundImage?.trim(),
-      !isMissingOrGeneratedCover(game.coverImage) ? game.coverImage?.trim() : null,
-    ].filter((s): s is string => Boolean(s));
-    return [...new Set(candidates)];
-  }, [game.heroImage, game.wideCoverImage, game.backgroundImage, game.coverImage]);
-
   useEffect(() => () => releaseQueueGhostHabitat('gameDetail'), []);
 
   useLayoutEffect(() => {
@@ -111,23 +92,17 @@ export function GameDetailView({
   }, [game.id]);
 
   useEffect(() => {
-    setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
-    setHeroBgSourceIndex(0);
     setTagText(game.tags.join(', '));
     setEditDraft(createEditDraft(game));
     setIsEditing(false);
     setEditError('');
-  }, [coverSources, heroBgSources, game.id, game.tags]);
+  }, [game.id, game.tags]);
 
-  const activeCoverSource = coverSources[coverSourceIndex];
-  const activeHeroBgSource = heroBgSources[heroBgSourceIndex] ?? null;
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
   const canApplyRawgCover = canUseRawgImageAsCover(game);
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
-  const logoUrl = getPreferredLogoUrl(game);
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
     ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
     : undefined;
@@ -245,120 +220,30 @@ export function GameDetailView({
       <div className="flex h-full min-h-0 flex-col">
         <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           <div className="space-y-3 sm:space-y-4">
-            <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
-              {activeHeroBgSource ? (
-                <div className="absolute inset-0" aria-hidden="true">
-                  <img
-                    alt=""
-                    className="h-full w-full object-cover opacity-[0.85]"
-                    decoding="async"
-                    loading="lazy"
-                    onError={() => setHeroBgSourceIndex((i) => i + 1)}
-                    src={activeHeroBgSource}
+            <GameHero
+              game={game}
+              kicker={t('detail.dashboard')}
+              onBack={onBack}
+              stats={<>
+                <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
+                <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
+                {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+                {achievementSummary ? (
+                  <HeroStat
+                    label={t('collection.achievements')}
+                    value={achievementSummary}
+                    onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
                   />
-                </div>
-              ) : null}
-              {/* Left-to-right veil: solid over cover/title area, fades to ~25% on far right so hero is clearly visible */}
-              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/75 to-ink-950/25" aria-hidden="true" />
-              {/* Bottom vignette: light darkening only where stat cards sit */}
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/50 to-transparent" aria-hidden="true" />
+                ) : null}
+                {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+                {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
+                {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+              </>}
+            />
 
-              <div className="relative grid gap-4 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center xl:grid-cols-[150px_minmax(0,1fr)] xl:p-5">
-                <div className="mx-auto w-32 overflow-hidden rounded-xl border border-white/10 bg-ink-800 shadow-panel sm:mx-0 sm:w-full">
-                  <div className="aspect-[2/3] bg-ink-700">
-                    {activeCoverSource ? (
-                      <div className="relative h-full">
-                        {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-                        <img
-                          alt=""
-                          className={`h-full w-full bg-ink-950 object-contain transition-opacity duration-300 ${
-                            isCoverLoaded ? 'opacity-100' : 'opacity-0'
-                          }`}
-                          decoding="async"
-                          loading="lazy"
-                          onError={() => {
-                            setIsCoverLoaded(false);
-                            setCoverSourceIndex((currentIndex) => currentIndex + 1);
-                          }}
-                          onLoad={() => setIsCoverLoaded(true)}
-                          src={activeCoverSource}
-                        />
-                      </div>
-                    ) : (
-                      <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
-                        <div>
-                          <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
-                            {game.title.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div className="mt-3 text-xs font-medium uppercase tracking-caps text-slate-500">{t('common.noCover')}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="min-w-0 space-y-4">
-                  <button className="inline-flex items-center gap-1.5 text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
-                    <Icon name="arrow-left" />
-                    <span>{t('detail.back')}</span>
-                  </button>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-spread text-slate-500">{t('detail.dashboard')}</div>
-                    {logoUrl ? (
-                      <img
-                        alt=""
-                        aria-hidden="true"
-                        className="mt-2 max-h-12 max-w-[180px] object-contain drop-shadow"
-                        decoding="async"
-                        loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        src={logoUrl}
-                      />
-                    ) : null}
-                    <h2 className="mt-1 min-w-0 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
-                  </div>
-
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(6.75rem,1fr))] gap-1.5 xl:max-w-4xl">
-                    <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
-                    <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
-                    {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                    {achievementSummary ? (
-                      <HeroStat
-                        label={t('collection.achievements')}
-                        value={achievementSummary}
-                        onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
-                      />
-                    ) : null}
-                    {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-                    {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
-                    {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-ink-950/80 p-3" aria-label={t('detail.actionsA11y')}>
-              <div className="flex flex-wrap items-center gap-2">
-                {primaryActions.map((action) => (
-                  <GameDetailActionButton key={action.label} action={action} />
-                ))}
-                <button
-                  ref={overflowButtonRef}
-                  aria-controls={isOverflowOpen ? overflowMenuId : undefined}
-                  aria-expanded={isOverflowOpen}
-                  aria-haspopup="dialog"
-                  aria-label={t('action.moreActions')}
-                  className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-                  onClick={() => setIsOverflowOpen(true)}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon name="more-horizontal" />
-                    <span>{t('action.more')}</span>
-                  </span>
-                </button>
-              </div>
-              {isOverflowOpen ? (
+            <GameDetailActionBar
+              ariaLabel={t('detail.actionsA11y')}
+              menu={isOverflowOpen ? (
                 <GameDetailOverflowMenu
                   anchorRef={overflowButtonRef}
                   canEditGame={canEditGame}
@@ -378,7 +263,26 @@ export function GameDetailView({
                   t={t}
                 />
               ) : null}
-            </section>
+            >
+              {primaryActions.map((action) => (
+                <GameDetailActionButton key={action.label} action={action} />
+              ))}
+              <button
+                ref={overflowButtonRef}
+                aria-controls={isOverflowOpen ? overflowMenuId : undefined}
+                aria-expanded={isOverflowOpen}
+                aria-haspopup="dialog"
+                aria-label={t('action.moreActions')}
+                className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+                onClick={() => setIsOverflowOpen(true)}
+                type="button"
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name="more-horizontal" />
+                  <span>{t('action.more')}</span>
+                </span>
+              </button>
+            </GameDetailActionBar>
 
             {isRawgLinkOpen ? (
               <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
@@ -482,48 +386,6 @@ export function GameDetailView({
           </div>
         </div>
       </div>
-    </section>
-  );
-}
-
-function GameInformationSection({
-  game,
-  metacriticScore,
-  rawgPlaytime,
-  t,
-}: {
-  game: Game;
-  metacriticScore: string | null;
-  rawgPlaytime: string | null;
-  t: TFunction;
-}) {
-  const hasInfo =
-    game.released ||
-    (game.developers?.length ?? 0) > 0 ||
-    (game.publishers?.length ?? 0) > 0 ||
-    metacriticScore ||
-    rawgPlaytime ||
-    (game.genres?.length ?? 0) > 0 ||
-    (game.rawgTags?.length ?? 0) > 0;
-
-  return (
-    <section className="rounded-2xl border border-white/10 bg-ink-900/40 p-4 space-y-4" aria-label="Game Information">
-      <h3 className="text-base font-semibold text-white">Game Information</h3>
-      {hasInfo ? (
-        <div className="space-y-5">
-          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoCard label="Released" value={game.released ?? t('detail.notAvailable')} />
-            <InfoCard label={t('detail.developers')} value={formatList(game.developers, t('detail.notAvailable'))} />
-            <InfoCard label={t('detail.publishers')} value={formatList(game.publishers, t('detail.notAvailable'))} />
-            {metacriticScore ? <InfoCard label="Metacritic" value={metacriticScore} /> : null}
-            {rawgPlaytime ? <InfoCard label="Average playtime" value={rawgPlaytime} /> : null}
-          </div>
-          <ChipGroup label={t('detail.genres')} values={game.genres} accent="mint" />
-          <ChipGroup label={t('detail.rawgTags')} values={game.rawgTags} />
-        </div>
-      ) : (
-        <p className="text-sm text-slate-600">{t('detail.noRawgMetadata')}</p>
-      )}
     </section>
   );
 }
@@ -698,15 +560,6 @@ function DeveloperToolsSection({
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-xs font-medium uppercase tracking-caps text-slate-600">{label}</div>
-      <div className="mt-0.5 text-sm text-slate-200 leading-snug">{value}</div>
-    </div>
-  );
-}
-
 function DevToolsSubSection({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="space-y-3">
@@ -791,58 +644,6 @@ function EditSelect({ label, onChange, options, value }: { label: string; onChan
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
-function formatMetacriticScore(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}%` : null;
-}
-
-function formatRawgPlaytime(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
-}
-
-function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {
-  const className = `rounded-xl border px-2.5 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
-  const content = (
-    <>
-      <div className="qs-label-caps truncate text-muted">{label}</div>
-      <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
-    </>
-  );
-  return onClick ? (
-    <button className={className} type="button" onClick={onClick}>{content}</button>
-  ) : (
-    <div className={className}>{content}</div>
-  );
-}
-
-function GameDetailActionButton({ action }: { action: GameDetailAction }) {
-  return (
-    <button
-      className={`min-h-10 rounded-xl border px-3 py-2 text-left text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${getGameDetailActionClassName(
-        action.tone,
-      )}`}
-      disabled={action.disabled}
-      onClick={action.onClick}
-      type="button"
-    >
-      <span className="flex items-center gap-2">
-        <Icon name={action.icon} />
-        <span>{action.label}</span>
-      </span>
-    </button>
-  );
-}
-
-function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
-  if (tone === 'accent') {
-    return 'border-mint/30 bg-mint/10 text-mint hover:bg-mint/20 hover:shadow-glow';
-  }
-
-  if (tone === 'danger') {
-    return 'border-red-400/30 bg-red-500/10 text-red-100 hover:bg-red-500/20';
-  }
-
-  return 'border-skyglass/15 bg-ink-950/70 text-slate-200 hover:bg-mint/10 hover:text-white';
-}
 
 type GameDetailOverflowMenuProps = {
   anchorRef: RefObject<HTMLButtonElement | null>;
@@ -1100,28 +901,6 @@ function GameDetailOverflowMenu({
   );
 }
 
-type DetailSectionProps = {
-  children: ReactNode;
-  description?: string;
-  kicker?: string;
-  title: string;
-};
-
-function DetailSection({ children, description, kicker, title }: DetailSectionProps) {
-  return (
-    <section className="rounded-2xl border border-mint/20 bg-ink-800 p-4 shadow-panel">
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          {kicker ? <div className="qs-label-caps text-accent">{kicker}</div> : null}
-          <h3 className={kicker ? 'mt-1 text-lg font-semibold text-white' : 'text-lg font-semibold text-white'}>{title}</h3>
-          {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
-        </div>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
-}
-
 function PersonalStatField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-mint/20 bg-ink-950/80 px-3 py-2 shadow-inner shadow-mint/5">
@@ -1173,36 +952,6 @@ function ReadOnlyLink({ label, value }: ReadOnlyLinkProps) {
   );
 }
 
-type ChipGroupProps = {
-  accent?: 'mint';
-  label: string;
-  values?: string[];
-};
-
-function ChipGroup({ accent, label, values }: ChipGroupProps) {
-  if (!values || values.length === 0) {
-    return null;
-  }
-
-  return (
-    <div>
-      <div className="text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {values.map((value) => (
-          <span
-            key={value}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              accent === 'mint' ? 'bg-mint/10 text-mint' : 'bg-white/10 text-slate-300'
-            }`}
-          >
-            {value}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function EmptyState({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed border-white/15 bg-ink-900/50 p-4 text-sm text-slate-400">{text}</div>;
 }
@@ -1216,10 +965,6 @@ function parseTags(value: string) {
         .filter(Boolean),
     ),
   );
-}
-
-function getDisplayTitle(game: Game) {
-  return game.displayTitleOverride?.trim() || game.title;
 }
 
 function isRetroGame(game: Game) {
@@ -1337,10 +1082,6 @@ function formatDateTime(value: string | undefined, unavailableText: string) {
 
 function formatHours(value: number | null | undefined, unavailableText: string) {
   return typeof value === 'number' ? `${value}h` : unavailableText;
-}
-
-function formatList(value: string[] | undefined, unavailableText: string) {
-  return value && value.length > 0 ? value.join(', ') : unavailableText;
 }
 
 function formatConfidence(value: number | undefined, unavailableText: string) {

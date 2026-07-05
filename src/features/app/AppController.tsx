@@ -1127,7 +1127,19 @@ export function AppController() {
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     importGames([base]);
     setPreviewCandidate(null);
+    // Evolve the Preview into the Game Hub for the newly owned game so the
+    // transition reads as "this game is now mine", not a navigation.
+    setSelectedGameId(base.id);
+    setActiveNavItem('Library');
     addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Library.` });
+  }
+
+  function handlePreviewOpenLibraryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const found = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    if (!found) return;
+    setPreviewCandidate(null);
+    setSelectedGameId(found.id);
+    setActiveNavItem(found.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
 
   function removeFromDiscoveryInbox(id: string) {
@@ -1836,6 +1848,8 @@ export function AppController() {
           onAddToInbox={handleAddToDiscoveryInbox}
           onAddToWishlist={handlePreviewAddToWishlist}
           onAddToLibrary={handlePreviewAddToLibrary}
+          onOpenPreview={handleDiscoverOpenGame}
+          onOpenLibraryGame={handlePreviewOpenLibraryGame}
         />
       ) : null}
 
