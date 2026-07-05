@@ -112,8 +112,9 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox }: Di
       ];
 
       for (const c of tagged) {
-        if (!seen.has(c.game.rawgId)) {
-          seen.add(c.game.rawgId);
+        seen.add(c.game.rawgId);
+        // Skip games already in the user's library or wishlist.
+        if (c.libraryStatus === null) {
           all.push(c);
         }
       }
