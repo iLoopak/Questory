@@ -192,7 +192,7 @@ export async function fetchPersonalRecommendations(
 function applyLibraryStatus(
   games: DiscoveryCandidate['game'][],
   userGames: Game[],
-  reasons?: string[],
+  reasons?: (string | undefined)[],
   inboxRawgIds: Set<number> = new Set(),
 ): DiscoveryCandidate[] {
   return games.map((game, i) => {
