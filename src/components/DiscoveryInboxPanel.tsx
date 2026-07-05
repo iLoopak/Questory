@@ -4,12 +4,14 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from 'react';
 import { useControllerAction } from '../lib/controllerActions';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 import type { DiscoveryInboxItem } from '../lib/discoveryInboxStorage';
 import { Icon, type IconName } from './Icon';
+import { DiscoveryScreenshotStrip } from './ScreenshotStrip';
 
 // ---------------------------------------------------------------------------
 // Action definitions
@@ -36,6 +38,13 @@ const positiveActions: ReadonlyArray<{
   { action: 'wishlist', icon: 'heart', label: 'Add to Wishlist', tone: 'neutral' },
   { action: 'plans', icon: 'list-plus', label: 'Add to Platform Plans', tone: 'neutral' },
 ];
+
+const actionDescriptions: Partial<Record<DiscoveryInboxAction, string>> = {
+  library: "Own it — add to your game collection",
+  wishlist: "Interested, not ready to commit",
+  plans: "Queue for a specific platform soon",
+  ignore: "Not for you — remove from inbox",
+};
 
 const decisionActions = [...negativeActions, ...positiveActions];
 const firstPositiveActionIndex = negativeActions.length;
@@ -138,6 +147,7 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   const [sessionStats, setSessionStats] = useState<SessionStats>(emptySessionStats);
   const [sessionReviewedCount, setSessionReviewedCount] = useState(0);
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);
+  const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const activeItem = items[0] ?? null;
   const totalCount = sessionReviewedCount + items.length;
@@ -193,6 +203,13 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeItem, highlightedActionIndex]);
 
+  useEffect(() => {
+    if (activeItem && hasGamepad) {
+      primaryButtonRef.current?.focus({ preventScroll: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeItem?.id]);
+
   const canReceiveControllerActions = !!activeItem && !isInteractiveOrOverlayActive();
 
   useControllerAction('pageNext', () => {
@@ -236,6 +253,7 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
               hasGamepad={hasGamepad}
               highlightedActionIndex={highlightedActionIndex}
               item={activeItem}
+              primaryButtonRef={primaryButtonRef}
               onAction={(action) => performAction(activeItem, action)}
               onHighlight={setHighlightedActionIndex}
             />
@@ -258,12 +276,14 @@ function FocusedDiscoveryCard({
   hasGamepad,
   highlightedActionIndex,
   item,
+  primaryButtonRef,
   onAction,
   onHighlight,
 }: {
   hasGamepad: boolean;
   highlightedActionIndex: number;
   item: DiscoveryInboxItem;
+  primaryButtonRef: RefObject<HTMLButtonElement | null>;
   onAction: (action: DiscoveryInboxAction) => void;
   onHighlight: (index: number) => void;
 }) {
@@ -374,6 +394,11 @@ function FocusedDiscoveryCard({
                   <Icon className="select-none" name={action.icon} />
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
                 </div>
+                {actionDescriptions[action.action] && !hasGamepad && (
+                  <span className="mt-0.5 block text-2xs leading-none opacity-50">
+                    {actionDescriptions[action.action]}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -394,6 +419,19 @@ function FocusedDiscoveryCard({
           style={swipeStyle}
         >
           <div className="qs-review-cover relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-ink-900 shadow-panel">
+            {/* Blurred cover used as hero background — mirrors Quest Queue's heroBgUrl treatment */}
+            {game.coverUrl ? (
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+                <img
+                  alt=""
+                  className="h-full w-full object-cover opacity-[0.18] blur-md"
+                  decoding="async"
+                  draggable={false}
+                  loading="lazy"
+                  src={game.coverUrl}
+                />
+              </div>
+            ) : null}
             {isSwipeEngaged && activeSwipeAction ? (
               <div
                 aria-hidden="true"
@@ -404,16 +442,25 @@ function FocusedDiscoveryCard({
             ) : null}
             <div className="qs-review-artwork-frame relative h-full w-full">
               {game.coverUrl ? (
-                <img
-                  alt={game.title}
-                  className={`relative h-full w-full object-contain p-2 transition-opacity duration-300 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
-                  decoding="async"
-                  draggable={false}
-                  loading="lazy"
-                  onDragStart={(e) => e.preventDefault()}
-                  onLoad={() => setIsCoverLoaded(true)}
-                  src={game.coverUrl}
-                />
+                <div className="relative h-full w-full">
+                  {/* Shimmer shown while main image loads */}
+                  {!isCoverLoaded ? (
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 animate-pulse rounded-xl bg-white/5"
+                    />
+                  ) : null}
+                  <img
+                    alt={game.title}
+                    className={`relative h-full w-full object-contain p-2 transition-opacity duration-300 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    decoding="async"
+                    draggable={false}
+                    loading="lazy"
+                    onDragStart={(e) => e.preventDefault()}
+                    onLoad={() => setIsCoverLoaded(true)}
+                    src={game.coverUrl}
+                  />
+                </div>
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <Icon className="text-slate-700" name="gamepad-2" size={40} />
@@ -456,6 +503,13 @@ function FocusedDiscoveryCard({
           </div>
         </div>
 
+        {/* Screenshot strip — helps decide if the game is worth adding before committing */}
+        <DiscoveryScreenshotStrip
+          className="mt-3 w-full px-2"
+          rawgId={game.rawgId}
+          title={game.title}
+        />
+
         {/* Recommendation reason */}
         {item.reason ? (
           <div className="mt-3 w-full rounded-xl border border-amber-400/15 bg-amber-400/5 px-4 py-3">
@@ -487,9 +541,11 @@ function FocusedDiscoveryCard({
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
             const isTarget = highlightedActionIndex === index;
+            const isLibrary = action.action === 'library';
             return (
               <button
                 key={action.action}
+                ref={isLibrary ? primaryButtonRef : undefined}
                 className={`qs-review-action qs-review-action-side min-h-[3.5rem] rounded-xl border px-3 py-2 text-center transition flex flex-col items-center justify-center gap-1 ${getActionClassName(action.tone, isTarget)} ${swipeTarget !== null && !isTarget ? 'opacity-30 pointer-events-none' : ''}`}
                 onClick={() => onAction(action.action)}
                 onFocus={() => onHighlight(index)}
@@ -499,6 +555,11 @@ function FocusedDiscoveryCard({
                   <Icon className="select-none" name={action.icon} />
                   <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
                 </div>
+                {actionDescriptions[action.action] && !hasGamepad && (
+                  <span className="mt-0.5 block text-2xs leading-none opacity-50">
+                    {actionDescriptions[action.action]}
+                  </span>
+                )}
               </button>
             );
           })}
