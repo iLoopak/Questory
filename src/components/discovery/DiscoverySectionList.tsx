@@ -121,14 +121,12 @@ export function DiscoverySectionList({
                   game={adaptedGame}
                   suppressWantToPlayStatus={!isLibrary}
                   detailsLabel={isLibrary ? undefined : 'Preview'}
+                  hideActionMenu
                   onOpenDetails={
                     isLibrary
                       ? () => onSelectGame(candidate.game)
                       : () => onOpenPreview?.(candidate)
                   }
-                  onRemove={() => {}}
-                  onStatusChange={() => {}}
-                  onRemoveAndIgnore={() => {}}
                   primaryAction={
                     canAddToInbox
                       ? {

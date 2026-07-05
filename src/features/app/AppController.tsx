@@ -738,9 +738,25 @@ export function AppController() {
         .map(getRetroDuplicateKey)
         .filter((key): key is string => Boolean(key)),
     );
+    // Duplicate guard for manual/discovery imports only — Steam and retro
+    // imports keep their own dedup keys, and a wishlist copy must not block
+    // a Steam library import of the same game.
+    const existingLibraryRawgIds = new Set(
+      games
+        .filter((game) => game.collectionType === 'library' && typeof game.rawgId === 'number')
+        .map((game) => game.rawgId as number),
+    );
 
     const newGames = importedGames.filter((game) => {
       if (typeof game.steamAppId === 'number' && existingSteamAppIds.has(game.steamAppId)) {
+        return false;
+      }
+
+      if (
+        game.externalSource === 'manual' &&
+        typeof game.rawgId === 'number' &&
+        existingLibraryRawgIds.has(game.rawgId)
+      ) {
         return false;
       }
 
@@ -1123,6 +1139,19 @@ export function AppController() {
   }
 
   function handlePreviewAddToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    // If the game already exists in the collection, never create a second
+    // record: move the wishlist copy in place, or just open the library copy.
+    const existing = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    if (existing) {
+      if (existing.collectionType === 'wishlist') {
+        moveToLibrary(existing);
+      }
+      setPreviewCandidate(null);
+      setSelectedGameId(existing.id);
+      setActiveNavItem('Library');
+      return;
+    }
+
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     importGames([base]);
