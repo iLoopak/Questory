@@ -53,7 +53,7 @@ const GENRE_SLUG: Record<string, string> = {
   Card: 'card',
 };
 
-function toSlug(name: string): string {
+export function toSlug(name: string): string {
   return (
     GENRE_SLUG[name] ??
     name

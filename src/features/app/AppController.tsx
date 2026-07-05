@@ -1340,6 +1340,9 @@ export function AppController() {
                   showToast: true,
                 });
               }}
+              onSelectDiscoveryGame={handleSelectDiscoveryGame}
+              onAddDiscoveryGameToWishlist={handleAddDiscoveryGameToWishlist}
+              onAddDiscoveryGameToLibrary={handleAddDiscoveryGameToLibrary}
             />
           ) : activeNavItem === 'Library' ? (
             <div className="relative h-full">
