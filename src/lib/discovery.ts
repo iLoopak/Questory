@@ -6,6 +6,8 @@ export interface DiscoveryGame {
   platforms: string[];
   hasSteamVersion: boolean;
   genres: string[];
+  /** RAWG tag slugs — used for semantic similarity scoring. */
+  tags: string[];
   released: string | null;
   slug: string | null;
 }

@@ -6,108 +6,170 @@ import { fetchSuggestedGames, fetchGameSeries, fetchRecommendedGames } from './r
 import type { RawgSearchResult } from '../types/rawg';
 
 // ---------------------------------------------------------------------------
-// Scoring
+// Scoring weights
+// Designed so that semantically specific signals dominate broad ones:
+//
+//   Franchise membership   50   ★★★★★  same game series
+//   RAWG suggested         40   ★★★★☆  RAWG's own similarity model
+//   Specific tag match     40   ★★★★☆  shared gameplay tags
+//   Profile affinity       20   ★★☆☆☆  user's taste from their library
+//   Broad genre match      15   ★★☆☆☆  coarse genre overlap
+//   Ownership penalty     −30          demotes already-owned games
 // ---------------------------------------------------------------------------
 
 export interface ContextualScore {
-  /** 0–40: appears in RAWG /suggested (40) or /game-series (30) */
-  rawgSimilarity: number;
-  /** 0–30: shared genres with the currently viewed game */
-  genreMatch: number;
-  /** 0–20: matches user's top profile genres (weighted) */
-  profileAffinity: number;
-  /** 0 or −30: already in library or wishlist */
+  franchise: number;       // 0 or 50
+  rawgSuggested: number;   // 0 or 40
+  tagMatch: number;        // 0–40
+  genreMatch: number;      // 0–15
+  profileAffinity: number; // 0–20
   ownershipPenalty: number;
   total: number;
 }
 
-function scoreCandidate(
-  result: RawgSearchResult,
-  rawgSimilarity: number,
+// ---------------------------------------------------------------------------
+// Tags that are too common to meaningfully distinguish similar games.
+// Matches on these tags are excluded from the scoring calculation.
+// ---------------------------------------------------------------------------
+
+const NON_DISCRIMINATING_TAGS = new Set([
+  'singleplayer',
+  'multiplayer',
+  'co-op',
+  'online-co-op',
+  'local-co-op',
+  'great-soundtrack',
+  'atmospheric',
+  'story-rich',
+  'dark',
+  'violent',
+  'exploration',
+  'steam-achievements',
+  'full-controller-support',
+  'partial-controller-support',
+  'steam-cloud',
+  'controller',
+  'linux',
+  'macos',
+  'windows',
+  'difficult',
+  'relaxing',
+  'colorful',
+  'cute',
+  'funny',
+  'casual',
+]);
+
+// ---------------------------------------------------------------------------
+// Scoring helpers
+// ---------------------------------------------------------------------------
+
+function computeTagMatchScore(
+  candidateTagSlugs: string[],
+  currentGameTagSlugs: string[],
+): number {
+  const specificMatches = candidateTagSlugs.filter(
+    (slug) => !NON_DISCRIMINATING_TAGS.has(slug) && currentGameTagSlugs.includes(slug),
+  ).length;
+  // Each specific match: +8 pts, capped at 40.
+  return Math.min(40, specificMatches * 8);
+}
+
+function computeGenreMatchScore(
+  candidateGenres: string[],
   currentGameGenres: string[],
+): number {
+  const matches = candidateGenres.filter((g) => currentGameGenres.includes(g)).length;
+  return Math.min(15, matches * 7);
+}
+
+function computeProfileAffinity(
+  candidateGenres: string[],
   profileGenres: Array<{ name: string; weight: number }>,
-): ContextualScore {
-  const candidateGenres = (result.genres ?? []).map((g) => g.name);
-
-  // Genre overlap with the currently viewed game.
-  let genreMatch = 0;
-  for (const g of currentGameGenres) {
-    if (candidateGenres.includes(g)) genreMatch += 15;
-  }
-  genreMatch = Math.min(30, genreMatch);
-
-  // Profile affinity: how well candidate genres align with user's taste.
-  const totalProfileWeight = profileGenres.reduce((s, g) => s + g.weight, 0) || 1;
-  let profileAffinity = 0;
+): number {
+  const totalWeight = profileGenres.reduce((s, g) => s + g.weight, 0) || 1;
+  let affinity = 0;
   for (const pg of profileGenres) {
     if (candidateGenres.includes(pg.name)) {
-      profileAffinity += (pg.weight / totalProfileWeight) * 20;
+      affinity += (pg.weight / totalWeight) * 20;
     }
   }
-  profileAffinity = Math.round(Math.min(20, profileAffinity));
-
-  const total = rawgSimilarity + genreMatch + profileAffinity;
-  return { rawgSimilarity, genreMatch, profileAffinity, ownershipPenalty: 0, total };
+  return Math.round(Math.min(20, affinity));
 }
 
 // ---------------------------------------------------------------------------
-// Reason text
+// Reason text generation
+// Prioritises tag-based explanations over genre-based ones.
 // ---------------------------------------------------------------------------
 
 function generateReason(
   result: RawgSearchResult,
   score: ContextualScore,
   currentGameTitle: string,
-  currentGameGenres: string[],
+  currentTagSlugs: string[],
   profileGenreNames: string[],
 ): string {
   const candidateGenres = (result.genres ?? []).map((g) => g.name);
 
-  // Genres the candidate shares with the current game.
-  const sharedWithGame = currentGameGenres.filter((g) => candidateGenres.includes(g));
-  // Genres the candidate shares with the user's top profile genres.
-  const sharedWithProfile = profileGenreNames.slice(0, 3).filter((g) => candidateGenres.includes(g));
+  // Collect the display names of specifically matched tags (non-generic, ordered by RAWG weight).
+  const matchedTagNames = (result.tags ?? [])
+    .filter((t) => {
+      const slug = t.slug ?? toSlug(t.name);
+      return !NON_DISCRIMINATING_TAGS.has(slug) && currentTagSlugs.includes(slug);
+    })
+    .slice(0, 2)
+    .map((t) => t.name);
 
-  if (score.rawgSimilarity >= 30 && sharedWithProfile.length > 0) {
+  const sharedWithProfile = profileGenreNames
+    .slice(0, 3)
+    .filter((g) => candidateGenres.includes(g));
+
+  if (score.franchise > 0) {
+    return `Part of the same series as ${currentGameTitle}`;
+  }
+  if (score.rawgSuggested > 0 && matchedTagNames.length >= 2) {
+    return `Similar to ${currentGameTitle} — shares ${matchedTagNames[0]} & ${matchedTagNames[1]}`;
+  }
+  if (score.rawgSuggested > 0 && matchedTagNames.length === 1) {
+    return `Similar to ${currentGameTitle} — shares ${matchedTagNames[0]}`;
+  }
+  if (score.rawgSuggested > 0 && sharedWithProfile.length > 0) {
     return `Similar to ${currentGameTitle} and fits your ${sharedWithProfile[0]} history`;
   }
-  if (score.rawgSimilarity >= 30) {
+  if (score.rawgSuggested > 0) {
     return `Similar to ${currentGameTitle}`;
   }
-  if (sharedWithGame.length >= 2 && score.profileAffinity >= 10) {
-    return `Shares ${sharedWithGame[0]} & ${sharedWithGame[1]} with ${currentGameTitle}`;
+  if (matchedTagNames.length >= 2) {
+    return `Shares ${matchedTagNames[0]} & ${matchedTagNames[1]} with ${currentGameTitle}`;
   }
-  if (sharedWithGame.length >= 1 && score.profileAffinity >= 10) {
-    return `Shares ${sharedWithGame[0]} with ${currentGameTitle} and fits your taste`;
+  if (matchedTagNames.length === 1 && sharedWithProfile.length > 0) {
+    return `Shares ${matchedTagNames[0]} with ${currentGameTitle} and fits your taste`;
   }
-  if (sharedWithGame.length >= 2) {
-    return `Shares ${sharedWithGame[0]} & ${sharedWithGame[1]} with ${currentGameTitle}`;
+  if (matchedTagNames.length === 1) {
+    return `Shares ${matchedTagNames[0]} with ${currentGameTitle}`;
   }
-  if (sharedWithGame.length === 1) {
-    return `Shares ${sharedWithGame[0]} with ${currentGameTitle}`;
-  }
-  if (score.profileAffinity >= 12 && sharedWithProfile.length > 0) {
+  if (sharedWithProfile.length > 0) {
     return `Matches your ${sharedWithProfile[0]} history`;
   }
   return `May complement ${currentGameTitle}`;
 }
 
 // ---------------------------------------------------------------------------
-// Diversity — max 2 games per primary genre to prevent genre flooding.
+// Diversity — max 2 games per primary tag (or genre as fallback).
+// Tag-based diversity is more semantically precise than genre-based.
 // ---------------------------------------------------------------------------
 
-function applyDiversityFilter<T extends { result: RawgSearchResult }>(
+function applyDiversityFilter<T extends { primaryTag: string }>(
   items: T[],
   max: number,
 ): T[] {
   const counts = new Map<string, number>();
   const output: T[] = [];
   for (const item of items) {
-    const genre = item.result.genres?.[0]?.name ?? '';
-    const n = counts.get(genre) ?? 0;
+    const n = counts.get(item.primaryTag) ?? 0;
     if (n < 2) {
       output.push(item);
-      counts.set(genre, n + 1);
+      counts.set(item.primaryTag, n + 1);
     }
     if (output.length >= max) break;
   }
@@ -115,12 +177,16 @@ function applyDiversityFilter<T extends { result: RawgSearchResult }>(
 }
 
 // ---------------------------------------------------------------------------
-// Cache — Map keyed by `${rawgId}:${profileFingerprint}` so each game+profile
-// combination is cached independently. TTL 15 minutes.
+// Cache
 // ---------------------------------------------------------------------------
 
 interface CacheEntry {
-  raw: Array<{ result: RawgSearchResult; score: ContextualScore; reason: string }>;
+  raw: Array<{
+    result: RawgSearchResult;
+    score: ContextualScore;
+    reason: string;
+    primaryTag: string;
+  }>;
   fetchedAt: number;
 }
 
@@ -143,8 +209,15 @@ export async function fetchContextualRecommendations(
 
   const profile = buildUserProfile(userGames);
   const key = cacheKey(game.rawgId, userGames);
+
   const currentGameGenres = game.genres ?? [];
-  const profileGenreNames = profile.topGenres.map((g) => g.name);
+  const currentTagSlugs = (game.rawgTags ?? []).map(toSlug);
+
+  // Specific tags are those not in the non-discriminating set — used for the
+  // tag pool query so RAWG returns semantically similar games.
+  const specificTagSlugs = currentTagSlugs
+    .filter((slug) => !NON_DISCRIMINATING_TAGS.has(slug))
+    .slice(0, 5);
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -152,9 +225,15 @@ export async function fetchContextualRecommendations(
   }
 
   // -------------------------------------------------------------------------
-  // Fetch candidate pool
-  // Primary: RAWG suggested + game-series (strong similarity signals)
-  // Secondary: genre-filtered pool (broadens when primary is thin)
+  // Fetch candidate pool — all three in parallel.
+  //
+  //   Pool 1: RAWG /suggested — their own similarity model (rawgSuggested = 40)
+  //   Pool 2: RAWG /game-series — franchise membership (franchise = 50)
+  //   Pool 3: Tag pool — specific gameplay tags (tagMatch score from overlap)
+  //   Pool 4: Genre pool — broad fallback when tag pool is thin
+  //
+  // Pools 1 + 2 fetch at the same time. Pools 3 + 4 run in a second parallel
+  // batch so we don't over-fetch if primary pools are already rich.
   // -------------------------------------------------------------------------
 
   const [suggested, series] = await Promise.all([
@@ -165,36 +244,54 @@ export async function fetchContextualRecommendations(
   const suggestedIds = new Set(suggested.map((r) => r.id));
   const seriesIds = new Set(series.map((r) => r.id));
 
-  // Fetch genre-broadened pool only when the current game has genre metadata.
-  let genrePool: RawgSearchResult[] = [];
-  if (currentGameGenres.length > 0) {
-    const genreSlugs = currentGameGenres.slice(0, 2).map(toSlug).join(',');
-    genrePool = await fetchRecommendedGames({ genres: genreSlugs, pageSize: 20 });
-  } else if (profile.topGenres.length > 0) {
-    // Fall back to profile genres if current game has no metadata.
-    const genreSlugs = profile.topGenres.slice(0, 2).map((g) => g.slug).join(',');
-    genrePool = await fetchRecommendedGames({ genres: genreSlugs, pageSize: 20 });
+  const [tagPool, genrePool] = await Promise.all([
+    specificTagSlugs.length > 0
+      ? fetchRecommendedGames({ tags: specificTagSlugs.join(','), pageSize: 20 })
+      : Promise.resolve([] as RawgSearchResult[]),
+    currentGameGenres.length > 0
+      ? fetchRecommendedGames({
+          genres: currentGameGenres.slice(0, 2).map(toSlug).join(','),
+          pageSize: 15,
+        })
+      : profile.topGenres.length > 0
+      ? fetchRecommendedGames({
+          genres: profile.topGenres
+            .slice(0, 2)
+            .map((g) => g.slug)
+            .join(','),
+          pageSize: 15,
+        })
+      : Promise.resolve([] as RawgSearchResult[]),
+  ]);
+
+  // -------------------------------------------------------------------------
+  // Merge — deduplicate, exclude the current game, cap at 35 before scoring.
+  // -------------------------------------------------------------------------
+
+  const seen = new Set<number>([game.rawgId]);
+  const merged: Array<{ result: RawgSearchResult; inSeries: boolean; inSuggested: boolean }> = [];
+
+  function addIfUnseen(result: RawgSearchResult, inSeries: boolean, inSuggested: boolean) {
+    if (seen.has(result.id) || merged.length >= 35) return;
+    seen.add(result.id);
+    merged.push({ result, inSeries, inSuggested });
   }
 
-  // Merge — exclude the current game, deduplicate, cap pool at 30.
-  const seen = new Set<number>([game.rawgId]);
-  const merged: Array<{ result: RawgSearchResult; rawgSim: number }> = [];
-
-  function addMerged(result: RawgSearchResult, sim: number) {
-    if (!seen.has(result.id) && merged.length < 30) {
-      seen.add(result.id);
-      merged.push({ result, rawgSim: sim });
+  // Game-series first (franchise = highest score).
+  for (const r of series) addIfUnseen(r, true, false);
+  // Then suggested (but may already be in series).
+  for (const r of suggested) {
+    if (seriesIds.has(r.id)) {
+      // Already added; update inSuggested flag.
+      const existing = merged.find((m) => m.result.id === r.id);
+      if (existing) existing.inSuggested = true;
+    } else {
+      addIfUnseen(r, false, true);
     }
   }
-
-  for (const r of suggested) addMerged(r, 40);
-  for (const r of series) {
-    // A game can appear in both suggested and series; keep the higher signal (40).
-    if (!suggestedIds.has(r.id)) addMerged(r, 30);
-  }
-  for (const r of genrePool) {
-    addMerged(r, suggestedIds.has(r.id) ? 40 : seriesIds.has(r.id) ? 30 : 0);
-  }
+  // Tag pool + genre pool for breadth.
+  for (const r of tagPool) addIfUnseen(r, seriesIds.has(r.id), suggestedIds.has(r.id));
+  for (const r of genrePool) addIfUnseen(r, seriesIds.has(r.id), suggestedIds.has(r.id));
 
   if (merged.length === 0) {
     cache.set(key, { raw: [], fetchedAt: Date.now() });
@@ -202,18 +299,54 @@ export async function fetchContextualRecommendations(
   }
 
   // -------------------------------------------------------------------------
-  // Score + sort
+  // Score → sort → diversity filter
   // -------------------------------------------------------------------------
 
   const scored = merged
-    .map(({ result, rawgSim }) => {
-      const score = scoreCandidate(result, rawgSim, currentGameGenres, profile.topGenres);
-      const reason = generateReason(result, score, game.title, currentGameGenres, profileGenreNames);
-      return { result, score, reason };
+    .map(({ result, inSeries, inSuggested }) => {
+      const candidateGenres = (result.genres ?? []).map((g) => g.name);
+      const candidateTagSlugs = (result.tags ?? []).map(
+        (t) => t.slug ?? toSlug(t.name),
+      );
+
+      const franchise = inSeries ? 50 : 0;
+      const rawgSuggested = inSuggested ? 40 : 0;
+      const tagMatch = computeTagMatchScore(candidateTagSlugs, currentTagSlugs);
+      const genreMatch = computeGenreMatchScore(candidateGenres, currentGameGenres);
+      const profileAffinity = computeProfileAffinity(candidateGenres, profile.topGenres);
+
+      const score: ContextualScore = {
+        franchise,
+        rawgSuggested,
+        tagMatch,
+        genreMatch,
+        profileAffinity,
+        ownershipPenalty: 0,
+        total: franchise + rawgSuggested + tagMatch + genreMatch + profileAffinity,
+      };
+
+      const reason = generateReason(
+        result,
+        score,
+        game.title,
+        currentTagSlugs,
+        profile.topGenres.map((g) => g.name),
+      );
+
+      // Primary tag for diversity bucketing — first specific non-discriminating
+      // tag shared with the current game, or the candidate's own first tag, or genre.
+      const primaryTag =
+        candidateTagSlugs.find(
+          (s) => !NON_DISCRIMINATING_TAGS.has(s) && currentTagSlugs.includes(s),
+        ) ??
+        candidateTagSlugs.find((s) => !NON_DISCRIMINATING_TAGS.has(s)) ??
+        candidateGenres[0] ??
+        '';
+
+      return { result, score, reason, primaryTag };
     })
     .sort((a, b) => b.score.total - a.score.total);
 
-  // Diversity filter and over-fetch so filtering owned games still leaves 6.
   const diverse = applyDiversityFilter(scored, 14);
 
   cache.set(key, { raw: diverse, fetchedAt: Date.now() });
@@ -221,12 +354,17 @@ export async function fetchContextualRecommendations(
 }
 
 // ---------------------------------------------------------------------------
-// Build DiscoveryCandidate[] from scored results + live library state.
-// Called both after a fresh fetch and on cache hits (library may have changed).
+// Materialise DiscoveryCandidate[] — always uses live userGames so library
+// status is current even when the result came from cache.
 // ---------------------------------------------------------------------------
 
 function buildCandidates(
-  raw: Array<{ result: RawgSearchResult; score: ContextualScore; reason: string }>,
+  raw: Array<{
+    result: RawgSearchResult;
+    score: ContextualScore;
+    reason: string;
+    primaryTag: string;
+  }>,
   userGames: Game[],
 ): DiscoveryCandidate[] {
   return raw
@@ -243,18 +381,10 @@ function buildCandidates(
         exclusionReason = 'finished';
       }
 
-      // Ownership penalty shifts owned/wishlisted games below unknowns.
       const ownershipPenalty = libraryStatus !== null ? -30 : 0;
       const total = score.total + ownershipPenalty;
 
-      return {
-        game,
-        libraryStatus,
-        excluded,
-        exclusionReason,
-        score: total,
-        reason,
-      };
+      return { game, libraryStatus, excluded, exclusionReason, score: total, reason };
     })
     .filter((c) => !c.excluded)
     .sort((a, b) => b.score - a.score)
