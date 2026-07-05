@@ -54,8 +54,8 @@ type HomePanelProps = {
   onSyncSteamPlaytime?: () => void;
   isImportingNewSteamGames?: boolean;
   onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
-  onAddDiscoveryGameToWishlist?: (game: DiscoveryGame) => void;
-  onAddDiscoveryGameToLibrary?: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToInbox?: (game: DiscoveryGame, reason: string) => void;
+  discoveryInboxRawgIds?: Set<number>;
 };
 
 type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
@@ -92,8 +92,8 @@ export function HomePanel({
   onSyncSteamPlaytime,
   isImportingNewSteamGames = false,
   onSelectDiscoveryGame,
-  onAddDiscoveryGameToWishlist,
-  onAddDiscoveryGameToLibrary,
+  onAddDiscoveryGameToInbox,
+  discoveryInboxRawgIds = new Set(),
 }: HomePanelProps) {
   const { t } = useI18n();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
@@ -633,9 +633,9 @@ export function HomePanel({
           {onSelectDiscoveryGame ? (
             <PersonalRecommendationsSection
               userGames={games}
+              inboxRawgIds={discoveryInboxRawgIds}
               onSelectGame={onSelectDiscoveryGame}
-              onAddToWishlist={onAddDiscoveryGameToWishlist}
-              onAddToLibrary={onAddDiscoveryGameToLibrary}
+              onAddToInbox={onAddDiscoveryGameToInbox}
             />
           ) : null}
 

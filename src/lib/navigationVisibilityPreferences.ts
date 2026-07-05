@@ -8,6 +8,7 @@ export const configurableNavigationItems = [
   'Review Mode',
   'Artwork',
   'Stats',
+  'Discovery Inbox',
 ] as const;
 
 export type ConfigurableNavigationItem = (typeof configurableNavigationItems)[number];
@@ -15,6 +16,7 @@ export type NavigationVisibilityPreferences = Record<ConfigurableNavigationItem,
 
 export const defaultNavigationVisibilityPreferences: NavigationVisibilityPreferences = {
   Artwork: true,
+  'Discovery Inbox': true,
   Queue: true,
   'Review Mode': true,
   Stats: true,

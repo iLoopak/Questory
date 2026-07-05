@@ -204,6 +204,7 @@ function cacheKey(rawgId: number, userGames: Game[]): string {
 export async function fetchContextualRecommendations(
   game: Game,
   userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
 ): Promise<DiscoveryCandidate[]> {
   if (!game.rawgId) return [];
 
@@ -221,7 +222,7 @@ export async function fetchContextualRecommendations(
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return buildCandidates(cached.raw, userGames);
+    return buildCandidates(cached.raw, userGames, inboxRawgIds);
   }
 
   // -------------------------------------------------------------------------
@@ -350,7 +351,7 @@ export async function fetchContextualRecommendations(
   const diverse = applyDiversityFilter(scored, 14);
 
   cache.set(key, { raw: diverse, fetchedAt: Date.now() });
-  return buildCandidates(diverse, userGames);
+  return buildCandidates(diverse, userGames, inboxRawgIds);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +367,7 @@ function buildCandidates(
     primaryTag: string;
   }>,
   userGames: Game[],
+  inboxRawgIds: Set<number>,
 ): DiscoveryCandidate[] {
   return raw
     .map(({ result, score, reason }) => {
@@ -373,6 +375,7 @@ function buildCandidates(
       const match = userGames.find((g) => g.rawgId === game.rawgId);
       const libraryStatus: DiscoveryCandidateStatus =
         match == null ? null : match.collectionType === 'wishlist' ? 'wishlist' : 'library';
+      const inboxStatus = inboxRawgIds.has(game.rawgId);
 
       let excluded = false;
       let exclusionReason: DiscoveryExclusionReason | null = null;
@@ -384,7 +387,7 @@ function buildCandidates(
       const ownershipPenalty = libraryStatus !== null ? -30 : 0;
       const total = score.total + ownershipPenalty;
 
-      return { game, libraryStatus, excluded, exclusionReason, score: total, reason };
+      return { game, libraryStatus, inboxStatus, excluded, exclusionReason, score: total, reason };
     })
     .filter((c) => !c.excluded)
     .sort((a, b) => b.score - a.score)

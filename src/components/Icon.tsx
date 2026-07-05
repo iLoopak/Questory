@@ -9,6 +9,7 @@ export type IconName =
   | 'check'
   | 'check-circle'
   | 'circle'
+  | 'compass'
   | 'chevron-left'
   | 'chevron-right'
   | 'chevrons-right'
@@ -84,6 +85,7 @@ const iconPaths: Record<IconName, ReactNode> = {
   check: <path d="m20 6-11 11-5-5" />,
   'check-circle': <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>,
   circle: <circle cx="12" cy="12" r="10" />,
+  compass: <><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></>,
   'chevron-left': <path d="m15 18-6-6 6-6" />,
   'chevron-right': <path d="m9 18 6-6-6-6" />,
   'chevrons-right': <><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></>,

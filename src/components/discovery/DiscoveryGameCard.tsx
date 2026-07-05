@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { Icon } from '../Icon';
 
@@ -17,28 +16,23 @@ function releaseYear(released: string | null): string | null {
 type Props = {
   candidate: DiscoveryCandidate;
   onOpenDetail?: () => void;
-  onAddToWishlist?: (game: DiscoveryGame) => void;
-  onAddToLibrary?: (game: DiscoveryGame) => void;
+  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
 };
 
-export function DiscoveryGameCard({
-  candidate,
-  onOpenDetail,
-  onAddToWishlist,
-  onAddToLibrary,
-}: Props) {
-  const { game, libraryStatus } = candidate;
-  const [touchOverlayOpen, setTouchOverlayOpen] = useState(false);
+export function DiscoveryGameCard({ candidate, onOpenDetail, onAddToInbox }: Props) {
+  const { game, libraryStatus, inboxStatus } = candidate;
 
   const isLibraryGame = libraryStatus === 'library';
   const isWishlistGame = libraryStatus === 'wishlist';
-  const hasAddActions = !isLibraryGame && (onAddToWishlist || onAddToLibrary);
+  const isOwned = isLibraryGame || isWishlistGame;
   const year = releaseYear(game.released);
+  const displayedGenres = game.genres.slice(0, 2);
+
+  // A game can be added to the inbox only when it's not already owned or already waiting.
+  const canAddToInbox = !isOwned && !inboxStatus && onAddToInbox != null;
 
   function handleCardClick() {
-    if (isLibraryGame && onOpenDetail) {
-      onOpenDetail();
-    }
+    if (isLibraryGame && onOpenDetail) onOpenDetail();
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -47,8 +41,6 @@ export function DiscoveryGameCard({
       onOpenDetail();
     }
   }
-
-  const displayedGenres = game.genres.slice(0, 2);
 
   return (
     <div
@@ -61,9 +53,7 @@ export function DiscoveryGameCard({
       tabIndex={isLibraryGame ? 0 : undefined}
       aria-label={isLibraryGame ? `Open ${game.title}` : game.title}
     >
-      {/* ------------------------------------------------------------------ */}
-      {/* Cover image area                                                     */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Cover image area */}
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-ink-900">
         {game.coverUrl ? (
           <img
@@ -95,81 +85,47 @@ export function DiscoveryGameCard({
           </span>
         ) : null}
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Quick action overlay — hover on desktop, state-toggle on touch   */}
-        {/* ---------------------------------------------------------------- */}
-        {hasAddActions ? (
-          <>
-            {/* Desktop hover overlay */}
-            <div
-              className={`pointer-events-none absolute inset-0 flex flex-col items-stretch justify-end gap-1 p-1.5
-                bg-gradient-to-t from-black/80 via-black/30 to-transparent
-                opacity-0 transition-opacity duration-200
-                [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:opacity-100
-              `}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ActionButtons
-                game={game}
-                libraryStatus={libraryStatus}
-                onAddToWishlist={onAddToWishlist}
-                onAddToLibrary={onAddToLibrary}
-              />
-            </div>
-
-            {/* Touch: small + trigger (hidden on hover-capable devices) */}
+        {/* "Review Later" — desktop hover overlay (hover-capable devices only) */}
+        {canAddToInbox ? (
+          <div
+            className="pointer-events-none absolute inset-0 flex flex-col items-stretch justify-end gap-1 p-1.5 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 transition-opacity duration-200 [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
-              className="[@media(hover:hover)]:hidden absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-ink-950/90 text-white/80 backdrop-blur-sm"
-              aria-label="Add game"
-              onClick={(e) => {
-                e.stopPropagation();
-                setTouchOverlayOpen(true);
-              }}
+              className="w-full rounded-lg bg-amber-400/90 px-2 py-1.5 text-[10px] font-semibold text-ink-950 transition hover:bg-amber-400"
+              onClick={() => onAddToInbox(game, candidate.reason ?? '')}
             >
-              <span className="text-sm font-bold leading-none">+</span>
+              Review Later
             </button>
+          </div>
+        ) : null}
 
-            {/* Touch overlay (state-driven) */}
-            {touchOverlayOpen ? (
-              <div
-                className="absolute inset-0 flex flex-col items-stretch justify-center gap-1.5 p-2 bg-black/85 backdrop-blur-sm"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ActionButtons
-                  game={game}
-                  libraryStatus={libraryStatus}
-                  onAddToWishlist={onAddToWishlist}
-                  onAddToLibrary={onAddToLibrary}
-                  onClose={() => setTouchOverlayOpen(false)}
-                />
-                <button
-                  type="button"
-                  className="mt-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-400"
-                  onClick={() => setTouchOverlayOpen(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : null}
-          </>
+        {/* "Review Later" — persistent touch button (non-hover devices only) */}
+        {canAddToInbox ? (
+          <button
+            type="button"
+            className="[@media(hover:hover)]:hidden absolute bottom-1.5 right-1.5 rounded-lg bg-amber-400/90 px-2 py-1 text-[9px] font-semibold text-ink-950 backdrop-blur-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToInbox(game, candidate.reason ?? '');
+            }}
+          >
+            Review Later
+          </button>
         ) : null}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Card body                                                            */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Card body */}
       <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
         <p className="line-clamp-2 text-xs font-semibold leading-snug text-white">
           {game.title}
         </p>
 
-        {/* Year */}
         {year ? (
           <p className="text-[10px] leading-none text-slate-600">{year}</p>
         ) : null}
 
-        {/* Genre chips */}
         {displayedGenres.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {displayedGenres.map((genre) => (
@@ -183,13 +139,12 @@ export function DiscoveryGameCard({
           </div>
         ) : null}
 
-        {/* Recommendation reason */}
         {candidate.reason ? (
           <p className="text-[9px] italic leading-snug text-slate-600">{candidate.reason}</p>
         ) : null}
 
-        {/* Library badges */}
-        {libraryStatus ? (
+        {/* Status badges */}
+        {(isOwned || inboxStatus) ? (
           <div className="mt-auto flex flex-wrap gap-1 pt-0.5">
             {isLibraryGame ? (
               <span className="inline-flex rounded-full bg-mint/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-mint">
@@ -199,67 +154,15 @@ export function DiscoveryGameCard({
               <span className="inline-flex rounded-full bg-purple-400/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-purple-300">
                 Wishlist
               </span>
+            ) : inboxStatus ? (
+              <span className="inline-flex rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+                In Inbox
+              </span>
             ) : null}
           </div>
         ) : null}
       </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Action buttons — shared between hover overlay and touch overlay
-// ---------------------------------------------------------------------------
-
-function ActionButtons({
-  game,
-  libraryStatus,
-  onAddToWishlist,
-  onAddToLibrary,
-  onClose,
-}: {
-  game: DiscoveryGame;
-  libraryStatus: DiscoveryCandidate['libraryStatus'];
-  onAddToWishlist?: (game: DiscoveryGame) => void;
-  onAddToLibrary?: (game: DiscoveryGame) => void;
-  onClose?: () => void;
-}) {
-  function act(fn: (() => void) | undefined) {
-    fn?.();
-    onClose?.();
-  }
-
-  return (
-    <>
-      {libraryStatus !== 'library' && onAddToLibrary ? (
-        <button
-          type="button"
-          className="w-full rounded-lg bg-mint/90 px-2 py-1.5 text-[10px] font-semibold text-ink-950 transition hover:bg-mint"
-          onClick={() => act(() => onAddToLibrary(game))}
-        >
-          + Library
-        </button>
-      ) : null}
-      {libraryStatus !== 'wishlist' && libraryStatus !== 'library' && onAddToWishlist ? (
-        <button
-          type="button"
-          className="w-full rounded-lg border border-white/15 bg-ink-900/80 px-2 py-1.5 text-[10px] font-semibold text-slate-300 transition hover:bg-ink-800 hover:text-white"
-          onClick={() => act(() => onAddToWishlist(game))}
-        >
-          + Wishlist
-        </button>
-      ) : null}
-      {/* Wishlist game — can still add to library */}
-      {libraryStatus === 'wishlist' && onAddToLibrary ? (
-        <button
-          type="button"
-          className="w-full rounded-lg bg-mint/90 px-2 py-1.5 text-[10px] font-semibold text-ink-950 transition hover:bg-mint"
-          onClick={() => act(() => onAddToLibrary(game))}
-        >
-          + Library
-        </button>
-      ) : null}
-    </>
   );
 }
 

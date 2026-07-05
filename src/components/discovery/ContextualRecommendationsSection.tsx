@@ -10,17 +10,17 @@ const SKELETON_COUNT = 5;
 type Props = {
   game: Game;
   userGames: Game[];
+  inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
-  onAddToWishlist?: (game: DiscoveryGame) => void;
-  onAddToLibrary?: (game: DiscoveryGame) => void;
+  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
 };
 
 export function ContextualRecommendationsSection({
   game,
   userGames,
+  inboxRawgIds,
   onSelectGame,
-  onAddToWishlist,
-  onAddToLibrary,
+  onAddToInbox,
 }: Props) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
 
@@ -47,7 +47,7 @@ export function ContextualRecommendationsSection({
     let cancelled = false;
     if (candidates !== null) setCandidates(null); // show skeleton on key change
 
-    fetchContextualRecommendations(game, userGames).then((result) => {
+    fetchContextualRecommendations(game, userGames, inboxRawgIds).then((result) => {
       if (!cancelled) setCandidates(result);
     });
 
@@ -56,17 +56,17 @@ export function ContextualRecommendationsSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchKey]);
 
-  // Lightweight re-apply when userGames changes without a fetchKey change
-  // (e.g., a wishlist or library badge needs updating after a quick-add action).
+  // Lightweight re-apply when userGames or inboxRawgIds changes without a fetchKey change
+  // (e.g., a wishlist/inbox badge needs updating after a quick-add action).
   useEffect(() => {
     if (candidates === null || !fetchKey) return;
     let cancelled = false;
-    fetchContextualRecommendations(game, userGames).then((result) => {
+    fetchContextualRecommendations(game, userGames, inboxRawgIds).then((result) => {
       if (!cancelled) setCandidates(result);
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userGames]);
+  }, [userGames, inboxRawgIds]);
 
   if (!game.rawgId) return null;
   if (candidates !== null && candidates.length === 0) return null;
@@ -87,8 +87,7 @@ export function ContextualRecommendationsSection({
                   ? () => onSelectGame(candidate.game)
                   : undefined
               }
-              onAddToWishlist={onAddToWishlist}
-              onAddToLibrary={onAddToLibrary}
+              onAddToInbox={onAddToInbox}
             />
           ))
         )}
