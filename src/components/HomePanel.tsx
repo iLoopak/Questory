@@ -23,6 +23,8 @@ import { HomeRecommendationsSection } from './home/HomeRecommendationsSection';
 import { GamePosterButton } from './home/GamePosterButton';
 import { NextAdventureCard } from './home/NextAdventureCard';
 import { WishlistDealCard, WishlistDealActionSheet } from './home/WishlistDealCard';
+import { useHomeWidgetPreferences } from '../hooks/useHomeWidgetPreferences';
+import { homeWidgetRegistry } from '../lib/homeWidgetPreferences';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type HomePanelProps = {
@@ -43,6 +45,7 @@ type HomePanelProps = {
   onOpenLibrary: () => void;
   onOpenQueue: (platform?: GamePlatform) => void;
   onOpenReviewMode: (source: ReviewSource) => void;
+  onOpenSettings?: () => void;
   onOpenWishlist: () => void;
   onPlayToday: (game: Game) => void;
   onQuickNote: (gameId: string, note: string) => void;
@@ -81,6 +84,7 @@ export function HomePanel({
   onOpenLibrary,
   onOpenQueue,
   onOpenReviewMode,
+  onOpenSettings,
   onOpenWishlist,
   onPlayToday,
   onQuickNote,
@@ -96,6 +100,7 @@ export function HomePanel({
   discoveryInboxRawgIds = new Set(),
 }: HomePanelProps) {
   const { t } = useI18n();
+  const { preferences: homeWidgets } = useHomeWidgetPreferences();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
   const [dealSheetGame, setDealSheetGame] = useState<Game | null>(null);
   const [syncSheetOpen, setSyncSheetOpen] = useState(false);
@@ -371,6 +376,26 @@ export function HomePanel({
     return () => window.removeEventListener('keydown', handleHomeKeyDown);
   }, [actionSheetGame, onOpenLibrary, onOpenQueue, onOpenReviewMode]);
 
+  // Per-widget render gates: user preference AND (existing) data conditions.
+  const showContinuePlaying = homeWidgets.continuePlaying;
+  const showNextAdventure = homeWidgets.nextAdventure;
+  const showQuestoryAchievements = homeWidgets.questoryAchievements;
+  const showSteamAchievements = homeWidgets.steamAchievements;
+  const showWishlistDeals = homeWidgets.wishlistDeals && wishlistGames.length > 0;
+  const showDailyQuest = homeWidgets.dailyQuest && libraryGames.length > 0;
+  const showAchievementQuiz = homeWidgets.achievementQuiz && libraryGames.length > 0;
+  const showQuestoryJourney = homeWidgets.questoryJourney;
+  const showQuestQueue = homeWidgets.questQueue && libraryGames.length > 0;
+  const showRecommendations = homeWidgets.recommendations && !!onSelectDiscoveryGame && libraryGames.length > 0;
+
+  const leftColumnHasContent = showContinuePlaying || showNextAdventure || showQuestoryAchievements || showSteamAchievements;
+  const rightColumnHasContent =
+    showWishlistDeals || showDailyQuest || showAchievementQuiz || showQuestoryJourney || showQuestQueue || showRecommendations;
+  const useTwoColumn = leftColumnHasContent && rightColumnHasContent;
+  // Empty-state fallback is keyed on preferences only, so a brand-new user (who has
+  // data-driven empty states but all widgets enabled) never sees it.
+  const anyWidgetEnabled = homeWidgetRegistry.some((widget) => homeWidgets[widget.id]);
+
   return (
     <section ref={shellRef} className="qs-home-shell space-y-4 pb-4 pt-2">
       {/* Compact Hero — full width */}
@@ -462,11 +487,16 @@ export function HomePanel({
         />
       )}
 
-      {/* Two-column layout on desktop — no overflow on either column, window scroll only */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4">
+      {!anyWidgetEnabled ? (
+        <HomeWidgetsEmptyState onOpenSettings={onOpenSettings} t={t} />
+      ) : (
+      /* Two-column layout on desktop — no overflow on either column, window scroll only */
+      <div className={useTwoColumn ? 'lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4' : ''}>
         {/* Left: main content */}
+        {leftColumnHasContent ? (
         <div className="space-y-4">
           {/* Continue Playing */}
+          {showContinuePlaying ? (
           <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
             {continuePlayingGames.length > 0 ? (
               <div className="qs-home-continue-playing-grid">
@@ -496,9 +526,11 @@ export function HomePanel({
               />
             )}
           </HomeSection>
+          ) : null}
 
 
           {/* Next Adventure — top candidate per active Platform Plan */}
+          {showNextAdventure ? (
           <HomeSection title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
             {nextAdventureEntries.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -524,8 +556,10 @@ export function HomePanel({
               />
             )}
           </HomeSection>
+          ) : null}
 
           {/* Questory Achievements showcase */}
+          {showQuestoryAchievements ? (
           <HomeWidgetErrorBoundary title={t('home.qsAchievements')}>
             <HomeAchievementsShowcase
               games={games}
@@ -533,8 +567,10 @@ export function HomePanel({
               reviewModeState={reviewModeState}
             />
           </HomeWidgetErrorBoundary>
+          ) : null}
 
           {/* Steam Achievements progress companion */}
+          {showSteamAchievements ? (
           <HomeWidgetErrorBoundary title={t('home.steamAchievements')}>
             <HomeSteamAchievementsWidget
               games={games}
@@ -543,13 +579,16 @@ export function HomePanel({
               onSyncSteamAchievements={onSyncSteamAchievements}
             />
           </HomeWidgetErrorBoundary>
+          ) : null}
 
         </div>
+        ) : null}
 
         {/* Right sidebar — stacks below main on mobile, sits beside it on desktop */}
-        <div className="mt-4 space-y-4 lg:mt-0">
+        {rightColumnHasContent ? (
+        <div className={`space-y-4${useTwoColumn ? ' mt-4 lg:mt-0' : ''}`}>
           {/* Wishlist Deals — hidden entirely until the user has a wishlist */}
-          {wishlistGames.length > 0 ? (
+          {showWishlistDeals ? (
             <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
               {wishlistDeals.length > 0 ? (
                 <div className="space-y-3">
@@ -573,12 +612,13 @@ export function HomePanel({
           ) : null}
 
           {/* Daily Quest */}
-          {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
+          {showDailyQuest ? <DailyQuestCard games={games} /> : null}
 
           {/* Achievement Quiz — needs a library to quiz about */}
-          {libraryGames.length > 0 ? <AchievementQuizCard games={games} /> : null}
+          {showAchievementQuiz ? <AchievementQuizCard games={games} /> : null}
 
           {/* Questory Journey */}
+          {showQuestoryJourney ? (
           <JourneyProgressCard
             importedCount={libraryGames.length}
             platformPlanCount={activePlatformCount}
@@ -589,9 +629,10 @@ export function HomePanel({
             nextReviewTarget={nextReviewTarget}
             onOpenReviewMode={() => onOpenReviewMode('backlog')}
           />
+          ) : null}
 
           {/* Quest Queue Remaining — hidden until there is a library to review */}
-          {libraryGames.length > 0 ? (
+          {showQuestQueue ? (
           <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
             <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
             <button
@@ -627,16 +668,20 @@ export function HomePanel({
           </section>
           ) : null}
 
-          <HomeRecommendationsSection
-            games={games}
-            libraryGameCount={libraryGames.length}
-            inboxRawgIds={discoveryInboxRawgIds}
-            onSelectGame={onSelectDiscoveryGame}
-            onOpenPreview={onOpenDiscoveryPreview}
-          />
+          {showRecommendations ? (
+            <HomeRecommendationsSection
+              games={games}
+              libraryGameCount={libraryGames.length}
+              inboxRawgIds={discoveryInboxRawgIds}
+              onSelectGame={onSelectDiscoveryGame}
+              onOpenPreview={onOpenDiscoveryPreview}
+            />
+          ) : null}
 
         </div>
+        ) : null}
       </div>
+      )}
 
       {/* Deal sheet for wishlist deal cards */}
       {dealSheetGame ? (
@@ -692,6 +737,34 @@ export function HomePanel({
             setActionSheetGame(null);
           }}
         />
+      ) : null}
+    </section>
+  );
+}
+
+function HomeWidgetsEmptyState({
+  onOpenSettings,
+  t,
+}: {
+  onOpenSettings?: () => void;
+  t: ReturnType<typeof useI18n>['t'];
+}) {
+  return (
+    <section className="rounded-2xl border border-dashed border-skyglass/20 bg-ink-900/60 p-5 text-center shadow-panel">
+      <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-skyglass/20 bg-ink-950/60 text-slate-400">
+        <Icon name="sparkles" size={18} />
+      </span>
+      <h3 className="mt-3 text-base font-semibold text-white">{t('home.allWidgetsHiddenTitle')}</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-slate-400">{t('home.allWidgetsHiddenText')}</p>
+      {onOpenSettings ? (
+        <button
+          className="mt-4 min-h-11 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"
+          data-home-focus="true"
+          onClick={onOpenSettings}
+          type="button"
+        >
+          {t('home.allWidgetsHiddenAction')}
+        </button>
       ) : null}
     </section>
   );
