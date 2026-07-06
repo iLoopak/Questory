@@ -24,7 +24,7 @@ import { GamePosterButton } from './home/GamePosterButton';
 import { NextAdventureCard } from './home/NextAdventureCard';
 import { WishlistDealCard, WishlistDealActionSheet } from './home/WishlistDealCard';
 import { useHomeWidgetPreferences } from '../hooks/useHomeWidgetPreferences';
-import { homeWidgetRegistry } from '../lib/homeWidgetPreferences';
+import { homeWidgetRegistry, orderedWidgetIdsForColumn, type HomeWidgetId } from '../lib/homeWidgetPreferences';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type HomePanelProps = {
@@ -376,28 +376,221 @@ export function HomePanel({
     return () => window.removeEventListener('keydown', handleHomeKeyDown);
   }, [actionSheetGame, onOpenLibrary, onOpenQueue, onOpenReviewMode]);
 
-  // Per-widget render gates: user preference AND (existing) data conditions.
-  const showContinuePlaying = homeWidgets.continuePlaying;
-  const showNextAdventure = homeWidgets.nextAdventure;
-  const showQuestoryAchievements = homeWidgets.questoryAchievements;
-  const showSteamAchievements = homeWidgets.steamAchievements;
-  const showWishlistDeals = homeWidgets.wishlistDeals && wishlistGames.length > 0;
-  const showDailyQuest = homeWidgets.dailyQuest && libraryGames.length > 0;
-  const showAchievementQuiz = homeWidgets.achievementQuiz && libraryGames.length > 0;
-  const showQuestoryJourney = homeWidgets.questoryJourney;
-  const showQuestQueue = homeWidgets.questQueue && libraryGames.length > 0;
-  const showRecommendations = homeWidgets.recommendations && !!onSelectDiscoveryGame && libraryGames.length > 0;
+  // Per-widget visibility: user preference AND (existing) data conditions.
+  const enabledWidgets = homeWidgets.enabled;
+  const widgetVisible: Record<HomeWidgetId, boolean> = {
+    continuePlaying: enabledWidgets.continuePlaying,
+    nextAdventure: enabledWidgets.nextAdventure,
+    questoryAchievements: enabledWidgets.questoryAchievements,
+    steamAchievements: enabledWidgets.steamAchievements,
+    wishlistDeals: enabledWidgets.wishlistDeals && wishlistGames.length > 0,
+    dailyQuest: enabledWidgets.dailyQuest && libraryGames.length > 0,
+    achievementQuiz: enabledWidgets.achievementQuiz && libraryGames.length > 0,
+    questoryJourney: enabledWidgets.questoryJourney,
+    questQueue: enabledWidgets.questQueue && libraryGames.length > 0,
+    recommendations: enabledWidgets.recommendations && !!onSelectDiscoveryGame && libraryGames.length > 0,
+  };
 
-  const leftColumnHasContent = showContinuePlaying || showNextAdventure || showQuestoryAchievements || showSteamAchievements;
-  const rightColumnHasContent =
-    showWishlistDeals || showDailyQuest || showAchievementQuiz || showQuestoryJourney || showQuestQueue || showRecommendations;
+  const mainWidgetOrder = orderedWidgetIdsForColumn(homeWidgets, 'main');
+  const sidebarWidgetOrder = orderedWidgetIdsForColumn(homeWidgets, 'sidebar');
+  const leftColumnHasContent = mainWidgetOrder.some((id) => widgetVisible[id]);
+  const rightColumnHasContent = sidebarWidgetOrder.some((id) => widgetVisible[id]);
   const useTwoColumn = leftColumnHasContent && rightColumnHasContent;
   // Empty-state fallback is keyed on preferences only, so a brand-new user (who has
   // data-driven empty states but all widgets enabled) never sees it.
-  const anyWidgetEnabled = homeWidgetRegistry.some((widget) => homeWidgets[widget.id]);
+  const anyWidgetEnabled = homeWidgetRegistry.some((widget) => enabledWidgets[widget.id]);
+
+  // Renders a single widget by id (in the user's chosen order). Returns null when
+  // the widget is disabled or has no data to show, so empty slots never leave gaps.
+  function renderWidget(id: HomeWidgetId): ReactNode {
+    if (!widgetVisible[id]) return null;
+
+    switch (id) {
+      case 'continuePlaying':
+        return (
+          <HomeSection key={id} title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
+            {continuePlayingGames.length > 0 ? (
+              <div className="qs-home-continue-playing-grid">
+                {continuePlayingGames.map((game) => (
+                  <GamePosterButton
+                    key={game.id}
+                    game={game}
+                    hero={continuePlayingGames.length === 1}
+                    activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
+                    onClick={() => setActionSheetGame(game)}
+                    queueState={queueState}
+                  />
+                ))}
+              </div>
+            ) : libraryGames.length > 0 ? (
+              <NoActiveGamesGuide
+                libraryGamesCount={libraryGames.length}
+                onOpenLibrary={onOpenLibrary}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+              />
+            ) : (
+              <OnboardingSteps
+                onOpenLibrary={onOpenLibrary}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+                t={t}
+              />
+            )}
+          </HomeSection>
+        );
+
+      case 'nextAdventure':
+        return (
+          <HomeSection key={id} title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
+            {nextAdventureEntries.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {nextAdventureEntries.map(({ entry, game }) => (
+                  <NextAdventureCard
+                    key={entry.gameId}
+                    entry={entry}
+                    game={game}
+                    queueState={queueState}
+                    onPlay={() => setActionSheetGame(game)}
+                    onOpenPlan={() => onOpenQueue(entry.targetPlatform)}
+                    t={t}
+                  />
+                ))}
+              </div>
+            ) : (
+              <NoNextAdventureGuide
+                hasLibraryGames={libraryGames.length > 0}
+                hasProcessedGames={queueEntries.length > 0 || continuePlayingGames.length > 0}
+                topPlatforms={topLibraryPlatforms}
+                onOpenQueue={onOpenQueue}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+              />
+            )}
+          </HomeSection>
+        );
+
+      case 'questoryAchievements':
+        return (
+          <HomeWidgetErrorBoundary key={id} title={t('home.qsAchievements')}>
+            <HomeAchievementsShowcase
+              games={games}
+              queueState={queueState}
+              reviewModeState={reviewModeState}
+            />
+          </HomeWidgetErrorBoundary>
+        );
+
+      case 'steamAchievements':
+        return (
+          <HomeWidgetErrorBoundary key={id} title={t('home.steamAchievements')}>
+            <HomeSteamAchievementsWidget
+              games={games}
+              isSteamAchievementSyncing={isSteamAchievementSyncing}
+              onOpenTimeline={onOpenAchievementTimeline}
+              onSyncSteamAchievements={onSyncSteamAchievements}
+            />
+          </HomeWidgetErrorBoundary>
+        );
+
+      case 'wishlistDeals':
+        return (
+          <HomeSection key={id} compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
+            {wishlistDeals.length > 0 ? (
+              <div className="space-y-3">
+                <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
+                <div className="border-t border-skyglass/10" />
+                <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
+                  {wishlistDeals.map((game) => (
+                    <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <WishlistNoDealsState
+                wishlistCount={wishlistGames.length}
+                canSync={!!onSyncItadDeals}
+                onOpenWishlist={onOpenWishlist}
+                onSyncDeals={onSyncItadDeals}
+              />
+            )}
+          </HomeSection>
+        );
+
+      case 'dailyQuest':
+        return <DailyQuestCard key={id} games={games} />;
+
+      case 'achievementQuiz':
+        return <AchievementQuizCard key={id} games={games} />;
+
+      case 'questoryJourney':
+        return (
+          <JourneyProgressCard
+            key={id}
+            importedCount={libraryGames.length}
+            platformPlanCount={activePlatformCount}
+            reviewedCount={reviewedCount}
+            reviewStats={reviewModeState.stats}
+            startedAdventureCount={startedAdventureCount}
+            unratedFinishedCount={unratedFinishedCount}
+            nextReviewTarget={nextReviewTarget}
+            onOpenReviewMode={() => onOpenReviewMode('backlog')}
+          />
+        );
+
+      case 'questQueue':
+        return (
+          <section key={id} className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+            <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
+            <button
+              className="mt-2 cursor-pointer text-left transition hover:opacity-75 focus:outline-none"
+              onClick={() => onOpenReviewMode('backlog')}
+              type="button"
+              aria-label="Open Quest Queue"
+            >
+              <div className="text-3xl font-semibold tabular-nums text-white">{reviewRemainingCount}</div>
+            </button>
+            <p className="mt-1 text-sm text-slate-300">
+              {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
+            </p>
+            {nextReviewCandidate ? (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-skyglass/15 bg-ink-950/50 px-3 py-2">
+                <span className="qs-home-next-candidate-label shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">{nextReviewCandidate.title}</span>
+              </div>
+            ) : null}
+            <button
+              className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+              data-home-focus="true"
+              onClick={() => onOpenReviewMode('backlog')}
+              type="button"
+            >
+              {t('home.reviewNextGame')}
+            </button>
+            {reviewRemainingCount > 10 && (
+              <p className="mt-2 text-xs text-slate-600">
+                {t('home.reviewMoreHint')}
+              </p>
+            )}
+          </section>
+        );
+
+      case 'recommendations':
+        return (
+          <HomeRecommendationsSection
+            key={id}
+            games={games}
+            libraryGameCount={libraryGames.length}
+            inboxRawgIds={discoveryInboxRawgIds}
+            onSelectGame={onSelectDiscoveryGame}
+            onOpenPreview={onOpenDiscoveryPreview}
+          />
+        );
+
+      default:
+        return null;
+    }
+  }
 
   return (
-    <section ref={shellRef} className="qs-home-shell space-y-4 pb-4 pt-2">
+    <section ref={shellRef} className={`qs-home-shell space-y-4 pb-4 pt-2${homeWidgets.compact ? ' qs-home-compact' : ''}`}>
       {/* Compact Hero — full width */}
       <section className="qs-home-hero relative flex items-center gap-3 rounded-xl border border-skyglass/15 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-2 shadow-panel">
         {avatar}
@@ -492,193 +685,13 @@ export function HomePanel({
       ) : (
       /* Two-column layout on desktop — no overflow on either column, window scroll only */
       <div className={useTwoColumn ? 'lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4' : ''}>
-        {/* Left: main content */}
         {leftColumnHasContent ? (
-        <div className="space-y-4">
-          {/* Continue Playing */}
-          {showContinuePlaying ? (
-          <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
-            {continuePlayingGames.length > 0 ? (
-              <div className="qs-home-continue-playing-grid">
-                {continuePlayingGames.map((game) => (
-                  <GamePosterButton
-                    key={game.id}
-                    game={game}
-
-                    hero={continuePlayingGames.length === 1}
-                    activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
-                    onClick={() => setActionSheetGame(game)}
-                    queueState={queueState}
-                  />
-                ))}
-              </div>
-            ) : libraryGames.length > 0 ? (
-              <NoActiveGamesGuide
-                libraryGamesCount={libraryGames.length}
-                onOpenLibrary={onOpenLibrary}
-                onOpenReviewMode={() => onOpenReviewMode('backlog')}
-              />
-            ) : (
-              <OnboardingSteps
-                onOpenLibrary={onOpenLibrary}
-                onOpenReviewMode={() => onOpenReviewMode('backlog')}
-                t={t}
-              />
-            )}
-          </HomeSection>
-          ) : null}
-
-
-          {/* Next Adventure — top candidate per active Platform Plan */}
-          {showNextAdventure ? (
-          <HomeSection title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
-            {nextAdventureEntries.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {nextAdventureEntries.map(({ entry, game }) => (
-                  <NextAdventureCard
-                    key={entry.gameId}
-                    entry={entry}
-                    game={game}
-                    queueState={queueState}
-                    onPlay={() => setActionSheetGame(game)}
-                    onOpenPlan={() => onOpenQueue(entry.targetPlatform)}
-                    t={t}
-                  />
-                ))}
-              </div>
-            ) : (
-              <NoNextAdventureGuide
-                hasLibraryGames={libraryGames.length > 0}
-                hasProcessedGames={queueEntries.length > 0 || continuePlayingGames.length > 0}
-                topPlatforms={topLibraryPlatforms}
-                onOpenQueue={onOpenQueue}
-                onOpenReviewMode={() => onOpenReviewMode('backlog')}
-              />
-            )}
-          </HomeSection>
-          ) : null}
-
-          {/* Questory Achievements showcase */}
-          {showQuestoryAchievements ? (
-          <HomeWidgetErrorBoundary title={t('home.qsAchievements')}>
-            <HomeAchievementsShowcase
-              games={games}
-              queueState={queueState}
-              reviewModeState={reviewModeState}
-            />
-          </HomeWidgetErrorBoundary>
-          ) : null}
-
-          {/* Steam Achievements progress companion */}
-          {showSteamAchievements ? (
-          <HomeWidgetErrorBoundary title={t('home.steamAchievements')}>
-            <HomeSteamAchievementsWidget
-              games={games}
-              isSteamAchievementSyncing={isSteamAchievementSyncing}
-              onOpenTimeline={onOpenAchievementTimeline}
-              onSyncSteamAchievements={onSyncSteamAchievements}
-            />
-          </HomeWidgetErrorBoundary>
-          ) : null}
-
-        </div>
+          <div className="space-y-4">{mainWidgetOrder.map(renderWidget)}</div>
         ) : null}
 
         {/* Right sidebar — stacks below main on mobile, sits beside it on desktop */}
         {rightColumnHasContent ? (
-        <div className={`space-y-4${useTwoColumn ? ' mt-4 lg:mt-0' : ''}`}>
-          {/* Wishlist Deals — hidden entirely until the user has a wishlist */}
-          {showWishlistDeals ? (
-            <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
-              {wishlistDeals.length > 0 ? (
-                <div className="space-y-3">
-                  <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
-                  <div className="border-t border-skyglass/10" />
-                  <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
-                    {wishlistDeals.map((game) => (
-                      <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <WishlistNoDealsState
-                  wishlistCount={wishlistGames.length}
-                  canSync={!!onSyncItadDeals}
-                  onOpenWishlist={onOpenWishlist}
-                  onSyncDeals={onSyncItadDeals}
-                />
-              )}
-            </HomeSection>
-          ) : null}
-
-          {/* Daily Quest */}
-          {showDailyQuest ? <DailyQuestCard games={games} /> : null}
-
-          {/* Achievement Quiz — needs a library to quiz about */}
-          {showAchievementQuiz ? <AchievementQuizCard games={games} /> : null}
-
-          {/* Questory Journey */}
-          {showQuestoryJourney ? (
-          <JourneyProgressCard
-            importedCount={libraryGames.length}
-            platformPlanCount={activePlatformCount}
-            reviewedCount={reviewedCount}
-            reviewStats={reviewModeState.stats}
-            startedAdventureCount={startedAdventureCount}
-            unratedFinishedCount={unratedFinishedCount}
-            nextReviewTarget={nextReviewTarget}
-            onOpenReviewMode={() => onOpenReviewMode('backlog')}
-          />
-          ) : null}
-
-          {/* Quest Queue Remaining — hidden until there is a library to review */}
-          {showQuestQueue ? (
-          <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
-            <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
-            <button
-              className="mt-2 cursor-pointer text-left transition hover:opacity-75 focus:outline-none"
-              onClick={() => onOpenReviewMode('backlog')}
-              type="button"
-              aria-label="Open Quest Queue"
-            >
-              <div className="text-3xl font-semibold tabular-nums text-white">{reviewRemainingCount}</div>
-            </button>
-            <p className="mt-1 text-sm text-slate-300">
-              {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
-            </p>
-            {nextReviewCandidate ? (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-skyglass/15 bg-ink-950/50 px-3 py-2">
-                <span className="qs-home-next-candidate-label shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
-                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">{nextReviewCandidate.title}</span>
-              </div>
-            ) : null}
-            <button
-              className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-              data-home-focus="true"
-              onClick={() => onOpenReviewMode('backlog')}
-              type="button"
-            >
-              {t('home.reviewNextGame')}
-            </button>
-            {reviewRemainingCount > 10 && (
-              <p className="mt-2 text-xs text-slate-600">
-                {t('home.reviewMoreHint')}
-              </p>
-            )}
-          </section>
-          ) : null}
-
-          {showRecommendations ? (
-            <HomeRecommendationsSection
-              games={games}
-              libraryGameCount={libraryGames.length}
-              inboxRawgIds={discoveryInboxRawgIds}
-              onSelectGame={onSelectDiscoveryGame}
-              onOpenPreview={onOpenDiscoveryPreview}
-            />
-          ) : null}
-
-        </div>
+          <div className={`space-y-4${useTwoColumn ? ' mt-4 lg:mt-0' : ''}`}>{sidebarWidgetOrder.map(renderWidget)}</div>
         ) : null}
       </div>
       )}
