@@ -198,6 +198,10 @@ body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   background: var(--body-background);
+  /* Crisper light-on-dark text on macOS/iOS WebKit & Blink. No-op elsewhere and
+     cheaper than text-rendering: optimizeLegibility (avoided for handheld perf). */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
