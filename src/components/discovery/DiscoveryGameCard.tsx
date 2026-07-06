@@ -1,5 +1,6 @@
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { Icon } from '../Icon';
+import { useI18n } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // DiscoveryCompactCard — matches WishlistDealCard proportions (w-36, no
@@ -18,20 +19,21 @@ function compactMetacriticClass(score: number): string {
 }
 
 export function DiscoveryCompactCard({ candidate, onClick }: CompactProps) {
+  const { t } = useI18n();
   const { game, libraryStatus, inboxStatus, reason } = candidate;
 
   const statusBadge =
     libraryStatus === 'library' ? (
       <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">
-        In Library
+        {t('discovery.inLibrary')}
       </div>
     ) : libraryStatus === 'wishlist' ? (
       <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-purple-400/90 px-1.5 py-0.5 text-xs font-bold text-purple-950">
-        Wishlisted
+        {t('discovery.wishlisted')}
       </div>
     ) : inboxStatus ? (
       <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-amber-950">
-        In Inbox
+        {t('discovery.inInbox')}
       </div>
     ) : null;
 

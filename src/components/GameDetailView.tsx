@@ -182,7 +182,7 @@ export function GameDetailView({
   const primaryActions: GameDetailAction[] = [
     {
       icon: 'list-plus',
-      label: 'Quest Queue',
+      label: t('action.platformPlans'),
       onClick: () => onAddToQueue?.(game),
       tone: 'accent',
       disabled: !onAddToQueue,

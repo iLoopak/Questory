@@ -125,18 +125,18 @@ export function DiscoveryPreviewPanel({
   const description = details?.description_raw?.trim();
 
   const collectionStatus = isInLibrary
-    ? 'In Library'
+    ? t('discovery.inLibrary')
     : isInWishlist
-      ? 'In Wishlist'
+      ? t('discovery.inWishlist')
       : isInInbox
-        ? 'In Discovery Inbox'
-        : 'Not in library yet';
+        ? t('discovery.inDiscoveryInbox')
+        : t('discovery.notInLibrary');
 
   const previewActions: GameDetailAction[] = isInLibrary
     ? [
         {
           icon: 'gamepad-2',
-          label: 'Open Game Hub',
+          label: t('preview.openGameHub'),
           onClick: () => onOpenLibraryGame?.(game),
           tone: 'accent',
           disabled: !onOpenLibraryGame,
@@ -146,13 +146,13 @@ export function DiscoveryPreviewPanel({
       ? [
           {
             icon: 'library',
-            label: 'Move to Library',
+            label: t('preview.moveToLibrary'),
             onClick: () => onAddToLibrary(game),
             tone: 'accent',
           },
           {
             icon: 'heart',
-            label: 'In your Wishlist',
+            label: t('discovery.inYourWishlist'),
             onClick: () => {},
             tone: 'neutral',
             disabled: true,
@@ -162,26 +162,26 @@ export function DiscoveryPreviewPanel({
           isInInbox
             ? {
                 icon: 'check' as const,
-                label: 'In Discovery Inbox',
+                label: t('discovery.inDiscoveryInbox'),
                 onClick: () => {},
                 tone: 'neutral' as const,
                 disabled: true,
               }
             : {
                 icon: 'list-plus' as const,
-                label: 'Review Later',
+                label: t('action.reviewLater'),
                 onClick: () => onAddToInbox(game, reason ?? ''),
                 tone: 'accent' as const,
               },
           {
             icon: 'heart',
-            label: 'Add to Wishlist',
+            label: t('preview.addToWishlist'),
             onClick: () => onAddToWishlist(game),
             tone: 'neutral',
           },
           {
             icon: 'library',
-            label: 'Add to Library',
+            label: t('preview.addToLibrary'),
             onClick: () => onAddToLibrary(game),
             tone: 'accent',
           },
@@ -190,7 +190,7 @@ export function DiscoveryPreviewPanel({
   return (
     <div
       ref={dialogRef}
-      aria-label={`Preview: ${game.title}`}
+      aria-label={`${t('action.preview')}: ${game.title}`}
       aria-modal="true"
       className="fixed inset-0 z-50 bg-ink-950"
       onKeyDown={handleTrapKeyDown}
@@ -201,24 +201,24 @@ export function DiscoveryPreviewPanel({
         <div className="mx-auto max-w-6xl space-y-3 sm:space-y-4">
           <GameHero
             game={previewGame}
-            kicker="Discovery Preview"
+            kicker={t('preview.kicker')}
             onBack={onClose}
             stats={<>
               <HeroStat label={t('detail.platformSource')} value={previewGame.platform} />
               <HeroStat label={t('detail.currentStatus')} value={collectionStatus} accent={isInLibrary || isInWishlist} />
-              {releaseYear ? <HeroStat label="Released" value={releaseYear} /> : null}
+              {releaseYear ? <HeroStat label={t('preview.released')} value={releaseYear} /> : null}
               {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-              {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
+              {rawgPlaytime ? <HeroStat label={t('preview.averagePlaytime')} value={rawgPlaytime} /> : null}
             </>}
           />
 
-          <GameDetailActionBar ariaLabel="Preview actions">
+          <GameDetailActionBar ariaLabel={t('preview.actionsA11y')}>
             {previewActions.map((action) => (
               <GameDetailActionButton key={action.label} action={action} />
             ))}
           </GameDetailActionBar>
 
-          <DetailSection title="About This Game" description="Decide whether this game belongs in your library.">
+          <DetailSection title={t('preview.aboutTitle')} description={t('preview.aboutDescription')}>
             {isLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }, (_, i) => (
@@ -232,18 +232,18 @@ export function DiscoveryPreviewPanel({
             ) : description ? (
               <p className="whitespace-pre-line text-sm leading-relaxed text-slate-300">{description}</p>
             ) : (
-              <p className="text-sm text-slate-600">No description available for this game.</p>
+              <p className="text-sm text-slate-600">{t('preview.noDescription')}</p>
             )}
           </DetailSection>
 
           {screenshotsLoading || screenshots.length > 0 ? (
-            <DetailSection title="Screenshots">
+            <DetailSection title={t('preview.screenshots')}>
               <DiscoveryScreenshotStrip rawgId={game.rawgId} title={game.title} />
             </DetailSection>
           ) : null}
 
           {reason ? (
-            <DetailSection title="Why This Recommendation">
+            <DetailSection title={t('preview.whyTitle')}>
               <p className="text-sm leading-relaxed text-slate-300">{reason}</p>
             </DetailSection>
           ) : null}
@@ -262,7 +262,7 @@ export function DiscoveryPreviewPanel({
             onSelectGame={(dg) => onOpenLibraryGame?.(dg)}
             onAddToInbox={onAddToInbox}
             onOpenPreview={onOpenPreview}
-            title="You Might Also Like"
+            title={t('preview.youMightAlsoLike')}
           />
         </div>
       </div>

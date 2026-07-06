@@ -4,6 +4,7 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { profileFingerprint } from '../../lib/userProfile';
 import { fetchContextualRecommendations } from '../../services/contextualRecommendationsService';
 import { GameCard } from '../GameCard';
+import { useI18n } from '../../i18n';
 
 const SKELETON_COUNT = 5;
 
@@ -68,8 +69,10 @@ export function ContextualRecommendationsSection({
   onSelectGame,
   onAddToInbox,
   onOpenPreview,
-  title = 'Because You Liked This',
+  title,
 }: Props) {
+  const { t } = useI18n();
+  const sectionTitle = title ?? t('recommendations.becauseYouLiked');
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
   const fetchKeyRef = useRef<string | null>(null);
 
@@ -116,8 +119,8 @@ export function ContextualRecommendationsSection({
   if (candidates !== null && candidates.length === 0) return null;
 
   return (
-    <section aria-label={title} className="space-y-3">
-      <h3 className="text-sm font-semibold text-white">{title}</h3>
+    <section aria-label={sectionTitle} className="space-y-3">
+      <h3 className="text-sm font-semibold text-white">{sectionTitle}</h3>
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {candidates === null ? (
           Array.from({ length: SKELETON_COUNT }, (_, i) => <CarouselSkeleton key={i} />)
@@ -135,7 +138,7 @@ export function ContextualRecommendationsSection({
                 <GameCard
                   game={adaptedGame}
                   suppressWantToPlayStatus={!isLibrary}
-                  detailsLabel={isLibrary ? undefined : 'Preview'}
+                  detailsLabel={isLibrary ? undefined : t('action.preview')}
                   hideActionMenu
                   onOpenDetails={
                     isLibrary
@@ -145,7 +148,7 @@ export function ContextualRecommendationsSection({
                   primaryAction={
                     canAddToInbox
                       ? {
-                          label: 'Review Later',
+                          label: t('action.reviewLater'),
                           onClick: () => onAddToInbox!(candidate.game, candidate.reason ?? ''),
                         }
                       : undefined

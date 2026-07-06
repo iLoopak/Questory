@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 import { GameCard } from './GameCard';
+import { EmptyState } from './EmptyState';
+import { useI18n, type TFunction } from '../i18n';
 import {
   fetchTrendingGames,
   fetchHiddenGems,
@@ -53,10 +55,10 @@ function metacriticColor(score: number): string {
   return 'text-red-400';
 }
 
-function getDiscoveryContext(candidate: DiscoveryCandidate): string | undefined {
-  if (candidate.libraryStatus === 'library') return 'In your library';
-  if (candidate.libraryStatus === 'wishlist') return 'In your wishlist';
-  if (candidate.inboxStatus) return 'In Discovery Inbox';
+function getDiscoveryContext(candidate: DiscoveryCandidate, t: TFunction): string | undefined {
+  if (candidate.libraryStatus === 'library') return t('discovery.inYourLibrary');
+  if (candidate.libraryStatus === 'wishlist') return t('discovery.inYourWishlist');
+  if (candidate.inboxStatus) return t('discovery.inDiscoveryInbox');
   return candidate.reason ?? undefined;
 }
 
@@ -84,6 +86,7 @@ function DiscoverGridSkeleton() {
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
 export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame }: DiscoverPanelProps) {
+  const { t } = useI18n();
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
 
   useEffect(() => {
@@ -107,9 +110,9 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
 
       const tagged = [
         ...recommended,
-        ...trending.map((c) => ({ ...c, reason: c.reason ?? 'Trending' })),
-        ...hiddenGems.map((c) => ({ ...c, reason: c.reason ?? 'Hidden Gem' })),
-        ...recent.map((c) => ({ ...c, reason: c.reason ?? 'Recently Released' })),
+        ...trending.map((c) => ({ ...c, reason: c.reason ?? t('discover.reason.trending') })),
+        ...hiddenGems.map((c) => ({ ...c, reason: c.reason ?? t('discover.reason.hiddenGem') })),
+        ...recent.map((c) => ({ ...c, reason: c.reason ?? t('discover.reason.recentlyReleased') })),
       ];
 
       for (const c of tagged) {
@@ -130,7 +133,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
     // games / discoveryInboxRawgIds re-stamp library and inbox status each time;
     // RAWG responses are served from module-level caches so re-fetching is fast.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [games, discoveryInboxRawgIds]);
+  }, [games, discoveryInboxRawgIds, t]);
 
   const adaptedGames = useMemo(
     () => (candidates ?? []).map((c) => candidateToGame(c, games)),
@@ -142,11 +145,12 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
       {candidates === null ? (
         <DiscoverGridSkeleton />
       ) : candidates.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <p className="text-sm text-slate-500">
-            No discoveries found. Play and finish more games to unlock personalised
-            recommendations.
-          </p>
+        <div className="mx-auto max-w-md py-16">
+          <EmptyState
+            icon="compass"
+            title={t('discover.empty.title')}
+            text={t('discover.empty.text')}
+          />
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2">
@@ -157,20 +161,20 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
             const canAddToInbox =
               !candidate.libraryStatus && !candidate.inboxStatus && onAddToInbox != null;
             const metacritic = candidate.game.metacritic;
-            const context = getDiscoveryContext(candidate);
+            const context = getDiscoveryContext(candidate, t);
 
             return (
               <GameCard
                 key={game.id}
                 game={game}
                 suppressWantToPlayStatus={candidate.libraryStatus === null}
-                detailsLabel="Preview"
+                detailsLabel={t('action.preview')}
                 hideActionMenu
                 onOpenDetails={() => onOpenGame(candidate)}
                 primaryAction={
                   canAddToInbox
                     ? {
-                        label: 'Review Later',
+                        label: t('action.reviewLater'),
                         onClick: () => onAddToInbox(candidate.game, candidate.reason ?? ''),
                       }
                     : undefined
