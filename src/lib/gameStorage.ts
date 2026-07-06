@@ -1,19 +1,32 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
 import { loadLocalJson, loadPersistedJson, savePersistedJson } from './localPersistence';
+import { createBlobGameRepository, type GameRepository } from './gameRepository';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
+/**
+ * Wave 1 seam. The public loadGames/saveGames API below now delegates to this
+ * repository, which is backed by the existing single-blob persistence — behavior is
+ * unchanged. A later IndexedDB implementation can replace this instance without any
+ * caller changing. Exported so future call sites can use per-record operations.
+ */
+export const gameRepository: GameRepository = createBlobGameRepository({
+  loadSync: () => loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames),
+  loadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
+  saveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
+});
+
 export function loadGames(): Game[] {
-  return loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames);
+  return gameRepository.getAllSync();
 }
 
 export function loadGamesFromPersistentStorage(): Promise<Game[]> {
-  return loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames);
+  return gameRepository.loadDurable();
 }
 
 export function saveGames(games: Game[]) {
-  savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games));
+  gameRepository.replaceAll(games);
 }
 
 export function getMockGames(): Game[] {

@@ -13,8 +13,14 @@ import {
   clearLocalStorageIssues,
   exportRawQuestShelfLocalData,
   getLocalStorageIssues,
+  storageIssueEventName,
   type LocalStorageIssue,
 } from '../lib/localPersistence';
+import {
+  formatBytes,
+  getStorageDiagnostics,
+  type StorageDiagnostics,
+} from '../lib/storageDiagnostics';
 import { portableSyncProviders } from '../lib/portableSync';
 import {
   chooseBackupFileHandle,
@@ -60,6 +66,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   );
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<StorageDiagnostics | null>(null);
   const autoBackupTimeoutRef = useRef<number | null>(null);
   const autoBackupSignalRef = useRef(autoBackupSignal);
   const supportsFileSystemAccess = useMemo(
@@ -71,6 +78,36 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   useEffect(() => {
     saveSyncFolderSettings(syncSettings);
   }, [syncSettings]);
+
+  // Wave 0: load the storage-health snapshot and keep issues live so a quota/write
+  // failure surfaces here immediately instead of only after a reload.
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    let active = true;
+    void getStorageDiagnostics().then((snapshot) => {
+      if (active) {
+        setDiagnostics(snapshot);
+      }
+    });
+
+    function refreshIssues() {
+      setStorageIssues(getLocalStorageIssues());
+      void getStorageDiagnostics().then((snapshot) => {
+        if (active) {
+          setDiagnostics(snapshot);
+        }
+      });
+    }
+
+    window.addEventListener(storageIssueEventName, refreshIssues);
+    return () => {
+      active = false;
+      window.removeEventListener(storageIssueEventName, refreshIssues);
+    };
+  }, []);
 
   useEffect(() => {
     if (!syncSettings.autoBackupEnabled || !supportsFileSystemAccess || !autoBackupSignal) {
@@ -318,6 +355,8 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
         onClearWarnings={clearRecoveryWarnings}
         onExportRawData={downloadRawLocalData}
       />
+
+      <StorageHealthPanel diagnostics={diagnostics} />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <label className="flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
@@ -669,6 +708,68 @@ function StorageRecoveryPanel({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics | null }) {
+  if (!diagnostics) {
+    return null;
+  }
+
+  const { local, device } = diagnostics;
+  // localStorage is capped near ~5 MB per origin; warn before writes start failing.
+  const localSoftLimitBytes = 5 * 1024 * 1024;
+  const localFraction = Math.min(local.totalBytes / localSoftLimitBytes, 1);
+  const localWarning = local.totalBytes > localSoftLimitBytes * 0.8;
+  const deviceWarning = device?.usedFraction != null && device.usedFraction > 0.8;
+  const tone = localWarning || deviceWarning ? 'border-amber-300/30 bg-amber-300/10' : 'border-skyglass/15 bg-ink-950/80';
+
+  return (
+    <section className={`mt-4 rounded-lg border p-4 text-sm text-slate-300 ${tone}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-white">Storage health</h3>
+        <span className="text-xs text-slate-500">Local diagnostics</span>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Questory local data</div>
+          <div className="mt-1 text-lg font-semibold tabular-nums text-white">{formatBytes(local.totalBytes)}</div>
+          <div className="mt-1 text-xs text-slate-500">{local.keyCount} keys · games {formatBytes(local.gamesBytes)}</div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink-900">
+            <div
+              className={`h-full rounded-full ${localWarning ? 'bg-amber-300' : 'bg-mint'}`}
+              style={{ width: `${Math.max(localFraction * 100, 1)}%` }}
+            />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">~{Math.round(localFraction * 100)}% of the ~5 MB localStorage limit</div>
+        </div>
+
+        <div className="rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Device storage estimate</div>
+          {device ? (
+            <>
+              <div className="mt-1 text-lg font-semibold tabular-nums text-white">
+                {formatBytes(device.usageBytes)}
+                {device.quotaBytes > 0 ? <span className="text-sm font-normal text-slate-500"> / {formatBytes(device.quotaBytes)}</span> : null}
+              </div>
+              {device.usedFraction != null ? (
+                <div className="mt-1 text-xs text-slate-500">~{Math.round(device.usedFraction * 100)}% of the browser quota used</div>
+              ) : null}
+            </>
+          ) : (
+            <div className="mt-1 text-xs text-slate-500">Not available in this environment.</div>
+          )}
+        </div>
+      </div>
+
+      {localWarning ? (
+        <p className="mt-3 text-xs text-amber-200/90">
+          Local storage is close to the browser limit. Export a backup; a future update will move the library to a
+          larger-capacity store.
+        </p>
+      ) : null}
     </section>
   );
 }
