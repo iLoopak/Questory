@@ -113,6 +113,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
       ];
 
       for (const c of tagged) {
+        if (seen.has(c.game.rawgId)) continue;
         seen.add(c.game.rawgId);
         // Skip games already in the user's library or wishlist.
         if (c.libraryStatus === null) {
@@ -164,10 +165,8 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
                 game={game}
                 suppressWantToPlayStatus={candidate.libraryStatus === null}
                 detailsLabel="Preview"
+                hideActionMenu
                 onOpenDetails={() => onOpenGame(candidate)}
-                onRemove={() => {}}
-                onStatusChange={() => {}}
-                onRemoveAndIgnore={() => {}}
                 primaryAction={
                   canAddToInbox
                     ? {

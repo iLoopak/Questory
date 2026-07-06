@@ -332,11 +332,11 @@ export function GameDetailView({
 
                 <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
                   <span className="qs-label-caps text-accent">{t('detail.myNotes')}</span>
-                  <textarea
-                    className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
-                    value={game.notes}
-                    onChange={(event) => updateTracking({ notes: event.target.value })}
+                  <NotesField
+                    key={game.id}
                     placeholder={t('detail.notesPlaceholder')}
+                    value={game.notes}
+                    onCommit={(notes) => updateTracking({ notes })}
                   />
                 </label>
               </div>
@@ -898,6 +898,42 @@ function GameDetailOverflowMenu({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Notes editor with local draft state. Typing only re-renders this field;
+ * the global games array is updated on blur (and on unmount as a safety
+ * net, e.g. navigating away mid-edit). Keyed by game.id at the call site
+ * so switching games commits the outgoing draft via unmount.
+ */
+function NotesField({ onCommit, placeholder, value }: { onCommit: (notes: string) => void; placeholder: string; value: string }) {
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
+
+  useEffect(() => () => {
+    if (draftRef.current !== valueRef.current) {
+      onCommitRef.current(draftRef.current);
+    }
+  }, []);
+
+  return (
+    <textarea
+      className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
+      value={draft}
+      onBlur={() => {
+        if (draft !== value) {
+          onCommit(draft);
+        }
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      placeholder={placeholder}
+    />
   );
 }
 

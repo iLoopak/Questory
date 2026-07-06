@@ -5,6 +5,7 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { getGameDetails } from '../../services/rawgApi';
 import { useI18n } from '../../i18n';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useDiscoveryScreenshots } from '../../hooks/useDiscoveryScreenshots';
 import { GameHero, HeroStat } from '../game-detail/GameHero';
 import { DetailSection } from '../game-detail/DetailSection';
@@ -50,9 +51,11 @@ export function DiscoveryPreviewPanel({
   const [details, setDetails] = useState<RawgGameDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const { screenshots, loading: screenshotsLoading } = useDiscoveryScreenshots(game.rawgId);
 
   useScrollLock();
+  const { handleTrapKeyDown } = useFocusTrap(dialogRef);
 
   // Real-time collection status (reacts to changes while the panel is open).
   const realMatch = userGames.find((g) => g.rawgId === game.rawgId);
@@ -65,6 +68,9 @@ export function DiscoveryPreviewPanel({
     setIsLoading(true);
     setDetails(null);
     scrollRef.current?.scrollTo({ top: 0 });
+    // When the preview swaps to another candidate in place (recommendation
+    // carousel), the previously focused card is gone — re-anchor focus.
+    dialogRef.current?.focus({ preventScroll: true });
 
     getGameDetails(game.rawgId)
       .then((d) => {
@@ -183,10 +189,13 @@ export function DiscoveryPreviewPanel({
 
   return (
     <div
+      ref={dialogRef}
       aria-label={`Preview: ${game.title}`}
       aria-modal="true"
       className="fixed inset-0 z-50 bg-ink-950"
+      onKeyDown={handleTrapKeyDown}
       role="dialog"
+      tabIndex={-1}
     >
       <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">
         <div className="mx-auto max-w-6xl space-y-3 sm:space-y-4">

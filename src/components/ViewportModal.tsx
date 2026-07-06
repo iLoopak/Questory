@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 
 type ViewportModalPlacement = 'bottom-sheet' | 'center' | 'fullscreen';
@@ -14,62 +15,21 @@ type ViewportModalProps = {
   onClose: () => void;
 };
 
-const focusableSelector = [
-  'a[href]',
-  'button:not([disabled])',
-  'textarea:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-function isEditableElement(element: EventTarget | null) {
-  if (!(element instanceof HTMLElement)) {
-    return false;
-  }
-
-  return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement || element.isContentEditable;
-}
-
 function isModalCloseKey(event: KeyboardEvent | globalThis.KeyboardEvent) {
   return event.key === 'Escape';
 }
 
-function getFocusableElements(container: HTMLElement | null) {
-  if (!container) {
-    return [];
-  }
-
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter((element) => {
-    return !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true' && element.offsetParent !== null;
-  });
-}
-
 export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, placement = 'bottom-sheet', restoreFocusRef }: ViewportModalProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
   useScrollLock();
+  const { handleTrapKeyDown } = useFocusTrap(dialogRef, { initialFocusRef, restoreFocusRef });
 
   useEffect(() => {
-    previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const { documentElement } = document;
     documentElement.classList.add('qs-modal-open');
-
-    window.setTimeout(() => {
-      const firstFocusableElement = initialFocusRef?.current ?? getFocusableElements(dialogRef.current)[0];
-      firstFocusableElement?.focus({ preventScroll: true });
-    }, 0);
-
-    return () => {
-      documentElement.classList.remove('qs-modal-open');
-
-      window.setTimeout(() => {
-        const focusTarget = restoreFocusRef?.current ?? previouslyFocusedElementRef.current;
-        focusTarget?.focus({ preventScroll: true });
-      }, 0);
-    };
-  }, [initialFocusRef, restoreFocusRef]);
+    return () => documentElement.classList.remove('qs-modal-open');
+  }, []);
 
   useEffect(() => {
     function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
@@ -86,34 +46,6 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, p
 
     return () => document.removeEventListener('keydown', handleDocumentKeyDown, true);
   }, [onClose]);
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== 'Tab') {
-      return;
-    }
-
-    const focusableElements = getFocusableElements(dialogRef.current);
-
-    if (focusableElements.length === 0) {
-      event.preventDefault();
-      dialogRef.current?.focus({ preventScroll: true });
-      return;
-    }
-
-    const firstFocusableElement = focusableElements[0];
-    const lastFocusableElement = focusableElements[focusableElements.length - 1];
-
-    if (event.shiftKey && document.activeElement === firstFocusableElement) {
-      event.preventDefault();
-      lastFocusableElement.focus({ preventScroll: true });
-      return;
-    }
-
-    if (!event.shiftKey && document.activeElement === lastFocusableElement) {
-      event.preventDefault();
-      firstFocusableElement.focus({ preventScroll: true });
-    }
-  }
 
   const isFullscreen = placement === 'fullscreen';
   const isCentered = placement === 'center';
@@ -140,7 +72,7 @@ export function ViewportModal({ ariaLabel, children, initialFocusRef, onClose, p
     <div
       className={backdropClassName}
       onClick={isFullscreen ? undefined : onClose}
-      onKeyDown={handleKeyDown}
+      onKeyDown={handleTrapKeyDown}
     >
       <section
         aria-label={ariaLabel}

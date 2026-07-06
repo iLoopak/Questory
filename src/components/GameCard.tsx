@@ -45,6 +45,11 @@ type GameCardProps = {
   discoveryContext?: string;
   /** Override the label of the "Details" button. Pass "Preview" for Discover cards. */
   detailsLabel?: string;
+  /**
+   * Hide the three-dot action menu entirely. Use for discovery/synthetic
+   * games where remove/status actions would be silent no-ops.
+   */
+  hideActionMenu?: boolean;
 };
 
 function GameCardComponent({
@@ -70,6 +75,7 @@ function GameCardComponent({
   coverBadgeTopRight,
   discoveryContext,
   detailsLabel,
+  hideActionMenu = false,
 }: GameCardProps) {
   const { t } = useI18n();
   const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
@@ -122,7 +128,7 @@ function GameCardComponent({
       event.preventDefault();
       if (isMultiSelectMode) {
         onToggleSelected?.();
-      } else {
+      } else if (!hideActionMenu) {
         setIsActionMenuOpen((currentValue) => !currentValue);
       }
       return;
@@ -276,23 +282,25 @@ function GameCardComponent({
             >
               {detailsLabel ?? t('action.details')}
             </button>
-            <div onClick={stopCardAction}>
-              <GameActionMenu
-                game={game}
-                includeDetails={includeDetailsAction}
-                isOpen={isActionMenuOpen}
-                onAddToQueue={onAddToQueue}
-                onAddToWishlist={onAddToWishlist}
-                onClose={() => setIsActionMenuOpen(false)}
-                onFindMetadata={onFindMetadata}
-                onMoveToLibrary={onMoveToLibrary}
-                onOpenChange={setIsActionMenuOpen}
-                onOpenDetails={onOpenDetails}
-                onRemove={onRemove ?? (() => {})}
-                onRemoveAndIgnore={onRemoveAndIgnore ?? (() => {})}
-                onStatusChange={onStatusChange ?? (() => {})}
-              />
-            </div>
+            {!hideActionMenu ? (
+              <div onClick={stopCardAction}>
+                <GameActionMenu
+                  game={game}
+                  includeDetails={includeDetailsAction}
+                  isOpen={isActionMenuOpen}
+                  onAddToQueue={onAddToQueue}
+                  onAddToWishlist={onAddToWishlist}
+                  onClose={() => setIsActionMenuOpen(false)}
+                  onFindMetadata={onFindMetadata}
+                  onMoveToLibrary={onMoveToLibrary}
+                  onOpenChange={setIsActionMenuOpen}
+                  onOpenDetails={onOpenDetails}
+                  onRemove={onRemove ?? (() => {})}
+                  onRemoveAndIgnore={onRemoveAndIgnore ?? (() => {})}
+                  onStatusChange={onStatusChange ?? (() => {})}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
