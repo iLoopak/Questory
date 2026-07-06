@@ -10,6 +10,7 @@ import { AboutSettingsPanel } from '../../components/settings/AboutSettingsPanel
 import { AppearanceSettingsPanel } from '../../components/settings/AppearanceSettingsPanel';
 import { ControlsSettingsPanel } from '../../components/settings/ControlsSettingsPanel';
 import { NavigationVisibilitySettingsPanel } from '../../components/settings/NavigationVisibilitySettingsPanel';
+import { HomeWidgetsSettingsPanel } from '../../components/settings/HomeWidgetsSettingsPanel';
 import { PersonalizationSettingsPanel } from '../../components/settings/PersonalizationSettingsPanel';
 import { QueuePlatformsSettingsPanel } from '../../components/settings/PlatformsSettingsPanel';
 import { SetupCenterPanel } from '../../components/settings/SetupCenterPanel';
@@ -361,6 +362,7 @@ export function SettingsView({
                 onNavigationVisibilityChange={onNavigationVisibilityChange}
                 t={t}
               />
+              <HomeWidgetsSettingsPanel t={t} />
             </div>
           ) : null}
 

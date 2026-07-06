@@ -28,6 +28,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.shelfIdentity.v1'
   | 'questshelf.languagePreference.v1'
   | 'questshelf.navigationVisibility.v1'
+  | 'questshelf.homeWidgets.v1'
   | 'questshelf.analyticsSettings.v1'
   | 'questshelf.storageIssues.v1';
 
@@ -245,6 +246,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Top navigation section visibility preferences.',
     scope: 'ui',
     schema: 'Record of configurable navigation section IDs to booleans.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.homeWidgets.v1',
+    purpose: 'Home screen widget visibility preferences.',
+    scope: 'ui',
+    schema: 'Record of configurable Home widget IDs to booleans.',
   },
   {
     backup: 'never',

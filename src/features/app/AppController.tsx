@@ -1384,6 +1384,11 @@ export function AppController() {
               }}
               onOpenQueue={openQueue}
               onOpenReviewMode={startReviewMode}
+              onOpenSettings={() => {
+                setSelectedGameId(null);
+                setActiveNavItem('Settings');
+                setActiveSettingsCategory('Personalization');
+              }}
               onOpenWishlist={() => {
                 setSelectedGameId(null);
                 setActiveNavItem('Wishlist');
