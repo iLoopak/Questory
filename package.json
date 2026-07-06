@@ -9,7 +9,8 @@
     "android:sync-icons": "node scripts/sync-android-icons.mjs",
     "android:prepare": "npm run build && npx cap sync android && npm run android:sync-icons",
     "preview": "vite preview",
-    "test": "node --test scripts/run-analytics-tests.mjs"
+    "test": "node --test scripts/run-analytics-tests.mjs",
+    "audit:architecture": "node scripts/audit-architecture.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.6",

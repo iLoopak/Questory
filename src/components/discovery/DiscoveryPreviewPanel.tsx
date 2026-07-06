@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { RawgGameDetails } from '../../types/rawg';
-import { discoveryGameToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
+import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { getGameDetails } from '../../services/rawgApi';
 import { useI18n } from '../../i18n';
 import { useDiscoveryScreenshots } from '../../hooks/useDiscoveryScreenshots';
@@ -86,13 +86,13 @@ export function DiscoveryPreviewPanel({
   // data without a library record ever being created. Base shape comes from
   // the shared adapter; RAWG details enrich it once loaded.
   const previewGame: Game = useMemo(() => ({
-    ...discoveryGameToGame(game, 'preview'),
+    ...discoveryCandidateToGame(candidate, userGames, 'preview'),
     backgroundImage: details?.background_image ?? game.coverUrl ?? null,
     developers: details?.developers?.map((d) => d.name),
     publishers: details?.publishers?.map((p) => p.name),
     averagePlaytime: details?.playtime,
     rawgTags: game.tags,
-  }), [game, details]);
+  }), [candidate, userGames, game, details]);
 
   const metacriticScore = formatMetacriticScore(game.metacritic);
   const rawgPlaytime = formatRawgPlaytime(details?.playtime);
