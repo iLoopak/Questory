@@ -392,12 +392,25 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
         });
       }
     }
+
+    // The scroll listener is capturing on window, so it fires for every
+    // scroll container in the app (e.g. the Library grid) — not just the one
+    // the ghost sits in. Coalesce the layout read into a single rAF per frame
+    // so continuous scrolling never pays a synchronous getBoundingClientRect
+    // per scroll event. Mirrors BackToTopButton.
+    let frame = 0;
+    function scheduleMeasure() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(measure);
+    }
+
     measure();
-    window.addEventListener('scroll', measure, { passive: true, capture: true });
-    window.addEventListener('resize', measure, { passive: true });
+    window.addEventListener('scroll', scheduleMeasure, { passive: true, capture: true });
+    window.addEventListener('resize', scheduleMeasure, { passive: true });
     return () => {
-      window.removeEventListener('scroll', measure, { capture: true });
-      window.removeEventListener('resize', measure);
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', scheduleMeasure, { capture: true });
+      window.removeEventListener('resize', scheduleMeasure);
     };
   }, []);
 
@@ -405,11 +418,18 @@ export function QueueGhost({ achievement = null, cover = null, variant = cover ?
     if (!open) return;
     computeTooltipStyle();
 
-    window.addEventListener('resize', computeTooltipStyle);
-    window.addEventListener('scroll', computeTooltipStyle, true);
+    let frame = 0;
+    function scheduleTooltip() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(computeTooltipStyle);
+    }
+
+    window.addEventListener('resize', scheduleTooltip);
+    window.addEventListener('scroll', scheduleTooltip, true);
     return () => {
-      window.removeEventListener('resize', computeTooltipStyle);
-      window.removeEventListener('scroll', computeTooltipStyle, true);
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', scheduleTooltip);
+      window.removeEventListener('scroll', scheduleTooltip, true);
     };
   }, [open]);
 
