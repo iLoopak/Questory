@@ -154,6 +154,7 @@ function GameCardComponent({
     <article
       aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
+      data-game-id={game.id}
       className={`qs-game-card qs-glass relative flex h-full min-h-[260px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[292px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${highlightLabel ? 'qs-highlight-card-border ring-1' : ''} cursor-pointer`}

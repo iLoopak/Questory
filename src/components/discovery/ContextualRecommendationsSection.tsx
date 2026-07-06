@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
-import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
+import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { profileFingerprint } from '../../lib/userProfile';
 import { fetchContextualRecommendations } from '../../services/contextualRecommendationsService';
 import { GameCard } from '../GameCard';
+import { MetacriticBadge } from '../MetacriticBadge';
 import { useI18n } from '../../i18n';
 
 const SKELETON_COUNT = 5;
@@ -18,37 +19,6 @@ type Props = {
   /** Section heading — defaults to the Game Hub's "Because You Liked This". */
   title?: string;
 };
-
-function candidateToGame(candidate: DiscoveryCandidate, userGames: Game[]): Game {
-  const { game, libraryStatus } = candidate;
-  if (libraryStatus !== null) {
-    const real = userGames.find((g) => g.rawgId === game.rawgId);
-    if (real) return real;
-  }
-  return {
-    id: `similar-${game.rawgId}`,
-    title: game.title,
-    platform: game.hasSteamVersion ? 'Steam' : (game.platforms[0] ?? 'PC'),
-    status: 'Want to play',
-    coverImage: game.coverUrl ?? '',
-    backgroundImage: game.coverUrl ?? null,
-    playtimeHours: 0,
-    tags: game.tags.slice(0, 5),
-    lastPlayedAt: null,
-    notes: '',
-    collectionType: 'library',
-    rawgId: game.rawgId,
-    genres: game.genres,
-    metacritic: game.metacritic ?? null,
-    released: game.released,
-  };
-}
-
-function metacriticBadgeClass(score: number): string {
-  if (score >= 75) return 'text-emerald-400';
-  if (score >= 50) return 'text-amber-400';
-  return 'text-red-400';
-}
 
 function CarouselSkeleton() {
   return (
@@ -111,7 +81,7 @@ export function ContextualRecommendationsSection({
   }, [userGames, inboxRawgIds]);
 
   const adaptedGames = useMemo(
-    () => (candidates ?? []).map((c) => candidateToGame(c, userGames)),
+    () => (candidates ?? []).map((c) => discoveryCandidateToGame(c, userGames, 'similar')),
     [candidates, userGames],
   );
 
@@ -153,15 +123,7 @@ export function ContextualRecommendationsSection({
                         }
                       : undefined
                   }
-                  coverBadgeTopRight={
-                    metacritic ? (
-                      <span
-                        className={`absolute right-3 top-3 rounded-md bg-ink-950/85 px-1.5 py-0.5 text-xs font-bold tabular-nums backdrop-blur-sm ${metacriticBadgeClass(metacritic)}`}
-                      >
-                        {metacritic}
-                      </span>
-                    ) : undefined
-                  }
+                  coverBadgeTopRight={metacritic ? <MetacriticBadge score={metacritic} variant="overlay" /> : undefined}
                   discoveryContext={candidate.reason}
                 />
               </div>

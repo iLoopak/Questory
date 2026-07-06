@@ -27,6 +27,8 @@ type GameCardShellProps = {
   refCallback?: (el: HTMLDivElement | null) => void;
   role?: string;
   tabIndex?: number;
+  /** Game id exposed as data-game-id for post-navigation focus restoration. */
+  dataGameId?: string;
 
   // ── Absolute overlays inside the root, above the cover ───────────────────
   /** Multi-select checkbox, highlight label, etc. */
@@ -79,6 +81,7 @@ export function GameCardShell({
   refCallback,
   role = 'button',
   tabIndex = 0,
+  dataGameId,
   cardOverlays,
   coverContent,
   coverBadgesBottom,
@@ -95,6 +98,7 @@ export function GameCardShell({
       aria-posinset={ariaPosinset}
       aria-selected={ariaSelected}
       className={`group relative flex w-[clamp(11rem,22vw,16rem)] shrink-0 flex-col rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow focus-visible:outline-none ${className}`}
+      data-game-id={dataGameId}
       onClick={onClick}
       onKeyDown={onKeyDown}
       role={role}

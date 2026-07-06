@@ -1257,10 +1257,24 @@ export function AppController() {
   }, []);
 
   function handleBackFromDetail() {
+    const returningGameId = selectedGameId;
     setSelectedGameId(null);
     if (detailReturnSection) {
       setActiveNavItem(detailReturnSection);
       setDetailReturnSection(null);
+    }
+    // Controller/keyboard flow: once the grid is interactive again (inert
+    // removed after re-render), put focus back on the originating card.
+    // Scroll position is already preserved because the collection panel
+    // stays mounted behind the detail view; scroll-mt on the card handles
+    // the edge case where it sits just outside the viewport.
+    if (returningGameId) {
+      window.setTimeout(() => {
+        const card = mainContentRef.current?.querySelector<HTMLElement>(
+          `[data-game-id="${CSS.escape(returningGameId)}"]`,
+        );
+        card?.focus();
+      }, 0);
     }
   }
 
@@ -1283,6 +1297,34 @@ export function AppController() {
   if (!isAppReady) {
     return <AppStartupScreen />;
   }
+
+  // Single source for the Game Hub detail route — rendered from the Review
+  // Mode, Library and Wishlist branches so their props cannot drift apart.
+  const renderGameDetailRoute = (game: Game) => (
+    <AppGameDetailsView
+      game={game}
+      allGames={games}
+      playActivity={playActivity}
+      refreshingMetadataGameIds={refreshingMetadataGameIds}
+      steamAchievementSyncState={steamAchievementSyncState}
+      steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+      platformQueueState={platformQueueState}
+      onAddToQueue={openBacklogPicker}
+      onAddToWishlist={addToWishlist}
+      onBack={handleBackFromDetail}
+      onFindArtwork={(targetGame, mode = 'artwork') => refreshGameMetadataFromActions(targetGame, mode as 'metadata' | 'artwork')}
+      onIgnore={removeAndIgnoreSteamGame}
+      onSyncSteamData={syncSteamDataForGame}
+      onStatusChange={updateGameStatusWithCompletion}
+      onTrackingChange={updateGameTracking}
+      onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
+      onGameEditSaved={(savedGame) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${savedGame.id}`, message: `${savedGame.title} details saved.` })}
+      onSelectDiscoveryGame={handleSelectDiscoveryGame}
+      onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+      discoveryInboxRawgIds={discoveryInboxRawgIds}
+      onOpenDiscoveryPreview={handleDiscoverOpenGame}
+    />
+  );
 
   return (
     <I18nProvider language={language}>
@@ -1390,29 +1432,7 @@ export function AppController() {
 
         <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
           {activeNavItem === 'Review Mode' && selectedGame ? (
-            <AppGameDetailsView
-              game={selectedGame}
-              allGames={games}
-              playActivity={playActivity}
-              refreshingMetadataGameIds={refreshingMetadataGameIds}
-              steamAchievementSyncState={steamAchievementSyncState}
-              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-              platformQueueState={platformQueueState}
-              onAddToQueue={openBacklogPicker}
-              onAddToWishlist={addToWishlist}
-              onBack={handleBackFromDetail}
-              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-              onIgnore={removeAndIgnoreSteamGame}
-              onSyncSteamData={syncSteamDataForGame}
-              onStatusChange={updateGameStatusWithCompletion}
-              onTrackingChange={updateGameTracking}
-              onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
-              onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-              onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
-              discoveryInboxRawgIds={discoveryInboxRawgIds}
-              onOpenDiscoveryPreview={handleDiscoverOpenGame}
-            />
+            renderGameDetailRoute(selectedGame)
           ) : activeNavItem === 'Home' ? (
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
@@ -1485,29 +1505,7 @@ export function AppController() {
             <div className="relative h-full">
               {selectedGame && (
                 <div className="absolute inset-0 z-10">
-                  <AppGameDetailsView
-                    game={selectedGame}
-                    allGames={games}
-                    playActivity={playActivity}
-                    refreshingMetadataGameIds={refreshingMetadataGameIds}
-                    steamAchievementSyncState={steamAchievementSyncState}
-                    steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-                    platformQueueState={platformQueueState}
-                    onAddToQueue={openBacklogPicker}
-                    onAddToWishlist={addToWishlist}
-                    onBack={handleBackFromDetail}
-                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-                    onIgnore={removeAndIgnoreSteamGame}
-                    onSyncSteamData={syncSteamDataForGame}
-                    onStatusChange={updateGameStatusWithCompletion}
-                    onTrackingChange={updateGameTracking}
-                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
-                    onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-                    onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
-              discoveryInboxRawgIds={discoveryInboxRawgIds}
-              onOpenDiscoveryPreview={handleDiscoverOpenGame}
-                  />
+                  {renderGameDetailRoute(selectedGame)}
                 </div>
               )}
               <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
@@ -1575,29 +1573,7 @@ export function AppController() {
             <div className="relative h-full">
               {selectedGame && (
                 <div className="absolute inset-0 z-10">
-                  <AppGameDetailsView
-                    game={selectedGame}
-                    allGames={games}
-                    playActivity={playActivity}
-                    refreshingMetadataGameIds={refreshingMetadataGameIds}
-                    steamAchievementSyncState={steamAchievementSyncState}
-                    steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-                    platformQueueState={platformQueueState}
-                    onAddToQueue={openBacklogPicker}
-                    onAddToWishlist={addToWishlist}
-                    onBack={handleBackFromDetail}
-                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-                    onIgnore={removeAndIgnoreSteamGame}
-                    onSyncSteamData={syncSteamDataForGame}
-                    onStatusChange={updateGameStatusWithCompletion}
-                    onTrackingChange={updateGameTracking}
-                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
-                    onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-                    onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
-              discoveryInboxRawgIds={discoveryInboxRawgIds}
-              onOpenDiscoveryPreview={handleDiscoverOpenGame}
-                  />
+                  {renderGameDetailRoute(selectedGame)}
                 </div>
               )}
               <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>

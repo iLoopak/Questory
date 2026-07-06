@@ -5,8 +5,7 @@ import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
 import { QueueGhost, getQueueGhostVariant, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
-import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
-import { GameCoverImage } from './GameCoverImage';
+import { getPreferredArtworkSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import { getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
 import { loadAchievementCounters } from '../lib/achievementCounters';
@@ -18,11 +17,12 @@ import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../ty
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
-import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
-import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PersonalRecommendationsSection } from './discovery/PersonalRecommendationsSection';
+import { GamePosterButton } from './home/GamePosterButton';
+import { NextAdventureCard } from './home/NextAdventureCard';
+import { WishlistDealCard, WishlistDealActionSheet } from './home/WishlistDealCard';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type HomePanelProps = {
@@ -760,11 +760,6 @@ function JourneyProgressCard({
   );
 }
 
-function getGamePlatformLabel(game: Game, queueState: PlatformQueueState): GamePlatform {
-  return queueState.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
-}
-
-
 type HomeWidgetErrorBoundaryProps = {
   children: ReactNode;
   title: string;
@@ -873,183 +868,6 @@ function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function formatPlaytimeHours(hours: number): string {
-  if (hours < 1) return '<1h';
-  const rounded = Math.round(hours * 10) / 10;
-  return `${Number.isInteger(rounded) ? Math.round(rounded) : rounded}h`;
-}
-
-function formatHomeAchievementProgress(game: Game): string | null {
-  if (!hasSteamAchievementSummary(game)) return null;
-  return `${game.steamAchievementsUnlocked}/${game.steamAchievementsTotal} achievements`;
-}
-
-function GamePosterButton({
-  game,
-  eyebrow,
-  hero = false,
-  onClick,
-  queueState,
-  activitySignal = null,
-}: {
-  game: Game;
-  eyebrow?: string;
-  hero?: boolean;
-  onClick: () => void;
-  queueState: PlatformQueueState;
-  activitySignal?: string | null;
-}) {
-  const { t } = useI18n();
-  const ambientSource = getPreferredArtworkSources(game, 'landscape')[0] ?? null;
-  const logoUrl = getPreferredLogoUrl(game);
-  const platform = getGamePlatformLabel(game, queueState);
-  const playtime = game.playtimeHours > 0 ? `${platform} playtime: ${formatPlaytimeHours(game.playtimeHours)}` : null;
-  const achievementSummary = formatHomeAchievementProgress(game);
-
-  return (
-    <button
-      className={`group relative flex w-full gap-4 overflow-hidden rounded-2xl border border-mint/25 bg-gradient-to-br from-mint/[0.12] via-ink-950 to-ink-950 p-3.5 text-left shadow-panel ring-1 ring-mint/10 transition hover:-translate-y-0.5 hover:border-mint/55 hover:bg-mint/[0.08] hover:shadow-glow focus-visible:border-mint/70 focus-visible:ring-2 focus-visible:ring-mint/40 ${hero ? 'min-h-[9.5rem] sm:p-4' : 'min-h-[8rem]'}`}
-      data-home-focus="true"
-      onClick={onClick}
-      type="button"
-    >
-      {/* Ambient background — landscape/hero art at low opacity for depth */}
-      {ambientSource ? (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-          <img
-            alt=""
-            className="h-full w-full scale-105 object-cover opacity-[0.16] blur-sm transition group-hover:opacity-[0.22]"
-            decoding="async"
-            loading="lazy"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            src={ambientSource}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/92 via-ink-950/78 to-ink-950/52" />
-          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-mint/[0.10] to-transparent" />
-        </div>
-      ) : null}
-
-      {/* Portrait cover */}
-      <span className={`relative shrink-0 overflow-hidden rounded-xl border border-mint/25 bg-ink-800 shadow-lg transition group-hover:border-mint/45 ${hero ? 'h-32 w-24 sm:h-36 sm:w-28' : 'h-28 w-20'}`}>
-        <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
-      </span>
-
-      {/* Text + metadata */}
-      <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-3">
-        <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <PlatformIdentityBadge
-              className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm"
-              platform={platform}
-              queueState={queueState}
-            />
-            {eyebrow ? (
-              <span className="inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
-                {eyebrow}
-              </span>
-            ) : null}
-          </div>
-          {logoUrl ? (
-            <img
-              alt=""
-              aria-hidden="true"
-              className="mb-1.5 block max-h-7 max-w-[140px] object-contain object-left drop-shadow"
-              decoding="async"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              src={logoUrl}
-            />
-          ) : null}
-          <span className={`line-clamp-2 block font-bold leading-tight text-white drop-shadow ${hero ? 'text-xl sm:text-2xl' : 'text-base'}`}>
-            {game.title}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <div className="grid gap-1.5 text-xs text-slate-300">
-            {activitySignal ? <span className="font-medium text-slate-200">{activitySignal}</span> : null}
-            {playtime ? <span>{playtime}</span> : null}
-            {achievementSummary ? <span>{achievementSummary}</span> : null}
-          </div>
-          <span className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-mint px-4 text-sm font-bold text-ink-950 shadow-glow transition group-hover:bg-mint/90">
-            {t('home.openDetails')}
-          </span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function NextAdventureCard({
-  entry,
-  game,
-  queueState,
-  onPlay,
-  onOpenPlan,
-  t,
-}: {
-  entry: PlatformQueueEntry;
-  game: Game;
-  queueState: PlatformQueueState;
-  onPlay: () => void;
-  onOpenPlan: () => void;
-  t: ReturnType<typeof useI18n>['t'];
-}) {
-  const coverSource = getPreferredArtworkSources(game, 'background')[0];
-
-  return (
-    // Outer card is a div, not a button, because the inner "Play today" CTA is a real
-    // button. Nested <button> inside <button> is invalid HTML and triggers a React warning.
-    <div
-      className="qs-home-next-adventure-card relative w-full cursor-pointer overflow-hidden rounded-xl border border-skyglass/12 bg-ink-950/55 text-left transition hover:border-skyglass/30 hover:bg-ink-950/75 focus-visible:border-mint/45 focus-visible:outline-none"
-      data-home-focus="true"
-      role="button"
-      tabIndex={0}
-      onClick={onOpenPlan}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onOpenPlan();
-        }
-      }}
-    >
-      {coverSource ? (
-        <div className="absolute inset-0">
-          <img
-            alt=""
-            className="h-full w-full object-cover opacity-10"
-            decoding="async"
-            loading="lazy"
-            src={coverSource}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 to-transparent" />
-        </div>
-      ) : null}
-      <div className="relative flex h-full flex-col gap-2.5 p-3">
-        <PlatformIdentityBadge
-          className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
-          platform={entry.targetPlatform}
-          queueState={queueState}
-        />
-        <div>
-          <div className="qs-home-next-candidate-label text-xs text-slate-500">{t('home.nextCandidate')}</div>
-          <h3 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-white">{game.title}</h3>
-        </div>
-        <div className="mt-auto">
-          <button
-            className="flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-mint/30 bg-mint/10 px-3 text-xs font-semibold text-mint transition hover:bg-mint/20"
-            data-home-focus="true"
-            onClick={(e) => { e.stopPropagation(); onPlay(); }}
-            type="button"
-          >
-            <Icon name="play-circle" size={16} strokeWidth={2.5} />
-            {t('home.playToday')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DealAlertCard({
   deals,
   onViewDeals,
@@ -1095,157 +913,6 @@ function DealAlertCard({
       >
         View Deals
       </button>
-    </div>
-  );
-}
-
-function WishlistDealCard({
-  game,
-  onClick,
-  t,
-}: {
-  game: Game;
-  onClick: () => void;
-  t: ReturnType<typeof useI18n>['t'];
-}) {
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
-  const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
-      : null;
-
-  return (
-    <button
-      className="w-36 shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
-      data-home-focus="true"
-      onClick={onClick}
-      type="button"
-    >
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-ink-800">
-        <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
-        {discount ? (
-          <div className="absolute left-1.5 top-1.5 rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">
-            {discount}
-          </div>
-        ) : null}
-        {game.itadIsHistoricalLow ? (
-          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-amber-950">
-            <Icon name="trophy" size={9} strokeWidth={2.5} />
-            {t('itad.historicalLow')}
-          </div>
-        ) : null}
-      </div>
-      <div className="p-2">
-        <p className="line-clamp-2 text-xs font-semibold text-white">{game.title}</p>
-        {price ? <p className="mt-1 text-xs font-semibold text-mint">{price}</p> : null}
-        {game.itadCurrentBestShop ? (
-          <p className="mt-0.5 truncate text-xs text-slate-500">{game.itadCurrentBestShop}</p>
-        ) : null}
-      </div>
-    </button>
-  );
-}
-
-function WishlistDealActionSheet({
-  game,
-  onClose,
-  onOpenDetails,
-}: {
-  game: Game;
-  onClose: () => void;
-  onOpenDetails: (game: Game) => void;
-}) {
-  const { t } = useI18n();
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
-  const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
-      : null;
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Deal for ${game.title}`}
-    >
-      <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        ref={panelRef}
-        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))', ...dragStyle }}
-      >
-        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}>
-          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
-        </div>
-        <div className="px-4 pb-2 pt-1">
-          <div className="mb-5 flex gap-3.5">
-            <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800 shadow-panel">
-              <GameCoverImage className="h-full w-full object-cover" game={game} />
-            </div>
-            <div className="min-w-0 flex-1 py-0.5">
-              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>
-              {game.itadCurrentBestShop ? (
-                <p className="mt-1 text-sm text-slate-400">{game.itadCurrentBestShop}</p>
-              ) : null}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {discount ? (
-                  <span className="rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{discount}</span>
-                ) : null}
-                {price ? <span className="text-sm font-semibold text-mint">{price}</span> : null}
-                {game.itadIsHistoricalLow ? (
-                  <span className="flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-400">
-                    <Icon name="trophy" size={10} strokeWidth={2.5} />
-                    {t('itad.historicalLow')}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {game.itadCurrentBestUrl ? (
-            <a
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-base font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
-              href={game.itadCurrentBestUrl}
-              rel="noreferrer"
-              target="_blank"
-              onClick={onClose}
-            >
-              🛒 {t('itad.openDeal')}
-            </a>
-          ) : null}
-
-          <div className="mt-3.5 overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60">
-            <button
-              className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10]"
-              onClick={() => { onOpenDetails(game); onClose(); }}
-              type="button"
-            >
-              <Icon name="external-link" size={18} strokeWidth={2} className="shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1 text-sm font-medium text-slate-200">{t('home.openDetails')}</span>
-              <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
-            </button>
-          </div>
-
-          <button
-            className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

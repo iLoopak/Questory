@@ -677,6 +677,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
       ariaLabel={`${isMultiSelectMode ? t('collection.select') : 'Open'} ${game.title}`}
       ariaPosinset={index + 1}
       ariaSelected={isMultiSelectMode ? isSelected : undefined}
+      dataGameId={game.id}
       className={`qs-shelf-card snap-center ${
         isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : 'border-skyglass/18'
       }`}
