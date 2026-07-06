@@ -19,7 +19,7 @@ import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
-import { PersonalRecommendationsSection } from './discovery/PersonalRecommendationsSection';
+import { HomeRecommendationsSection } from './home/HomeRecommendationsSection';
 import { GamePosterButton } from './home/GamePosterButton';
 import { NextAdventureCard } from './home/NextAdventureCard';
 import { WishlistDealCard, WishlistDealActionSheet } from './home/WishlistDealCard';
@@ -627,14 +627,13 @@ export function HomePanel({
           </section>
           ) : null}
 
-          {onSelectDiscoveryGame && libraryGames.length > 0 ? (
-            <PersonalRecommendationsSection
-              userGames={games}
-              inboxRawgIds={discoveryInboxRawgIds}
-              onSelectGame={onSelectDiscoveryGame}
-              onOpenPreview={onOpenDiscoveryPreview}
-            />
-          ) : null}
+          <HomeRecommendationsSection
+            games={games}
+            libraryGameCount={libraryGames.length}
+            inboxRawgIds={discoveryInboxRawgIds}
+            onSelectGame={onSelectDiscoveryGame}
+            onOpenPreview={onOpenDiscoveryPreview}
+          />
 
         </div>
       </div>

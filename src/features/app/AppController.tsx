@@ -91,7 +91,7 @@ import { useSyncController } from '../integrations/useSyncController';
 import { useMetadataController } from '../metadata/useMetadataController';
 import { AppGameDetailsView } from './AppGameDetailsView';
 import { DiscoveryInboxPanel } from '../../components/DiscoveryInboxPanel';
-import { loadDiscoveryInbox, saveDiscoveryInbox, type DiscoveryInboxItem } from '../../lib/discoveryInboxStorage';
+import type { DiscoveryInboxItem } from '../../lib/discoveryInboxStorage';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { AchievementTimelineView } from '../achievement-timeline/AchievementTimelineView';
 const SettingsView = lazy(() =>
@@ -104,6 +104,7 @@ import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGh
 import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
 import { useControllerAction } from '../../lib/controllerActions';
 import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../../services/steamApi';
+import { useDiscoveryController } from './useDiscoveryController';
 
 const appLogo = '/icons/questshelf-icon.png';
 
@@ -310,12 +311,6 @@ export function AppController() {
   const [pendingAchievementGhost, setPendingAchievementGhost] = useState<QueueGhostAchievement | null>(null);
   const [isAchievementTimelineOpen, setIsAchievementTimelineOpen] = useState(false);
   const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
-  const [discoveryInboxItems, setDiscoveryInboxItems] = useState<DiscoveryInboxItem[]>(() => loadDiscoveryInbox());
-  const [previewCandidate, setPreviewCandidate] = useState<import('../../lib/discovery').DiscoveryCandidate | null>(null);
-  const discoveryInboxRawgIds = useMemo(
-    () => new Set(discoveryInboxItems.map((i) => i.rawgId)),
-    [discoveryInboxItems],
-  );
   const achievementCountersRef = useRef(achievementCounters);
   achievementCountersRef.current = achievementCounters;
 
@@ -470,6 +465,15 @@ export function AppController() {
     setSelectedGameId,
   });
   addToastRef.current = addToastNotification;
+  const {
+    inboxItems: discoveryInboxItems,
+    inboxRawgIds: discoveryInboxRawgIds,
+    previewCandidate,
+    addToInbox: addToDiscoveryInbox,
+    closePreview: closeDiscoveryPreview,
+    openPreview: openDiscoveryPreview,
+    removeFromInbox: removeFromDiscoveryInbox,
+  } = useDiscoveryController({ games, t, addToastNotification });
 
   const {
     addManualGame,
@@ -1081,38 +1085,12 @@ export function AppController() {
     if (found) setSelectedGameId(found.id);
   }
 
-  function handleAddToDiscoveryInbox(discoveryGame: import('../../lib/discovery').DiscoveryGame, reason: string) {
-    if (discoveryInboxItems.some((i) => i.rawgId === discoveryGame.rawgId)) {
-      addToastNotification({ category: 'info', dedupeKey: `inbox-dup:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAlreadyInInbox'), { game: discoveryGame.title }) });
-      return;
-    }
-    if (games.some((g) => g.rawgId === discoveryGame.rawgId)) {
-      addToastNotification({ category: 'info', dedupeKey: `inbox-owned:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAlreadyInLibrary'), { game: discoveryGame.title }) });
-      return;
-    }
-    const newItem: DiscoveryInboxItem = {
-      id: `inbox-${Date.now()}-${discoveryGame.rawgId}`,
-      rawgId: discoveryGame.rawgId,
-      game: discoveryGame,
-      source: 'similar',
-      reason,
-      createdAt: Date.now(),
-    };
-    const updated = [...discoveryInboxItems, newItem];
-    saveDiscoveryInbox(updated);
-    setDiscoveryInboxItems(updated);
-    addToastNotification({ category: 'success', dedupeKey: `inbox-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToInbox'), { game: discoveryGame.title }) });
-  }
-
-  function handleDiscoverOpenGame(candidate: import('../../lib/discovery').DiscoveryCandidate) {
-    setPreviewCandidate(candidate);
-  }
 
   function handlePreviewAddToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     addToWishlist({ ...base, collectionType: 'wishlist' });
-    setPreviewCandidate(null);
+    closeDiscoveryPreview();
     addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToWishlist'), { game: discoveryGame.title }) });
   }
 
@@ -1124,7 +1102,7 @@ export function AppController() {
       if (existing.collectionType === 'wishlist') {
         moveToLibrary(existing);
       }
-      setPreviewCandidate(null);
+      closeDiscoveryPreview();
       setSelectedGameId(existing.id);
       setActiveNavItem('Library');
       return;
@@ -1133,7 +1111,7 @@ export function AppController() {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     importGames([base]);
-    setPreviewCandidate(null);
+    closeDiscoveryPreview();
     // Evolve the Preview into the Game Hub for the newly owned game so the
     // transition reads as "this game is now mine", not a navigation.
     setSelectedGameId(base.id);
@@ -1144,17 +1122,9 @@ export function AppController() {
   function handlePreviewOpenLibraryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
     const found = games.find((g) => g.rawgId === discoveryGame.rawgId);
     if (!found) return;
-    setPreviewCandidate(null);
+    closeDiscoveryPreview();
     setSelectedGameId(found.id);
     setActiveNavItem(found.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-  }
-
-  function removeFromDiscoveryInbox(id: string) {
-    setDiscoveryInboxItems((prev) => {
-      const updated = prev.filter((i) => i.id !== id);
-      saveDiscoveryInbox(updated);
-      return updated;
-    });
   }
 
   function handleInboxAddToLibrary(item: DiscoveryInboxItem) {
@@ -1280,9 +1250,9 @@ export function AppController() {
       onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
       onGameEditSaved={(savedGame) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${savedGame.id}`, message: `${savedGame.title} details saved.` })}
       onSelectDiscoveryGame={handleSelectDiscoveryGame}
-      onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+      onAddDiscoveryGameToInbox={addToDiscoveryInbox}
       discoveryInboxRawgIds={discoveryInboxRawgIds}
-      onOpenDiscoveryPreview={handleDiscoverOpenGame}
+      onOpenDiscoveryPreview={openDiscoveryPreview}
     />
   );
 
@@ -1456,7 +1426,7 @@ export function AppController() {
                 });
               }}
               onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onOpenDiscoveryPreview={handleDiscoverOpenGame}
+              onOpenDiscoveryPreview={openDiscoveryPreview}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
             />
           ) : activeNavItem === 'Library' ? (
@@ -1473,53 +1443,61 @@ export function AppController() {
               platformOptions={platformOptions}
               tags={tags}
               platformQueueState={platformQueueState}
-              onAddGame={() => setIsAddGameOpen(true)}
-              onAddToWishlist={addToWishlist}
-              onAddManyToWishlist={addManyToWishlist}
-              onAddToQueue={openBacklogPicker}
-              onPlayNow={playGameFromCompactRow}
-              onFinish={finishGameFromCompactRow}
-              onDrop={dropGameFromCompactRow}
-              onBulkEnrich={startMetadataWorkflow}
               isHltbSyncing={isHltbSyncing}
-              onBulkSyncHltb={syncHltb}
-              onBulkRemove={removeManyGames}
-              onBulkSyncSteamAchievements={(gameIds, options) =>
-                syncSteamAchievements(gameIds, {
-                  completionToastMessage: formatSteamAchievementSyncSummary,
-                  emptyToastMessage: options?.emptyToastMessage,
-                  force: options?.force,
-                  showToast: true,
-                })
-              }
-              onBulkRefreshSteamPlaytime={(gameIds, options) =>
-                refreshSteamPlaytime(gameIds, {
-                  completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
-                  emptyToastMessage: options?.emptyToastMessage,
-                  showToast: true,
-                })
-              }
-              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-              onBulkStatusChange={updateManyGameStatuses}
-              onClearFilters={handleClearLibraryFilters}
-              onFiltersChange={handleLibraryFiltersChange}
-              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-              onFindMetadata={refreshGameMetadataFromActions}
-              onMoveToLibrary={moveToLibrary}
-              onOpenDetails={handleOpenDetailsFromCollection}
-              onRemove={removeGame}
-              onRemoveAndIgnore={removeAndIgnoreSteamGame}
-              onOpenQueue={() => startReviewMode('backlog')}
-              onStartReview={startReviewMode}
-              onStatusChange={updateGameStatusWithCompletion}
-              onOpenOnboarding={openOnboarding}
-              onOpenIntegrations={() => {
-                setActiveNavItem('Settings');
-                setActiveSettingsCategory('Integrations');
+              collectionActions={{
+                addGame: () => setIsAddGameOpen(true),
+                addToWishlist,
+                addManyToWishlist,
+                findArtwork: (game) => refreshGameMetadataFromActions(game, 'artwork'),
+                findMetadata: refreshGameMetadataFromActions,
+                moveToLibrary,
+                openDetails: handleOpenDetailsFromCollection,
+                remove: removeGame,
+                removeAndIgnore: removeAndIgnoreSteamGame,
+                statusChange: updateGameStatusWithCompletion,
               }}
-              onOpenRetro={() => {
-                setActiveNavItem('Settings');
-                setActiveSettingsCategory('Retro');
+              bulkActions={{
+                enrich: startMetadataWorkflow,
+                remove: removeManyGames,
+                removeAndIgnore: removeAndIgnoreManyGames,
+                statusChange: updateManyGameStatuses,
+                syncHltb,
+                syncSteamAchievements: (gameIds, options) =>
+                  syncSteamAchievements(gameIds, {
+                    completionToastMessage: formatSteamAchievementSyncSummary,
+                    emptyToastMessage: options?.emptyToastMessage,
+                    force: options?.force,
+                    showToast: true,
+                  }),
+                refreshSteamPlaytime: (gameIds, options) =>
+                  refreshSteamPlaytime(gameIds, {
+                    completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
+                    emptyToastMessage: options?.emptyToastMessage,
+                    showToast: true,
+                  }),
+              }}
+              queueActions={{
+                addToQueue: openBacklogPicker,
+                openQueue: () => startReviewMode('backlog'),
+                playNow: playGameFromCompactRow,
+                finish: finishGameFromCompactRow,
+                drop: dropGameFromCompactRow,
+              }}
+              reviewActions={{ startReview: startReviewMode }}
+              filterActions={{
+                clearFilters: handleClearLibraryFilters,
+                filtersChange: handleLibraryFiltersChange,
+              }}
+              navigationActions={{
+                openOnboarding,
+                openIntegrations: () => {
+                  setActiveNavItem('Settings');
+                  setActiveSettingsCategory('Integrations');
+                },
+                openRetro: () => {
+                  setActiveNavItem('Settings');
+                  setActiveSettingsCategory('Retro');
+                },
               }}
             />
           ) : activeNavItem === 'Wishlist' ? (
@@ -1533,32 +1511,42 @@ export function AppController() {
               itadDealSyncState={itadDealSyncState}
               tags={tags}
               platformQueueState={platformQueueState}
-              onAddGame={() => setIsAddGameOpen(true)}
-              onAddToWishlist={addToWishlist}
-              onAddManyToWishlist={addManyToWishlist}
-              onAddToQueue={openBacklogPicker}
-              onPlayNow={playGameFromCompactRow}
-              onFinish={finishGameFromCompactRow}
-              onDrop={dropGameFromCompactRow}
-              onBulkEnrich={startMetadataWorkflow}
               isHltbSyncing={isHltbSyncing}
-              onBulkSyncHltb={syncHltb}
-              onBulkRemove={removeManyGames}
-              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-              onBulkStatusChange={updateManyGameStatuses}
-              onClearFilters={handleClearWishlistFilters}
-              onFiltersChange={handleWishlistFiltersChange}
-              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-              onFindMetadata={refreshGameMetadataFromActions}
-              onMoveToLibrary={moveToLibrary}
-              onOpenDetails={handleOpenDetailsFromCollection}
-              onRemove={removeGame}
-              onRemoveAndIgnore={removeAndIgnoreSteamGame}
-              onStartReview={startReviewMode}
-              onStatusChange={updateGameStatusWithCompletion}
-              onSyncSteamWishlist={syncSteamWishlist}
-              onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
-              onSyncItadDeals={syncWishlistDeals}
+              collectionActions={{
+                addGame: () => setIsAddGameOpen(true),
+                addToWishlist,
+                addManyToWishlist,
+                findArtwork: (game) => refreshGameMetadataFromActions(game, 'artwork'),
+                findMetadata: refreshGameMetadataFromActions,
+                moveToLibrary,
+                openDetails: handleOpenDetailsFromCollection,
+                remove: removeGame,
+                removeAndIgnore: removeAndIgnoreSteamGame,
+                statusChange: updateGameStatusWithCompletion,
+              }}
+              bulkActions={{
+                enrich: startMetadataWorkflow,
+                remove: removeManyGames,
+                removeAndIgnore: removeAndIgnoreManyGames,
+                statusChange: updateManyGameStatuses,
+                syncHltb,
+              }}
+              queueActions={{
+                addToQueue: openBacklogPicker,
+                playNow: playGameFromCompactRow,
+                finish: finishGameFromCompactRow,
+                drop: dropGameFromCompactRow,
+              }}
+              reviewActions={{ startReview: startReviewMode }}
+              filterActions={{
+                clearFilters: handleClearWishlistFilters,
+                filtersChange: handleWishlistFiltersChange,
+              }}
+              syncActions={{
+                syncSteamWishlist,
+                importSteamWishlistHtml: importSteamWishlistHtmlItemsWithAnalytics,
+                syncItadDeals: syncWishlistDeals,
+              }}
             />
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
@@ -1627,8 +1615,8 @@ export function AppController() {
             <DiscoverPanel
               games={games}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
-              onAddToInbox={handleAddToDiscoveryInbox}
-              onOpenGame={handleDiscoverOpenGame}
+              onAddToInbox={addToDiscoveryInbox}
+              onOpenGame={openDiscoveryPreview}
             />
           ) : activeNavItem === 'Stats' ? (
             <Suspense fallback={<PanelLoadingFallback />}>
@@ -1805,11 +1793,11 @@ export function AppController() {
           candidate={previewCandidate}
           userGames={games}
           discoveryInboxRawgIds={discoveryInboxRawgIds}
-          onClose={() => setPreviewCandidate(null)}
-          onAddToInbox={handleAddToDiscoveryInbox}
+          onClose={() => closeDiscoveryPreview()}
+          onAddToInbox={addToDiscoveryInbox}
           onAddToWishlist={handlePreviewAddToWishlist}
           onAddToLibrary={handlePreviewAddToLibrary}
-          onOpenPreview={handleDiscoverOpenGame}
+          onOpenPreview={openDiscoveryPreview}
           onOpenLibraryGame={handlePreviewOpenLibraryGame}
         />
       ) : null}

@@ -55,6 +55,58 @@ import type {
 } from '../../types/steam';
 import type { ReviewModeState, ReviewSource } from '../../lib/reviewModeStorage';
 
+export type CollectionPanelCollectionActions = {
+  addGame: () => void;
+  addToWishlist: (game: Game) => void;
+  addManyToWishlist: (games: Game[]) => void;
+  findArtwork?: (game: Game) => void;
+  findMetadata: (game: Game) => void;
+  moveToLibrary: (game: Game) => void;
+  openDetails: (gameId: string) => void;
+  remove: (gameId: string) => void;
+  removeAndIgnore: (game: Game) => void;
+  statusChange: (gameId: string, status: GameStatus) => void;
+};
+
+export type CollectionPanelBulkActions = {
+  enrich: (gameIds: string[]) => void;
+  remove: (gameIds: string[]) => void;
+  removeAndIgnore: (games: Game[]) => void;
+  statusChange: (gameIds: string[], status: GameStatus) => void;
+  syncHltb: (gameIds: string[]) => Promise<HltbSyncSummary | null>;
+  refreshSteamPlaytime?: (gameIds: string[], options?: { emptyToastMessage?: string }) => Promise<SteamPlaytimeRefreshSummary | null>;
+  syncSteamAchievements?: (gameIds: string[], options?: { emptyToastMessage?: string; force?: boolean }) => Promise<SteamAchievementSyncSummary | null>;
+};
+
+export type CollectionPanelQueueActions = {
+  addToQueue: (game: Game) => void;
+  openQueue?: () => void;
+  playNow: (game: Game) => void;
+  finish: (game: Game) => void;
+  drop: (game: Game) => void;
+};
+
+export type CollectionPanelReviewActions = {
+  startReview: (source: ReviewSource) => void;
+};
+
+export type CollectionPanelSyncActions = {
+  syncSteamWishlist?: () => void;
+  importSteamWishlistHtml?: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
+  syncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
+};
+
+export type CollectionPanelNavigationActions = {
+  openOnboarding?: () => void;
+  openIntegrations?: () => void;
+  openRetro?: () => void;
+};
+
+export type CollectionPanelFilterActions = {
+  clearFilters: () => void;
+  filtersChange: (changes: Partial<CollectionFilters>) => void;
+};
+
 export type CollectionPanelProps = {
   collectionType: GameCollectionType;
   contentScrollRef: RefObject<HTMLElement | null>;
@@ -70,38 +122,14 @@ export type CollectionPanelProps = {
   steamWishlistSyncState?: SteamWishlistSyncState;
   isHltbSyncing?: boolean;
   tags: string[];
-  onAddGame: () => void;
-  onAddToWishlist: (game: Game) => void;
-  onAddManyToWishlist: (games: Game[]) => void;
-  onAddToQueue: (game: Game) => void;
-  onPlayNow: (game: Game) => void;
-  onFinish: (game: Game) => void;
-  onDrop: (game: Game) => void;
-  onBulkEnrich: (gameIds: string[]) => void;
-  onBulkSyncHltb: (gameIds: string[]) => Promise<HltbSyncSummary | null>;
-  onBulkRefreshSteamPlaytime?: (gameIds: string[], options?: { emptyToastMessage?: string }) => Promise<SteamPlaytimeRefreshSummary | null>;
-  onBulkSyncSteamAchievements?: (gameIds: string[], options?: { emptyToastMessage?: string; force?: boolean }) => Promise<SteamAchievementSyncSummary | null>;
-  onBulkRemove: (gameIds: string[]) => void;
-  onBulkRemoveAndIgnore: (games: Game[]) => void;
-  onBulkStatusChange: (gameIds: string[], status: GameStatus) => void;
-  onClearFilters: () => void;
-  onFiltersChange: (changes: Partial<CollectionFilters>) => void;
-  onFindArtwork?: (game: Game) => void;
-  onFindMetadata: (game: Game) => void;
-  onMoveToLibrary: (game: Game) => void;
-  onOpenDetails: (gameId: string) => void;
-  onRemove: (gameId: string) => void;
-  onRemoveAndIgnore: (game: Game) => void;
-  onOpenQueue?: () => void;
-  onStartReview: (source: ReviewSource) => void;
-  onStatusChange: (gameId: string, status: GameStatus) => void;
-  onSyncSteamWishlist?: () => void;
-  onImportSteamWishlistHtml?: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
+  collectionActions: CollectionPanelCollectionActions;
+  bulkActions: CollectionPanelBulkActions;
+  queueActions: CollectionPanelQueueActions;
+  reviewActions: CollectionPanelReviewActions;
+  syncActions?: CollectionPanelSyncActions;
+  navigationActions?: CollectionPanelNavigationActions;
+  filterActions: CollectionPanelFilterActions;
   itadDealSyncState?: ItadDealSyncState;
-  onSyncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
-  onOpenOnboarding?: () => void;
-  onOpenIntegrations?: () => void;
-  onOpenRetro?: () => void;
 };
 
 export function CollectionPanel({
@@ -118,40 +146,48 @@ export function CollectionPanel({
   steamPlaytimeRefreshState,
   steamWishlistSyncState,
   tags,
-  onAddGame,
-  onAddToWishlist,
-  onAddManyToWishlist,
-  onAddToQueue,
-  onPlayNow,
-  onFinish,
-  onDrop,
-  onBulkEnrich,
-  onBulkSyncHltb,
-  onBulkRefreshSteamPlaytime,
-  onBulkSyncSteamAchievements,
-  onBulkRemove,
-  onBulkRemoveAndIgnore,
-  onBulkStatusChange,
-  onClearFilters,
-  onFiltersChange,
-  onFindArtwork,
-  onFindMetadata,
-  onMoveToLibrary,
-  onOpenDetails,
-  onRemove,
-  onRemoveAndIgnore,
-  onOpenQueue,
-  onStartReview,
-  onStatusChange,
-  onSyncSteamWishlist,
-  onImportSteamWishlistHtml,
+  collectionActions,
+  bulkActions,
+  queueActions,
+  reviewActions,
+  syncActions,
+  navigationActions,
+  filterActions,
   itadDealSyncState,
-  onSyncItadDeals,
-  onOpenOnboarding,
-  onOpenIntegrations,
-  onOpenRetro,
   isHltbSyncing = false,
 }: CollectionPanelProps) {
+  const {
+    addGame: onAddGame,
+    addToWishlist: onAddToWishlist,
+    addManyToWishlist: onAddManyToWishlist,
+    findArtwork: onFindArtwork,
+    findMetadata: onFindMetadata,
+    moveToLibrary: onMoveToLibrary,
+    openDetails: onOpenDetails,
+    remove: onRemove,
+    removeAndIgnore: onRemoveAndIgnore,
+    statusChange: onStatusChange,
+  } = collectionActions;
+  const {
+    enrich: onBulkEnrich,
+    remove: onBulkRemove,
+    removeAndIgnore: onBulkRemoveAndIgnore,
+    statusChange: onBulkStatusChange,
+    syncHltb: onBulkSyncHltb,
+    refreshSteamPlaytime: onBulkRefreshSteamPlaytime,
+    syncSteamAchievements: onBulkSyncSteamAchievements,
+  } = bulkActions;
+  const {
+    addToQueue: onAddToQueue,
+    openQueue: onOpenQueue,
+    playNow: onPlayNow,
+    finish: onFinish,
+    drop: onDrop,
+  } = queueActions;
+  const { startReview: onStartReview } = reviewActions;
+  const { clearFilters: onClearFilters, filtersChange: onFiltersChange } = filterActions;
+  const { syncSteamWishlist: onSyncSteamWishlist, importSteamWishlistHtml: onImportSteamWishlistHtml, syncItadDeals: onSyncItadDeals } = syncActions ?? {};
+  const { openOnboarding: onOpenOnboarding, openIntegrations: onOpenIntegrations, openRetro: onOpenRetro } = navigationActions ?? {};
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [bulkSummary, setBulkSummary] = useState<BulkActionSummary | null>(null);
