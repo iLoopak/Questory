@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { Icon } from '../../components/Icon';
 
@@ -8,7 +8,6 @@ import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
 import { UndoToastStack } from '../../components/UndoToastStack';
 import { RawgLinkDialog } from '../../components/RawgLinkDialog';
 import { HomePanel } from '../../components/HomePanel';
-import { MetadataEnrichmentPanel } from '../../components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from '../../components/OnboardingChecklist';
 import { ShelfAvatar } from '../../components/ShelfIdentity';
 import { ShelfProfilePopover } from '../shelf-profile/ShelfProfilePopover';
@@ -17,8 +16,19 @@ import { QueuePanel } from '../../components/QueuePanel';
 import { DiscoverPanel } from '../../components/DiscoverPanel';
 import { DiscoveryPreviewPanel } from '../../components/discovery/DiscoveryPreviewPanel';
 import { ReviewModePanel } from '../../components/ReviewModePanel';
-import { StatsPanel } from '../../components/StatsPanel';
-import { QuestRunnerGame } from '../../components/QuestRunnerGame';
+import { PanelLoadingFallback } from '../../components/PanelLoadingFallback';
+
+// Low-frequency nav screens are code-split so they stay out of the initial
+// bundle. Home / Library / Wishlist / Discover / Platform Plans load eagerly.
+const MetadataEnrichmentPanel = lazy(() =>
+  import('../../components/MetadataEnrichmentPanel').then((m) => ({ default: m.MetadataEnrichmentPanel })),
+);
+const StatsPanel = lazy(() =>
+  import('../../components/StatsPanel').then((m) => ({ default: m.StatsPanel })),
+);
+const QuestRunnerGame = lazy(() =>
+  import('../../components/QuestRunnerGame').then((m) => ({ default: m.QuestRunnerGame })),
+);
 import {
   getNavDescription,
   moreNavItems,
@@ -85,7 +95,9 @@ import { DiscoveryInboxPanel } from '../../components/DiscoveryInboxPanel';
 import { loadDiscoveryInbox, saveDiscoveryInbox, type DiscoveryInboxItem } from '../../lib/discoveryInboxStorage';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
 import { AchievementTimelineView } from '../achievement-timeline/AchievementTimelineView';
-import { SettingsView } from '../settings/SettingsView';
+const SettingsView = lazy(() =>
+  import('../settings/SettingsView').then((m) => ({ default: m.SettingsView })),
+);
 import { buildSetupTasks } from '../../lib/setupTasks';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
@@ -1105,11 +1117,11 @@ export function AppController() {
 
   function handleAddToDiscoveryInbox(discoveryGame: import('../../lib/discovery').DiscoveryGame, reason: string) {
     if (discoveryInboxItems.some((i) => i.rawgId === discoveryGame.rawgId)) {
-      addToastNotification({ category: 'info', dedupeKey: `inbox-dup:${discoveryGame.rawgId}`, message: `${discoveryGame.title} is already in your Discovery Inbox.` });
+      addToastNotification({ category: 'info', dedupeKey: `inbox-dup:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAlreadyInInbox'), { game: discoveryGame.title }) });
       return;
     }
     if (games.some((g) => g.rawgId === discoveryGame.rawgId)) {
-      addToastNotification({ category: 'info', dedupeKey: `inbox-owned:${discoveryGame.rawgId}`, message: `${discoveryGame.title} is already in your library.` });
+      addToastNotification({ category: 'info', dedupeKey: `inbox-owned:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAlreadyInLibrary'), { game: discoveryGame.title }) });
       return;
     }
     const newItem: DiscoveryInboxItem = {
@@ -1123,7 +1135,7 @@ export function AppController() {
     const updated = [...discoveryInboxItems, newItem];
     saveDiscoveryInbox(updated);
     setDiscoveryInboxItems(updated);
-    addToastNotification({ category: 'success', dedupeKey: `inbox-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Discovery Inbox.` });
+    addToastNotification({ category: 'success', dedupeKey: `inbox-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToInbox'), { game: discoveryGame.title }) });
   }
 
   function handleDiscoverOpenGame(candidate: import('../../lib/discovery').DiscoveryCandidate) {
@@ -1135,7 +1147,7 @@ export function AppController() {
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     addToWishlist({ ...base, collectionType: 'wishlist' });
     setPreviewCandidate(null);
-    addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Wishlist.` });
+    addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToWishlist'), { game: discoveryGame.title }) });
   }
 
   function handlePreviewAddToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
@@ -1160,7 +1172,7 @@ export function AppController() {
     // transition reads as "this game is now mine", not a navigation.
     setSelectedGameId(base.id);
     setActiveNavItem('Library');
-    addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: `${discoveryGame.title} added to Library.` });
+    addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToLibrary'), { game: discoveryGame.title }) });
   }
 
   function handlePreviewOpenLibraryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
@@ -1466,7 +1478,7 @@ export function AppController() {
                 });
               }}
               onSelectDiscoveryGame={handleSelectDiscoveryGame}
-              onAddDiscoveryGameToInbox={handleAddToDiscoveryInbox}
+              onOpenDiscoveryPreview={handleDiscoverOpenGame}
               discoveryInboxRawgIds={discoveryInboxRawgIds}
             />
           ) : activeNavItem === 'Library' ? (
@@ -1678,14 +1690,16 @@ export function AppController() {
               onIgnore={handleInboxIgnore}
             />
           ) : activeNavItem === 'Metadata' ? (
-            <MetadataEnrichmentPanel
-              games={games}
-              initialSelectedGameIds={metadataSelectionRequest?.ids}
-              onMetadataManagementChange={updateGameMetadataManagement}
-              onMetadataEnriched={() => markOnboardingItemComplete('metadata-enriched')}
-              onMetadataUpdate={updateGameMetadata}
-              selectionRequestId={metadataSelectionRequest?.requestId}
-            />
+            <Suspense fallback={<PanelLoadingFallback />}>
+              <MetadataEnrichmentPanel
+                games={games}
+                initialSelectedGameIds={metadataSelectionRequest?.ids}
+                onMetadataManagementChange={updateGameMetadataManagement}
+                onMetadataEnriched={() => markOnboardingItemComplete('metadata-enriched')}
+                onMetadataUpdate={updateGameMetadata}
+                selectionRequestId={metadataSelectionRequest?.requestId}
+              />
+            </Suspense>
           ) : activeNavItem === 'Artwork' ? (
             <ArtworkBrowserView
               games={games}
@@ -1707,21 +1721,26 @@ export function AppController() {
               onOpenGame={handleDiscoverOpenGame}
             />
           ) : activeNavItem === 'Stats' ? (
-            <StatsPanel
-              games={games}
-              queueSummary={queueSummary}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Stats');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
-            />
+            <Suspense fallback={<PanelLoadingFallback />}>
+              <StatsPanel
+                games={games}
+                queueSummary={queueSummary}
+                onOpenDetails={(gameId) => {
+                  const targetGame = games.find((game) => game.id === gameId);
+                  setDetailReturnSection('Stats');
+                  setSelectedGameId(gameId);
+                  setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+                }}
+              />
+            </Suspense>
           ) : activeNavItem === 'Quest Runner' ? (
             <div className="px-4 py-4">
-              <QuestRunnerGame games={games} />
+              <Suspense fallback={<PanelLoadingFallback />}>
+                <QuestRunnerGame games={games} />
+              </Suspense>
             </div>
           ) : activeNavItem === 'Settings' ? (
+            <Suspense fallback={<PanelLoadingFallback />}>
             <SettingsView
               activeCategory={activeSettingsCategory}
               autoBackupSignal={autoBackupSignal}
@@ -1813,6 +1832,7 @@ export function AppController() {
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
             />
+            </Suspense>
           ) : (
             <PlaceholderPanel title={activeNavItem} />
           )}

@@ -23,7 +23,7 @@ import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
 import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { PersonalRecommendationsSection } from './discovery/PersonalRecommendationsSection';
-import type { DiscoveryGame } from '../lib/discovery';
+import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -54,7 +54,7 @@ type HomePanelProps = {
   onSyncSteamPlaytime?: () => void;
   isImportingNewSteamGames?: boolean;
   onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
-  onAddDiscoveryGameToInbox?: (game: DiscoveryGame, reason: string) => void;
+  onOpenDiscoveryPreview?: (candidate: DiscoveryCandidate) => void;
   discoveryInboxRawgIds?: Set<number>;
 };
 
@@ -92,7 +92,7 @@ export function HomePanel({
   onSyncSteamPlaytime,
   isImportingNewSteamGames = false,
   onSelectDiscoveryGame,
-  onAddDiscoveryGameToInbox,
+  onOpenDiscoveryPreview,
   discoveryInboxRawgIds = new Set(),
 }: HomePanelProps) {
   const { t } = useI18n();
@@ -548,40 +548,35 @@ export function HomePanel({
 
         {/* Right sidebar — stacks below main on mobile, sits beside it on desktop */}
         <div className="mt-4 space-y-4 lg:mt-0">
-          {/* Wishlist Deals */}
-          <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
-            {wishlistDeals.length > 0 ? (
-              <div className="space-y-3">
-                <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
-                <div className="border-t border-skyglass/10" />
-                <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
-                  {wishlistDeals.map((game) => (
-                    <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
-                  ))}
+          {/* Wishlist Deals — hidden entirely until the user has a wishlist */}
+          {wishlistGames.length > 0 ? (
+            <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
+              {wishlistDeals.length > 0 ? (
+                <div className="space-y-3">
+                  <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
+                  <div className="border-t border-skyglass/10" />
+                  <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
+                    {wishlistDeals.map((game) => (
+                      <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : wishlistGames.length === 0 ? (
-              <EmptyState
-                title="No wishlist yet"
-                text="Save games to your Wishlist to track deals when they go on sale."
-                actionLabel={t('home.openWishlist')}
-                onAction={onOpenWishlist}
-              />
-            ) : (
-              <WishlistNoDealsState
-                wishlistCount={wishlistGames.length}
-                canSync={!!onSyncItadDeals}
-                onOpenWishlist={onOpenWishlist}
-                onSyncDeals={onSyncItadDeals}
-              />
-            )}
-          </HomeSection>
+              ) : (
+                <WishlistNoDealsState
+                  wishlistCount={wishlistGames.length}
+                  canSync={!!onSyncItadDeals}
+                  onOpenWishlist={onOpenWishlist}
+                  onSyncDeals={onSyncItadDeals}
+                />
+              )}
+            </HomeSection>
+          ) : null}
 
           {/* Daily Quest */}
           {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
 
-          {/* Achievement Quiz */}
-          <AchievementQuizCard games={games} />
+          {/* Achievement Quiz — needs a library to quiz about */}
+          {libraryGames.length > 0 ? <AchievementQuizCard games={games} /> : null}
 
           {/* Questory Journey */}
           <JourneyProgressCard
@@ -595,7 +590,8 @@ export function HomePanel({
             onOpenReviewMode={() => onOpenReviewMode('backlog')}
           />
 
-          {/* Quest Queue Remaining */}
+          {/* Quest Queue Remaining — hidden until there is a library to review */}
+          {libraryGames.length > 0 ? (
           <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
             <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
             <button
@@ -625,17 +621,18 @@ export function HomePanel({
             </button>
             {reviewRemainingCount > 10 && (
               <p className="mt-2 text-xs text-slate-600">
-                Reviewing more games improves recommendations in the Recommendations tab.
+                {t('home.reviewMoreHint')}
               </p>
             )}
           </section>
+          ) : null}
 
-          {onSelectDiscoveryGame ? (
+          {onSelectDiscoveryGame && libraryGames.length > 0 ? (
             <PersonalRecommendationsSection
               userGames={games}
               inboxRawgIds={discoveryInboxRawgIds}
               onSelectGame={onSelectDiscoveryGame}
-              onAddToInbox={onAddDiscoveryGameToInbox}
+              onOpenPreview={onOpenDiscoveryPreview}
             />
           ) : null}
 
@@ -1599,33 +1596,6 @@ function FirstDayProgressPanel({
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function EmptyState({
-  actionLabel,
-  text,
-  title,
-  onAction,
-}: {
-  actionLabel: string;
-  text: string;
-  title: string;
-  onAction: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4 text-center">
-      <h4 className="text-base font-semibold text-white">{title}</h4>
-      <p className="mt-1 text-sm text-slate-400">{text}</p>
-      <button
-        className="mt-4 min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
-        data-home-focus="true"
-        onClick={onAction}
-        type="button"
-      >
-        {actionLabel}
-      </button>
     </div>
   );
 }

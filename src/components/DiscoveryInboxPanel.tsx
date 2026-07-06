@@ -10,8 +10,10 @@ import { useControllerAction } from '../lib/controllerActions';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 import type { DiscoveryInboxItem } from '../lib/discoveryInboxStorage';
-import { Icon, type IconName } from './Icon';
+import { Icon } from './Icon';
 import { DiscoveryScreenshotStrip } from './ScreenshotStrip';
+import { useI18n } from '../i18n';
+import { formatMessageTemplate } from '../utils/summaryFormatters';
 
 // ---------------------------------------------------------------------------
 // Action definitions
@@ -19,35 +21,26 @@ import { DiscoveryScreenshotStrip } from './ScreenshotStrip';
 
 type DiscoveryInboxAction = 'library' | 'wishlist' | 'plans' | 'ignore';
 
-const negativeActions: ReadonlyArray<{
-  readonly action: DiscoveryInboxAction;
-  readonly icon: IconName;
-  readonly label: string;
-  readonly tone: 'danger';
-}> = [
-  { action: 'ignore', icon: 'eye-off', label: 'Ignore', tone: 'danger' },
-];
+// Labels/descriptions are i18n keys, translated at render time.
+const negativeActions = [
+  { action: 'ignore', icon: 'eye-off', labelKey: 'action.ignore', tone: 'danger' },
+] as const;
 
-const positiveActions: ReadonlyArray<{
-  readonly action: DiscoveryInboxAction;
-  readonly icon: IconName;
-  readonly label: string;
-  readonly tone: 'accent' | 'neutral';
-}> = [
-  { action: 'library', icon: 'library', label: 'Add to Library', tone: 'accent' },
-  { action: 'wishlist', icon: 'heart', label: 'Add to Wishlist', tone: 'neutral' },
-  { action: 'plans', icon: 'list-plus', label: 'Add to Platform Plans', tone: 'neutral' },
-];
+const positiveActions = [
+  { action: 'library', icon: 'library', labelKey: 'preview.addToLibrary', tone: 'accent' },
+  { action: 'wishlist', icon: 'heart', labelKey: 'preview.addToWishlist', tone: 'neutral' },
+  { action: 'plans', icon: 'list-plus', labelKey: 'action.addToQueue', tone: 'neutral' },
+] as const;
 
-const actionDescriptions: Partial<Record<DiscoveryInboxAction, string>> = {
-  library: "Own it — add to your game collection",
-  wishlist: "Interested, not ready to commit",
-  plans: "Queue for a specific platform soon",
-  ignore: "Not for you — remove from inbox",
-};
+const actionDescriptionKeys = {
+  library: 'discoveryInbox.modeLibrary',
+  wishlist: 'discoveryInbox.modeWishlist',
+  plans: 'discoveryInbox.modePlans',
+  ignore: 'discoveryInbox.modeIgnore',
+} as const;
 
 const decisionActions = [...negativeActions, ...positiveActions];
-const firstPositiveActionIndex = negativeActions.length;
+const firstPositiveActionIndex: number = negativeActions.length;
 
 // ---------------------------------------------------------------------------
 // Swipe mechanics — mirrors ReviewModePanel
@@ -287,6 +280,7 @@ function FocusedDiscoveryCard({
   onAction: (action: DiscoveryInboxAction) => void;
   onHighlight: (index: number) => void;
 }) {
+  const { t } = useI18n();
   const { game } = item;
   const year = game.released?.match(/^(\d{4})/)?.[1] ?? null;
   const [swipeState, setSwipeState] = useState<SwipeState>(emptySwipeState);
@@ -375,10 +369,10 @@ function FocusedDiscoveryCard({
     >
       {/* Left zone — Ignore */}
       <section
-        aria-label="Ignore"
+        aria-label={t('action.ignore')}
         className={`qs-review-zone qs-review-zone-negative ${isSwipeEngaged && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`}
       >
-        <div className="qs-review-zone-label">Ignore</div>
+        <div className="qs-review-zone-label">{t('action.ignore')}</div>
         <div className="grid gap-2">
           {negativeActions.map((action, index) => {
             const isTarget = highlightedActionIndex === index;
@@ -392,11 +386,11 @@ function FocusedDiscoveryCard({
               >
                 <div className="flex items-center gap-1.5 justify-center">
                   <Icon className="select-none" name={action.icon} />
-                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
+                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{t(action.labelKey)}</span>
                 </div>
-                {actionDescriptions[action.action] && !hasGamepad && (
+                {!hasGamepad && (
                   <span className="mt-0.5 block text-2xs leading-none opacity-50">
-                    {actionDescriptions[action.action]}
+                    {t(actionDescriptionKeys[action.action])}
                   </span>
                 )}
               </button>
@@ -437,7 +431,7 @@ function FocusedDiscoveryCard({
                 aria-hidden="true"
                 className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`}
               >
-                {activeSwipeAction.label}
+                {t(activeSwipeAction.labelKey)}
               </div>
             ) : null}
             <div className="qs-review-artwork-frame relative h-full w-full">
@@ -522,21 +516,21 @@ function FocusedDiscoveryCard({
 
         {hasGamepad ? (
           <div className="qs-gamepad-hints mt-4 flex flex-wrap items-center justify-center gap-2 qs-label-caps text-slate-400">
-            <span>R2 Ignore</span>
+            <span>{t('discoveryInbox.hintIgnore')}</span>
             <span>•</span>
-            <span>D-Pad choose action</span>
+            <span>{t('discoveryInbox.hintChoose')}</span>
             <span>•</span>
-            <span>A confirm</span>
+            <span>{t('discoveryInbox.hintConfirm')}</span>
           </div>
         ) : null}
       </section>
 
       {/* Right zone — Library, Wishlist, Platform Plans */}
       <section
-        aria-label="Add game"
+        aria-label={t('discoveryInbox.zoneAddA11y')}
         className={`qs-review-zone qs-review-zone-positive ${isSwipeEngaged && swipeDirection === 'right' ? 'qs-review-zone-active' : ''}`}
       >
-        <div className="qs-review-zone-label">Add</div>
+        <div className="qs-review-zone-label">{t('discoveryInbox.zoneAdd')}</div>
         <div className="grid gap-2">
           {positiveActions.map((action, actionIndex) => {
             const index = firstPositiveActionIndex + actionIndex;
@@ -553,11 +547,11 @@ function FocusedDiscoveryCard({
               >
                 <div className="flex items-center gap-1.5 justify-center">
                   <Icon className="select-none" name={action.icon} />
-                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{action.label}</span>
+                  <span className="font-bold text-xs sm:text-sm tracking-wide leading-none">{t(action.labelKey)}</span>
                 </div>
-                {actionDescriptions[action.action] && !hasGamepad && (
+                {!hasGamepad && (
                   <span className="mt-0.5 block text-2xs leading-none opacity-50">
-                    {actionDescriptions[action.action]}
+                    {t(actionDescriptionKeys[action.action])}
                   </span>
                 )}
               </button>
@@ -574,6 +568,7 @@ function FocusedDiscoveryCard({
 // ---------------------------------------------------------------------------
 
 function InboxComplete({ stats, reviewedCount }: { stats: SessionStats; reviewedCount: number }) {
+  const { t } = useI18n();
   const hasStats = stats.library > 0 || stats.wishlist > 0 || stats.plans > 0 || stats.ignored > 0;
   const addedCount = stats.library + stats.wishlist + stats.plans;
 
@@ -581,50 +576,53 @@ function InboxComplete({ stats, reviewedCount }: { stats: SessionStats; reviewed
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-sm">
         <div className="text-xs font-semibold uppercase tracking-spread text-amber-400">
-          Discovery Inbox Complete
+          {t('discoveryInbox.completeKicker')}
         </div>
-        <h3 className="mt-2 text-3xl font-semibold text-white">Inbox cleared!</h3>
+        <h3 className="mt-2 text-3xl font-semibold text-white">{t('discoveryInbox.completeTitle')}</h3>
         <p className="mt-3 text-sm text-slate-400">
-          You triaged {reviewedCount} {reviewedCount === 1 ? 'recommendation' : 'recommendations'}.
+          {formatMessageTemplate(
+            t(reviewedCount === 1 ? 'discoveryInbox.completeTriagedOne' : 'discoveryInbox.completeTriagedMany'),
+            { count: reviewedCount },
+          )}
         </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
-            <div className="qs-label-caps text-amber-400">Triaged</div>
+            <div className="qs-label-caps text-amber-400">{t('discoveryInbox.completeTriagedLabel')}</div>
             <div className="mt-1 text-2xl font-semibold text-white">{reviewedCount}</div>
-            <div className="text-xs text-slate-400">this session</div>
+            <div className="text-xs text-slate-400">{t('discoveryInbox.completeThisSession')}</div>
           </div>
           <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
-            <div className="qs-label-caps text-accent">Added</div>
+            <div className="qs-label-caps text-accent">{t('discoveryInbox.completeAddedLabel')}</div>
             <div className="mt-1 text-2xl font-semibold text-white">{addedCount}</div>
-            <div className="text-xs text-slate-400">to your collection</div>
+            <div className="text-xs text-slate-400">{t('discoveryInbox.completeToCollection')}</div>
           </div>
         </div>
         {hasStats && (
           <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
             {stats.library > 0 && (
               <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">
-                {stats.library} added to Library
+                {formatMessageTemplate(t('discoveryInbox.completeAddedLibrary'), { count: stats.library })}
               </span>
             )}
             {stats.wishlist > 0 && (
               <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">
-                {stats.wishlist} added to Wishlist
+                {formatMessageTemplate(t('discoveryInbox.completeAddedWishlist'), { count: stats.wishlist })}
               </span>
             )}
             {stats.plans > 0 && (
               <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">
-                {stats.plans} added to Platform Plans
+                {formatMessageTemplate(t('discoveryInbox.completeAddedPlans'), { count: stats.plans })}
               </span>
             )}
             {stats.ignored > 0 && (
               <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">
-                {stats.ignored} ignored
+                {formatMessageTemplate(t('discoveryInbox.completeIgnored'), { count: stats.ignored })}
               </span>
             )}
           </div>
         )}
         <p className="mt-6 text-xs text-slate-500">
-          Browse the Home screen to discover more games worth adding.
+          {t('discoveryInbox.completeBrowseMore')}
         </p>
       </div>
     </div>
@@ -636,13 +634,14 @@ function InboxComplete({ stats, reviewedCount }: { stats: SessionStats; reviewed
 // ---------------------------------------------------------------------------
 
 function InboxEmpty() {
+  const { t } = useI18n();
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
       <div className="max-w-sm">
         <Icon className="mx-auto text-slate-600" name="compass" size={40} />
-        <h3 className="mt-3 text-xl font-semibold text-white">Discovery Inbox is clear</h3>
+        <h3 className="mt-3 text-xl font-semibold text-white">{t('discoveryInbox.emptyTitle')}</h3>
         <p className="mt-2 text-sm text-slate-400">
-          Browse the Home screen recommendations and tap "Review Later" to queue games here.
+          {t('discoveryInbox.emptyHint')}
         </p>
       </div>
     </div>

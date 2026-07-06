@@ -4,6 +4,7 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { getUserProfileReadiness } from '../../lib/userProfile';
 import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
 import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from './DiscoveryGameCard';
+import { useI18n, type TFunction } from '../../i18n';
 
 const SKELETON_COUNT = 5;
 
@@ -11,18 +12,18 @@ const SKELETON_COUNT = 5;
 // Cold start
 // ---------------------------------------------------------------------------
 
-function ColdStart({ progress }: { progress: number }) {
+function ColdStart({ progress, t }: { progress: number; t: TFunction }) {
   return (
     <section
-      aria-label="Recommended For You"
+      aria-label={t('recommendations.forYouTitle')}
       className="rounded-2xl border border-white/8 bg-ink-950/60 p-4 space-y-3"
     >
-      <h3 className="text-sm font-semibold text-white">Recommended For You</h3>
+      <h3 className="text-sm font-semibold text-white">{t('recommendations.forYouTitle')}</h3>
       <p className="text-xs text-slate-400 leading-relaxed">
-        Questory is learning your gaming taste.
+        {t('recommendations.coldStartLearning')}
       </p>
       <p className="text-xs text-slate-600 leading-relaxed">
-        Play and finish more games to unlock recommendations tailored just for you.
+        {t('recommendations.coldStartUnlock')}
       </p>
       <div className="space-y-1.5 pt-1">
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/6">
@@ -44,14 +45,16 @@ type LoadedProps = {
   userGames: Game[];
   inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
-  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
+  onOpenPreview?: (candidate: DiscoveryCandidate) => void;
+  t: TFunction;
 };
 
 function PersonalRecommendationsLoaded({
   userGames,
   inboxRawgIds,
   onSelectGame,
-  onAddToInbox,
+  onOpenPreview,
+  t,
 }: LoadedProps) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
 
@@ -95,10 +98,10 @@ function PersonalRecommendationsLoaded({
   if (candidates !== null && candidates.length === 0) return null;
 
   return (
-    <section aria-label="Recommended For You" className="space-y-3">
+    <section aria-label={t('recommendations.forYouTitle')} className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold text-white">Recommended For You</h3>
-        <p className="mt-0.5 text-xs text-slate-500">Tap a game to save it to your Discovery Inbox</p>
+        <h3 className="text-sm font-semibold text-white">{t('recommendations.forYouTitle')}</h3>
+        <p className="mt-0.5 text-xs text-slate-500">{t('recommendations.tapHint')}</p>
       </div>
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {candidates === null ? (
@@ -108,11 +111,14 @@ function PersonalRecommendationsLoaded({
             <DiscoveryCompactCard
               key={candidate.game.rawgId}
               candidate={candidate}
-              onClick={(game, reason) => {
-                if (!candidate.libraryStatus && !candidate.inboxStatus && onAddToInbox) {
-                  onAddToInbox(game, reason);
-                } else if (candidate.libraryStatus === 'library') {
+              onClick={(game) => {
+                // Tap always opens the game — Preview for discovery games,
+                // Game Hub for owned ones. Saving to the inbox is an explicit
+                // "Review Later" action inside the Preview.
+                if (candidate.libraryStatus === 'library') {
                   onSelectGame(game);
+                } else {
+                  onOpenPreview?.(candidate);
                 }
               }}
             />
@@ -131,19 +137,20 @@ type Props = {
   userGames: Game[];
   inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
-  onAddToInbox?: (game: DiscoveryGame, reason: string) => void;
+  onOpenPreview?: (candidate: DiscoveryCandidate) => void;
 };
 
 export function PersonalRecommendationsSection({
   userGames,
   inboxRawgIds,
   onSelectGame,
-  onAddToInbox,
+  onOpenPreview,
 }: Props) {
+  const { t } = useI18n();
   const readiness = useMemo(() => getUserProfileReadiness(userGames), [userGames]);
 
   if (!readiness.ready) {
-    return <ColdStart progress={readiness.progress} />;
+    return <ColdStart progress={readiness.progress} t={t} />;
   }
 
   return (
@@ -151,7 +158,8 @@ export function PersonalRecommendationsSection({
       userGames={userGames}
       inboxRawgIds={inboxRawgIds}
       onSelectGame={onSelectGame}
-      onAddToInbox={onAddToInbox}
+      onOpenPreview={onOpenPreview}
+      t={t}
     />
   );
 }
