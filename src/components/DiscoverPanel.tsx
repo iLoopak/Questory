@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Game } from '../types/game';
-import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
+import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../lib/discovery';
 import { GameCard } from './GameCard';
 import { EmptyState } from './EmptyState';
+import { MetacriticBadge } from './MetacriticBadge';
 import { useI18n, type TFunction } from '../i18n';
 import {
   fetchTrendingGames,
@@ -17,43 +18,6 @@ type DiscoverPanelProps = {
   onAddToInbox: (game: DiscoveryGame, reason: string) => void;
   onOpenGame: (candidate: DiscoveryCandidate) => void;
 };
-
-// ── Type adapter ──────────────────────────────────────────────────────────────
-
-function candidateToGame(candidate: DiscoveryCandidate, userGames: Game[]): Game {
-  const { game, libraryStatus } = candidate;
-
-  // For library/wishlist games use the real Game object so the card reflects
-  // actual status, rating, artwork, etc., and Details opens the right game.
-  if (libraryStatus !== null) {
-    const real = userGames.find((g) => g.rawgId === game.rawgId);
-    if (real) return real;
-  }
-
-  return {
-    id: `discover-${game.rawgId}`,
-    title: game.title,
-    platform: game.hasSteamVersion ? 'Steam' : (game.platforms[0] ?? 'PC'),
-    status: 'Want to play',
-    coverImage: game.coverUrl ?? '',
-    backgroundImage: game.coverUrl ?? null,
-    playtimeHours: 0,
-    tags: game.tags.slice(0, 5),
-    lastPlayedAt: null,
-    notes: '',
-    collectionType: 'library',
-    rawgId: game.rawgId,
-    genres: game.genres,
-    metacritic: game.metacritic ?? null,
-    released: game.released,
-  };
-}
-
-function metacriticColor(score: number): string {
-  if (score >= 75) return 'text-emerald-400';
-  if (score >= 50) return 'text-amber-400';
-  return 'text-red-400';
-}
 
 function getDiscoveryContext(candidate: DiscoveryCandidate, t: TFunction): string | undefined {
   if (candidate.libraryStatus === 'library') return t('discovery.inYourLibrary');
@@ -136,7 +100,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
   }, [games, discoveryInboxRawgIds, t]);
 
   const adaptedGames = useMemo(
-    () => (candidates ?? []).map((c) => candidateToGame(c, games)),
+    () => (candidates ?? []).map((c) => discoveryCandidateToGame(c, games, 'discover')),
     [candidates, games],
   );
 
@@ -179,15 +143,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
                       }
                     : undefined
                 }
-                coverBadgeTopRight={
-                  metacritic ? (
-                    <span
-                      className={`absolute right-3 top-3 rounded-md bg-ink-950/85 px-1.5 py-0.5 text-xs font-bold tabular-nums backdrop-blur-sm ${metacriticColor(metacritic)}`}
-                    >
-                      {metacritic}
-                    </span>
-                  ) : undefined
-                }
+                coverBadgeTopRight={metacritic ? <MetacriticBadge score={metacritic} variant="overlay" /> : undefined}
                 discoveryContext={context}
               />
             );

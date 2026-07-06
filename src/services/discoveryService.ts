@@ -1,13 +1,10 @@
-import { fetchSuggestedGames, fetchGameSeries } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
 import type { Game } from '../types/game';
 import type {
   DiscoveryCandidate,
   DiscoveryExclusionReason,
   DiscoveryGame,
-  DiscoverySection,
 } from '../lib/discovery';
-// DiscoverySection kept in import for fetchDiscoverySections return type.
 
 const PLATFORM_ABBREV: Record<string, string> = {
   'PlayStation 5': 'PS5',
@@ -49,56 +46,7 @@ export function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
 }
 
 // ---------------------------------------------------------------------------
-// Cache — keyed by rawgId, stores raw RAWG results only.
-// Library-dependent filtering is applied later in buildDiscoveryCandidates so
-// the same cached data works regardless of library changes.
-// ---------------------------------------------------------------------------
-
-interface CacheEntry {
-  sections: DiscoverySection[];
-  fetchedAt: number;
-}
-
-const cache = new Map<number, CacheEntry>();
-const CACHE_TTL_MS = 10 * 60 * 1000;
-
-export async function fetchDiscoverySections(
-  rawgId: number,
-): Promise<DiscoverySection[]> {
-  const cached = cache.get(rawgId);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.sections;
-  }
-
-  const [suggested, series] = await Promise.all([
-    fetchSuggestedGames(rawgId),
-    fetchGameSeries(rawgId),
-  ]);
-
-  // Merge, deduplicate, exclude the current game, cap at 10 before filtering.
-  const seen = new Set<number>([rawgId]);
-  const merged: RawgSearchResult[] = [];
-  for (const result of [...suggested, ...series]) {
-    if (!seen.has(result.id)) {
-      seen.add(result.id);
-      merged.push(result);
-    }
-    if (merged.length === 10) break;
-  }
-
-  const games: DiscoveryGame[] = merged.map(mapRawgResult);
-  const sections: DiscoverySection[] =
-    games.length > 0
-      ? [{ id: 'you-might-also-like', title: 'You Might Also Like', games }]
-      : [];
-
-  cache.set(rawgId, { sections, fetchedAt: Date.now() });
-  return sections;
-}
-
-// ---------------------------------------------------------------------------
 // Library-aware filtering + ranking
-// Call this after fetchDiscoverySections, passing the live userGames snapshot.
 // ---------------------------------------------------------------------------
 
 export interface CandidateFilterOptions {

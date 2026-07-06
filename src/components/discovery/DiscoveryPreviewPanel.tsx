@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { RawgGameDetails } from '../../types/rawg';
-import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
+import { discoveryGameToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { getGameDetails } from '../../services/rawgApi';
 import { useI18n } from '../../i18n';
 import { useScrollLock } from '../../hooks/useScrollLock';
@@ -95,24 +95,11 @@ export function DiscoveryPreviewPanel({
   }, [onClose]);
 
   // Synthetic Game so the shared Game Hub components can render discovery
-  // data without a library record ever being created.
+  // data without a library record ever being created. Base shape comes from
+  // the shared adapter; RAWG details enrich it once loaded.
   const previewGame: Game = useMemo(() => ({
-    id: `preview-${game.rawgId}`,
-    title: game.title,
-    platform: game.hasSteamVersion ? 'Steam' : (game.platforms[0] ?? 'PC'),
-    status: 'Want to play',
-    coverImage: game.coverUrl ?? '',
+    ...discoveryGameToGame(game, 'preview'),
     backgroundImage: details?.background_image ?? game.coverUrl ?? null,
-    playtimeHours: 0,
-    tags: [],
-    lastPlayedAt: null,
-    notes: '',
-    collectionType: 'library',
-    rawgId: game.rawgId,
-    rawgSlug: game.slug ?? undefined,
-    genres: game.genres,
-    metacritic: game.metacritic ?? null,
-    released: game.released,
     developers: details?.developers?.map((d) => d.name),
     publishers: details?.publishers?.map((p) => p.name),
     averagePlaytime: details?.playtime,

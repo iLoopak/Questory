@@ -1,5 +1,6 @@
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { Icon } from '../Icon';
+import { MetacriticBadge } from '../MetacriticBadge';
 import { useI18n } from '../../i18n';
 
 // ---------------------------------------------------------------------------
@@ -11,12 +12,6 @@ type CompactProps = {
   candidate: DiscoveryCandidate;
   onClick: (game: DiscoveryGame, reason: string) => void;
 };
-
-function compactMetacriticClass(score: number): string {
-  if (score >= 75) return 'bg-emerald-500/90 text-white';
-  if (score >= 50) return 'bg-amber-400/90 text-amber-950';
-  return 'bg-red-500/90 text-white';
-}
 
 export function DiscoveryCompactCard({ candidate, onClick }: CompactProps) {
   const { t } = useI18n();
@@ -57,13 +52,7 @@ export function DiscoveryCompactCard({ candidate, onClick }: CompactProps) {
             <Icon name="gamepad-2" size={24} className="text-slate-700" />
           </div>
         )}
-        {game.metacritic ? (
-          <div
-            className={`absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-xs font-bold ${compactMetacriticClass(game.metacritic)}`}
-          >
-            {game.metacritic}
-          </div>
-        ) : null}
+        {game.metacritic ? <MetacriticBadge score={game.metacritic} variant="chip" /> : null}
         {statusBadge}
       </div>
       <div className="p-2">
