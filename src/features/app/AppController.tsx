@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { Icon } from '../../components/Icon';
 
@@ -34,7 +34,6 @@ import {
   moreNavItems,
   navItemLabelKeys,
   type MoreNavItem,
-  type NavItem,
   type TopNavItem,
 } from '../../config/navigation';
 import type { SettingsCategory } from '../../config/settings';
@@ -198,7 +197,6 @@ export function AppController() {
     visibleNavItems,
   } = useNavigationState({ onSectionChange: () => setSelectedGameId(null) });
   const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
-  const [detailReturnSection, setDetailReturnSection] = useState<NavItem | null>(null);
   const {
     activeQueuePlatforms,
     backlogPickerGame,
@@ -245,7 +243,6 @@ export function AppController() {
     trackMinimalAnalyticsEvent(eventName, importSource);
   }
   const mainContentRef = useRef<HTMLElement | null>(null);
-  const selectedGameScrollRestoreRef = useRef<number | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
@@ -619,37 +616,6 @@ export function AppController() {
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
-
-  useLayoutEffect(() => {
-    const isCollectionDetailOpen = Boolean(selectedGameId) && (activeNavItem === 'Library' || activeNavItem === 'Wishlist');
-    const el = mainContentRef.current;
-    if (!isCollectionDetailOpen || !el) return;
-
-    if (selectedGameScrollRestoreRef.current === null) {
-      selectedGameScrollRestoreRef.current = el.scrollTop;
-    }
-
-    const previousOverflow = el.style.overflow;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    el.scrollTo({ top: 0, behavior: 'auto' });
-    el.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-
-    return () => {
-      el.style.overflow = previousOverflow;
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-
-      const scrollTop = selectedGameScrollRestoreRef.current;
-      if (scrollTop !== null) {
-        el.scrollTo({ top: scrollTop, behavior: 'auto' });
-        selectedGameScrollRestoreRef.current = null;
-      }
-    };
-  }, [activeNavItem, selectedGameId]);
 
   useEffect(() => {
     markOnboardingItemsComplete([
@@ -1104,10 +1070,10 @@ export function AppController() {
     setActiveNavItem('Artwork');
   }
 
+  // The Game Hub opens as a fullscreen overlay, so the originating screen
+  // stays mounted behind it and back restores scroll/focus for free.
   function openGameFromHome(game: Game) {
-    setDetailReturnSection('Home');
     setSelectedGameId(game.id);
-    setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
 
   function handleSelectDiscoveryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
@@ -1246,7 +1212,6 @@ export function AppController() {
   }
 
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
-    setDetailReturnSection(null);
     setSelectedGameId(null);
     setActiveNavItem(item);
     setIsMoreMenuOpen(false);
@@ -1259,15 +1224,10 @@ export function AppController() {
   function handleBackFromDetail() {
     const returningGameId = selectedGameId;
     setSelectedGameId(null);
-    if (detailReturnSection) {
-      setActiveNavItem(detailReturnSection);
-      setDetailReturnSection(null);
-    }
-    // Controller/keyboard flow: once the grid is interactive again (inert
-    // removed after re-render), put focus back on the originating card.
-    // Scroll position is already preserved because the collection panel
-    // stays mounted behind the detail view; scroll-mt on the card handles
-    // the edge case where it sits just outside the viewport.
+    // Controller/keyboard flow: put focus back on the originating card.
+    // Scroll position is already preserved because the previous screen
+    // stays mounted behind the fullscreen Game Hub; scroll-mt on the card
+    // handles the edge case where it sits just outside the viewport.
     if (returningGameId) {
       window.setTimeout(() => {
         const card = mainContentRef.current?.querySelector<HTMLElement>(
@@ -1298,8 +1258,8 @@ export function AppController() {
     return <AppStartupScreen />;
   }
 
-  // Single source for the Game Hub detail route — rendered from the Review
-  // Mode, Library and Wishlist branches so their props cannot drift apart.
+  // Single source for the Game Hub detail route — rendered once as a
+  // fullscreen overlay whenever a game is selected, from any screen.
   const renderGameDetailRoute = (game: Game) => (
     <AppGameDetailsView
       game={game}
@@ -1431,9 +1391,7 @@ export function AppController() {
         </header>
 
         <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
-          {activeNavItem === 'Review Mode' && selectedGame ? (
-            renderGameDetailRoute(selectedGame)
-          ) : activeNavItem === 'Home' ? (
+          {activeNavItem === 'Home' ? (
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
               shelfTitle={computedShelfTitle}
@@ -1502,120 +1460,102 @@ export function AppController() {
               discoveryInboxRawgIds={discoveryInboxRawgIds}
             />
           ) : activeNavItem === 'Library' ? (
-            <div className="relative h-full">
-              {selectedGame && (
-                <div className="absolute inset-0 z-10">
-                  {renderGameDetailRoute(selectedGame)}
-                </div>
-              )}
-              <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
-                <CollectionPanel
-                  collectionType="library"
-                  contentScrollRef={mainContentRef}
-                  filters={libraryFilters}
-                  steamAchievementSyncState={steamAchievementSyncState}
-                  steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-                  games={filteredLibraryGames}
-                  allGames={games}
-                  ignoredReviewGameIds={reviewIgnoredGameIds}
-                  reviewModeState={reviewModeState}
-                  platformOptions={platformOptions}
-                  tags={tags}
-                  platformQueueState={platformQueueState}
-                  onAddGame={() => setIsAddGameOpen(true)}
-                  onAddToWishlist={addToWishlist}
-                  onAddManyToWishlist={addManyToWishlist}
-                  onAddToQueue={openBacklogPicker}
-                  onPlayNow={playGameFromCompactRow}
-                  onFinish={finishGameFromCompactRow}
-                  onDrop={dropGameFromCompactRow}
-                  onBulkEnrich={startMetadataWorkflow}
-                  isHltbSyncing={isHltbSyncing}
-                  onBulkSyncHltb={syncHltb}
-                  onBulkRemove={removeManyGames}
-                  onBulkSyncSteamAchievements={(gameIds, options) =>
-                    syncSteamAchievements(gameIds, {
-                      completionToastMessage: formatSteamAchievementSyncSummary,
-                      emptyToastMessage: options?.emptyToastMessage,
-                      force: options?.force,
-                      showToast: true,
-                    })
-                  }
-                  onBulkRefreshSteamPlaytime={(gameIds, options) =>
-                    refreshSteamPlaytime(gameIds, {
-                      completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
-                      emptyToastMessage: options?.emptyToastMessage,
-                      showToast: true,
-                    })
-                  }
-                  onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-                  onBulkStatusChange={updateManyGameStatuses}
-                  onClearFilters={handleClearLibraryFilters}
-                  onFiltersChange={handleLibraryFiltersChange}
-                  onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-                  onFindMetadata={refreshGameMetadataFromActions}
-                  onMoveToLibrary={moveToLibrary}
-                  onOpenDetails={handleOpenDetailsFromCollection}
-                  onRemove={removeGame}
-                  onRemoveAndIgnore={removeAndIgnoreSteamGame}
-                  onOpenQueue={() => startReviewMode('backlog')}
-                  onStartReview={startReviewMode}
-                  onStatusChange={updateGameStatusWithCompletion}
-                  onOpenOnboarding={openOnboarding}
-                  onOpenRetro={() => {
-                    setActiveNavItem('Settings');
-                    setActiveSettingsCategory('Retro');
-                  }}
-                />
-              </div>
-            </div>
+            <CollectionPanel
+              collectionType="library"
+              contentScrollRef={mainContentRef}
+              filters={libraryFilters}
+              steamAchievementSyncState={steamAchievementSyncState}
+              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+              games={filteredLibraryGames}
+              allGames={games}
+              ignoredReviewGameIds={reviewIgnoredGameIds}
+              reviewModeState={reviewModeState}
+              platformOptions={platformOptions}
+              tags={tags}
+              platformQueueState={platformQueueState}
+              onAddGame={() => setIsAddGameOpen(true)}
+              onAddToWishlist={addToWishlist}
+              onAddManyToWishlist={addManyToWishlist}
+              onAddToQueue={openBacklogPicker}
+              onPlayNow={playGameFromCompactRow}
+              onFinish={finishGameFromCompactRow}
+              onDrop={dropGameFromCompactRow}
+              onBulkEnrich={startMetadataWorkflow}
+              isHltbSyncing={isHltbSyncing}
+              onBulkSyncHltb={syncHltb}
+              onBulkRemove={removeManyGames}
+              onBulkSyncSteamAchievements={(gameIds, options) =>
+                syncSteamAchievements(gameIds, {
+                  completionToastMessage: formatSteamAchievementSyncSummary,
+                  emptyToastMessage: options?.emptyToastMessage,
+                  force: options?.force,
+                  showToast: true,
+                })
+              }
+              onBulkRefreshSteamPlaytime={(gameIds, options) =>
+                refreshSteamPlaytime(gameIds, {
+                  completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
+                  emptyToastMessage: options?.emptyToastMessage,
+                  showToast: true,
+                })
+              }
+              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
+              onBulkStatusChange={updateManyGameStatuses}
+              onClearFilters={handleClearLibraryFilters}
+              onFiltersChange={handleLibraryFiltersChange}
+              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+              onFindMetadata={refreshGameMetadataFromActions}
+              onMoveToLibrary={moveToLibrary}
+              onOpenDetails={handleOpenDetailsFromCollection}
+              onRemove={removeGame}
+              onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              onOpenQueue={() => startReviewMode('backlog')}
+              onStartReview={startReviewMode}
+              onStatusChange={updateGameStatusWithCompletion}
+              onOpenOnboarding={openOnboarding}
+              onOpenRetro={() => {
+                setActiveNavItem('Settings');
+                setActiveSettingsCategory('Retro');
+              }}
+            />
           ) : activeNavItem === 'Wishlist' ? (
-            <div className="relative h-full">
-              {selectedGame && (
-                <div className="absolute inset-0 z-10">
-                  {renderGameDetailRoute(selectedGame)}
-                </div>
-              )}
-              <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
-                <CollectionPanel
-                  collectionType="wishlist"
-                  contentScrollRef={mainContentRef}
-                  filters={wishlistFilters}
-                  games={filteredWishlistGames}
-                  platformOptions={platformOptions}
-                  steamWishlistSyncState={steamWishlistSyncState}
-                  itadDealSyncState={itadDealSyncState}
-                  tags={tags}
-                  platformQueueState={platformQueueState}
-                  onAddGame={() => setIsAddGameOpen(true)}
-                  onAddToWishlist={addToWishlist}
-                  onAddManyToWishlist={addManyToWishlist}
-                  onAddToQueue={openBacklogPicker}
-                  onPlayNow={playGameFromCompactRow}
-                  onFinish={finishGameFromCompactRow}
-                  onDrop={dropGameFromCompactRow}
-                  onBulkEnrich={startMetadataWorkflow}
-                  isHltbSyncing={isHltbSyncing}
-                  onBulkSyncHltb={syncHltb}
-                  onBulkRemove={removeManyGames}
-                  onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-                  onBulkStatusChange={updateManyGameStatuses}
-                  onClearFilters={handleClearWishlistFilters}
-                  onFiltersChange={handleWishlistFiltersChange}
-                  onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-                  onFindMetadata={refreshGameMetadataFromActions}
-                  onMoveToLibrary={moveToLibrary}
-                  onOpenDetails={handleOpenDetailsFromCollection}
-                  onRemove={removeGame}
-                  onRemoveAndIgnore={removeAndIgnoreSteamGame}
-                  onStartReview={startReviewMode}
-                  onStatusChange={updateGameStatusWithCompletion}
-                  onSyncSteamWishlist={syncSteamWishlist}
-                  onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
-                  onSyncItadDeals={syncWishlistDeals}
-                />
-              </div>
-            </div>
+            <CollectionPanel
+              collectionType="wishlist"
+              contentScrollRef={mainContentRef}
+              filters={wishlistFilters}
+              games={filteredWishlistGames}
+              platformOptions={platformOptions}
+              steamWishlistSyncState={steamWishlistSyncState}
+              itadDealSyncState={itadDealSyncState}
+              tags={tags}
+              platformQueueState={platformQueueState}
+              onAddGame={() => setIsAddGameOpen(true)}
+              onAddToWishlist={addToWishlist}
+              onAddManyToWishlist={addManyToWishlist}
+              onAddToQueue={openBacklogPicker}
+              onPlayNow={playGameFromCompactRow}
+              onFinish={finishGameFromCompactRow}
+              onDrop={dropGameFromCompactRow}
+              onBulkEnrich={startMetadataWorkflow}
+              isHltbSyncing={isHltbSyncing}
+              onBulkSyncHltb={syncHltb}
+              onBulkRemove={removeManyGames}
+              onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
+              onBulkStatusChange={updateManyGameStatuses}
+              onClearFilters={handleClearWishlistFilters}
+              onFiltersChange={handleWishlistFiltersChange}
+              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
+              onFindMetadata={refreshGameMetadataFromActions}
+              onMoveToLibrary={moveToLibrary}
+              onOpenDetails={handleOpenDetailsFromCollection}
+              onRemove={removeGame}
+              onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              onStartReview={startReviewMode}
+              onStatusChange={updateGameStatusWithCompletion}
+              onSyncSteamWishlist={syncSteamWishlist}
+              onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
+              onSyncItadDeals={syncWishlistDeals}
+            />
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
               games={games}
@@ -1630,12 +1570,7 @@ export function AppController() {
               onMoveEntryToPlatform={moveQueueGameToPlatform}
               onPlayNow={playQueueGameNow}
               onPlayingAction={updateCurrentlyPlayingGame}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Queue');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
+              onOpenDetails={setSelectedGameId}
               onRemoveEntry={removeQueueGame}
               onStartReview={() => startReviewMode('backlog')}
             />
@@ -1682,12 +1617,7 @@ export function AppController() {
               onApplyArtworkUpdate={updateGameArtwork}
               onEnrichGames={startMetadataWorkflow}
               onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Artwork');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
+              onOpenDetails={setSelectedGameId}
             />
           ) : activeNavItem === 'Discover' ? (
             <DiscoverPanel
@@ -1701,12 +1631,7 @@ export function AppController() {
               <StatsPanel
                 games={games}
                 queueSummary={queueSummary}
-                onOpenDetails={(gameId) => {
-                  const targetGame = games.find((game) => game.id === gameId);
-                  setDetailReturnSection('Stats');
-                  setSelectedGameId(gameId);
-                  setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-                }}
+                onOpenDetails={setSelectedGameId}
               />
             </Suspense>
           ) : activeNavItem === 'Quest Runner' ? (
@@ -1863,6 +1788,13 @@ export function AppController() {
           onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
         />
       ) : null}
+
+      {/* Game Hub — fullscreen overlay over the app shell, sharing the
+          FullscreenGameShell presentation with Discovery Preview. The
+          originating screen stays mounted behind it, so back restores
+          scroll/focus. Rendered before the preview so a preview opened
+          from the hub's recommendations stacks on top. */}
+      {selectedGame ? renderGameDetailRoute(selectedGame) : null}
 
       {previewCandidate ? (
         <DiscoveryPreviewPanel
