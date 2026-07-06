@@ -100,6 +100,7 @@ export type CollectionPanelProps = {
   itadDealSyncState?: ItadDealSyncState;
   onSyncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
   onOpenOnboarding?: () => void;
+  onOpenIntegrations?: () => void;
   onOpenRetro?: () => void;
 };
 
@@ -147,6 +148,7 @@ export function CollectionPanel({
   itadDealSyncState,
   onSyncItadDeals,
   onOpenOnboarding,
+  onOpenIntegrations,
   onOpenRetro,
   isHltbSyncing = false,
 }: CollectionPanelProps) {
@@ -879,7 +881,7 @@ export function CollectionPanel({
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <button
               className="rounded-lg border border-skyglass/15 bg-ink-900 px-3 py-3 text-left transition hover:border-mint/30 hover:bg-ink-900/80"
-              onClick={onAddGame}
+              onClick={onOpenIntegrations ?? onAddGame}
               type="button"
             >
               <div className="qs-label-caps text-accent">Steam</div>

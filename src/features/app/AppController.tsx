@@ -1377,7 +1377,7 @@ export function AppController() {
                       type="button"
                     >
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
-                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Discover' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : 'image-frame'} size={15} strokeWidth={2.2} />
+                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Discover' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : item === 'Settings' ? 'settings' : 'image-frame'} size={15} strokeWidth={2.2} />
                       </span>
                       <span className="whitespace-nowrap">{t(navItemLabelKeys[item])}</span>
                     </button>
@@ -1513,6 +1513,10 @@ export function AppController() {
               onStartReview={startReviewMode}
               onStatusChange={updateGameStatusWithCompletion}
               onOpenOnboarding={openOnboarding}
+              onOpenIntegrations={() => {
+                setActiveNavItem('Settings');
+                setActiveSettingsCategory('Integrations');
+              }}
               onOpenRetro={() => {
                 setActiveNavItem('Settings');
                 setActiveSettingsCategory('Retro');
