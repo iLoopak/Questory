@@ -2,7 +2,7 @@ import type { TFunction } from '../i18n';
 import type { ConfigurableNavigationItem, NavigationVisibilityPreferences } from '../lib/navigationVisibilityPreferences';
 
 export const navItems = ['Home', 'Library', 'Review Mode', 'Discovery Inbox', 'Queue', 'Wishlist'] as const;
-export const moreNavItems = ['Discover', 'Stats', 'Artwork', 'Quest Runner'] as const;
+export const moreNavItems = ['Discover', 'Stats', 'Artwork', 'Quest Runner', 'Settings'] as const;
 export const alwaysVisibleNavItems = ['Home', 'Library'] as const;
 
 export type TopNavItem = (typeof navItems)[number];
@@ -31,7 +31,7 @@ export const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, P
   Wishlist: 'nav.wishlist',
 };
 
-export const allNavItems = [...navItems, ...moreNavItems, 'Settings', 'Metadata'] as const;
+export const allNavItems = [...navItems, ...moreNavItems, 'Metadata'] as const;
 export type NavItem = (typeof allNavItems)[number];
 
 export function getNavDescription(activeNavItem: NavItem) {
