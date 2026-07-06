@@ -1086,7 +1086,7 @@ export function AppController() {
   }
 
 
-  function handlePreviewAddToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+  function promoteDiscoveryToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     addToWishlist({ ...base, collectionType: 'wishlist' });
@@ -1094,7 +1094,7 @@ export function AppController() {
     addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToWishlist'), { game: discoveryGame.title }) });
   }
 
-  function handlePreviewAddToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+  function promoteDiscoveryToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
     // If the game already exists in the collection, never create a second
     // record: move the wishlist copy in place, or just open the library copy.
     const existing = games.find((g) => g.rawgId === discoveryGame.rawgId);
@@ -1127,21 +1127,21 @@ export function AppController() {
     setActiveNavItem(found.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
 
-  function handleInboxAddToLibrary(item: DiscoveryInboxItem) {
+  function promoteInboxDiscoveryToLibrary(item: DiscoveryInboxItem) {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(item.game, existingIds);
     importGames([base]);
     removeFromDiscoveryInbox(item.id);
   }
 
-  function handleInboxAddToWishlist(item: DiscoveryInboxItem) {
+  function promoteInboxDiscoveryToWishlist(item: DiscoveryInboxItem) {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(item.game, existingIds);
     addToWishlist({ ...base, collectionType: 'wishlist' });
     removeFromDiscoveryInbox(item.id);
   }
 
-  function handleInboxAddToPlans(item: DiscoveryInboxItem) {
+  function promoteInboxDiscoveryToPlans(item: DiscoveryInboxItem) {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(item.game, existingIds);
     importGames([base]);
@@ -1587,9 +1587,9 @@ export function AppController() {
           ) : activeNavItem === 'Discovery Inbox' ? (
             <DiscoveryInboxPanel
               items={discoveryInboxItems}
-              onAddToLibrary={handleInboxAddToLibrary}
-              onAddToWishlist={handleInboxAddToWishlist}
-              onAddToPlans={handleInboxAddToPlans}
+              onAddToLibrary={promoteInboxDiscoveryToLibrary}
+              onAddToWishlist={promoteInboxDiscoveryToWishlist}
+              onAddToPlans={promoteInboxDiscoveryToPlans}
               onIgnore={handleInboxIgnore}
             />
           ) : activeNavItem === 'Metadata' ? (
@@ -1795,8 +1795,8 @@ export function AppController() {
           discoveryInboxRawgIds={discoveryInboxRawgIds}
           onClose={() => closeDiscoveryPreview()}
           onAddToInbox={addToDiscoveryInbox}
-          onAddToWishlist={handlePreviewAddToWishlist}
-          onAddToLibrary={handlePreviewAddToLibrary}
+          onAddToWishlist={promoteDiscoveryToWishlist}
+          onAddToLibrary={promoteDiscoveryToLibrary}
           onOpenPreview={openDiscoveryPreview}
           onOpenLibraryGame={handlePreviewOpenLibraryGame}
         />

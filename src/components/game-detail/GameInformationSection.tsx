@@ -1,5 +1,6 @@
 import type { Game } from '../../types/game';
 import type { TFunction } from '../../i18n';
+import { getMetadataSummary } from '../../lib/gameSelectors';
 
 export function formatMetacriticScore(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}%` : null;
@@ -29,14 +30,15 @@ export function GameInformationSection({
   rawgPlaytime: string | null;
   t: TFunction;
 }) {
+  const metadata = getMetadataSummary(game);
   const hasInfo =
-    game.released ||
-    (game.developers?.length ?? 0) > 0 ||
-    (game.publishers?.length ?? 0) > 0 ||
+    metadata.releaseDate ||
+    metadata.developers.length > 0 ||
+    metadata.publishers.length > 0 ||
     metacriticScore ||
     rawgPlaytime ||
-    (game.genres?.length ?? 0) > 0 ||
-    (game.rawgTags?.length ?? 0) > 0;
+    metadata.genres.length > 0 ||
+    metadata.tags.length > 0;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-ink-900/40 p-4 space-y-4" aria-label="Game Information">
@@ -44,14 +46,14 @@ export function GameInformationSection({
       {hasInfo ? (
         <div className="space-y-5">
           <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoCard label="Released" value={game.released ?? t('detail.notAvailable')} />
-            <InfoCard label={t('detail.developers')} value={formatList(game.developers, t('detail.notAvailable'))} />
-            <InfoCard label={t('detail.publishers')} value={formatList(game.publishers, t('detail.notAvailable'))} />
+            <InfoCard label="Released" value={metadata.releaseDate ?? t('detail.notAvailable')} />
+            <InfoCard label={t('detail.developers')} value={formatList(metadata.developers, t('detail.notAvailable'))} />
+            <InfoCard label={t('detail.publishers')} value={formatList(metadata.publishers, t('detail.notAvailable'))} />
             {metacriticScore ? <InfoCard label="Metacritic" value={metacriticScore} /> : null}
             {rawgPlaytime ? <InfoCard label="Average playtime" value={rawgPlaytime} /> : null}
           </div>
-          <ChipGroup label={t('detail.genres')} values={game.genres} accent="mint" />
-          <ChipGroup label={t('detail.rawgTags')} values={game.rawgTags} />
+          <ChipGroup label={t('detail.genres')} values={metadata.genres} accent="mint" />
+          <ChipGroup label={t('detail.rawgTags')} values={metadata.tags} />
         </div>
       ) : (
         <p className="text-sm text-slate-600">{t('detail.noRawgMetadata')}</p>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Game } from '../../types/game';
-import { getGameCoverSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
+import { getGameCoverSources, isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
+import { getArtworkSet } from '../../lib/gameSelectors';
 import { useI18n } from '../../i18n';
 import { Icon } from '../Icon';
 
@@ -44,17 +45,18 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [heroBgSourceIndex, setHeroBgSourceIndex] = useState(0);
 
+  const artworkSet = useMemo(() => getArtworkSet(game), [game]);
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
 
   const heroBgSources = useMemo(() => {
     const candidates = [
-      game.heroImage?.trim(),
-      game.wideCoverImage?.trim(),
-      game.backgroundImage?.trim(),
-      !isMissingOrGeneratedCover(game.coverImage) ? game.coverImage?.trim() : null,
+      artworkSet.hero?.trim(),
+      artworkSet.wideCover?.trim(),
+      artworkSet.background?.trim(),
+      !isMissingOrGeneratedCover(artworkSet.cover) ? artworkSet.cover.trim() : null,
     ].filter((s): s is string => Boolean(s));
     return [...new Set(candidates)];
-  }, [game.heroImage, game.wideCoverImage, game.backgroundImage, game.coverImage]);
+  }, [artworkSet]);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -64,7 +66,7 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
 
   const activeCoverSource = coverSources[coverSourceIndex];
   const activeHeroBgSource = heroBgSources[heroBgSourceIndex] ?? null;
-  const logoUrl = getPreferredLogoUrl(game);
+  const logoUrl = artworkSet.logo?.trim() || null;
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">

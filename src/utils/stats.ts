@@ -2,6 +2,7 @@ import type { Game, GameCollectionType, GameStatus } from '../types/game';
 import { gameStatuses } from '../types/game';
 import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { getPrimaryHltbHours, hasHltbData } from '../lib/hltb';
+import { isLibraryGame, isWishlistGame } from '../types/collectionItem';
 
 export const statsScopeOptions = ['library', 'wishlist', 'all'] as const;
 
@@ -50,8 +51,8 @@ export type QuestShelfStats = {
 
 export function getQuestShelfStats(games: Game[], scope: StatsScope): QuestShelfStats {
   const scopedGames = games.filter((game) => matchesStatsScope(game, scope));
-  const libraryGames = games.filter((game) => game.collectionType === 'library');
-  const wishlistGames = games.filter((game) => game.collectionType === 'wishlist');
+  const libraryGames = games.filter(isLibraryGame);
+  const wishlistGames = games.filter(isWishlistGame);
   const statusCounts = countStatuses(scopedGames);
   const finishedCount = statusCounts.Finished;
   const droppedCount = statusCounts.Dropped;

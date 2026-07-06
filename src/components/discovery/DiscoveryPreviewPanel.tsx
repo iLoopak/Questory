@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { RawgGameDetails } from '../../types/rawg';
-import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
+import { discoveryCandidateToGame, discoveryCandidateToPreviewModel, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { getGameDetails } from '../../services/rawgApi';
+import { getArtworkSet, getMetadataSummary } from '../../lib/gameSelectors';
 import { useI18n } from '../../i18n';
 import { useDiscoveryScreenshots } from '../../hooks/useDiscoveryScreenshots';
 import { FullscreenGameShell } from '../game-detail/FullscreenGameShell';
@@ -82,21 +83,32 @@ export function DiscoveryPreviewPanel({
     return () => { cancelled = true; };
   }, [game.rawgId]);
 
-  // Synthetic Game so the shared Game Hub components can render discovery
-  // data without a library record ever being created. Base shape comes from
-  // the shared adapter; RAWG details enrich it once loaded.
-  const previewGame: Game = useMemo(() => ({
-    ...discoveryCandidateToGame(candidate, userGames, 'preview'),
+  const previewModel = useMemo(() => discoveryCandidateToPreviewModel(candidate, {
     backgroundImage: details?.background_image ?? game.coverUrl ?? null,
     developers: details?.developers?.map((d) => d.name),
     publishers: details?.publishers?.map((p) => p.name),
     averagePlaytime: details?.playtime,
-    rawgTags: game.tags,
-  }), [candidate, userGames, game, details]);
+    source: 'rawg',
+  }), [candidate, game.coverUrl, details]);
 
-  const metacriticScore = formatMetacriticScore(game.metacritic);
+  const previewArtwork = useMemo(() => getArtworkSet(previewModel), [previewModel]);
+  const previewMetadata = useMemo(() => getMetadataSummary(previewModel), [previewModel]);
+
+  // Compatibility Game for shared Game Hub sections that still take Game props.
+  // Preview-specific code should prefer previewModel so catalog previews do not
+  // conceptually require collectionType/status/notes/playtime.
+  const previewGame: Game = useMemo(() => ({
+    ...discoveryCandidateToGame(candidate, userGames, 'preview'),
+    backgroundImage: previewArtwork.background ?? null,
+    developers: previewModel.metadata.developers,
+    publishers: previewModel.metadata.publishers,
+    averagePlaytime: previewModel.metadata.averagePlaytime,
+    rawgTags: previewModel.metadata.tags,
+  }), [candidate, userGames, previewArtwork, previewModel]);
+
+  const metacriticScore = formatMetacriticScore(previewMetadata.metacritic);
   const rawgPlaytime = formatRawgPlaytime(details?.playtime);
-  const releaseYear = game.released ? game.released.slice(0, 4) : null;
+  const releaseYear = previewMetadata.releaseYear;
   const description = details?.description_raw?.trim();
 
   const collectionStatus = isInLibrary

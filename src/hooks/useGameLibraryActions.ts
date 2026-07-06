@@ -182,7 +182,7 @@ export function useGameLibraryActions({
     });
   }
 
-  function moveToLibrary(game: Game) {
+  function moveWishlistToLibrary(game: Game) {
     addUndoAction(`${game.title} moved to Library`, {
       actionType: 'move-to-library',
       affectedGameIds: [game.id],
@@ -324,7 +324,7 @@ export function useGameLibraryActions({
     addManualGame,
     addManyToWishlist,
     addToWishlist,
-    moveToLibrary,
+    moveToLibrary: moveWishlistToLibrary,
     removeAndIgnoreManyGames,
     removeAndIgnoreSteamGame,
     removeGame,
