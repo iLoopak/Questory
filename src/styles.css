@@ -813,6 +813,27 @@ img {
   }
 }
 
+/* Compact Home density — tighter gaps, padding, and smaller posters so more fits
+   on small handheld screens. Applied when the "Compact Home" preference is on. */
+.qs-home-compact.qs-home-shell > * + *,
+.qs-home-compact .space-y-4 > * + * {
+  margin-top: 0.625rem !important;
+}
+
+.qs-home-compact .qs-home-section,
+.qs-home-compact .qs-home-queue-widget {
+  padding: 0.75rem;
+}
+
+.qs-home-compact .qs-home-section .mb-3 {
+  margin-bottom: 0.5rem;
+}
+
+.qs-home-compact .qs-home-continue-playing-grid {
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+}
+
 .qs-game-grid > * {
   content-visibility: auto;
   contain-intrinsic-size: 390px 292px;
