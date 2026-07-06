@@ -124,6 +124,9 @@ export function CollectionGrid({
     }
 
     let animationFrame = 0;
+    // Row gap comes from a stable CSS class; read it once per column config
+    // instead of calling getComputedStyle (a style recalc) on every measure.
+    let rowGap = -1;
 
     function measureRowHeight() {
       const grid = renderedGridRef.current;
@@ -132,15 +135,21 @@ export function CollectionGrid({
         return;
       }
 
-      const renderedRowCount = Math.ceil(renderedGames.length / Math.max(1, columns));
+      // Count from the live DOM rather than the renderedGames prop so this effect
+      // does not need to re-run (and re-subscribe its observer) on every scroll
+      // boundary as the virtual window slides.
+      const renderedRowCount = Math.ceil(grid.children.length / Math.max(1, columns));
 
       if (renderedRowCount <= 0) {
         setRowHeight(getVirtualGridRowHeight());
         return;
       }
 
-      const computedStyle = window.getComputedStyle(grid);
-      const rowGap = Number.parseFloat(computedStyle.rowGap || computedStyle.gap || '0') || 0;
+      if (rowGap < 0) {
+        const computedStyle = window.getComputedStyle(grid);
+        rowGap = Number.parseFloat(computedStyle.rowGap || computedStyle.gap || '0') || 0;
+      }
+
       const measuredRowHeight = Math.ceil((grid.scrollHeight + rowGap) / renderedRowCount);
 
       if (!Number.isFinite(measuredRowHeight) || measuredRowHeight <= 0) {
@@ -157,9 +166,11 @@ export function CollectionGrid({
 
     scheduleMeasure();
 
+    // Observe only the grid container. Its auto height already reflects any child
+    // height change, so we no longer need a per-child observer (whose set churned
+    // on every scroll frame as rows mounted/unmounted).
     const resizeObserver = typeof ResizeObserver !== 'undefined' && renderedGridRef.current ? new ResizeObserver(scheduleMeasure) : null;
     resizeObserver?.observe(renderedGridRef.current as Element);
-    Array.from(renderedGridRef.current?.children ?? []).forEach((child) => resizeObserver?.observe(child));
     window.addEventListener('resize', scheduleMeasure);
 
     return () => {
@@ -167,7 +178,7 @@ export function CollectionGrid({
       resizeObserver?.disconnect();
       window.removeEventListener('resize', scheduleMeasure);
     };
-  }, [columns, renderedGames.length]);
+  }, [columns]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {

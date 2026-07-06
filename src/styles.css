@@ -4302,3 +4302,15 @@ body.qs-controller-active .qs-compact-card:focus-within {
     align-items: center;
   }
 }
+
+/* Performance: grid cards render over the opaque collection surface, so their
+   glass backdrop-filter blurs a solid colour — no visible effect, but it costs
+   a per-card GPU backdrop pass on every scroll frame (worst on handhelds with
+   ~24 cards in view). Drop the blur on cards only; they keep their own
+   background, border and shadow. Modals, popovers and the list shell that sit
+   over real content keep .qs-glass blur. */
+.qs-game-card.qs-glass,
+.qs-template-neon-deck .qs-game-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
