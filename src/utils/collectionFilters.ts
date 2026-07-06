@@ -9,10 +9,11 @@ import {
 import { getPrimaryHltbHours, hasHltbData } from '../lib/hltb';
 import { hasSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import type { Game, GameCollectionType } from '../types/game';
+import { isLibraryGame, isWishlistGame } from '../types/collectionItem';
 import { compareGames, isMissingRawgMetadata } from './collectionSort';
 
 export function getCollectionGames(games: Game[], collectionType: GameCollectionType): Game[] {
-  return games.filter((game) => game.collectionType === collectionType);
+  return collectionType === 'library' ? games.filter(isLibraryGame) : games.filter(isWishlistGame);
 }
 
 export function getVisibleCollectionGames(
@@ -98,7 +99,7 @@ export function matchesSourceFilter(game: Game, source: SourceFilter): boolean {
   }
 
   if (source === 'Wishlist') {
-    return game.collectionType === 'wishlist';
+    return isWishlistGame(game);
   }
 
   return isRetroOrFutureReady(game);

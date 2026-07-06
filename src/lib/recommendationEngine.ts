@@ -1,4 +1,6 @@
 import type { Game, GamePlatform } from '../types/game';
+import type { CollectionItem, LibraryGame, WishlistGame } from '../types/collectionItem';
+import { getAchievementProgress, getMetadataSummary } from './gameSelectors';
 import { getPrimaryHltbHours, hasHltbData } from './hltb';
 import { hasSteamAchievementSummary } from './steamAchievementSummary';
 
@@ -16,9 +18,27 @@ export type RecommendationPreferences = {
   preferredPlatform: GamePlatform | 'Any';
 };
 
+export type RecommendationCandidateSource = 'library' | 'wishlist' | 'platform-plan' | 'discovery';
+
+export type RecommendationCandidate = {
+  id: string;
+  source: RecommendationCandidateSource;
+  game: CollectionItem;
+  title: string;
+  platform: GamePlatform;
+  status: Game['status'];
+  tags: string[];
+  genres: string[];
+  playtimeHours: number;
+  lastPlayedAt: string | null;
+  metadataAvailable: boolean;
+  achievementPercent?: number;
+};
+
 export type RecommendationResult = {
   confidence: number;
   game: Game;
+  candidate: RecommendationCandidate;
   reasons: string[];
   score: number;
 };
@@ -34,15 +54,44 @@ const moodKeywords: Record<RecommendationMood, string[]> = {
 const shortSessionKeywords = ['arcade', 'roguelike', 'roguelite', 'platformer', 'puzzle', 'casual'];
 const longSessionKeywords = ['rpg', 'open world', 'strategy', 'simulation', 'survival', 'story'];
 
+export function buildRecommendationCandidates(games: CollectionItem[], platformPlans?: unknown): RecommendationCandidate[] {
+  void platformPlans;
+
+  return games.map((game) => {
+    const metadata = getMetadataSummary(game);
+    const achievementProgress = getAchievementProgress(game, 'steam');
+
+    return {
+      id: game.id,
+      source: game.collectionType,
+      game,
+      title: game.title,
+      platform: game.platform,
+      status: game.status,
+      tags: [...game.tags, ...(game.rawgTags ?? [])],
+      genres: metadata.genres,
+      playtimeHours: game.playtimeHours,
+      lastPlayedAt: game.lastPlayedAt,
+      metadataAvailable: game.metadataSource === 'rawg',
+      achievementPercent: achievementProgress.percent,
+    };
+  });
+}
+
+export function buildRecommendationCandidate(game: LibraryGame | WishlistGame): RecommendationCandidate {
+  return buildRecommendationCandidates([game])[0];
+}
+
 export function getRecommendations(games: Game[], preferences: RecommendationPreferences): RecommendationResult[] {
-  return games
-    .filter((game) => preferences.includeWishlist || game.collectionType === 'library')
-    .filter((game) => preferences.includeFinishedGames || game.status !== 'Finished')
-    .map((game) => scoreGame(game, preferences))
+  return buildRecommendationCandidates(games)
+    .filter((candidate) => preferences.includeWishlist || candidate.source === 'library')
+    .filter((candidate) => preferences.includeFinishedGames || candidate.status !== 'Finished')
+    .map((candidate) => scoreRecommendationCandidate(candidate, preferences))
     .sort((first, second) => second.score - first.score);
 }
 
-export function scoreGame(game: Game, preferences: RecommendationPreferences): RecommendationResult {
+export function scoreRecommendationCandidate(candidate: RecommendationCandidate, preferences: RecommendationPreferences): RecommendationResult {
+  const game = candidate.game;
   const reasons: string[] = [];
   let score = 0;
 
@@ -65,7 +114,7 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
   }
 
   // Recency favors games that have not been touched lately, while still allowing never-started games to surface.
-  const daysSincePlayed = getDaysSincePlayed(game.lastPlayedAt);
+  const daysSincePlayed = getDaysSincePlayed(candidate.lastPlayedAt);
 
   if (daysSincePlayed === null) {
     score += 8;
@@ -83,10 +132,10 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
 
   // Platform preference is a direct boost, with Steam Deck treated as compatible with Steam.
   if (preferences.preferredPlatform !== 'Any') {
-    if (game.platform === preferences.preferredPlatform) {
+    if (candidate.platform === preferences.preferredPlatform) {
       score += 18;
       reasons.push(`Matches ${preferences.preferredPlatform}`);
-    } else if (preferences.preferredPlatform === 'Steam Deck' && game.platform === 'Steam') {
+    } else if (preferences.preferredPlatform === 'Steam Deck' && candidate.platform === 'Steam') {
       score += 10;
       reasons.push('Steam library fits handheld play');
     } else {
@@ -137,9 +186,14 @@ export function scoreGame(game: Game, preferences: RecommendationPreferences): R
   return {
     confidence,
     game,
+    candidate,
     reasons: reasons.slice(0, 5),
     score,
   };
+}
+
+export function scoreGame(game: Game, preferences: RecommendationPreferences): RecommendationResult {
+  return scoreRecommendationCandidate(buildRecommendationCandidate(game as CollectionItem), preferences);
 }
 
 

@@ -5,6 +5,7 @@ import { Icon } from '../Icon';
 import { useBottomSheetDragToClose } from '../../hooks/useBottomSheetDragToClose';
 import type { Game } from '../../types/game';
 import { useI18n, type TFunction } from '../../i18n';
+import { getWishlistDealInfo } from '../../lib/gameSelectors';
 
 export function WishlistDealCard({
   game,
@@ -15,10 +16,11 @@ export function WishlistDealCard({
   onClick: () => void;
   t: TFunction;
 }) {
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
+  const dealInfo = getWishlistDealInfo(game);
+  const discount = typeof dealInfo.discount === 'number' ? `-${dealInfo.discount}%` : null;
   const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
+    typeof dealInfo.price === 'number' && dealInfo.currency
+      ? formatDealPrice(dealInfo.price, dealInfo.currency)
       : null;
 
   return (
@@ -35,7 +37,7 @@ export function WishlistDealCard({
             {discount}
           </div>
         ) : null}
-        {game.itadIsHistoricalLow ? (
+        {dealInfo.historicalLow?.isCurrent ? (
           <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-amber-950">
             <Icon name="trophy" size={9} strokeWidth={2.5} />
             {t('itad.historicalLow')}
@@ -45,8 +47,8 @@ export function WishlistDealCard({
       <div className="p-2">
         <p className="line-clamp-2 text-xs font-semibold text-white">{game.title}</p>
         {price ? <p className="mt-1 text-xs font-semibold text-mint">{price}</p> : null}
-        {game.itadCurrentBestShop ? (
-          <p className="mt-0.5 truncate text-xs text-slate-500">{game.itadCurrentBestShop}</p>
+        {dealInfo.shop ? (
+          <p className="mt-0.5 truncate text-xs text-slate-500">{dealInfo.shop}</p>
         ) : null}
       </div>
     </button>
@@ -65,10 +67,11 @@ export function WishlistDealActionSheet({
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
+  const dealInfo = getWishlistDealInfo(game);
+  const discount = typeof dealInfo.discount === 'number' ? `-${dealInfo.discount}%` : null;
   const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
+    typeof dealInfo.price === 'number' && dealInfo.currency
+      ? formatDealPrice(dealInfo.price, dealInfo.currency)
       : null;
 
   useEffect(() => {
@@ -102,15 +105,15 @@ export function WishlistDealActionSheet({
             </div>
             <div className="min-w-0 flex-1 py-0.5">
               <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>
-              {game.itadCurrentBestShop ? (
-                <p className="mt-1 text-sm text-slate-400">{game.itadCurrentBestShop}</p>
+              {dealInfo.shop ? (
+                <p className="mt-1 text-sm text-slate-400">{dealInfo.shop}</p>
               ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {discount ? (
                   <span className="rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{discount}</span>
                 ) : null}
                 {price ? <span className="text-sm font-semibold text-mint">{price}</span> : null}
-                {game.itadIsHistoricalLow ? (
+                {dealInfo.historicalLow?.isCurrent ? (
                   <span className="flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-400">
                     <Icon name="trophy" size={10} strokeWidth={2.5} />
                     {t('itad.historicalLow')}
@@ -120,10 +123,10 @@ export function WishlistDealActionSheet({
             </div>
           </div>
 
-          {game.itadCurrentBestUrl ? (
+          {dealInfo.url ? (
             <a
               className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-base font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
-              href={game.itadCurrentBestUrl}
+              href={dealInfo.url}
               rel="noreferrer"
               target="_blank"
               onClick={onClose}

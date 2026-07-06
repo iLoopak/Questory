@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { getPreferredArtworkSources } from '../lib/gameCoverImages';
+import { getArtworkSet, getGameIdentity } from '../lib/gameSelectors';
 import type { Game, GameStatus } from '../types/game';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
@@ -78,6 +79,8 @@ function GameCardComponent({
   hideActionMenu = false,
 }: GameCardProps) {
   const { t } = useI18n();
+  const gameIdentity = useMemo(() => getGameIdentity(game), [game]);
+  const artworkSet = useMemo(() => getArtworkSet(game), [game]);
   const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
@@ -152,9 +155,9 @@ function GameCardComponent({
 
   return (
     <article
-      aria-label={isMultiSelectMode ? `Select ${game.title}` : `Open details for ${game.title}`}
+      aria-label={isMultiSelectMode ? `Select ${gameIdentity.title}` : `Open details for ${gameIdentity.title}`}
       aria-selected={isMultiSelectMode ? isSelected : undefined}
-      data-game-id={game.id}
+      data-game-id={gameIdentity.id}
       className={`qs-game-card qs-glass relative flex h-full min-h-[260px] min-w-0 scroll-mt-4 flex-col overflow-hidden rounded-lg border transition hover:border-mint/35 hover:shadow-glow focus-within:border-mint/45 focus-within:shadow-glow sm:min-h-[292px] ${
         isSelected ? 'border-mint/70 shadow-glow ring-1 ring-mint/40' : ''
       } ${highlightLabel ? 'qs-highlight-card-border ring-1' : ''} cursor-pointer`}
@@ -169,7 +172,7 @@ function GameCardComponent({
         </div>
       ) : null}
 
-      <div className="qs-game-card-artwork relative aspect-[16/9] max-h-32 shrink-0 overflow-hidden bg-ink-700 sm:max-h-36">
+      <div className="qs-game-card-artwork relative aspect-[16/9] max-h-32 shrink-0 overflow-hidden bg-ink-700 sm:max-h-36" data-artwork-source={artworkSet.source}>
         {isMultiSelectMode ? (
           <label
             className={`absolute left-0 top-0 z-20 flex h-11 w-11 cursor-pointer items-center justify-center rounded-br-xl transition ${
@@ -178,7 +181,7 @@ function GameCardComponent({
             onClick={stopCardAction}
           >
             <input
-              aria-label={`Select ${game.title}`}
+              aria-label={`Select ${gameIdentity.title}`}
               checked={isSelected}
               className="sr-only"
               onChange={() => onToggleSelected?.()}
@@ -217,7 +220,7 @@ function GameCardComponent({
           <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
             <div>
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border border-mint/20 bg-ink-900 text-xl font-semibold text-mint shadow-glow">
-                {game.title.slice(0, 1).toUpperCase()}
+                {gameIdentity.title.slice(0, 1).toUpperCase()}
               </div>
               <div className="mt-3 text-xs font-medium uppercase tracking-caps text-slate-500">{t('common.noCover')}</div>
             </div>

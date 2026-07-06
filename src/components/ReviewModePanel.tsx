@@ -13,6 +13,7 @@ import { getControllerButtonLabels, type ConfirmCancelConvention } from '../lib/
 import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources, getGeneratedFallbackCover, hasFallbackArtwork } from '../lib/gameCoverImages';
+import { getProviderLinks } from '../lib/gameSelectors';
 import { GameCoverImage } from './GameCoverImage';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
@@ -1267,9 +1268,10 @@ function getGameActionExternalLinks(game: Game, t: TFunction) {
     links.push({ href: game.externalUrl, label: t('detail.externalUrl') });
   }
 
-  if (typeof game.steamAppId === 'number') {
-    links.push({ href: `https://store.steampowered.com/app/${game.steamAppId}`, label: 'Steam' });
-  }
+  getProviderLinks(game).forEach((providerLink) => {
+    if (!providerLink.url) return;
+    links.push({ href: providerLink.url, label: providerLink.provider === 'rawg' ? 'RAWG' : providerLink.provider === 'steam' ? 'Steam' : providerLink.provider });
+  });
 
   return links.filter((link, index, allLinks) => allLinks.findIndex((candidate) => candidate.href === link.href) === index);
 }
