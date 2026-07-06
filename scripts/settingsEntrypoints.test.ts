@@ -35,7 +35,7 @@ test('generic Settings entrypoints open the Settings overview instead of Persona
 
   assert.match(appController, /useControllerAction\('openMenu',[\s\S]*?setActiveNavItem\('Settings'\)[\s\S]*?setActiveSettingsCategory\(null\)/, 'handheld/controller menu Settings shortcut should open the overview');
   assert.match(appNavigation, /useState<SettingsCategory \| null>\(null\)/, 'main Settings navigation starts without a selected section');
-  assert.match(settingsView, /activeCategoryMeta \? \([\s\S]*?\) : \(\s*<SettingsOverview onSelect=\{selectCategory\} \/>/, 'Settings overview should render when no category is selected');
+  assert.match(settingsView, /activeCategoryMeta \? \([\s\S]*?\) : \(\s*<SettingsOverview[\s\S]*?onSelect=\{selectCategory\}/, 'Settings overview should render when no category is selected');
 
   assert.doesNotMatch(appController, /defaultSettingsSection\s*=\s*['"]Personalization['"]|defaultSettingsSection\s*=\s*['"]personalization['"]|setActiveSettingsCategory\('personalization'\)|setActiveSettingsCategory\('appearance'\)/, 'generic Settings entrypoints should not use legacy hardcoded lowercase section targets');
 });

@@ -4,6 +4,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from '
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover } from '../lib/gameCoverImages';
+import { FullscreenGameShell } from './game-detail/FullscreenGameShell';
 import { GameHero, HeroStat, getDisplayTitle } from './game-detail/GameHero';
 import { DetailSection } from './game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from './game-detail/GameDetailActions';
@@ -210,183 +211,202 @@ export function GameDetailView({
     },
   ];
 
+  // Escape peels one layer at a time: inner surfaces that don't intercept
+  // Escape themselves (they would stop propagation) close before the hub
+  // itself navigates back.
+  function handleShellClose() {
+    if (isRawgLinkOpen) {
+      setIsRawgLinkOpen(false);
+      return;
+    }
+    if (isAchievementsOpen) {
+      setIsAchievementsOpen(false);
+      return;
+    }
+    if (isEditing) {
+      setEditDraft(createEditDraft(game));
+      setEditError('');
+      setIsEditing(false);
+      return;
+    }
+    onBack();
+  }
+
   return (
-    <section className="relative h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
-      {showPausedGhost && pausedGhostSlot ? (
+    <FullscreenGameShell
+      ariaLabel={`${t('detail.dashboard')}: ${getDisplayTitle(game)}`}
+      floating={showPausedGhost && pausedGhostSlot ? (
         <div className={`queue-ghost-habitat queue-ghost-habitat--game-detail queue-ghost-slot--${pausedGhostSlot}`}>
           <QueueGhost variant="sleepy" message={pickQueueGhostMessage(pausedGameGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('gameDetail'); setShowPausedGhost(false); }} />
         </div>
       ) : null}
-      <div className="flex h-full min-h-0 flex-col">
-        <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
-          <div className="space-y-3 sm:space-y-4">
-            <GameHero
-              game={game}
-              kicker={t('detail.dashboard')}
-              onBack={onBack}
-              stats={<>
-                <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
-                <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
-                {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                {achievementSummary ? (
-                  <HeroStat
-                    label={t('collection.achievements')}
-                    value={achievementSummary}
-                    onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
-                  />
-                ) : null}
-                {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-                {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
-                {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-              </>}
+      onClose={handleShellClose}
+      scrollRef={detailScrollRef}
+    >
+      <GameHero
+        game={game}
+        kicker={t('detail.dashboard')}
+        onBack={onBack}
+        stats={<>
+          <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
+          <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
+          {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+          {achievementSummary ? (
+            <HeroStat
+              label={t('collection.achievements')}
+              value={achievementSummary}
+              onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
             />
+          ) : null}
+          {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+          {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
+          {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+        </>}
+      />
 
-            <GameDetailActionBar
-              ariaLabel={t('detail.actionsA11y')}
-              menu={isOverflowOpen ? (
-                <GameDetailOverflowMenu
-                  anchorRef={overflowButtonRef}
-                  canEditGame={canEditGame}
-                  currentItadPrice={currentItadPrice}
-                  game={game}
-                  isFindingArtwork={isFindingArtwork}
-                  isSteamDataSyncing={isSteamDataSyncing}
-                  isSteamLibraryGame={isSteamLibraryGame}
-                  menuId={overflowMenuId}
-                  onChangeArtwork={() => setIsArtworkPickerOpen(true)}
-                  onClose={() => setIsOverflowOpen(false)}
-                  onEdit={() => setIsEditing(true)}
-                  onFindArtwork={onFindArtwork}
-                  onIgnore={onIgnore}
-                  onStatusChange={onStatusChange}
-                  onSyncSteamData={onSyncSteamData}
-                  t={t}
-                />
-              ) : null}
-            >
-              {primaryActions.map((action) => (
-                <GameDetailActionButton key={action.label} action={action} />
-              ))}
-              <button
-                ref={overflowButtonRef}
-                aria-controls={isOverflowOpen ? overflowMenuId : undefined}
-                aria-expanded={isOverflowOpen}
-                aria-haspopup="dialog"
-                aria-label={t('action.moreActions')}
-                className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-                onClick={() => setIsOverflowOpen(true)}
-                type="button"
-              >
-                <span className="flex items-center gap-2">
-                  <Icon name="more-horizontal" />
-                  <span>{t('action.more')}</span>
-                </span>
-              </button>
-            </GameDetailActionBar>
+      <GameDetailActionBar
+        ariaLabel={t('detail.actionsA11y')}
+        menu={isOverflowOpen ? (
+          <GameDetailOverflowMenu
+            anchorRef={overflowButtonRef}
+            canEditGame={canEditGame}
+            currentItadPrice={currentItadPrice}
+            game={game}
+            isFindingArtwork={isFindingArtwork}
+            isSteamDataSyncing={isSteamDataSyncing}
+            isSteamLibraryGame={isSteamLibraryGame}
+            menuId={overflowMenuId}
+            onChangeArtwork={() => setIsArtworkPickerOpen(true)}
+            onClose={() => setIsOverflowOpen(false)}
+            onEdit={() => setIsEditing(true)}
+            onFindArtwork={onFindArtwork}
+            onIgnore={onIgnore}
+            onStatusChange={onStatusChange}
+            onSyncSteamData={onSyncSteamData}
+            t={t}
+          />
+        ) : null}
+      >
+        {primaryActions.map((action) => (
+          <GameDetailActionButton key={action.label} action={action} />
+        ))}
+        <button
+          ref={overflowButtonRef}
+          aria-controls={isOverflowOpen ? overflowMenuId : undefined}
+          aria-expanded={isOverflowOpen}
+          aria-haspopup="dialog"
+          aria-label={t('action.moreActions')}
+          className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+          onClick={() => setIsOverflowOpen(true)}
+          type="button"
+        >
+          <span className="flex items-center gap-2">
+            <Icon name="more-horizontal" />
+            <span>{t('action.more')}</span>
+          </span>
+        </button>
+      </GameDetailActionBar>
 
-            {isRawgLinkOpen ? (
-              <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
-            ) : null}
+      {isRawgLinkOpen ? (
+        <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
+      ) : null}
 
-            {isArtworkPickerOpen ? (
-              <SteamGridDbArtworkPickerModal game={game} onClose={() => setIsArtworkPickerOpen(false)} onSave={saveArtworkFromPicker} />
-            ) : null}
+      {isArtworkPickerOpen ? (
+        <SteamGridDbArtworkPickerModal game={game} onClose={() => setIsArtworkPickerOpen(false)} onSave={saveArtworkFromPicker} />
+      ) : null}
 
-            {isAchievementsOpen && game.steamAchievements ? (
-              <SteamAchievementsPanel
-                achievements={game.steamAchievements}
-                gameTitle={game.title}
-                onClose={() => setIsAchievementsOpen(false)}
-              />
-            ) : null}
+      {isAchievementsOpen && game.steamAchievements ? (
+        <SteamAchievementsPanel
+          achievements={game.steamAchievements}
+          gameTitle={game.title}
+          onClose={() => setIsAchievementsOpen(false)}
+        />
+      ) : null}
 
-            {isEditing ? (
-              <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
-            ) : null}
+      {isEditing ? (
+        <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
+      ) : null}
 
-            <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
-                <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="qs-label-caps text-accent">{t('detail.tags')}</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
-                    value={tagText}
-                    onBlur={() => {
-                      setTagText(parsedTags.join(', '));
-                      updateTracking({ tags: parsedTags });
-                    }}
-                    onChange={(event) => setTagText(event.target.value)}
-                    placeholder="cozy, backlog, handheld"
-                    type="text"
-                  />
-                  {parsedTags.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {parsedTags.map((tag) => (
-                        <span key={tag} className="rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </label>
-
-                <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="qs-label-caps text-accent">{t('detail.myNotes')}</span>
-                  <NotesField
-                    key={game.id}
-                    placeholder={t('detail.notesPlaceholder')}
-                    value={game.notes}
-                    onCommit={(notes) => updateTracking({ notes })}
-                  />
-                </label>
+      <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
+          <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
+            <span className="qs-label-caps text-accent">{t('detail.tags')}</span>
+            <input
+              className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
+              value={tagText}
+              onBlur={() => {
+                setTagText(parsedTags.join(', '));
+                updateTracking({ tags: parsedTags });
+              }}
+              onChange={(event) => setTagText(event.target.value)}
+              placeholder="cozy, backlog, handheld"
+              type="text"
+            />
+            {parsedTags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {parsedTags.map((tag) => (
+                  <span key={tag} className="rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
+                    {tag}
+                  </span>
+                ))}
               </div>
+            ) : null}
+          </label>
 
-              <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
-                <div>
-                  <div className="qs-label-caps text-accent">{t('detail.activity')}</div>
-                  {isSteamLibraryGame ? <p className="mt-1 text-xs text-slate-500">{t('detail.steamActivityHelp')}</p> : null}
-                </div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
-                  {isSteamLibraryGame ? <PersonalStatField label={t('detail.lastSteamActivity')} value={formatRelativeActivityDate(lastSteamActivityAt)} /> : null}
-                  {isSteamLibraryGame ? <PersonalStatField label={t('detail.recentDelta')} value={formatDeltaMinutes(recentSteamDeltaMinutes)} /> : null}
-                  {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                  {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                </div>
-              </div>
-            </DetailSection>
+          <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
+            <span className="qs-label-caps text-accent">{t('detail.myNotes')}</span>
+            <NotesField
+              key={game.id}
+              placeholder={t('detail.notesPlaceholder')}
+              value={game.notes}
+              onCommit={(notes) => updateTracking({ notes })}
+            />
+          </label>
+        </div>
 
-            <GameInformationSection
-              game={game}
-              metacriticScore={metacriticScore}
-              rawgPlaytime={rawgPlaytime}
-              t={t}
-            />
-            <DeveloperToolsSection
-              achievementSummary={achievementSummary}
-              canApplyRawgCover={canApplyRawgCover}
-              currentItadPrice={currentItadPrice}
-              game={game}
-              historicalItadPrice={historicalItadPrice}
-              isFindingArtwork={isFindingArtwork}
-              onChangeLink={() => setIsRawgLinkOpen(true)}
-              onFindArtwork={onFindArtwork}
-              onUseRawgCover={useRawgImageAsCover}
-              onViewAchievements={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
-              t={t}
-            />
-            <ContextualRecommendationsSection
-              game={game}
-              userGames={allGames}
-              inboxRawgIds={discoveryInboxRawgIds}
-              onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
-              onAddToInbox={onAddDiscoveryGameToInbox}
-              onOpenPreview={onOpenDiscoveryPreview}
-            />
+        <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
+          <div>
+            <div className="qs-label-caps text-accent">{t('detail.activity')}</div>
+            {isSteamLibraryGame ? <p className="mt-1 text-xs text-slate-500">{t('detail.steamActivityHelp')}</p> : null}
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
+            {isSteamLibraryGame ? <PersonalStatField label={t('detail.lastSteamActivity')} value={formatRelativeActivityDate(lastSteamActivityAt)} /> : null}
+            {isSteamLibraryGame ? <PersonalStatField label={t('detail.recentDelta')} value={formatDeltaMinutes(recentSteamDeltaMinutes)} /> : null}
+            {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+            {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
           </div>
         </div>
-      </div>
-    </section>
+      </DetailSection>
+
+      <GameInformationSection
+        game={game}
+        metacriticScore={metacriticScore}
+        rawgPlaytime={rawgPlaytime}
+        t={t}
+      />
+      <DeveloperToolsSection
+        achievementSummary={achievementSummary}
+        canApplyRawgCover={canApplyRawgCover}
+        currentItadPrice={currentItadPrice}
+        game={game}
+        historicalItadPrice={historicalItadPrice}
+        isFindingArtwork={isFindingArtwork}
+        onChangeLink={() => setIsRawgLinkOpen(true)}
+        onFindArtwork={onFindArtwork}
+        onUseRawgCover={useRawgImageAsCover}
+        onViewAchievements={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
+        t={t}
+      />
+      <ContextualRecommendationsSection
+        game={game}
+        userGames={allGames}
+        inboxRawgIds={discoveryInboxRawgIds}
+        onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
+        onAddToInbox={onAddDiscoveryGameToInbox}
+        onOpenPreview={onOpenDiscoveryPreview}
+      />
+    </FullscreenGameShell>
   );
 }
 

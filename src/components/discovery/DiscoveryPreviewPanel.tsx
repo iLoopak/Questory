@@ -4,9 +4,8 @@ import type { RawgGameDetails } from '../../types/rawg';
 import { discoveryGameToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { getGameDetails } from '../../services/rawgApi';
 import { useI18n } from '../../i18n';
-import { useScrollLock } from '../../hooks/useScrollLock';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useDiscoveryScreenshots } from '../../hooks/useDiscoveryScreenshots';
+import { FullscreenGameShell } from '../game-detail/FullscreenGameShell';
 import { GameHero, HeroStat } from '../game-detail/GameHero';
 import { DetailSection } from '../game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from '../game-detail/GameDetailActions';
@@ -54,9 +53,6 @@ export function DiscoveryPreviewPanel({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const { screenshots, loading: screenshotsLoading } = useDiscoveryScreenshots(game.rawgId);
 
-  useScrollLock();
-  const { handleTrapKeyDown } = useFocusTrap(dialogRef);
-
   // Real-time collection status (reacts to changes while the panel is open).
   const realMatch = userGames.find((g) => g.rawgId === game.rawgId);
   const isInLibrary = realMatch?.collectionType === 'library';
@@ -85,14 +81,6 @@ export function DiscoveryPreviewPanel({
 
     return () => { cancelled = true; };
   }, [game.rawgId]);
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
 
   // Synthetic Game so the shared Game Hub components can render discovery
   // data without a library record ever being created. Base shape comes from
@@ -175,84 +163,77 @@ export function DiscoveryPreviewPanel({
         ];
 
   return (
-    <div
-      ref={dialogRef}
-      aria-label={`${t('action.preview')}: ${game.title}`}
-      aria-modal="true"
-      className="fixed inset-0 z-50 bg-ink-950"
-      onKeyDown={handleTrapKeyDown}
-      role="dialog"
-      tabIndex={-1}
+    <FullscreenGameShell
+      ariaLabel={`${t('action.preview')}: ${game.title}`}
+      dialogRef={dialogRef}
+      onClose={onClose}
+      scrollRef={scrollRef}
     >
-      <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">
-        <div className="mx-auto max-w-6xl space-y-3 sm:space-y-4">
-          <GameHero
-            game={previewGame}
-            kicker={t('preview.kicker')}
-            onBack={onClose}
-            stats={<>
-              <HeroStat label={t('detail.platformSource')} value={previewGame.platform} />
-              <HeroStat label={t('detail.currentStatus')} value={collectionStatus} accent={isInLibrary || isInWishlist} />
-              {releaseYear ? <HeroStat label={t('preview.released')} value={releaseYear} /> : null}
-              {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-              {rawgPlaytime ? <HeroStat label={t('preview.averagePlaytime')} value={rawgPlaytime} /> : null}
-            </>}
-          />
+      <GameHero
+        game={previewGame}
+        kicker={t('preview.kicker')}
+        onBack={onClose}
+        stats={<>
+          <HeroStat label={t('detail.platformSource')} value={previewGame.platform} />
+          <HeroStat label={t('detail.currentStatus')} value={collectionStatus} accent={isInLibrary || isInWishlist} />
+          {releaseYear ? <HeroStat label={t('preview.released')} value={releaseYear} /> : null}
+          {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+          {rawgPlaytime ? <HeroStat label={t('preview.averagePlaytime')} value={rawgPlaytime} /> : null}
+        </>}
+      />
 
-          <GameDetailActionBar ariaLabel={t('preview.actionsA11y')}>
-            {previewActions.map((action) => (
-              <GameDetailActionButton key={action.label} action={action} />
+      <GameDetailActionBar ariaLabel={t('preview.actionsA11y')}>
+        {previewActions.map((action) => (
+          <GameDetailActionButton key={action.label} action={action} />
+        ))}
+      </GameDetailActionBar>
+
+      <DetailSection title={t('preview.aboutTitle')} description={t('preview.aboutDescription')}>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div
+                key={i}
+                className="h-4 animate-pulse rounded bg-ink-900"
+                style={{ width: `${[100, 92, 96, 78][i]}%` }}
+              />
             ))}
-          </GameDetailActionBar>
+          </div>
+        ) : description ? (
+          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-300">{description}</p>
+        ) : (
+          <p className="text-sm text-slate-600">{t('preview.noDescription')}</p>
+        )}
+      </DetailSection>
 
-          <DetailSection title={t('preview.aboutTitle')} description={t('preview.aboutDescription')}>
-            {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <div
-                    key={i}
-                    className="h-4 animate-pulse rounded bg-ink-900"
-                    style={{ width: `${[100, 92, 96, 78][i]}%` }}
-                  />
-                ))}
-              </div>
-            ) : description ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-300">{description}</p>
-            ) : (
-              <p className="text-sm text-slate-600">{t('preview.noDescription')}</p>
-            )}
-          </DetailSection>
+      {screenshotsLoading || screenshots.length > 0 ? (
+        <DetailSection title={t('preview.screenshots')}>
+          <DiscoveryScreenshotStrip rawgId={game.rawgId} title={game.title} />
+        </DetailSection>
+      ) : null}
 
-          {screenshotsLoading || screenshots.length > 0 ? (
-            <DetailSection title={t('preview.screenshots')}>
-              <DiscoveryScreenshotStrip rawgId={game.rawgId} title={game.title} />
-            </DetailSection>
-          ) : null}
+      {reason ? (
+        <DetailSection title={t('preview.whyTitle')}>
+          <p className="text-sm leading-relaxed text-slate-300">{reason}</p>
+        </DetailSection>
+      ) : null}
 
-          {reason ? (
-            <DetailSection title={t('preview.whyTitle')}>
-              <p className="text-sm leading-relaxed text-slate-300">{reason}</p>
-            </DetailSection>
-          ) : null}
+      <GameInformationSection
+        game={previewGame}
+        metacriticScore={metacriticScore}
+        rawgPlaytime={rawgPlaytime}
+        t={t}
+      />
 
-          <GameInformationSection
-            game={previewGame}
-            metacriticScore={metacriticScore}
-            rawgPlaytime={rawgPlaytime}
-            t={t}
-          />
-
-          <ContextualRecommendationsSection
-            game={previewGame}
-            userGames={userGames}
-            inboxRawgIds={discoveryInboxRawgIds}
-            onSelectGame={(dg) => onOpenLibraryGame?.(dg)}
-            onAddToInbox={onAddToInbox}
-            onOpenPreview={onOpenPreview}
-            title={t('preview.youMightAlsoLike')}
-          />
-        </div>
-      </div>
-    </div>
+      <ContextualRecommendationsSection
+        game={previewGame}
+        userGames={userGames}
+        inboxRawgIds={discoveryInboxRawgIds}
+        onSelectGame={(dg) => onOpenLibraryGame?.(dg)}
+        onAddToInbox={onAddToInbox}
+        onOpenPreview={onOpenPreview}
+        title={t('preview.youMightAlsoLike')}
+      />
+    </FullscreenGameShell>
   );
 }
