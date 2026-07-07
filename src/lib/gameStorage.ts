@@ -1,6 +1,14 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
 import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
-import { createIndexedDbGameRepository, type GameRepositoryStatus } from './indexedDbGameRepository';
+import {
+  createIndexedDbGameRepository,
+  type GameRepositoryStatus,
+  type GameSnapshotRepairResult,
+  type GameStorageVerification,
+  type LegacyRecoveryMode,
+  type LegacyRecoveryPreview,
+  type LegacyRecoveryResult,
+} from './indexedDbGameRepository';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
@@ -15,6 +23,7 @@ export const gameRepository = createIndexedDbGameRepository({
   legacyLoadSync: () => loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames),
   legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
   legacyClear: () => removePersistedKeys([STORAGE_KEY]),
+  normalize: normalizeLoadedGames,
 });
 
 /** Awaited once at boot (before React renders) so getAllSync() is correct on first paint. */
@@ -36,6 +45,23 @@ export function loadGamesFromPersistentStorage(): Promise<Game[]> {
 
 export function saveGames(games: Game[]) {
   gameRepository.replaceAll(games);
+}
+
+// Wave 5: storage verification / repair / recovery (games). See indexedDbGameRepository.
+export function verifyGameStorage(): Promise<GameStorageVerification> {
+  return gameRepository.verify();
+}
+
+export function repairGameSnapshot(): Promise<GameSnapshotRepairResult> {
+  return gameRepository.repairSnapshot();
+}
+
+export function previewLegacyGameRecovery(): Promise<LegacyRecoveryPreview> {
+  return gameRepository.previewLegacyRecovery();
+}
+
+export function recoverGamesFromLegacyBlob(mode: LegacyRecoveryMode): Promise<LegacyRecoveryResult> {
+  return gameRepository.recoverFromLegacyBlob(mode);
 }
 
 export function getMockGames(): Game[] {

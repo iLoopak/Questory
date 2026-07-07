@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createQuestShelfBackup,
   getQuestShelfBackupSummary,
@@ -9,6 +9,12 @@ import {
   type QuestShelfBackup,
   type QuestShelfBackupSummary,
 } from '../lib/backupStorage';
+import {
+  previewLegacyGameRecovery,
+  recoverGamesFromLegacyBlob,
+  repairGameSnapshot,
+  verifyGameStorage,
+} from '../lib/gameStorage';
 import {
   clearLocalStorageIssues,
   exportRawQuestShelfLocalData,
@@ -135,6 +141,10 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       }
     };
   }, [autoBackupSignal, supportsFileSystemAccess, syncSettings.autoBackupEnabled, syncSettings.includeIntegrationSettings]);
+
+  const refreshDiagnostics = useCallback(() => {
+    void getStorageDiagnostics().then(setDiagnostics);
+  }, []);
 
   function showMessage(nextMessage: string, tone: 'error' | 'info' | 'success' = 'info') {
     setMessage(nextMessage);
@@ -357,6 +367,12 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       />
 
       <StorageHealthPanel diagnostics={diagnostics} />
+
+      <StorageToolsPanel
+        diagnostics={diagnostics}
+        onChanged={refreshDiagnostics}
+        onCreateBackup={() => void downloadBackup()}
+      />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <label className="flex items-start gap-3 rounded-md border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-300">
@@ -732,6 +748,10 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
         <span className="text-xs text-slate-500">Local diagnostics</span>
       </div>
 
+      <div className="mt-3 text-xs text-slate-500">
+        IndexedDB: {diagnostics.indexedDbAvailable ? 'available' : 'unavailable (using legacy fallback)'}
+      </div>
+
       <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
         <div className="text-xs uppercase tracking-wide text-slate-500">Games store</div>
         <div className="mt-1 text-sm text-slate-200">
@@ -812,6 +832,169 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
           larger-capacity store.
         </p>
       ) : null}
+    </section>
+  );
+}
+
+type RecoveryPreview = Awaited<ReturnType<typeof previewLegacyGameRecovery>>;
+type ToolResult = { tone: 'ok' | 'warn' | 'error'; text: string };
+
+function StorageToolsPanel({
+  diagnostics,
+  onChanged,
+  onCreateBackup,
+}: {
+  diagnostics: StorageDiagnostics | null;
+  onChanged: () => void;
+  onCreateBackup: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<ToolResult | null>(null);
+  const [recoveryPreview, setRecoveryPreview] = useState<RecoveryPreview | null>(null);
+
+  const legacyBlobPresent = diagnostics?.gameStore.legacyBlobPresent ?? false;
+  const resultTone =
+    result?.tone === 'error' ? 'text-rose-200' : result?.tone === 'warn' ? 'text-amber-200' : 'text-emerald-200';
+
+  async function runVerify() {
+    setBusy('verify');
+    setResult(null);
+    try {
+      const v = await verifyGameStorage();
+      const clean = v.invalidCount === 0 && v.duplicateIds.length === 0;
+      setResult({
+        tone: clean ? 'ok' : 'warn',
+        text:
+          `IndexedDB ${v.idbAvailable ? 'available' : 'unavailable'} · ${v.idbRowCount} rows · ` +
+          `${v.validCount} valid · ${v.invalidCount} invalid · ${v.duplicateIds.length} duplicate ids · ` +
+          `snapshot ${v.snapshotCount} · legacy blob ${v.legacyBlobPresent ? `${v.legacyBlobCount} records` : 'absent'}.`,
+      });
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Verification failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runRepair() {
+    setBusy('repair');
+    setResult(null);
+    try {
+      const r = await repairGameSnapshot();
+      setResult({
+        tone: 'ok',
+        text: `Rebuilt snapshot from IndexedDB: ${r.after} records${r.removedInvalid > 0 ? ` (excluded ${r.removedInvalid} invalid row${r.removedInvalid === 1 ? '' : 's'})` : ''}.`,
+      });
+      onChanged();
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Repair failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startRecovery() {
+    setBusy('recover');
+    setResult(null);
+    try {
+      const preview = await previewLegacyGameRecovery();
+      if (!preview.legacyBlobPresent || preview.legacyCount === 0) {
+        setResult({ tone: 'warn', text: 'No legacy games blob to recover from.' });
+        setRecoveryPreview(null);
+        return;
+      }
+      setRecoveryPreview(preview);
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Recovery preview failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function doRecover(mode: 'merge' | 'replace') {
+    if (
+      mode === 'replace' &&
+      !window.confirm(
+        `Replace all ${recoveryPreview?.idbCount ?? 0} games in IndexedDB with ${recoveryPreview?.legacyCount ?? 0} from the legacy blob? This overwrites current library data.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(mode);
+    try {
+      const res = await recoverGamesFromLegacyBlob(mode);
+      setResult({
+        tone: 'ok',
+        text:
+          `${mode === 'merge' ? 'Merged' : 'Replaced'}: imported ${res.importedCount}, total ${res.totalCount}` +
+          `${res.skippedExistingCount > 0 ? `, kept ${res.skippedExistingCount} existing` : ''}.`,
+      });
+      setRecoveryPreview(null);
+      onChanged();
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Recovery failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const buttonClass =
+    'h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50';
+
+  return (
+    <section className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-4 text-sm text-slate-300">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-white">Storage tools</h3>
+        <span className="text-xs text-slate-500">Verify · repair · recover</span>
+      </div>
+
+      <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-500">
+        Non-destructive checks for the IndexedDB game library. Repair only rebuilds the in-memory snapshot; recovery
+        imports the legacy blob and never overwrites it. Export a backup first if you plan to replace data.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className={buttonClass} disabled={busy !== null} onClick={() => void runVerify()} type="button">
+          {busy === 'verify' ? 'Verifying…' : 'Verify library storage'}
+        </button>
+        <button className={buttonClass} disabled={busy !== null} onClick={() => void runRepair()} type="button">
+          {busy === 'repair' ? 'Repairing…' : 'Repair library snapshot'}
+        </button>
+        <button
+          className={buttonClass}
+          disabled={busy !== null || !legacyBlobPresent}
+          onClick={() => void startRecovery()}
+          title={legacyBlobPresent ? undefined : 'No legacy games blob present.'}
+          type="button"
+        >
+          {busy === 'recover' ? 'Checking…' : 'Recover from legacy games blob'}
+        </button>
+        <button className={buttonClass} disabled={busy !== null} onClick={onCreateBackup} type="button">
+          Create backup now
+        </button>
+      </div>
+
+      {recoveryPreview ? (
+        <div className="mt-3 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-amber-100">
+          <div className="text-sm">
+            Legacy blob: {recoveryPreview.legacyCount} records · IndexedDB: {recoveryPreview.idbCount} records ·{' '}
+            {recoveryPreview.onlyInLegacyCount} only in legacy · {recoveryPreview.conflictCount} already present.
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button className={buttonClass} disabled={busy !== null} onClick={() => void doRecover('merge')} type="button">
+              {busy === 'merge' ? 'Merging…' : `Merge (add ${recoveryPreview.onlyInLegacyCount})`}
+            </button>
+            <button className={buttonClass} disabled={busy !== null} onClick={() => void doRecover('replace')} type="button">
+              {busy === 'replace' ? 'Replacing…' : 'Replace all'}
+            </button>
+            <button className={buttonClass} disabled={busy !== null} onClick={() => setRecoveryPreview(null)} type="button">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {result ? <p className={`mt-3 text-xs leading-5 ${resultTone}`}>{result.text}</p> : null}
     </section>
   );
 }

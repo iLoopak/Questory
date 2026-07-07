@@ -44,6 +44,8 @@ export type StorageDiagnostics = {
   gameStore: GameRepositoryStatus;
   rawgCacheStore: RawgMetadataCacheStatus;
   playActivityStore: PlayActivityStoreStatus;
+  /** Whether the IndexedDB API exists in this environment (the store backend depends on it). */
+  indexedDbAvailable: boolean;
 };
 
 function byteLength(value: string): number {
@@ -109,6 +111,7 @@ export async function getStorageDiagnostics(): Promise<StorageDiagnostics> {
     gameStore: getGameRepositoryStatus(),
     rawgCacheStore: getRawgMetadataCacheStatus(),
     playActivityStore: getPlayActivityStoreStatus(),
+    indexedDbAvailable: typeof indexedDB !== 'undefined',
   };
 }
 

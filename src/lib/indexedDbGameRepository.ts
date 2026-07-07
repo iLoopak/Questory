@@ -31,6 +31,48 @@ export type IndexedDbGameRepositoryIo = {
   /** Remove the legacy blob from every tier — used by clear()/reset so a stale blob
    *  cannot re-import "deleted" games on the next boot. */
   legacyClear: () => Promise<void>;
+  /** Normalize raw values into valid Games (drops invalid, preserves unknown fields). */
+  normalize: (value: unknown) => Game[];
+};
+
+/** Non-mutating integrity report for the IndexedDB game store (Wave 5). */
+export type GameStorageVerification = {
+  idbAvailable: boolean;
+  backend: GameStoreBackend;
+  idbRowCount: number;
+  validCount: number;
+  invalidCount: number;
+  duplicateIds: string[];
+  snapshotCount: number;
+  legacyBlobPresent: boolean;
+  legacyBlobCount: number;
+};
+
+/** Result of rebuilding the in-memory snapshot from IndexedDB (Wave 5, non-destructive). */
+export type GameSnapshotRepairResult = {
+  backend: GameStoreBackend;
+  before: number;
+  after: number;
+  removedInvalid: number;
+};
+
+/** Non-mutating preview of a legacy-blob recovery (Wave 5). */
+export type LegacyRecoveryPreview = {
+  legacyBlobPresent: boolean;
+  idbAvailable: boolean;
+  legacyCount: number;
+  idbCount: number;
+  onlyInLegacyCount: number;
+  conflictCount: number;
+};
+
+export type LegacyRecoveryMode = 'merge' | 'replace';
+
+export type LegacyRecoveryResult = {
+  mode: LegacyRecoveryMode;
+  importedCount: number;
+  totalCount: number;
+  skippedExistingCount: number;
 };
 
 export type GameStoreBackend = 'indexeddb' | 'legacy-fallback';
@@ -47,6 +89,17 @@ export type GameRepositoryStatus = {
 
 export interface IndexedDbGameRepository extends GameRepository {
   getStatus(): GameRepositoryStatus;
+  /** Read-only integrity check of the IndexedDB game store. Never mutates data. */
+  verify(): Promise<GameStorageVerification>;
+  /** Rebuild the in-memory snapshot from IndexedDB (normalized, deduped). Non-destructive:
+   *  never writes to IndexedDB and never overwrites the legacy blob. */
+  repairSnapshot(): Promise<GameSnapshotRepairResult>;
+  /** Non-mutating preview of importing the legacy blob into IndexedDB. */
+  previewLegacyRecovery(): Promise<LegacyRecoveryPreview>;
+  /** Import the legacy blob into IndexedDB. 'merge' (default) adds legacy-only records and
+   *  keeps existing IndexedDB records on id conflicts; 'replace' overwrites the store but
+   *  refuses to wipe a non-empty store with an empty legacy blob. Never writes the legacy blob. */
+  recoverFromLegacyBlob(mode: LegacyRecoveryMode): Promise<LegacyRecoveryResult>;
 }
 
 export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): IndexedDbGameRepository {
@@ -196,6 +249,143 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
         gameCount: snapshot.length,
         legacyBlobPresent: getStorageAdapter().readLocal(GAMES_KEY) !== null,
         schemaVersion: QUESTORY_DB_VERSION,
+      };
+    },
+    async verify() {
+      const db = getGameDatabase();
+      const legacyBlobPresent = getStorageAdapter().readLocal(GAMES_KEY) !== null;
+      const legacyBlobCount = io.legacyLoadSync().length;
+      const base = {
+        idbAvailable: Boolean(db),
+        backend,
+        snapshotCount: snapshot.length,
+        legacyBlobPresent,
+        legacyBlobCount,
+      };
+
+      if (!db) {
+        return { ...base, idbRowCount: 0, validCount: 0, invalidCount: 0, duplicateIds: [] };
+      }
+
+      try {
+        const rows = await db.games.toArray();
+        const seen = new Set<string>();
+        const duplicates = new Set<string>();
+        let valid = 0;
+        let invalid = 0;
+
+        for (const row of rows) {
+          const normalized = io.normalize([row]);
+          if (normalized.length === 0) {
+            invalid += 1;
+            continue;
+          }
+          valid += 1;
+          const id = normalized[0].id;
+          if (seen.has(id)) {
+            duplicates.add(id);
+          } else {
+            seen.add(id);
+          }
+        }
+
+        return {
+          ...base,
+          idbRowCount: rows.length,
+          validCount: valid,
+          invalidCount: invalid,
+          duplicateIds: [...duplicates],
+        };
+      } catch (error) {
+        fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB read failed.');
+        return { ...base, idbAvailable: true, idbRowCount: 0, validCount: 0, invalidCount: 0, duplicateIds: [] };
+      }
+    },
+    async repairSnapshot() {
+      const before = snapshot.length;
+      const db = getGameDatabase();
+
+      if (!db || backend === 'legacy-fallback') {
+        // No IndexedDB: rebuild the snapshot from the legacy blob (read-only).
+        const rebuilt = io.legacyLoadSync();
+        snapshot = rebuilt;
+        return { backend, before, after: rebuilt.length, removedInvalid: 0 };
+      }
+
+      try {
+        const rows = await db.games.toArray();
+        const normalized = io.normalize(rows);
+        const byId = new Map<string, Game>();
+        for (const game of normalized) {
+          if (!byId.has(game.id)) {
+            byId.set(game.id, game);
+          }
+        }
+        const rebuilt = [...byId.values()];
+        snapshot = rebuilt;
+        return { backend, before, after: rebuilt.length, removedInvalid: rows.length - rebuilt.length };
+      } catch (error) {
+        fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB read failed.');
+        snapshot = io.legacyLoadSync();
+        return { backend, before, after: snapshot.length, removedInvalid: 0 };
+      }
+    },
+    async previewLegacyRecovery() {
+      const legacyBlobPresent = getStorageAdapter().readLocal(GAMES_KEY) !== null;
+      const legacy = await io.legacyLoadDurable();
+      const db = getGameDatabase();
+      const idbAvailable = Boolean(db) && backend !== 'legacy-fallback';
+      const idbGames = idbAvailable ? await db!.games.toArray() : snapshot;
+      const idbIds = new Set(idbGames.map((game) => game.id));
+      const onlyInLegacyCount = legacy.reduce((count, game) => (idbIds.has(game.id) ? count : count + 1), 0);
+
+      return {
+        legacyBlobPresent,
+        idbAvailable,
+        legacyCount: legacy.length,
+        idbCount: idbGames.length,
+        onlyInLegacyCount,
+        conflictCount: legacy.length - onlyInLegacyCount,
+      };
+    },
+    async recoverFromLegacyBlob(mode) {
+      const db = getGameDatabase();
+      if (!db || backend === 'legacy-fallback') {
+        throw new Error('IndexedDB is not available; cannot recover into it.');
+      }
+
+      const legacy = await io.legacyLoadDurable();
+
+      if (mode === 'replace') {
+        // Safety: never wipe a non-empty store with an empty legacy blob.
+        if (legacy.length === 0 && (await db.games.count()) > 0) {
+          throw new Error('Refusing to replace a non-empty library with an empty legacy blob.');
+        }
+        await db.transaction('rw', db.games, async () => {
+          await db.games.clear();
+          if (legacy.length > 0) {
+            await db.games.bulkPut(legacy);
+          }
+        });
+        snapshot = legacy;
+        return { mode, importedCount: legacy.length, totalCount: legacy.length, skippedExistingCount: 0 };
+      }
+
+      // merge: add legacy-only records; keep existing IndexedDB records on id conflicts.
+      const existing = await db.games.toArray();
+      const existingIds = new Set(existing.map((game) => game.id));
+      const toAdd = legacy.filter((game) => !existingIds.has(game.id));
+      if (toAdd.length > 0) {
+        await db.transaction('rw', db.games, async () => {
+          await db.games.bulkPut(toAdd);
+        });
+      }
+      snapshot = [...existing, ...toAdd];
+      return {
+        mode,
+        importedCount: toAdd.length,
+        totalCount: snapshot.length,
+        skippedExistingCount: legacy.length - toAdd.length,
       };
     },
   };
