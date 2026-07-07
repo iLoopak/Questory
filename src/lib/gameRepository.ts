@@ -14,6 +14,13 @@
 import type { Game } from '../types/game';
 
 export interface GameRepository {
+  /**
+   * Initialize the backing store and populate the in-memory snapshot. Awaited once
+   * at boot (before React renders) so getAllSync() is correct on first paint. The
+   * blob repository resolves immediately; the IndexedDB repository opens the DB and
+   * runs the one-time legacy import here.
+   */
+  ready(): Promise<void>;
   /** Synchronous snapshot of all games (enables synchronous first paint). */
   getAllSync(): Game[];
   /** Durable async load (mirrors the pre-seam loadGamesFromPersistentStorage). */
@@ -26,6 +33,8 @@ export interface GameRepository {
   upsert(game: Game): void;
   /** Remove a single game by id. Forward-looking; today writes the whole blob. */
   remove(id: string): void;
+  /** Remove every game from the store and snapshot (used by the reset-data flow). */
+  clear(): Promise<void>;
 }
 
 export type BlobGameRepositoryIo = {
@@ -41,6 +50,9 @@ export type BlobGameRepositoryIo = {
  */
 export function createBlobGameRepository(io: BlobGameRepositoryIo): GameRepository {
   return {
+    async ready() {
+      // Blob storage is synchronous; nothing to initialize.
+    },
     getAllSync() {
       return io.loadSync();
     },
@@ -70,6 +82,9 @@ export function createBlobGameRepository(io: BlobGameRepositoryIo): GameReposito
       if (next.length !== games.length) {
         io.saveAll(next);
       }
+    },
+    async clear() {
+      io.saveAll([]);
     },
   };
 }

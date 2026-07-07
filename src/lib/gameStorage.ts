@@ -1,21 +1,31 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
 import { loadLocalJson, loadPersistedJson, savePersistedJson } from './localPersistence';
-import { createBlobGameRepository, type GameRepository } from './gameRepository';
+import { createIndexedDbGameRepository, type GameRepositoryStatus } from './indexedDbGameRepository';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
 /**
- * Wave 1 seam. The public loadGames/saveGames API below now delegates to this
- * repository, which is backed by the existing single-blob persistence — behavior is
- * unchanged. A later IndexedDB implementation can replace this instance without any
- * caller changing. Exported so future call sites can use per-record operations.
+ * Wave 2 seam. Games are stored in IndexedDB via this repository, which keeps an
+ * in-memory snapshot so loadGames() stays synchronous, imports the legacy blob once,
+ * and keeps dual-writing `questshelf.games.v1` this wave as rollback insurance. The
+ * public loadGames/saveGames API below delegates to it, so no caller changed.
  */
-export const gameRepository: GameRepository = createBlobGameRepository({
-  loadSync: () => loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames),
-  loadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
-  saveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
+export const gameRepository = createIndexedDbGameRepository({
+  legacyLoadSync: () => loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames),
+  legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
+  legacySaveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
+  normalize: normalizeLoadedGames,
 });
+
+/** Awaited once at boot (before React renders) so getAllSync() is correct on first paint. */
+export function initGameRepository(): Promise<void> {
+  return gameRepository.ready();
+}
+
+export function getGameRepositoryStatus(): GameRepositoryStatus {
+  return gameRepository.getStatus();
+}
 
 export function loadGames(): Game[] {
   return gameRepository.getAllSync();

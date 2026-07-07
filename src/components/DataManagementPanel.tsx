@@ -732,6 +732,18 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
         <span className="text-xs text-slate-500">Local diagnostics</span>
       </div>
 
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+        <div className="text-xs uppercase tracking-wide text-slate-500">Games store</div>
+        <div className="mt-1 text-sm text-slate-200">
+          {diagnostics.gameStore.backend === 'indexeddb' ? 'IndexedDB' : 'Legacy blob (fallback)'}
+          <span className="text-slate-500"> · {diagnostics.gameStore.gameCount} records</span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Legacy blob is still dual-written for rollback safety.
+          {diagnostics.gameStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
+        </div>
+      </div>
+
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
           <div className="text-xs uppercase tracking-wide text-slate-500">Questory local data</div>

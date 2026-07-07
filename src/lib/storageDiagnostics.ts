@@ -5,6 +5,8 @@
 // surface size/quota pressure before the ~5 MB localStorage cliff silently drops writes.
 
 import { getStorageAdapter } from './storageAdapter';
+import { getGameRepositoryStatus } from './gameStorage';
+import type { GameRepositoryStatus } from './indexedDbGameRepository';
 
 const QUESTSHELF_PREFIX = 'questshelf.';
 const GAMES_KEY = 'questshelf.games.v1';
@@ -35,6 +37,7 @@ export type DeviceStorageEstimate = {
 export type StorageDiagnostics = {
   local: LocalStorageBreakdown;
   device: DeviceStorageEstimate | null;
+  gameStore: GameRepositoryStatus;
 };
 
 function byteLength(value: string): number {
@@ -97,6 +100,7 @@ export async function getStorageDiagnostics(): Promise<StorageDiagnostics> {
   return {
     local: getLocalStorageBreakdown(),
     device: await estimateDeviceStorage(),
+    gameStore: getGameRepositoryStatus(),
   };
 }
 

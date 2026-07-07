@@ -1,6 +1,7 @@
 export type QuestShelfStorageKey =
   | 'questshelf.achievementCounters.v1'
   | 'questshelf.games.v1'
+  | 'questshelf.gamesSyncState.v1'
   | 'questshelf.rawgMetadataCache.v1'
   | 'questshelf.rawgSettings.v1'
   | 'questshelf.steamGridDbSettings.v1'
@@ -53,9 +54,16 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'default',
     key: 'questshelf.games.v1',
-    purpose: 'Library and Wishlist game records.',
+    purpose: 'Library and Wishlist game records. Wave 2: mirrored from the IndexedDB game store as rollback insurance; still the backup source.',
     scope: 'core',
     schema: 'Game[] normalized by gameStorage.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.gamesSyncState.v1',
+    purpose: 'Wave 2 IndexedDB↔legacy-blob reconciliation counters (device-local, temporary during dual-write).',
+    scope: 'device',
+    schema: '{ legacy: number; idb: number }.',
   },
   {
     backup: 'default',

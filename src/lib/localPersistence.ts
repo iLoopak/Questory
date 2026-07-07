@@ -46,7 +46,7 @@ export function loadLocalJson<T>(key: string, fallback: T, normalize: (value: un
     const parsedValue = JSON.parse(storedValue);
     return normalize(parsedValue);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Stored JSON could not be read.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Stored JSON could not be read.');
     return fallback;
   }
 }
@@ -57,7 +57,7 @@ export function savePersistedJson<T>(key: string, value: T) {
   try {
     serializedValue = JSON.stringify(value);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     return;
   }
 
@@ -153,7 +153,7 @@ export function saveLocalJson<T>(key: string, value: T) {
   try {
     serializedValue = JSON.stringify(value);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     return;
   }
 
@@ -164,12 +164,18 @@ function saveLocalJsonStringified(key: string, serializedValue: string) {
   try {
     getStorageAdapter().writeLocal(key, serializedValue);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     // Local persistence should never block the UI if the browser storage quota is unavailable.
   }
 }
 
-function recordStorageIssue(key: string, message: string) {
+/**
+ * Record a storage parse/write/quota issue: logs it, dispatches the storageIssue
+ * event (so the UI can surface it), and appends it to the recovery log. Exported so
+ * other storage backends (e.g. the IndexedDB game repository) report issues the same
+ * visible way. Wave 0.
+ */
+export function reportStorageIssue(key: string, message: string) {
   if (!isBrowser || key === storageIssueKey) {
     return;
   }

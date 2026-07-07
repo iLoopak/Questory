@@ -1,5 +1,5 @@
 import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
-import { loadGames, normalizeLoadedGames } from './gameStorage';
+import { gameRepository, loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
 import { normalizePlatformQueueState } from './platformQueueStorage';
@@ -120,6 +120,11 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
   const removes: Array<(typeof allBackupStorageKeys)[number]> = [];
 
   allBackupStorageKeys.forEach((key) => {
+    // Games are written through the repository below so IndexedDB + snapshot + the
+    // legacy blob all stay consistent (Wave 2). Everything else uses the blob path.
+    if (key === 'questshelf.games.v1') {
+      return;
+    }
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
       writes.push([key, normalizeBackupDataSection(key, backup.data[key])]);
     } else if (!integrationBackupStorageKeys.includes(key as (typeof integrationBackupStorageKeys)[number])) {
@@ -129,6 +134,14 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
 
   writes.forEach(([key, value]) => savePersistedJson(key, value));
   void removePersistedKeys(removes);
+
+  // Replace the game collection through the repository (updates IndexedDB, the in-memory
+  // snapshot, and dual-writes the legacy blob). A backup without a games section clears it.
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.games.v1')) {
+    gameRepository.replaceAll(normalizeLoadedGames(backup.data['questshelf.games.v1']));
+  } else {
+    void gameRepository.clear();
+  }
 
   return {
     games: loadGames(),
@@ -140,7 +153,7 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
   // Pre-normalize before touching storage so an unexpected normalize error cannot leave
   // storage in a partially-written state.
   const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
-  const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [['questshelf.games.v1', mergedGames]];
+  const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
 
   allBackupStorageKeys.forEach((key) => {
     if (key === 'questshelf.games.v1') {
@@ -154,6 +167,9 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 
   writes.forEach(([key, value]) => savePersistedJson(key, value));
 
+  // Merged games go through the repository (IndexedDB + snapshot + legacy dual-write).
+  gameRepository.replaceAll(mergedGames);
+
   return {
     games: loadGames(),
     ignoredSteamGames: loadIgnoredSteamGames(),
@@ -161,6 +177,9 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 }
 
 export async function resetQuestShelfLocalData() {
+  // Clear the IndexedDB game store + snapshot first so reset does not leave orphaned
+  // games in IndexedDB after the legacy blob is removed.
+  await gameRepository.clear();
   await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys]);
 }
 

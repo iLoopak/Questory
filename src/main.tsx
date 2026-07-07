@@ -5,6 +5,7 @@ import { configureAndroidGamepadShortcuts } from './lib/androidGamepadShortcuts'
 import { configureHandheldImmersiveMode } from './lib/handheldImmersiveMode';
 import { hydrateLocalStorageFromPreferences } from './lib/localPersistence';
 import { persistentStorageKeys } from './lib/persistentStorageKeys';
+import { initGameRepository } from './lib/gameStorage';
 import {
   accentColorStorageKey,
   appTemplateStorageKey,
@@ -55,6 +56,16 @@ async function startApp() {
   }
 
   await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
+
+  // Wave 2: open the IndexedDB game store and run the one-time legacy import before
+  // React renders, so the synchronous loadGames() first paint reads a correct snapshot.
+  // The repository degrades to the legacy blob internally if IndexedDB is unavailable,
+  // so this never blocks boot.
+  try {
+    await initGameRepository();
+  } catch {
+    // Repository initialization is internally resilient; never block boot on it.
+  }
 
   // First-launch detection: if the template key has never been written, this is a clean
   // install. Seed the neon-deck green accent so new users get Green / Blue as default
