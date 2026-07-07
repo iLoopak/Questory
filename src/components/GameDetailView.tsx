@@ -135,6 +135,17 @@ export function GameDetailView({
     onGameEdit?.(game.id, artworkChanges);
   }
 
+  async function handleRefreshArtwork() {
+    if (!onFindArtwork) return;
+    const result = await onFindArtwork(game, 'artwork');
+    // When the automatic lookup applies nothing, flow straight into the manual
+    // SteamGridDB picker (the same one "Change Artwork" opens) instead of dead-ending
+    // on a toast and making the user reopen the menu.
+    if (result === 'no-match' || result === 'error') {
+      setIsArtworkPickerOpen(true);
+    }
+  }
+
 
 
   function updateEditDraft<K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) {
@@ -291,6 +302,7 @@ export function GameDetailView({
             onClose={() => setIsOverflowOpen(false)}
             onEdit={() => setIsEditing(true)}
             onFindArtwork={onFindArtwork}
+            onRefreshArtwork={handleRefreshArtwork}
             onIgnore={onIgnore}
             onStatusChange={onStatusChange}
             onSyncSteamData={onSyncSteamData}
@@ -710,6 +722,7 @@ type GameDetailOverflowMenuProps = {
   onClose: () => void;
   onEdit: () => void;
   onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>;
+  onRefreshArtwork: () => void;
   onIgnore?: (game: Game) => void;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onSyncSteamData?: (game: Game) => void;
@@ -729,6 +742,7 @@ function GameDetailOverflowMenu({
   onClose,
   onEdit,
   onFindArtwork,
+  onRefreshArtwork,
   onIgnore,
   onStatusChange,
   onSyncSteamData,
@@ -809,7 +823,9 @@ function GameDetailOverflowMenu({
       icon: 'image',
       label: isFindingArtwork ? t('artwork.searching') : t('artwork.refreshArtwork'),
       disabled: isFindingArtwork,
-      onClick: () => closeAndRun(() => { void onFindArtwork(game, 'artwork'); }),
+      // Automatic lookup first; if nothing is applied, handleRefreshArtwork opens the
+      // Change Artwork picker so the user can pick without reopening the menu.
+      onClick: () => closeAndRun(onRefreshArtwork),
     });
   }
 
