@@ -1,5 +1,5 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
-import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
+import { loadLocalJson, loadPersistedJson, removePersistedKeys, savePersistedJson } from './localPersistence';
 import {
   createIndexedDbGameRepository,
   type GameRepositoryStatus,
@@ -24,6 +24,7 @@ export const gameRepository = createIndexedDbGameRepository({
   legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
   legacyClear: () => removePersistedKeys([STORAGE_KEY]),
   normalize: normalizeLoadedGames,
+  legacySaveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
 });
 
 /** Awaited once at boot (before React renders) so getAllSync() is correct on first paint. */

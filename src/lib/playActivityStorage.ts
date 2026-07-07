@@ -1,4 +1,4 @@
-import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
+import { loadLocalJson, loadPersistedJson, removePersistedKeys, savePersistedJson } from './localPersistence';
 import {
   createIndexedDbPlayActivityRepository,
   type PlayActivityRecoveryMode,
@@ -47,6 +47,7 @@ export const playActivityRepository = createIndexedDbPlayActivityRepository({
   legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizePlayActivityRecords),
   legacyClear: () => removePersistedKeys([STORAGE_KEY]),
   normalize: normalizePlayActivityRecords,
+  legacySaveAll: (records) => savePersistedJson(STORAGE_KEY, normalizePlayActivityRecords(records)),
 });
 
 /** Awaited once at boot (before React renders) so the snapshot is populated. */

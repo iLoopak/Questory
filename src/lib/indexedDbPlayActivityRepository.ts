@@ -22,6 +22,8 @@ export type PlayActivityRepositoryIo = {
   legacyLoadDurable: () => Promise<PlayActivityRecord[]>;
   legacyClear: () => Promise<void>;
   normalize: (value: unknown) => PlayActivityRecord[];
+  /** Durable legacy-blob write, used only when IndexedDB is unavailable or a write fails. */
+  legacySaveAll: (records: PlayActivityRecord[]) => void;
 };
 
 export type PlayActivityStoreStatus = CollectionStoreStatus;

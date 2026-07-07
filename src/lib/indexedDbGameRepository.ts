@@ -30,6 +30,8 @@ export type IndexedDbGameRepositoryIo = {
   legacyClear: () => Promise<void>;
   /** Normalize raw values into valid Games (drops invalid, preserves unknown fields). */
   normalize: (value: unknown) => Game[];
+  /** Durable legacy-blob write, used only when IndexedDB is unavailable or a write fails. */
+  legacySaveAll: (games: Game[]) => void;
 };
 
 export type GameStoreBackend = CollectionStoreBackend;

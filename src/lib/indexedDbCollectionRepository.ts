@@ -12,9 +12,10 @@
 //  - One-time import from the legacy blob if the store is empty (durable read so a native
 //    pre-migration blob in Preferences still imports). If the store already has records,
 //    the legacy blob is ignored — it can't overwrite them.
-//  - No dual-write. The legacy blob is a read-only fallback, kept inert (never overwritten
-//    with empty data). If IndexedDB is unavailable/fails, the repo degrades to the legacy
-//    blob and surfaces a storage diagnostic.
+//  - No dual-write in normal operation. The legacy blob is a read-only import fallback while
+//    IndexedDB is healthy. If IndexedDB is unavailable or a write fails, the repo degrades to
+//    writing the legacy blob (the pre-IndexedDB behavior) so writes are never lost, and
+//    surfaces a storage diagnostic.
 //  - Wave 5 verify/repair/recover, all safe by construction (never write the legacy blob).
 
 import type { Table } from 'dexie';
@@ -77,6 +78,11 @@ export type CollectionRepositoryIo<T> = {
   legacyLoadDurable: () => Promise<T[]>;
   legacyClear: () => Promise<void>;
   normalize: (value: unknown) => T[];
+  /** Durable write of the whole collection to the legacy blob (localStorage + Preferences).
+   *  Used ONLY when IndexedDB is unavailable or a write fails, so writes are not lost in
+   *  those cases (restores the pre-IndexedDB durability). Never called in normal operation,
+   *  so there is no dual-write while IndexedDB is healthy. */
+  legacySaveAll: (items: T[]) => void;
 };
 
 export type CollectionRepositoryConfig<T> = {
@@ -169,6 +175,10 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
   function persistToIdb(previous: T[], next: T[]) {
     const db = getGameDatabase();
     if (!db || backend === 'legacy-fallback') {
+      // IndexedDB is unavailable (or already failed this session): persist durably to the
+      // legacy blob so the write is not lost. This is the pre-IndexedDB behavior, used only
+      // in the degraded path — normal operation never writes the legacy blob.
+      io.legacySaveAll(next);
       return;
     }
 
@@ -193,6 +203,8 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
       })
       .catch((error: unknown) => {
         fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB write failed.');
+        // Persist the write that just failed to the legacy blob so it is not lost.
+        io.legacySaveAll(next);
       });
   }
 
