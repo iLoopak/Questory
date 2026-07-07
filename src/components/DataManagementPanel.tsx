@@ -736,10 +736,12 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
         <div className="text-xs uppercase tracking-wide text-slate-500">Games store</div>
         <div className="mt-1 text-sm text-slate-200">
           {diagnostics.gameStore.backend === 'indexeddb' ? 'IndexedDB' : 'Legacy blob (fallback)'}
-          <span className="text-slate-500"> · {diagnostics.gameStore.gameCount} records</span>
+          <span className="text-slate-500">
+            {' · '}{diagnostics.gameStore.gameCount} records{' · '}schema v{diagnostics.gameStore.schemaVersion}
+          </span>
         </div>
         <div className="mt-1 text-xs text-slate-500">
-          Legacy blob is still dual-written for rollback safety.
+          Legacy blob: {diagnostics.gameStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
           {diagnostics.gameStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
         </div>
       </div>

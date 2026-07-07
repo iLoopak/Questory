@@ -1,65 +1,36 @@
-// Wave 2: IndexedDB-backed GameRepository (games collection only).
+// Wave 3: IndexedDB is the sole active store for the games collection.
 //
-// Design goals (see docs/persistence-migration-audit.md):
-//  - IndexedDB is the store; an in-memory snapshot keeps loadGames() synchronous for
-//    first paint.
-//  - One-time migration imports the legacy `questshelf.games.v1` blob into IndexedDB.
-//  - The legacy blob keeps being dual-written this wave as rollback insurance and is
-//    NOT deleted. Backup export still reads it, so backup format is unchanged.
-//  - Per-edit writes only touch changed rows in IndexedDB (no whole-collection rewrite).
-//  - If IndexedDB is unavailable or fails, the repository degrades to legacy-blob-only
-//    behavior and surfaces a storage diagnostic.
+// What changed from Wave 2:
+//  - No more dual-write to the legacy `questshelf.games.v1` blob during normal use.
+//    saveGames() updates IndexedDB + the in-memory snapshot only.
+//  - The Wave 2 reconciliation counter is gone; IndexedDB is the source of truth.
+//  - The legacy blob is now a READ-ONLY import fallback: it is imported once if
+//    IndexedDB is empty, and otherwise left inert (not deleted).
 //
-// Rollback safety / reconciliation:
-//   Every write bumps a synchronous legacy sequence number and (best-effort, async)
-//   marks the sequence IndexedDB has confirmed. The legacy blob is always written
-//   synchronously first, so it can only be equal to or ahead of IndexedDB. On boot, if
-//   the legacy sequence is ahead (e.g. a fire-and-forget IndexedDB write was dropped
-//   when the tab closed), we trust the legacy blob and re-sync IndexedDB from it — no
-//   silent loss of the last edit.
+// Preserved:
+//  - In-memory snapshot keeps loadGames() synchronous for first paint.
+//  - The whole Game object is stored per row, so unknown/future fields survive.
+//  - Per-edit writes diff against the snapshot and only put/delete changed rows.
+//  - If IndexedDB is unavailable/fails, the repo degrades to the legacy blob and
+//    surfaces a storage diagnostic.
 
 import type { Game } from '../types/game';
 import type { GameRepository } from './gameRepository';
-import { getGameDatabase } from './gameDatabase';
-import { loadLocalJson, reportStorageIssue, savePersistedJson } from './localPersistence';
+import { getGameDatabase, GAME_DB_SCHEMA_VERSION } from './gameDatabase';
+import { reportStorageIssue } from './localPersistence';
+import { getStorageAdapter } from './storageAdapter';
 
 const GAMES_KEY = 'questshelf.games.v1';
-export const gamesSyncStateStorageKey = 'questshelf.gamesSyncState.v1';
-
-type GamesSyncState = {
-  /** Sequence of the last write applied to the legacy blob (synchronous, authoritative). */
-  legacy: number;
-  /** Highest sequence IndexedDB has confirmed persisting. */
-  idb: number;
-};
-
-const defaultSyncState: GamesSyncState = { legacy: 0, idb: 0 };
-
-function normalizeSyncState(value: unknown): GamesSyncState {
-  if (!value || typeof value !== 'object') {
-    return { ...defaultSyncState };
-  }
-  const raw = value as Partial<GamesSyncState>;
-  return {
-    legacy: typeof raw.legacy === 'number' && Number.isFinite(raw.legacy) ? raw.legacy : 0,
-    idb: typeof raw.idb === 'number' && Number.isFinite(raw.idb) ? raw.idb : 0,
-  };
-}
-
-// Read synchronously from localStorage (post-hydration on native); write through the
-// durable path so the counters survive a WebView localStorage eviction.
-const loadSyncState = () => loadLocalJson(gamesSyncStateStorageKey, defaultSyncState, normalizeSyncState);
-const saveSyncState = (state: GamesSyncState) => savePersistedJson(gamesSyncStateStorageKey, state);
 
 export type IndexedDbGameRepositoryIo = {
-  /** Synchronous read of the legacy blob (already normalized). */
+  /** Synchronous read of the legacy blob from localStorage (already normalized). */
   legacyLoadSync: () => Game[];
-  /** Durable async read of the legacy blob (localStorage + Preferences). */
+  /** Durable async read (localStorage + Preferences) — used for the one-time import so a
+   *  pre-Wave-2 native blob that only lives in Preferences is still migrated. */
   legacyLoadDurable: () => Promise<Game[]>;
-  /** Whole-blob write of the legacy `questshelf.games.v1` (dual-write insurance). */
-  legacySaveAll: (games: Game[]) => void;
-  /** Reused normalization so IndexedDB and the blob stay identical in shape. */
-  normalize: (value: unknown) => Game[];
+  /** Remove the legacy blob from every tier — used by clear()/reset so a stale blob
+   *  cannot re-import "deleted" games on the next boot. */
+  legacyClear: () => Promise<void>;
 };
 
 export type GameStoreBackend = 'indexeddb' | 'legacy-fallback';
@@ -69,6 +40,9 @@ export type GameRepositoryStatus = {
   ready: boolean;
   migratedFromLegacy: boolean;
   gameCount: number;
+  /** Whether the legacy `questshelf.games.v1` blob is still present (kept inert this wave). */
+  legacyBlobPresent: boolean;
+  schemaVersion: number;
 };
 
 export interface IndexedDbGameRepository extends GameRepository {
@@ -76,8 +50,8 @@ export interface IndexedDbGameRepository extends GameRepository {
 }
 
 export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): IndexedDbGameRepository {
-  // Best-effort synchronous seed so reads before ready() still return data on the web
-  // (native localStorage is empty until hydration, but ready() runs after hydration).
+  // Best-effort synchronous seed so reads before ready() still return data on the web.
+  // ready() (awaited before render) establishes the authoritative snapshot.
   let snapshot: Game[] = io.legacyLoadSync();
   let isReady = false;
   let backend: GameStoreBackend = 'indexeddb';
@@ -95,22 +69,25 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
       return;
     }
 
-    const legacyGames = io.legacyLoadSync();
     const db = getGameDatabase();
 
     if (!db) {
-      snapshot = legacyGames;
+      snapshot = io.legacyLoadSync();
       isReady = true;
       fallbackToLegacy('IndexedDB is not available in this environment.');
       return;
     }
 
     try {
-      const state = loadSyncState();
       const idbCount = await db.games.count();
 
       if (idbCount === 0) {
-        // First run on this device: import the legacy blob in one transaction.
+        // First run on this device: import the legacy blob once. Read the durable copy so
+        // a pre-Wave-2 native user whose blob only survived in Preferences still migrates.
+        let legacyGames = io.legacyLoadSync();
+        if (legacyGames.length === 0) {
+          legacyGames = await io.legacyLoadDurable();
+        }
         if (legacyGames.length > 0) {
           await db.transaction('rw', db.games, async () => {
             await db.games.bulkPut(legacyGames);
@@ -118,31 +95,21 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
           migratedFromLegacy = true;
         }
         snapshot = legacyGames;
-        saveSyncState({ legacy: state.legacy, idb: state.legacy });
-      } else if (state.legacy > state.idb) {
-        // The legacy blob has a write IndexedDB never confirmed (e.g. dropped on unload).
-        // Trust the synchronously-written legacy blob and re-sync IndexedDB from it.
-        await db.transaction('rw', db.games, async () => {
-          await db.games.clear();
-          await db.games.bulkPut(legacyGames);
-        });
-        snapshot = legacyGames;
-        saveSyncState({ legacy: state.legacy, idb: state.legacy });
       } else {
-        // IndexedDB is the source of truth.
+        // IndexedDB has games: it is the source of truth. The legacy blob (if any) is
+        // ignored so it can never overwrite IndexedDB.
         snapshot = await db.games.toArray();
       }
 
       isReady = true;
     } catch (error) {
-      // Any failure: fall back to the legacy blob so the user keeps their library.
-      snapshot = legacyGames;
+      snapshot = io.legacyLoadSync();
       isReady = true;
       fallbackToLegacy(error instanceof Error ? error.message : 'Unknown IndexedDB error.');
     }
   }
 
-  function persistToIdb(previous: Game[], next: Game[], seq: number) {
+  function persistToIdb(previous: Game[], next: Game[]) {
     const db = getGameDatabase();
     if (!db || backend === 'legacy-fallback') {
       return;
@@ -154,8 +121,6 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
     const removed = [...previousById.keys()].filter((id) => !nextIds.has(id));
 
     if (changed.length === 0 && removed.length === 0) {
-      // Nothing to write; still mark IndexedDB as caught up to this sequence.
-      saveSyncState({ ...loadSyncState(), idb: seq });
       return;
     }
 
@@ -168,9 +133,6 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
           await db.games.bulkDelete(removed);
         }
       })
-      .then(() => {
-        saveSyncState({ ...loadSyncState(), idb: seq });
-      })
       .catch((error: unknown) => {
         fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB write failed.');
       });
@@ -178,13 +140,9 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
 
   function commit(next: Game[]) {
     const previous = snapshot;
-    // Bump the legacy sequence synchronously and write the legacy blob first so it is
-    // always at least as fresh as IndexedDB (the basis for boot reconciliation).
-    const seq = loadSyncState().legacy + 1;
-    saveSyncState({ ...loadSyncState(), legacy: seq });
-    io.legacySaveAll(next);
     snapshot = next;
-    persistToIdb(previous, next, seq);
+    // Wave 3: IndexedDB + snapshot only — no legacy blob dual-write.
+    persistToIdb(previous, next);
   }
 
   return {
@@ -219,8 +177,8 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
     },
     async clear() {
       snapshot = [];
-      io.legacySaveAll([]);
-      saveSyncState({ ...defaultSyncState });
+      // Neutralize the legacy blob across every tier so a reset can't re-import games.
+      await io.legacyClear();
       const db = getGameDatabase();
       if (db && backend !== 'legacy-fallback') {
         try {
@@ -236,6 +194,8 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
         ready: isReady,
         migratedFromLegacy,
         gameCount: snapshot.length,
+        legacyBlobPresent: getStorageAdapter().readLocal(GAMES_KEY) !== null,
+        schemaVersion: GAME_DB_SCHEMA_VERSION,
       };
     },
   };

@@ -1,7 +1,6 @@
 export type QuestShelfStorageKey =
   | 'questshelf.achievementCounters.v1'
   | 'questshelf.games.v1'
-  | 'questshelf.gamesSyncState.v1'
   | 'questshelf.rawgMetadataCache.v1'
   | 'questshelf.rawgSettings.v1'
   | 'questshelf.steamGridDbSettings.v1'
@@ -35,12 +34,21 @@ export type QuestShelfStorageKey =
 
 export type StorageKeyScope = 'core' | 'integration' | 'device' | 'ui' | 'recovery';
 
+/**
+ * Where a key's data lives. 'kv' = the JSON-per-key localStorage + Capacitor Preferences
+ * path (the default). 'collection' = an IndexedDB-backed store; such keys are NOT mirrored
+ * to / hydrated from Capacitor Preferences. Only `questshelf.games.v1` is 'collection'
+ * (Wave 3); it keeps its key name so backups stay compatible.
+ */
+export type StorageKeyStore = 'kv' | 'collection';
+
 export type StorageKeyDescriptor = {
   backup: 'default' | 'optional' | 'never';
   key: QuestShelfStorageKey;
   purpose: string;
   scope: StorageKeyScope;
   schema: string;
+  store?: StorageKeyStore;
 };
 
 export const storageKeyRegistry: StorageKeyDescriptor[] = [
@@ -54,16 +62,10 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'default',
     key: 'questshelf.games.v1',
-    purpose: 'Library and Wishlist game records. Wave 2: mirrored from the IndexedDB game store as rollback insurance; still the backup source.',
+    purpose: 'Library and Wishlist game records. Wave 3: stored in the IndexedDB game store; this blob is a read-only import fallback kept inert (not mirrored to Preferences). Still the backup export/import shape.',
     scope: 'core',
     schema: 'Game[] normalized by gameStorage.',
-  },
-  {
-    backup: 'never',
-    key: 'questshelf.gamesSyncState.v1',
-    purpose: 'Wave 2 IndexedDB↔legacy-blob reconciliation counters (device-local, temporary during dual-write).',
-    scope: 'device',
-    schema: '{ legacy: number; idb: number }.',
+    store: 'collection',
   },
   {
     backup: 'default',
@@ -290,4 +292,8 @@ export const deviceOnlyStorageKeys = storageKeyRegistry
   .filter((descriptor) => descriptor.backup === 'never')
   .map((descriptor) => descriptor.key);
 
-export const persistentStorageKeys = storageKeyRegistry.map((descriptor) => descriptor.key);
+// Keys mirrored to / hydrated from Capacitor Preferences. Collection-backed keys
+// (IndexedDB) are excluded: their data must not round-trip through Preferences.
+export const persistentStorageKeys = storageKeyRegistry
+  .filter((descriptor) => descriptor.store !== 'collection')
+  .map((descriptor) => descriptor.key);

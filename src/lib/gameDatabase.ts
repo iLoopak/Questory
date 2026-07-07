@@ -9,6 +9,7 @@ import Dexie, { type Table } from 'dexie';
 import type { Game } from '../types/game';
 
 export const GAME_DATABASE_NAME = 'questory';
+export const GAME_DB_SCHEMA_VERSION = 1;
 
 export class QuestoryDatabase extends Dexie {
   games!: Table<Game, string>;

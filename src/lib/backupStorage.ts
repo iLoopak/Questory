@@ -78,6 +78,13 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
       schemaVersion: questShelfBackupVersion,
     },
     data: keys.reduce<QuestShelfBackup['data']>((backupData, key) => {
+      // Wave 3: games come from the IndexedDB repository (the blob is inert), but the
+      // backup shape is unchanged — still data['questshelf.games.v1'] = Game[].
+      if (key === 'questshelf.games.v1') {
+        backupData[key] = normalizeLoadedGames(loadGames());
+        return backupData;
+      }
+
       const value = readStorageJson(key);
 
       if (typeof value !== 'undefined') {

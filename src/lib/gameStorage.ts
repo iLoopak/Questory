@@ -1,21 +1,20 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
-import { loadLocalJson, loadPersistedJson, savePersistedJson } from './localPersistence';
+import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
 import { createIndexedDbGameRepository, type GameRepositoryStatus } from './indexedDbGameRepository';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
 /**
- * Wave 2 seam. Games are stored in IndexedDB via this repository, which keeps an
- * in-memory snapshot so loadGames() stays synchronous, imports the legacy blob once,
- * and keeps dual-writing `questshelf.games.v1` this wave as rollback insurance. The
- * public loadGames/saveGames API below delegates to it, so no caller changed.
+ * Wave 3 seam. Games live in IndexedDB via this repository, with an in-memory snapshot
+ * so loadGames() stays synchronous. The legacy `questshelf.games.v1` blob is now a
+ * read-only import fallback only — normal saves no longer write it. The public
+ * loadGames/saveGames API below delegates here, so no caller changed.
  */
 export const gameRepository = createIndexedDbGameRepository({
   legacyLoadSync: () => loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames),
   legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
-  legacySaveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
-  normalize: normalizeLoadedGames,
+  legacyClear: () => removePersistedKeys([STORAGE_KEY]),
 });
 
 /** Awaited once at boot (before React renders) so getAllSync() is correct on first paint. */
