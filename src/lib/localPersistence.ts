@@ -1,14 +1,13 @@
-type PreferencesPlugin = {
-  Preferences: {
-    get: (options: { key: string }) => Promise<{ value: string | null }>;
-    remove: (options: { key: string }) => Promise<void>;
-    set: (options: { key: string; value: string }) => Promise<void>;
-  };
-};
+import { getStorageAdapter } from './storageAdapter';
 
 const isBrowser = typeof window !== 'undefined';
-const preferenceModuleName = '@capacitor/preferences';
 const storageIssueKey = 'questshelf.storageIssues.v1';
+
+/**
+ * Fired on `window` whenever a storage parse/write/quota issue is recorded, so the UI
+ * can surface it instead of it only living in a background localStorage log. Wave 0.
+ */
+export const storageIssueEventName = 'questshelf:storage-issue';
 
 export type LocalStorageIssue = {
   key: string;
@@ -18,22 +17,18 @@ export type LocalStorageIssue = {
 
 export async function loadPersistedJson<T>(key: string, fallback: T, normalize: (value: unknown) => T): Promise<T> {
   const localValue = loadLocalJson(key, fallback, normalize);
-  const preferences = await getPreferencesPlugin();
-
-  if (!preferences) {
-    return localValue;
-  }
+  const adapter = getStorageAdapter();
 
   try {
-    const storedValue = await preferences.Preferences.get({ key });
+    const durableValue = await adapter.readDurable(key);
 
-    if (storedValue.value) {
-      const normalizedValue = normalize(JSON.parse(storedValue.value));
+    if (durableValue !== null) {
+      const normalizedValue = normalize(JSON.parse(durableValue));
       saveLocalJson(key, normalizedValue);
       return normalizedValue;
     }
 
-    await preferences.Preferences.set({ key, value: JSON.stringify(localValue) });
+    await adapter.writeDurable(key, JSON.stringify(localValue));
     return localValue;
   } catch {
     return localValue;
@@ -41,11 +36,7 @@ export async function loadPersistedJson<T>(key: string, fallback: T, normalize: 
 }
 
 export function loadLocalJson<T>(key: string, fallback: T, normalize: (value: unknown) => T): T {
-  if (!isBrowser) {
-    return fallback;
-  }
-
-  const storedValue = window.localStorage.getItem(key);
+  const storedValue = getStorageAdapter().readLocal(key);
 
   if (!storedValue) {
     return fallback;
@@ -55,7 +46,7 @@ export function loadLocalJson<T>(key: string, fallback: T, normalize: (value: un
     const parsedValue = JSON.parse(storedValue);
     return normalize(parsedValue);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Stored JSON could not be read.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Stored JSON could not be read.');
     return fallback;
   }
 }
@@ -66,12 +57,12 @@ export function savePersistedJson<T>(key: string, value: T) {
   try {
     serializedValue = JSON.stringify(value);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     return;
   }
 
   saveLocalJsonStringified(key, serializedValue);
-  void savePreferenceJsonStringified(key, serializedValue);
+  void getStorageAdapter().writeDurable(key, serializedValue);
 }
 
 export async function hydrateLocalStorageFromPreferences(keys: string[]) {
@@ -79,44 +70,44 @@ export async function hydrateLocalStorageFromPreferences(keys: string[]) {
     return;
   }
 
-  const preferences = await getPreferencesPlugin();
+  const adapter = getStorageAdapter();
 
-  if (!preferences) {
+  if (!(await adapter.hasDurableBackend())) {
     return;
   }
 
   await Promise.all(
     keys.map(async (key) => {
       try {
-        const storedPreference = await preferences.Preferences.get({ key });
-        const storedLocalValue = window.localStorage.getItem(key);
+        const durableValue = await adapter.readDurable(key);
+        const localValue = adapter.readLocal(key);
 
-        if (storedPreference.value) {
+        if (durableValue) {
           // Guard against stale Capacitor entries (e.g. {"apiKey":""}) overwriting a valid
           // localStorage value. This can happen when a previous app version wrote an empty
           // settings object to Capacitor on mount before the user had entered any key.
           // If Capacitor has an empty apiKey but localStorage has a real one, trust localStorage
           // and sync it back to Capacitor so future launches are consistent.
-          if (storedLocalValue && storedPreference.value !== storedLocalValue) {
+          if (localValue && durableValue !== localValue) {
             try {
-              const capData = JSON.parse(storedPreference.value) as Record<string, unknown>;
-              const lsData = JSON.parse(storedLocalValue) as Record<string, unknown>;
+              const capData = JSON.parse(durableValue) as Record<string, unknown>;
+              const lsData = JSON.parse(localValue) as Record<string, unknown>;
               const capKey = typeof capData.apiKey === 'string' ? capData.apiKey : '';
               const lsKey = typeof lsData.apiKey === 'string' ? lsData.apiKey : '';
               if (!capKey.trim() && lsKey.trim()) {
-                await preferences.Preferences.set({ key, value: storedLocalValue });
+                await adapter.writeDurable(key, localValue);
                 return;
               }
             } catch {
               // Fall through: Capacitor wins by default
             }
           }
-          window.localStorage.setItem(key, storedPreference.value);
+          adapter.writeLocal(key, durableValue);
           return;
         }
 
-        if (storedLocalValue) {
-          await preferences.Preferences.set({ key, value: storedLocalValue });
+        if (localValue) {
+          await adapter.writeDurable(key, localValue);
         }
       } catch {
         // Best-effort hydration. Corrupted native values fall back to existing localStorage/defaults.
@@ -126,25 +117,15 @@ export async function hydrateLocalStorageFromPreferences(keys: string[]) {
 }
 
 export async function removePersistedKeys(keys: string[]) {
-  if (isBrowser) {
-    keys.forEach((key) => window.localStorage.removeItem(key));
-  }
+  const adapter = getStorageAdapter();
 
-  const preferences = await getPreferencesPlugin();
+  keys.forEach((key) => adapter.removeLocal(key));
 
-  if (!preferences) {
+  if (!(await adapter.hasDurableBackend())) {
     return;
   }
 
-  await Promise.all(
-    keys.map(async (key) => {
-      try {
-        await preferences.Preferences.remove({ key });
-      } catch {
-        // Reset is best-effort across browser and native storage.
-      }
-    }),
-  );
+  await Promise.all(keys.map((key) => adapter.removeDurable(key)));
 }
 
 export function getLocalStorageIssues(): LocalStorageIssue[] {
@@ -152,23 +133,16 @@ export function getLocalStorageIssues(): LocalStorageIssue[] {
 }
 
 export function clearLocalStorageIssues() {
-  if (!isBrowser) {
-    return;
-  }
-
-  window.localStorage.removeItem(storageIssueKey);
+  getStorageAdapter().removeLocal(storageIssueKey);
 }
 
 export function exportRawQuestShelfLocalData() {
-  if (!isBrowser) {
-    return {};
-  }
-
-  return Object.keys(window.localStorage)
+  return getStorageAdapter()
+    .localKeys()
     .filter((key) => key.startsWith('questshelf.'))
     .sort()
     .reduce<Record<string, string>>((rawData, key) => {
-      rawData[key] = window.localStorage.getItem(key) ?? '';
+      rawData[key] = getStorageAdapter().readLocal(key) ?? '';
       return rawData;
     }, {});
 }
@@ -179,7 +153,7 @@ export function saveLocalJson<T>(key: string, value: T) {
   try {
     serializedValue = JSON.stringify(value);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     return;
   }
 
@@ -187,21 +161,33 @@ export function saveLocalJson<T>(key: string, value: T) {
 }
 
 function saveLocalJsonStringified(key: string, serializedValue: string) {
-  if (!isBrowser) {
-    return;
-  }
-
   try {
-    window.localStorage.setItem(key, serializedValue);
+    getStorageAdapter().writeLocal(key, serializedValue);
   } catch (error) {
-    recordStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
+    reportStorageIssue(key, error instanceof Error ? error.message : 'Local storage write failed.');
     // Local persistence should never block the UI if the browser storage quota is unavailable.
   }
 }
 
-function recordStorageIssue(key: string, message: string) {
+/**
+ * Record a storage parse/write/quota issue: logs it, dispatches the storageIssue
+ * event (so the UI can surface it), and appends it to the recovery log. Exported so
+ * other storage backends (e.g. the IndexedDB game repository) report issues the same
+ * visible way. Wave 0.
+ */
+export function reportStorageIssue(key: string, message: string) {
   if (!isBrowser || key === storageIssueKey) {
     return;
+  }
+
+  // Wave 0: make storage failures visible instead of only living in a background log.
+  console.warn(`[Questory storage] ${key}: ${message}`);
+  try {
+    window.dispatchEvent(new CustomEvent<LocalStorageIssue>(storageIssueEventName, {
+      detail: { key, message, recordedAt: new Date().toISOString() },
+    }));
+  } catch {
+    // Event dispatch is best-effort diagnostics; never let it break a write path.
   }
 
   const issues = getLocalStorageIssues();
@@ -215,7 +201,7 @@ function recordStorageIssue(key: string, message: string) {
   ].slice(-12);
 
   try {
-    window.localStorage.setItem(storageIssueKey, JSON.stringify(nextIssues));
+    getStorageAdapter().writeLocal(storageIssueKey, JSON.stringify(nextIssues));
   } catch {
     // If even issue tracking cannot be written, keep the app usable and rely on safe defaults.
   }
@@ -236,26 +222,4 @@ function normalizeStorageIssues(value: unknown): LocalStorageIssue[] {
         );
       })
     : [];
-}
-
-async function savePreferenceJsonStringified(key: string, serializedValue: string) {
-  const preferences = await getPreferencesPlugin();
-
-  if (!preferences) {
-    return;
-  }
-
-  try {
-    await preferences.Preferences.set({ key, value: serializedValue });
-  } catch {
-    // Capacitor persistence mirrors localStorage; the app remains usable if the native write fails.
-  }
-}
-
-async function getPreferencesPlugin(): Promise<PreferencesPlugin | null> {
-  try {
-    return (await import(/* @vite-ignore */ preferenceModuleName)) as PreferencesPlugin;
-  } catch {
-    return null;
-  }
 }

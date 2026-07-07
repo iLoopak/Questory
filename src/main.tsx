@@ -5,6 +5,9 @@ import { configureAndroidGamepadShortcuts } from './lib/androidGamepadShortcuts'
 import { configureHandheldImmersiveMode } from './lib/handheldImmersiveMode';
 import { hydrateLocalStorageFromPreferences } from './lib/localPersistence';
 import { persistentStorageKeys } from './lib/persistentStorageKeys';
+import { initGameRepository } from './lib/gameStorage';
+import { initRawgMetadataCacheRepository } from './lib/rawgMetadataCache';
+import { initPlayActivityRepository } from './lib/playActivityStorage';
 import {
   accentColorStorageKey,
   appTemplateStorageKey,
@@ -55,6 +58,34 @@ async function startApp() {
   }
 
   await hydrateLocalStorageFromPreferences([...persistentStorageKeys]);
+
+  // Wave 2: open the IndexedDB game store and run the one-time legacy import before
+  // React renders, so the synchronous loadGames() first paint reads a correct snapshot.
+  // The repository degrades to the legacy blob internally if IndexedDB is unavailable,
+  // so this never blocks boot.
+  try {
+    await initGameRepository();
+  } catch {
+    // Repository initialization is internally resilient; never block boot on it.
+  }
+
+  // Wave 4: open the IndexedDB RAWG metadata cache store and run its one-time legacy
+  // import before render, so synchronous getCachedRawgMetadata() reads a correct snapshot.
+  // Also internally resilient (degrades to the legacy blob) — never blocks boot.
+  try {
+    await initRawgMetadataCacheRepository();
+  } catch {
+    // Cache is non-critical; never block boot on it.
+  }
+
+  // Wave 4b: open the IndexedDB play activity store and run its one-time legacy import
+  // before render, so the synchronous loadPlayActivity() first paint reads a correct
+  // snapshot. Internally resilient (degrades to the legacy blob) — never blocks boot.
+  try {
+    await initPlayActivityRepository();
+  } catch {
+    // Repository initialization is internally resilient; never block boot on it.
+  }
 
   // First-launch detection: if the template key has never been written, this is a clean
   // install. Seed the neon-deck green accent so new users get Green / Blue as default

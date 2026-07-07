@@ -1,5 +1,14 @@
 import type { RawgMetadata } from '../types/rawg';
-import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
+import {
+  createRawgMetadataCacheRepository,
+  type RawgMetadataCacheStatus,
+  type RawgRecoveryMode,
+  type RawgRecoveryPreview,
+  type RawgRecoveryResult,
+  type RawgRepairResult,
+  type RawgVerification,
+} from './rawgMetadataCacheRepository';
 
 const STORAGE_KEY = 'questshelf.rawgMetadataCache.v1';
 
@@ -22,19 +31,54 @@ export function getRawgMetadataCacheKey(title: string) {
     .trim();
 }
 
+/**
+ * Wave 4 seam. The RAWG metadata cache lives in IndexedDB via this repository, with an
+ * in-memory snapshot so the read/write API below stays synchronous. The legacy
+ * `questshelf.rawgMetadataCache.v1` blob is a read-only import fallback only — writes no
+ * longer touch it. Public function signatures are unchanged.
+ */
+export const rawgMetadataCacheRepository = createRawgMetadataCacheRepository({
+  legacyLoadSync: () => loadLocalJson(STORAGE_KEY, {}, normalizeRawgMetadataCache),
+  legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, {}, normalizeRawgMetadataCache),
+  legacyClear: () => removePersistedKeys([STORAGE_KEY]),
+});
+
+/** Awaited once at boot (before React renders) so the cache snapshot is populated. */
+export function initRawgMetadataCacheRepository(): Promise<void> {
+  return rawgMetadataCacheRepository.ready();
+}
+
+export function getRawgMetadataCacheStatus(): RawgMetadataCacheStatus {
+  return rawgMetadataCacheRepository.getStatus();
+}
+
+// Wave 6: storage verification / repair / recovery (RAWG metadata cache).
+export function verifyRawgMetadataCache(): Promise<RawgVerification> {
+  return rawgMetadataCacheRepository.verify();
+}
+
+export function repairRawgMetadataCacheSnapshot(): Promise<RawgRepairResult> {
+  return rawgMetadataCacheRepository.repairSnapshot();
+}
+
+export function previewLegacyRawgMetadataCacheRecovery(): Promise<RawgRecoveryPreview> {
+  return rawgMetadataCacheRepository.previewLegacyRecovery();
+}
+
+export function recoverRawgMetadataCacheFromLegacyBlob(mode: RawgRecoveryMode): Promise<RawgRecoveryResult> {
+  return rawgMetadataCacheRepository.recoverFromLegacyBlob(mode);
+}
+
 export function loadRawgMetadataCache(): RawgMetadataCache {
-  return loadLocalJson(STORAGE_KEY, {}, normalizeRawgMetadataCache);
+  return rawgMetadataCacheRepository.getAllSync();
 }
 
 export function getCachedRawgMetadata(title: string): RawgMetadataCacheEntry | null {
-  const cache = loadRawgMetadataCache();
-  return cache[getRawgMetadataCacheKey(title)] ?? null;
+  return rawgMetadataCacheRepository.get(getRawgMetadataCacheKey(title));
 }
 
 export function saveRawgMetadataCacheEntry(entry: RawgMetadataCacheEntry) {
-  const cache = loadRawgMetadataCache();
-  cache[getRawgMetadataCacheKey(entry.gameTitle)] = entry;
-  savePersistedJson(STORAGE_KEY, normalizeRawgMetadataCache(cache));
+  rawgMetadataCacheRepository.put(getRawgMetadataCacheKey(entry.gameTitle), entry);
 }
 
 export function normalizeRawgMetadataCache(value: unknown): RawgMetadataCache {

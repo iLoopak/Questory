@@ -18,6 +18,7 @@
     "@capacitor/core": "^7.6.6",
     "@capacitor/preferences": "^7.0.4",
     "@capacitor/status-bar": "^7.0.6",
+    "dexie": "^4.4.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
