@@ -26,6 +26,7 @@ import { Icon, type IconName } from './Icon';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ScreenshotStrip } from './ScreenshotStrip';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
+import { useQuestQueuePrefetch } from '../hooks/useQuestQueuePrefetch';
 
 export type ReviewModeAction =
   | 'queue'
@@ -64,6 +65,9 @@ type ReviewModePanelProps = {
 
 const anyPlatform = 'Any platform';
 const reviewSessionBatchSize = 20;
+
+// Stable no-op so the prefetch hook always receives a callable metadata runner.
+const noopEnsureMetadata = () => {};
 
 const negativeActions: Array<{
   action: ReviewModeAction;
@@ -180,7 +184,6 @@ export function ReviewModePanel({
   const [retainedUtilityGameIds, setRetainedUtilityGameIds] = useState<Set<string>>(() => new Set());
   const [showReviewHint, setShowReviewHint] = useState(() => localStorage.getItem('qs-review-hint-v1') !== 'dismissed');
   const queueButtonRef = useRef<HTMLButtonElement | null>(null);
-  const attemptedRawgTriageGameIdsRef = useRef<Set<string>>(new Set());
 
   const reviewedGameIds = useMemo(() => new Set(Object.keys(reviewModeState.reviewedGames)), [reviewModeState.reviewedGames]);
   const queueOrderPositions = useMemo(() => new Map(reviewModeState.queueOrder.map((gameId, index) => [gameId, index])), [reviewModeState.queueOrder]);
@@ -252,13 +255,24 @@ export function ReviewModePanel({
 
   const activeGame = reviewQueue[0] ?? null;
 
-  useEffect(() => {
-    if (!activeGame) return;
-    if (attemptedRawgTriageGameIdsRef.current.has(activeGame.id)) return;
-    if (hasPositiveNumber(activeGame.metacriticScore) && hasPositiveNumber(activeGame.rawgPlaytimeHours)) return;
-    attemptedRawgTriageGameIdsRef.current.add(activeGame.id);
-    onEnsureRawgMetadata?.(activeGame);
-  }, [activeGame?.id, onEnsureRawgMetadata]);
+  // Games beyond the current session, ordered — used to warm the next batch once
+  // the current one is nearly exhausted.
+  const lookaheadGames = useMemo(() => {
+    const sessionIds = new Set(sessionGameIds);
+    return baseSourceGames.filter((game) => !sessionIds.has(game.id)).slice(0, reviewSessionBatchSize);
+  }, [baseSourceGames, sessionGameIds]);
+
+  // Background prefetch: prepare metadata + screenshots for the current card first,
+  // then the next few, then the rest of the batch (and the next batch when close to
+  // done) so swiping through cards rarely hits a loading state. Replaces the old
+  // active-card-only metadata fetch.
+  useQuestQueuePrefetch({
+    enabled: reviewQueue.length > 0,
+    upcomingGames: reviewQueue,
+    lookaheadGames,
+    ensureMetadata: onEnsureRawgMetadata ?? noopEnsureMetadata,
+  });
+
   const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = sessionGameIds.filter((gameId) => processedGameIds.has(gameId)).length;
@@ -1659,10 +1673,6 @@ function formatReviewMetacriticScore(value: unknown) {
 
 function formatReviewRawgPlaytime(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
-}
-
-function hasPositiveNumber(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function compareReviewGames(firstGame: Game, secondGame: Game) {
