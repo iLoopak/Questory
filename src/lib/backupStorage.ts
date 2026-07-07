@@ -1,3 +1,4 @@
+import { normalizeAchievementCounters } from './achievementCounters';
 import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
 import { gameRepository, loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
@@ -398,6 +399,12 @@ function getGameUpdatedAt(game: Game) {
 
 function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], value: unknown) {
   switch (key) {
+    case 'questshelf.achievementCounters.v1':
+      // Non-critical event counters. Any shape is tolerated here and repaired to safe
+      // defaults by normalizeAchievementCounters on write, so a missing, partial, or
+      // corrupt counters section never blocks importing games/playActivity/RAWG data.
+      // Critical sections below stay strictly validated.
+      return true;
     case 'questshelf.games.v1':
     case 'questshelf.steamIgnoredGames.v1':
     case 'questshelf.playActivity.v1':
@@ -424,6 +431,8 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
   // Backups are user-editable JSON. Normalize every section before writing so restore/merge
   // cannot persist malformed data that later crashes startup.
   switch (key) {
+    case 'questshelf.achievementCounters.v1':
+      return normalizeAchievementCounters(value);
     case 'questshelf.games.v1':
       return normalizeLoadedGames(value);
     case 'questshelf.steamIgnoredGames.v1':
@@ -466,6 +475,7 @@ function isPlainObject(value: unknown) {
 
 function getBackupSectionDisplayName(key: string): string {
   const displayNames: Record<string, string> = {
+    'questshelf.achievementCounters.v1': 'achievement counters',
     'questshelf.games.v1': 'game library',
     'questshelf.steamIgnoredGames.v1': 'ignored Steam games',
     'questshelf.rawgMetadataCache.v1': 'RAWG metadata cache',
