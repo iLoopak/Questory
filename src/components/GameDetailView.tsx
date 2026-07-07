@@ -6,6 +6,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { canUseRawgImageAsCover } from '../lib/gameCoverImages';
 import { FullscreenGameShell } from './game-detail/FullscreenGameShell';
 import { GameHero, HeroStat, getDisplayTitle } from './game-detail/GameHero';
+import { EditTitleModal } from './game-detail/EditTitleModal';
 import { DetailSection } from './game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from './game-detail/GameDetailActions';
 import { GameInformationSection, formatMetacriticScore, formatRawgPlaytime } from './game-detail/GameInformationSection';
@@ -74,6 +75,7 @@ export function GameDetailView({
   const { t } = useI18n();
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
   const [editError, setEditError] = useState('');
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
@@ -96,6 +98,7 @@ export function GameDetailView({
     setTagText(game.tags.join(', '));
     setEditDraft(createEditDraft(game));
     setIsEditing(false);
+    setIsEditingTitle(false);
     setEditError('');
   }, [game.id, game.tags]);
 
@@ -149,6 +152,14 @@ export function GameDetailView({
     setIsEditing(false);
     setEditError('');
     onGameEditSaved?.({ ...game, ...getGameEditChanges(game, editDraft) });
+  }
+
+  function saveTitleCorrection(rawTitle: string) {
+    const changes = getTitleCorrectionChanges(game, rawTitle);
+    if (!changes.title) return;
+    onGameEdit?.(game.id, changes);
+    onGameEditSaved?.({ ...game, ...changes });
+    setIsEditingTitle(false);
   }
 
   function linkRawgGame(result: RawgSearchResult) {
@@ -290,6 +301,18 @@ export function GameDetailView({
         {primaryActions.map((action) => (
           <GameDetailActionButton key={action.label} action={action} />
         ))}
+        {game.collectionType === 'wishlist' ? (
+          <button
+            className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={() => setIsEditingTitle(true)}
+            type="button"
+          >
+            <span className="flex items-center gap-2">
+              <Icon name="pencil" />
+              <span>Edit title</span>
+            </span>
+          </button>
+        ) : null}
         <button
           ref={overflowButtonRef}
           aria-controls={isOverflowOpen ? overflowMenuId : undefined}
@@ -306,6 +329,15 @@ export function GameDetailView({
           </span>
         </button>
       </GameDetailActionBar>
+
+      {isEditingTitle ? (
+        <EditTitleModal
+          initialTitle={getDisplayTitle(game)}
+          originalImportedTitle={game.originalImportedTitle}
+          onCancel={() => setIsEditingTitle(false)}
+          onSave={saveTitleCorrection}
+        />
+      ) : null}
 
       {isRawgLinkOpen ? (
         <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
@@ -1083,6 +1115,27 @@ function getGameEditChanges(game: Game, draft: GameEditDraft): Partial<Game> {
     status: draft.status,
     tags: parseTags(draft.tags),
     title,
+  };
+}
+
+/**
+ * Changes for the focused title-correction flow. The corrected title becomes the
+ * canonical `title` (used by screenshot search + cache key) and the metadata
+ * search title (used by RAWG/artwork matching), and any stale display override is
+ * cleared. The raw imported title is preserved once for reference. IDs, notes,
+ * status, platform and plans are untouched, so no duplicate is created.
+ */
+export function getTitleCorrectionChanges(game: Game, rawTitle: string): Partial<Game> {
+  const title = rawTitle.trim();
+  if (!title || title === getDisplayTitle(game)) {
+    return {};
+  }
+
+  return {
+    title,
+    metadataSearchTitle: title,
+    displayTitleOverride: undefined,
+    originalImportedTitle: game.originalImportedTitle ?? game.title,
   };
 }
 
