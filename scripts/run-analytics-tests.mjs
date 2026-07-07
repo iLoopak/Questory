@@ -12,6 +12,7 @@ const sharedConfig = {
   platform: 'node',
   format: 'esm',
   define: {
+    'import.meta.env.DEV': JSON.stringify(false),
     'import.meta.env.VITE_QS_ANALYTICS_ENABLED': JSON.stringify('false'),
     'import.meta.env.VITE_QS_ANALYTICS_WEBHOOK_URL': JSON.stringify('https://example.invalid/questshelf-analytics'),
     'import.meta.env.VITE_QS_ANALYTICS_KEY': JSON.stringify('replace-with-alpha-analytics-key'),
