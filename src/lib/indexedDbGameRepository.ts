@@ -16,7 +16,7 @@
 
 import type { Game } from '../types/game';
 import type { GameRepository } from './gameRepository';
-import { getGameDatabase, GAME_DB_SCHEMA_VERSION } from './gameDatabase';
+import { getGameDatabase, QUESTORY_DB_VERSION } from './gameDatabase';
 import { reportStorageIssue } from './localPersistence';
 import { getStorageAdapter } from './storageAdapter';
 
@@ -195,7 +195,7 @@ export function createIndexedDbGameRepository(io: IndexedDbGameRepositoryIo): In
         migratedFromLegacy,
         gameCount: snapshot.length,
         legacyBlobPresent: getStorageAdapter().readLocal(GAMES_KEY) !== null,
-        schemaVersion: GAME_DB_SCHEMA_VERSION,
+        schemaVersion: QUESTORY_DB_VERSION,
       };
     },
   };

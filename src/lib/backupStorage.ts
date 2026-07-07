@@ -4,7 +4,7 @@ import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
 import { normalizePlatformQueueState } from './platformQueueStorage';
 import { normalizePlayActivityRecords } from './playActivityStorage';
-import { normalizeRawgMetadataCache } from './rawgMetadataCache';
+import { loadRawgMetadataCache, normalizeRawgMetadataCache, rawgMetadataCacheRepository } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
 import { normalizeReviewModeState } from './reviewModeStorage';
 import { normalizeIsThereAnyDealSettings } from './isThereAnyDealSettingsStorage';
@@ -85,6 +85,12 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
         return backupData;
       }
 
+      // Wave 4: RAWG cache also comes from its IndexedDB repository; same blob shape.
+      if (key === 'questshelf.rawgMetadataCache.v1') {
+        backupData[key] = normalizeRawgMetadataCache(loadRawgMetadataCache());
+        return backupData;
+      }
+
       const value = readStorageJson(key);
 
       if (typeof value !== 'undefined') {
@@ -127,9 +133,9 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
   const removes: Array<(typeof allBackupStorageKeys)[number]> = [];
 
   allBackupStorageKeys.forEach((key) => {
-    // Games are written through the repository below so IndexedDB + snapshot + the
-    // legacy blob all stay consistent (Wave 2). Everything else uses the blob path.
-    if (key === 'questshelf.games.v1') {
+    // Collection-backed keys (games, RAWG cache) are written through their IndexedDB
+    // repositories below; everything else uses the localStorage + Preferences blob path.
+    if (key === 'questshelf.games.v1' || key === 'questshelf.rawgMetadataCache.v1') {
       return;
     }
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
@@ -142,12 +148,20 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
   writes.forEach(([key, value]) => savePersistedJson(key, value));
   void removePersistedKeys(removes);
 
-  // Replace the game collection through the repository (updates IndexedDB, the in-memory
-  // snapshot, and dual-writes the legacy blob). A backup without a games section clears it.
+  // Replace the game collection through the repository (IndexedDB + in-memory snapshot).
+  // A backup without a games section clears it.
   if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.games.v1')) {
     gameRepository.replaceAll(normalizeLoadedGames(backup.data['questshelf.games.v1']));
   } else {
     void gameRepository.clear();
+  }
+
+  // Replace the RAWG metadata cache through its repository. A backup without the section
+  // clears the cache (restore has replace semantics); it will simply repopulate on demand.
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
+    rawgMetadataCacheRepository.replaceAll(normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']));
+  } else {
+    void rawgMetadataCacheRepository.clear();
   }
 
   return {
@@ -163,7 +177,7 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
   const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
 
   allBackupStorageKeys.forEach((key) => {
-    if (key === 'questshelf.games.v1') {
+    if (key === 'questshelf.games.v1' || key === 'questshelf.rawgMetadataCache.v1') {
       return;
     }
 
@@ -174,8 +188,14 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 
   writes.forEach(([key, value]) => savePersistedJson(key, value));
 
-  // Merged games go through the repository (IndexedDB + snapshot + legacy dual-write).
+  // Merged games go through the repository (IndexedDB + snapshot).
   gameRepository.replaceAll(mergedGames);
+
+  // A present RAWG cache section overwrites the cache through its repository (merge only
+  // adds/overwrites present sections; an absent section leaves the existing cache intact).
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
+    rawgMetadataCacheRepository.replaceAll(normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']));
+  }
 
   return {
     games: loadGames(),
@@ -184,9 +204,10 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 }
 
 export async function resetQuestShelfLocalData() {
-  // Clear the IndexedDB game store + snapshot first so reset does not leave orphaned
-  // games in IndexedDB after the legacy blob is removed.
+  // Clear the IndexedDB collection stores + snapshots first so reset does not leave
+  // orphaned records in IndexedDB after the legacy blobs are removed.
   await gameRepository.clear();
+  await rawgMetadataCacheRepository.clear();
   await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys]);
 }
 
