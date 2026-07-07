@@ -9,6 +9,7 @@ import { GameActionMenu } from './GameActionMenu';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { translateOption, useI18n } from '../i18n';
+import { useCoverImageLoaded } from '../hooks/useCoverImageLoaded';
 
 type GameCardProps = {
   game: Game;
@@ -83,17 +84,16 @@ function GameCardComponent({
   const artworkSet = useMemo(() => getArtworkSet(game), [game]);
   const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
 
   const firstCoverSource = coverSources[0] ?? null;
   useEffect(() => {
     setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
   }, [firstCoverSource]);
 
   const activeCoverSource = coverSources[coverSourceIndex];
+  const { imgRef, isLoaded: isCoverLoaded, markLoaded, markBroken } = useCoverImageLoaded(activeCoverSource);
 
   function handleCardClick(event: MouseEvent<HTMLElement>) {
     if (isInteractiveCardChild(event.target, event.currentTarget)) {
@@ -202,6 +202,7 @@ function GameCardComponent({
           <>
             {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
             <img
+              ref={imgRef}
               className={`h-full w-full object-cover transition-opacity duration-300 ${
                 isCoverLoaded ? 'opacity-100' : 'opacity-0'
               }`}
@@ -210,10 +211,10 @@ function GameCardComponent({
               decoding="async"
               loading="lazy"
               onError={() => {
-                setIsCoverLoaded(false);
+                markBroken();
                 setCoverSourceIndex((currentIndex) => currentIndex + 1);
               }}
-              onLoad={() => setIsCoverLoaded(true)}
+              onLoad={markLoaded}
             />
           </>
         ) : (

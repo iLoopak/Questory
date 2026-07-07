@@ -14,6 +14,7 @@ import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { HltbBadge } from './HltbBadge';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
+import { useCoverImageLoaded } from '../hooks/useCoverImageLoaded';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -652,9 +653,9 @@ const ShelfGameCard = memo(function ShelfGameCard({
   const { t } = useI18n();
   const { coverSourceSignature, coverSources } = useStableCollectionCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
+  const { imgRef, isLoaded: isCoverLoaded, markLoaded, markBroken } = useCoverImageLoaded(activeCoverSource);
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
   const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
   const openDetails = useCallback(() => onOpenDetails(game.id), [game.id, onOpenDetails]);
@@ -662,7 +663,6 @@ const ShelfGameCard = memo(function ShelfGameCard({
 
   useEffect(() => {
     setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
   }, [coverSourceSignature]);
 
   function handleShelfCardKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -712,6 +712,7 @@ const ShelfGameCard = memo(function ShelfGameCard({
           <>
             {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
             <img
+              ref={imgRef}
               alt=""
               className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] ${
                 isCoverLoaded ? 'opacity-100' : 'opacity-0'
@@ -719,10 +720,10 @@ const ShelfGameCard = memo(function ShelfGameCard({
               decoding="async"
               loading="lazy"
               onError={() => {
-                setIsCoverLoaded(false);
+                markBroken();
                 setCoverSourceIndex((currentIndex) => currentIndex + 1);
               }}
-              onLoad={() => setIsCoverLoaded(true)}
+              onLoad={markLoaded}
               src={activeCoverSource}
             />
           </>
@@ -838,8 +839,8 @@ const CompactGameRow = memo(function CompactGameRow({
   const { t } = useI18n();
   const { coverSourceSignature, coverSources } = useStableCollectionCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
+  const { imgRef, isLoaded: isCoverLoaded, markLoaded, markBroken } = useCoverImageLoaded(activeCoverSource);
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
   const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
   const openDetails = useCallback(() => onOpenDetails(game.id), [game.id, onOpenDetails]);
@@ -850,7 +851,6 @@ const CompactGameRow = memo(function CompactGameRow({
 
   useEffect(() => {
     setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
   }, [coverSourceSignature]);
 
   return (
@@ -890,15 +890,16 @@ const CompactGameRow = memo(function CompactGameRow({
         <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-md bg-ink-700">
           {activeCoverSource ? (
             <img
+              ref={imgRef}
               alt=""
               className={`h-full w-full object-cover transition-opacity ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
               decoding="async"
               loading="lazy"
               onError={() => {
-                setIsCoverLoaded(false);
+                markBroken();
                 setCoverSourceIndex((currentIndex) => currentIndex + 1);
               }}
-              onLoad={() => setIsCoverLoaded(true)}
+              onLoad={markLoaded}
               src={activeCoverSource}
             />
           ) : (
