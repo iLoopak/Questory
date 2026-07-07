@@ -7,6 +7,7 @@ import { hydrateLocalStorageFromPreferences } from './lib/localPersistence';
 import { persistentStorageKeys } from './lib/persistentStorageKeys';
 import { initGameRepository } from './lib/gameStorage';
 import { initRawgMetadataCacheRepository } from './lib/rawgMetadataCache';
+import { initPlayActivityRepository } from './lib/playActivityStorage';
 import {
   accentColorStorageKey,
   appTemplateStorageKey,
@@ -75,6 +76,15 @@ async function startApp() {
     await initRawgMetadataCacheRepository();
   } catch {
     // Cache is non-critical; never block boot on it.
+  }
+
+  // Wave 4b: open the IndexedDB play activity store and run its one-time legacy import
+  // before render, so the synchronous loadPlayActivity() first paint reads a correct
+  // snapshot. Internally resilient (degrades to the legacy blob) — never blocks boot.
+  try {
+    await initPlayActivityRepository();
+  } catch {
+    // Repository initialization is internally resilient; never block boot on it.
   }
 
   // First-launch detection: if the template key has never been written, this is a clean

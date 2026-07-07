@@ -37,9 +37,9 @@ export type StorageKeyScope = 'core' | 'integration' | 'device' | 'ui' | 'recove
 /**
  * Where a key's data lives. 'kv' = the JSON-per-key localStorage + Capacitor Preferences
  * path (the default). 'collection' = an IndexedDB-backed store; such keys are NOT mirrored
- * to / hydrated from Capacitor Preferences. `questshelf.games.v1` (Wave 3) and
- * `questshelf.rawgMetadataCache.v1` (Wave 4) are 'collection'; they keep their key names
- * so backups stay compatible.
+ * to / hydrated from Capacitor Preferences. `questshelf.games.v1` (Wave 3),
+ * `questshelf.rawgMetadataCache.v1` (Wave 4), and `questshelf.playActivity.v1` (Wave 4b)
+ * are 'collection'; they keep their key names so backups stay compatible.
  */
 export type StorageKeyStore = 'kv' | 'collection';
 
@@ -115,9 +115,10 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   {
     backup: 'default',
     key: 'questshelf.playActivity.v1',
-    purpose: 'Daily play intent activity records for games marked as played today.',
+    purpose: 'Daily play intent activity records for games marked as played today. Wave 4b: stored per-record in the IndexedDB playActivity store; this blob is a read-only import fallback kept inert (not mirrored to Preferences). Still the backup export/import shape.',
     scope: 'core',
     schema: 'PlayActivityRecord[] normalized by playActivityStorage.',
+    store: 'collection',
   },
   {
     backup: 'default',

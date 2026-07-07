@@ -7,8 +7,10 @@
 import { getStorageAdapter } from './storageAdapter';
 import { getGameRepositoryStatus } from './gameStorage';
 import { getRawgMetadataCacheStatus } from './rawgMetadataCache';
+import { getPlayActivityStoreStatus } from './playActivityStorage';
 import type { GameRepositoryStatus } from './indexedDbGameRepository';
 import type { RawgMetadataCacheStatus } from './rawgMetadataCacheRepository';
+import type { PlayActivityStoreStatus } from './indexedDbPlayActivityRepository';
 
 const QUESTSHELF_PREFIX = 'questshelf.';
 const GAMES_KEY = 'questshelf.games.v1';
@@ -41,6 +43,7 @@ export type StorageDiagnostics = {
   device: DeviceStorageEstimate | null;
   gameStore: GameRepositoryStatus;
   rawgCacheStore: RawgMetadataCacheStatus;
+  playActivityStore: PlayActivityStoreStatus;
 };
 
 function byteLength(value: string): number {
@@ -105,6 +108,7 @@ export async function getStorageDiagnostics(): Promise<StorageDiagnostics> {
     device: await estimateDeviceStorage(),
     gameStore: getGameRepositoryStatus(),
     rawgCacheStore: getRawgMetadataCacheStatus(),
+    playActivityStore: getPlayActivityStoreStatus(),
   };
 }
 

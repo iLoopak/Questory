@@ -1,17 +1,18 @@
-// Wave 2/4: IndexedDB storage for Questory's heavy collections (via Dexie).
+// Wave 2/4/4b: IndexedDB storage for Questory's heavy collections (via Dexie).
 //
-// Wave 2 added the games store. Wave 4 adds the RAWG metadata cache store. Only
-// unbounded/heavy collections live here; small settings stay on the localStorage +
+// Wave 2 added the games store; Wave 4 the RAWG metadata cache; Wave 4b play activity.
+// Only unbounded/heavy collections live here; small settings stay on the localStorage +
 // Capacitor Preferences path. Whole objects are stored per row (structured clone),
 // so all current and future/unknown fields are preserved — indexes are secondary.
 
 import Dexie, { type Table } from 'dexie';
 import type { Game } from '../types/game';
 import type { RawgMetadataCacheEntry } from './rawgMetadataCache';
+import type { PlayActivityRecord } from './playActivityStorage';
 
 export const GAME_DATABASE_NAME = 'questory';
 /** Dexie schema version for the shared Questory database. Bumped when a store is added. */
-export const QUESTORY_DB_VERSION = 2;
+export const QUESTORY_DB_VERSION = 3;
 
 /** RAWG cache row: the entry plus its cache key as the inbound primary key. */
 export type RawgMetadataCacheRow = { key: string } & RawgMetadataCacheEntry;
@@ -19,6 +20,7 @@ export type RawgMetadataCacheRow = { key: string } & RawgMetadataCacheEntry;
 export class QuestoryDatabase extends Dexie {
   games!: Table<Game, string>;
   rawgMetadataCache!: Table<RawgMetadataCacheRow, string>;
+  playActivity!: Table<PlayActivityRecord, string>;
 
   constructor() {
     super(GAME_DATABASE_NAME);
@@ -30,6 +32,12 @@ export class QuestoryDatabase extends Dexie {
     this.version(2).stores({
       games: 'id, collectionType, status, platform, steamAppId, rawgId, updatedAt',
       rawgMetadataCache: 'key, rawgId, cachedAt',
+    });
+    // v3 (Wave 4b): add play activity, keyed by the existing record id.
+    this.version(3).stores({
+      games: 'id, collectionType, status, platform, steamAppId, rawgId, updatedAt',
+      rawgMetadataCache: 'key, rawgId, cachedAt',
+      playActivity: 'id, gameId, date, source, type, detectedAt',
     });
   }
 }

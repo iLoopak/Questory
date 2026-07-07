@@ -1,4 +1,5 @@
-import { loadLocalJson, loadPersistedJson, savePersistedJson } from './localPersistence';
+import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
+import { createIndexedDbPlayActivityRepository, type PlayActivityStoreStatus } from './indexedDbPlayActivityRepository';
 
 const STORAGE_KEY = 'questshelf.playActivity.v1';
 export const PLAY_ACTIVITY_SOURCES = ['manual', 'steam'] as const;
@@ -27,16 +28,37 @@ export type SteamPlaytimeDeltaInput = {
   previousPlaytimeMinutes: number;
 };
 
+/**
+ * Wave 4b seam. Play activity lives in IndexedDB via this repository, with an in-memory
+ * snapshot so loadPlayActivity() stays synchronous for first paint. The legacy
+ * `questshelf.playActivity.v1` blob is a read-only import fallback only — writes no longer
+ * touch it. Public function signatures below are unchanged.
+ */
+export const playActivityRepository = createIndexedDbPlayActivityRepository({
+  legacyLoadSync: () => loadLocalJson(STORAGE_KEY, [], normalizePlayActivityRecords),
+  legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizePlayActivityRecords),
+  legacyClear: () => removePersistedKeys([STORAGE_KEY]),
+});
+
+/** Awaited once at boot (before React renders) so the snapshot is populated. */
+export function initPlayActivityRepository(): Promise<void> {
+  return playActivityRepository.ready();
+}
+
+export function getPlayActivityStoreStatus(): PlayActivityStoreStatus {
+  return playActivityRepository.getStatus();
+}
+
 export function loadPlayActivity(): PlayActivityRecord[] {
-  return loadLocalJson(STORAGE_KEY, [], normalizePlayActivityRecords);
+  return playActivityRepository.getAllSync();
 }
 
 export function loadPlayActivityFromPersistentStorage(): Promise<PlayActivityRecord[]> {
-  return loadPersistedJson(STORAGE_KEY, [], normalizePlayActivityRecords);
+  return playActivityRepository.loadDurable();
 }
 
 export function savePlayActivity(records: PlayActivityRecord[]) {
-  savePersistedJson(STORAGE_KEY, normalizePlayActivityRecords(records));
+  playActivityRepository.replaceAll(normalizePlayActivityRecords(records));
 }
 
 export function createPlayedTodayRecord(gameId: string, now = new Date()): PlayActivityRecord {
