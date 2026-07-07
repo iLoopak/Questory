@@ -1,6 +1,14 @@
 import type { RawgMetadata } from '../types/rawg';
 import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
-import { createRawgMetadataCacheRepository, type RawgMetadataCacheStatus } from './rawgMetadataCacheRepository';
+import {
+  createRawgMetadataCacheRepository,
+  type RawgMetadataCacheStatus,
+  type RawgRecoveryMode,
+  type RawgRecoveryPreview,
+  type RawgRecoveryResult,
+  type RawgRepairResult,
+  type RawgVerification,
+} from './rawgMetadataCacheRepository';
 
 const STORAGE_KEY = 'questshelf.rawgMetadataCache.v1';
 
@@ -42,6 +50,23 @@ export function initRawgMetadataCacheRepository(): Promise<void> {
 
 export function getRawgMetadataCacheStatus(): RawgMetadataCacheStatus {
   return rawgMetadataCacheRepository.getStatus();
+}
+
+// Wave 6: storage verification / repair / recovery (RAWG metadata cache).
+export function verifyRawgMetadataCache(): Promise<RawgVerification> {
+  return rawgMetadataCacheRepository.verify();
+}
+
+export function repairRawgMetadataCacheSnapshot(): Promise<RawgRepairResult> {
+  return rawgMetadataCacheRepository.repairSnapshot();
+}
+
+export function previewLegacyRawgMetadataCacheRecovery(): Promise<RawgRecoveryPreview> {
+  return rawgMetadataCacheRepository.previewLegacyRecovery();
+}
+
+export function recoverRawgMetadataCacheFromLegacyBlob(mode: RawgRecoveryMode): Promise<RawgRecoveryResult> {
+  return rawgMetadataCacheRepository.recoverFromLegacyBlob(mode);
 }
 
 export function loadRawgMetadataCache(): RawgMetadataCache {

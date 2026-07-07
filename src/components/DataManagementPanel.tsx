@@ -16,6 +16,25 @@ import {
   verifyGameStorage,
 } from '../lib/gameStorage';
 import {
+  previewLegacyRawgMetadataCacheRecovery,
+  recoverRawgMetadataCacheFromLegacyBlob,
+  repairRawgMetadataCacheSnapshot,
+  verifyRawgMetadataCache,
+} from '../lib/rawgMetadataCache';
+import {
+  previewLegacyPlayActivityRecovery,
+  recoverPlayActivityFromLegacyBlob,
+  repairPlayActivitySnapshot,
+  verifyPlayActivityStorage,
+} from '../lib/playActivityStorage';
+import type {
+  CollectionLegacyRecoveryMode,
+  CollectionLegacyRecoveryPreview,
+  CollectionLegacyRecoveryResult,
+  CollectionSnapshotRepairResult,
+  CollectionVerification,
+} from '../lib/indexedDbCollectionRepository';
+import {
   clearLocalStorageIssues,
   exportRawQuestShelfLocalData,
   getLocalStorageIssues,
@@ -764,6 +783,9 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
           Legacy blob: {diagnostics.gameStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
           {diagnostics.gameStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
         </div>
+        {diagnostics.gameStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.gameStore.lastError}</div>
+        ) : null}
       </div>
 
       <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
@@ -778,6 +800,9 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
           Legacy blob: {diagnostics.rawgCacheStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
           {diagnostics.rawgCacheStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
         </div>
+        {diagnostics.rawgCacheStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.rawgCacheStore.lastError}</div>
+        ) : null}
       </div>
 
       <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
@@ -792,6 +817,9 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
           Legacy blob: {diagnostics.playActivityStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
           {diagnostics.playActivityStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
         </div>
+        {diagnostics.playActivityStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.playActivityStore.lastError}</div>
+        ) : null}
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -836,23 +864,35 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
   );
 }
 
-type RecoveryPreview = Awaited<ReturnType<typeof previewLegacyGameRecovery>>;
 type ToolResult = { tone: 'ok' | 'warn' | 'error'; text: string };
 
-function StorageToolsPanel({
-  diagnostics,
+type StoreToolsActions = {
+  verify: () => Promise<CollectionVerification>;
+  repair: () => Promise<CollectionSnapshotRepairResult>;
+  previewRecovery: () => Promise<CollectionLegacyRecoveryPreview>;
+  recover: (mode: CollectionLegacyRecoveryMode) => Promise<CollectionLegacyRecoveryResult>;
+};
+
+const toolButtonClass =
+  'h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50';
+
+function StoreToolsRow({
+  label,
+  noun,
+  legacyBlobPresent,
+  actions,
   onChanged,
-  onCreateBackup,
 }: {
-  diagnostics: StorageDiagnostics | null;
+  label: string;
+  noun: string;
+  legacyBlobPresent: boolean;
+  actions: StoreToolsActions;
   onChanged: () => void;
-  onCreateBackup: () => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<ToolResult | null>(null);
-  const [recoveryPreview, setRecoveryPreview] = useState<RecoveryPreview | null>(null);
+  const [preview, setPreview] = useState<CollectionLegacyRecoveryPreview | null>(null);
 
-  const legacyBlobPresent = diagnostics?.gameStore.legacyBlobPresent ?? false;
   const resultTone =
     result?.tone === 'error' ? 'text-rose-200' : result?.tone === 'warn' ? 'text-amber-200' : 'text-emerald-200';
 
@@ -860,7 +900,7 @@ function StorageToolsPanel({
     setBusy('verify');
     setResult(null);
     try {
-      const v = await verifyGameStorage();
+      const v = await actions.verify();
       const clean = v.invalidCount === 0 && v.duplicateIds.length === 0;
       setResult({
         tone: clean ? 'ok' : 'warn',
@@ -880,7 +920,7 @@ function StorageToolsPanel({
     setBusy('repair');
     setResult(null);
     try {
-      const r = await repairGameSnapshot();
+      const r = await actions.repair();
       setResult({
         tone: 'ok',
         text: `Rebuilt snapshot from IndexedDB: ${r.after} records${r.removedInvalid > 0 ? ` (excluded ${r.removedInvalid} invalid row${r.removedInvalid === 1 ? '' : 's'})` : ''}.`,
@@ -897,13 +937,13 @@ function StorageToolsPanel({
     setBusy('recover');
     setResult(null);
     try {
-      const preview = await previewLegacyGameRecovery();
-      if (!preview.legacyBlobPresent || preview.legacyCount === 0) {
-        setResult({ tone: 'warn', text: 'No legacy games blob to recover from.' });
-        setRecoveryPreview(null);
+      const pv = await actions.previewRecovery();
+      if (!pv.legacyBlobPresent || pv.legacyCount === 0) {
+        setResult({ tone: 'warn', text: `No legacy ${noun} blob to recover from.` });
+        setPreview(null);
         return;
       }
-      setRecoveryPreview(preview);
+      setPreview(pv);
     } catch (error) {
       setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Recovery preview failed.' });
     } finally {
@@ -911,25 +951,25 @@ function StorageToolsPanel({
     }
   }
 
-  async function doRecover(mode: 'merge' | 'replace') {
+  async function doRecover(mode: CollectionLegacyRecoveryMode) {
     if (
       mode === 'replace' &&
       !window.confirm(
-        `Replace all ${recoveryPreview?.idbCount ?? 0} games in IndexedDB with ${recoveryPreview?.legacyCount ?? 0} from the legacy blob? This overwrites current library data.`,
+        `Replace all ${preview?.idbCount ?? 0} ${noun} records in IndexedDB with ${preview?.legacyCount ?? 0} from the legacy blob? This overwrites current data.`,
       )
     ) {
       return;
     }
     setBusy(mode);
     try {
-      const res = await recoverGamesFromLegacyBlob(mode);
+      const res = await actions.recover(mode);
       setResult({
         tone: 'ok',
         text:
           `${mode === 'merge' ? 'Merged' : 'Replaced'}: imported ${res.importedCount}, total ${res.totalCount}` +
           `${res.skippedExistingCount > 0 ? `, kept ${res.skippedExistingCount} existing` : ''}.`,
       });
-      setRecoveryPreview(null);
+      setPreview(null);
       onChanged();
     } catch (error) {
       setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Recovery failed.' });
@@ -938,9 +978,61 @@ function StorageToolsPanel({
     }
   }
 
-  const buttonClass =
-    'h-10 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50';
+  return (
+    <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button className={toolButtonClass} disabled={busy !== null} onClick={() => void runVerify()} type="button">
+          {busy === 'verify' ? 'Verifying…' : 'Verify'}
+        </button>
+        <button className={toolButtonClass} disabled={busy !== null} onClick={() => void runRepair()} type="button">
+          {busy === 'repair' ? 'Repairing…' : 'Repair snapshot'}
+        </button>
+        <button
+          className={toolButtonClass}
+          disabled={busy !== null || !legacyBlobPresent}
+          onClick={() => void startRecovery()}
+          title={legacyBlobPresent ? undefined : `No legacy ${noun} blob present.`}
+          type="button"
+        >
+          {busy === 'recover' ? 'Checking…' : 'Recover from legacy blob'}
+        </button>
+      </div>
 
+      {preview ? (
+        <div className="mt-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-amber-100">
+          <div className="text-sm">
+            Legacy blob: {preview.legacyCount} records · IndexedDB: {preview.idbCount} records ·{' '}
+            {preview.onlyInLegacyCount} only in legacy · {preview.conflictCount} already present.
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button className={toolButtonClass} disabled={busy !== null} onClick={() => void doRecover('merge')} type="button">
+              {busy === 'merge' ? 'Merging…' : `Merge (add ${preview.onlyInLegacyCount})`}
+            </button>
+            <button className={toolButtonClass} disabled={busy !== null} onClick={() => void doRecover('replace')} type="button">
+              {busy === 'replace' ? 'Replacing…' : 'Replace all'}
+            </button>
+            <button className={toolButtonClass} disabled={busy !== null} onClick={() => setPreview(null)} type="button">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {result ? <p className={`mt-2 text-xs leading-5 ${resultTone}`}>{result.text}</p> : null}
+    </div>
+  );
+}
+
+function StorageToolsPanel({
+  diagnostics,
+  onChanged,
+  onCreateBackup,
+}: {
+  diagnostics: StorageDiagnostics | null;
+  onChanged: () => void;
+  onCreateBackup: () => void;
+}) {
   return (
     <section className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-4 text-sm text-slate-300">
       <div className="flex items-center justify-between gap-3">
@@ -949,52 +1041,54 @@ function StorageToolsPanel({
       </div>
 
       <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-500">
-        Non-destructive checks for the IndexedDB game library. Repair only rebuilds the in-memory snapshot; recovery
+        Non-destructive checks for the IndexedDB-backed stores. Repair only rebuilds the in-memory snapshot; recovery
         imports the legacy blob and never overwrites it. Export a backup first if you plan to replace data.
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button className={buttonClass} disabled={busy !== null} onClick={() => void runVerify()} type="button">
-          {busy === 'verify' ? 'Verifying…' : 'Verify library storage'}
-        </button>
-        <button className={buttonClass} disabled={busy !== null} onClick={() => void runRepair()} type="button">
-          {busy === 'repair' ? 'Repairing…' : 'Repair library snapshot'}
-        </button>
-        <button
-          className={buttonClass}
-          disabled={busy !== null || !legacyBlobPresent}
-          onClick={() => void startRecovery()}
-          title={legacyBlobPresent ? undefined : 'No legacy games blob present.'}
-          type="button"
-        >
-          {busy === 'recover' ? 'Checking…' : 'Recover from legacy games blob'}
-        </button>
-        <button className={buttonClass} disabled={busy !== null} onClick={onCreateBackup} type="button">
+      <StoreToolsRow
+        label="Games"
+        noun="games"
+        legacyBlobPresent={diagnostics?.gameStore.legacyBlobPresent ?? false}
+        actions={{
+          verify: verifyGameStorage,
+          repair: repairGameSnapshot,
+          previewRecovery: previewLegacyGameRecovery,
+          recover: recoverGamesFromLegacyBlob,
+        }}
+        onChanged={onChanged}
+      />
+
+      <StoreToolsRow
+        label="RAWG cache"
+        noun="RAWG cache"
+        legacyBlobPresent={diagnostics?.rawgCacheStore.legacyBlobPresent ?? false}
+        actions={{
+          verify: verifyRawgMetadataCache,
+          repair: repairRawgMetadataCacheSnapshot,
+          previewRecovery: previewLegacyRawgMetadataCacheRecovery,
+          recover: recoverRawgMetadataCacheFromLegacyBlob,
+        }}
+        onChanged={onChanged}
+      />
+
+      <StoreToolsRow
+        label="Play activity"
+        noun="play activity"
+        legacyBlobPresent={diagnostics?.playActivityStore.legacyBlobPresent ?? false}
+        actions={{
+          verify: verifyPlayActivityStorage,
+          repair: repairPlayActivitySnapshot,
+          previewRecovery: previewLegacyPlayActivityRecovery,
+          recover: recoverPlayActivityFromLegacyBlob,
+        }}
+        onChanged={onChanged}
+      />
+
+      <div className="mt-3">
+        <button className={toolButtonClass} onClick={onCreateBackup} type="button">
           Create backup now
         </button>
       </div>
-
-      {recoveryPreview ? (
-        <div className="mt-3 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-amber-100">
-          <div className="text-sm">
-            Legacy blob: {recoveryPreview.legacyCount} records · IndexedDB: {recoveryPreview.idbCount} records ·{' '}
-            {recoveryPreview.onlyInLegacyCount} only in legacy · {recoveryPreview.conflictCount} already present.
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button className={buttonClass} disabled={busy !== null} onClick={() => void doRecover('merge')} type="button">
-              {busy === 'merge' ? 'Merging…' : `Merge (add ${recoveryPreview.onlyInLegacyCount})`}
-            </button>
-            <button className={buttonClass} disabled={busy !== null} onClick={() => void doRecover('replace')} type="button">
-              {busy === 'replace' ? 'Replacing…' : 'Replace all'}
-            </button>
-            <button className={buttonClass} disabled={busy !== null} onClick={() => setRecoveryPreview(null)} type="button">
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {result ? <p className={`mt-3 text-xs leading-5 ${resultTone}`}>{result.text}</p> : null}
     </section>
   );
 }

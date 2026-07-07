@@ -1,5 +1,13 @@
 import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
-import { createIndexedDbPlayActivityRepository, type PlayActivityStoreStatus } from './indexedDbPlayActivityRepository';
+import {
+  createIndexedDbPlayActivityRepository,
+  type PlayActivityRecoveryMode,
+  type PlayActivityRecoveryPreview,
+  type PlayActivityRecoveryResult,
+  type PlayActivityRepairResult,
+  type PlayActivityStoreStatus,
+  type PlayActivityVerification,
+} from './indexedDbPlayActivityRepository';
 
 const STORAGE_KEY = 'questshelf.playActivity.v1';
 export const PLAY_ACTIVITY_SOURCES = ['manual', 'steam'] as const;
@@ -38,6 +46,7 @@ export const playActivityRepository = createIndexedDbPlayActivityRepository({
   legacyLoadSync: () => loadLocalJson(STORAGE_KEY, [], normalizePlayActivityRecords),
   legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizePlayActivityRecords),
   legacyClear: () => removePersistedKeys([STORAGE_KEY]),
+  normalize: normalizePlayActivityRecords,
 });
 
 /** Awaited once at boot (before React renders) so the snapshot is populated. */
@@ -47,6 +56,23 @@ export function initPlayActivityRepository(): Promise<void> {
 
 export function getPlayActivityStoreStatus(): PlayActivityStoreStatus {
   return playActivityRepository.getStatus();
+}
+
+// Wave 6: storage verification / repair / recovery (play activity).
+export function verifyPlayActivityStorage(): Promise<PlayActivityVerification> {
+  return playActivityRepository.verify();
+}
+
+export function repairPlayActivitySnapshot(): Promise<PlayActivityRepairResult> {
+  return playActivityRepository.repairSnapshot();
+}
+
+export function previewLegacyPlayActivityRecovery(): Promise<PlayActivityRecoveryPreview> {
+  return playActivityRepository.previewLegacyRecovery();
+}
+
+export function recoverPlayActivityFromLegacyBlob(mode: PlayActivityRecoveryMode): Promise<PlayActivityRecoveryResult> {
+  return playActivityRepository.recoverFromLegacyBlob(mode);
 }
 
 export function loadPlayActivity(): PlayActivityRecord[] {
