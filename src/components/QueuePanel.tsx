@@ -1466,8 +1466,9 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [activeCoverSource, setActiveCoverSource] = useState<string | null>(null);
   const isPlayingSize = size === 'playing';
-  const metacriticScore = formatQueueMetacriticScore(game.metacriticScore);
-  const rawgPlaytime = formatQueueRawgPlaytime(game.rawgPlaytimeHours);
+  const shouldShowMetadataBadges = isPlayingSize;
+  const metacriticScore = shouldShowMetadataBadges ? formatQueueMetacriticScore(game.metacriticScore) : null;
+  const rawgPlaytime = shouldShowMetadataBadges ? formatQueueRawgPlaytime(game.rawgPlaytimeHours) : null;
 
   useEffect(() => {
     setIsCoverLoaded(false);
