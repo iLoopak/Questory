@@ -1513,7 +1513,10 @@ function formatQueueMetacriticScore(value: unknown) {
 }
 
 function formatQueueRawgPlaytime(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  const hours = Math.round(value);
+  if (hours <= 0) return null;
+  return `${hours}h`;
 }
 
 function pickQueueGhostMessage(messages: readonly string[]) {

@@ -7,7 +7,10 @@ export function formatMetacriticScore(value: unknown) {
 }
 
 export function formatRawgPlaytime(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  const hours = Math.round(value);
+  if (hours <= 0) return null;
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 }
 
 function formatList(value: string[] | undefined, unavailableText: string) {
@@ -50,7 +53,7 @@ export function GameInformationSection({
             <InfoCard label={t('detail.developers')} value={formatList(metadata.developers, t('detail.notAvailable'))} />
             <InfoCard label={t('detail.publishers')} value={formatList(metadata.publishers, t('detail.notAvailable'))} />
             {metacriticScore ? <InfoCard label="Metacritic" value={metacriticScore} /> : null}
-            {rawgPlaytime ? <InfoCard label="Average playtime" value={rawgPlaytime} /> : null}
+            {rawgPlaytime ? <InfoCard label={t('detail.rawgSteamAveragePlaytime')} value={rawgPlaytime} /> : null}
           </div>
           <ChipGroup label={t('detail.genres')} values={metadata.genres} accent="mint" />
           <ChipGroup label={t('detail.rawgTags')} values={metadata.tags} />

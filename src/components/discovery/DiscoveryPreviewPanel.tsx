@@ -190,7 +190,7 @@ export function DiscoveryPreviewPanel({
           <HeroStat label={t('detail.currentStatus')} value={collectionStatus} accent={isInLibrary || isInWishlist} />
           {releaseYear ? <HeroStat label={t('preview.released')} value={releaseYear} /> : null}
           {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-          {rawgPlaytime ? <HeroStat label={t('preview.averagePlaytime')} value={rawgPlaytime} /> : null}
+          {rawgPlaytime ? <HeroStat label={t('preview.rawgSteamAveragePlaytime')} value={rawgPlaytime} /> : null}
         </>}
       />
 
