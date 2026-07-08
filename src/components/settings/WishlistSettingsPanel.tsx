@@ -450,8 +450,8 @@ export function WishlistSettingsPanel({
           <h4 className="text-sm font-semibold uppercase tracking-caps text-mint">PlayStation Library bookmarklet</h4>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
             <li>Open <a className="text-mint underline" href="https://library.playstation.com/recently-purchased/1" rel="noreferrer" target="_blank">PlayStation Library recently purchased</a>.</li>
-            <li>Run the bookmarklet on each page, such as /recently-purchased/1, /2, and so on.</li>
-            <li>Paste the copied JSON above and repeat for each page.</li>
+            <li>Run the bookmarklet, then choose the first and last recently-purchased pages to import.</li>
+            <li>Paste the copied JSON above to import the selected page range.</li>
           </ol>
           <div className="mt-3 flex flex-wrap gap-2"><button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90" onClick={() => void copyPlayStationBookmarklet()} type="button">Copy PlayStation bookmarklet</button></div>
           <textarea className="mt-3 h-24 w-full resize-y rounded-md border border-skyglass/15 bg-ink-950/80 p-2 font-mono text-xs text-slate-300 outline-none focus:border-mint/50" readOnly value={playStationLibraryBookmarklet} />
