@@ -27,7 +27,7 @@ import {
 import type { Game, GamePlatform } from '../types/game';
 
 export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
-import { getPreferredArtworkSources } from '../lib/gameCoverImages';
+import { GameCoverImage } from './GameCoverImage';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
@@ -358,17 +358,17 @@ export function QueuePanel({
 
       {selectedPlatformSummary ? (
         <div
-          className="mb-3 rounded-xl border px-4 py-3"
+          className="qs-platform-summary mb-3 rounded-xl border px-4 py-3"
           style={{
             borderColor: `color-mix(in srgb, ${summaryAccentColor} 32%, rgb(255 255 255 / 0.06))`,
             backgroundColor: `color-mix(in srgb, ${summaryAccentColor} 7%, rgb(2 6 23 / 0.6))`,
           }}
         >
           <div className="text-sm font-semibold text-white">{platformFilter} {t('queue.platformSummary')}</div>
-          <div className="mt-2 flex gap-6">
+          <div className="mt-2 flex flex-wrap gap-6">
             <div>
               <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.playing}</div>
-              <div className="mt-0.5 text-xs text-slate-400">{t('nav.playingNow')}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{t('action.playingNow')}</div>
             </div>
             <div>
               <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.planned}</div>
@@ -381,7 +381,7 @@ export function QueuePanel({
           </div>
         </div>
       ) : activeQueuePlatforms.length > 0 ? (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
+        <div className="qs-platform-progress mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
           {activeQueuePlatforms.map((platform) => {
             const planned = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
             const playing = playingGamesByPlatform.get(platform)?.length ?? 0;
@@ -389,7 +389,7 @@ export function QueuePanel({
             return (
               <button
                 key={platform}
-                className="min-w-[8rem] rounded-xl border px-3 py-2 text-left transition"
+                className="min-w-[8rem] max-w-[11rem] shrink-0 rounded-xl border px-3 py-2 text-left transition"
                 style={{
                   borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
                   backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
@@ -469,13 +469,13 @@ export function QueuePanel({
         </div>
       ) : null}
 
-      <div ref={queueListRef} className="qs-queue-list pr-1">
+      <div ref={queueListRef} className="qs-queue-list min-w-0 pr-1">
         <div className={
           displayedQueuePlatforms.length === 1
-            ? 'grid gap-2'
+            ? 'qs-platform-grid grid min-w-0 gap-2'
             : displayedQueuePlatforms.length === 2
-            ? 'grid grid-cols-2 gap-2'
-            : 'grid gap-2 xl:grid-cols-2'
+            ? 'qs-platform-grid grid min-w-0 grid-cols-2 gap-2'
+            : 'qs-platform-grid grid min-w-0 gap-2 xl:grid-cols-2'
         }>
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
@@ -903,16 +903,23 @@ function PlatformQueueColumn({
   onRemoveEntry: (gameId: string, platform: GamePlatform) => void;
 }) {
   const { t } = useI18n();
-  const playingNowLabel = t('nav.playingNow');
+  const playingNowLabel = t('action.playingNow');
+  const [isPlannedQueueExpanded, setIsPlannedQueueExpanded] = useState(false);
+  const plannedQueuePreviewLimit = 5;
+  const shouldCollapsePlannedQueue = queueEntries.length > plannedQueuePreviewLimit;
+  const displayedQueueEntries = shouldCollapsePlannedQueue && !isPlannedQueueExpanded
+    ? queueEntries.slice(0, plannedQueuePreviewLimit)
+    : queueEntries;
+  const hiddenPlannedQueueCount = Math.max(0, queueEntries.length - plannedQueuePreviewLimit);
   const queueEntriesVirtualizerRef = useRef<HTMLDivElement | null>(null);
   const virtualQueueEntries = useVirtualWindow({
-    itemCount: queueEntries.length,
+    itemCount: displayedQueueEntries.length,
     estimateItemSize: 148,
     overscan: 5,
     scrollElementRef: queueScrollRef,
     virtualizerRef: queueEntriesVirtualizerRef,
   });
-  const renderedQueueEntries = queueEntries.slice(virtualQueueEntries.startIndex, virtualQueueEntries.endIndex + 1);
+  const renderedQueueEntries = displayedQueueEntries.slice(virtualQueueEntries.startIndex, virtualQueueEntries.endIndex + 1);
   const showPlayingSection = statusFilter !== 'Planned';
   const showPlannedSection = statusFilter !== 'Playing';
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
@@ -920,13 +927,10 @@ function PlatformQueueColumn({
   const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
   const accentStyle = {
     '--platform-accent': platformAccentColor,
+    '--platform-column-border-strength': `${isHighlighted ? 55 : hasGames ? 32 : 18}%`,
+    '--platform-column-glow-strength': `${isHighlighted ? 18 : hasGames ? 8 : 0}%`,
     borderColor: `color-mix(in srgb, ${platformAccentColor} ${isHighlighted ? 55 : hasGames ? 32 : 18}%, rgb(255 255 255 / 0.04))`,
     backgroundImage: `radial-gradient(ellipse at 50% 0%, color-mix(in srgb, ${platformAccentColor} ${hasGames || isHighlighted ? 10 : 5}%, transparent) 0%, transparent 65%)`,
-    boxShadow: isHighlighted
-      ? `0 0 0 1px color-mix(in srgb, ${platformAccentColor} 38%, transparent), 0 0 32px color-mix(in srgb, ${platformAccentColor} 18%, transparent)`
-      : hasGames
-      ? `0 0 16px color-mix(in srgb, ${platformAccentColor} 8%, transparent)`
-      : 'none',
   } as CSSProperties;
 
   useEffect(() => {
@@ -938,27 +942,29 @@ function PlatformQueueColumn({
       label: `${platform} queue`,
       totalItems: queueEntries.length,
       renderedItemCount: renderedQueueEntries.length,
+      displayedItemCount: displayedQueueEntries.length,
+      collapsed: shouldCollapsePlannedQueue && !isPlannedQueueExpanded,
       virtualRangeStart: virtualQueueEntries.startIndex,
       virtualRangeEnd: virtualQueueEntries.endIndex,
       columns: 1,
       viewportHeight: virtualQueueEntries.viewportSize,
       containerHeight: queueScrollRef.current?.clientHeight ?? null,
     });
-  }, [platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
+  }, [displayedQueueEntries.length, isPlannedQueueExpanded, platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, shouldCollapsePlannedQueue, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
 
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
 
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-lg border bg-ink-950/80 p-3 ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
-        <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden border-b border-white/10">
+        <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden rounded-t-lg border-b border-white/10">
           <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
             <h3
-              className="flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
               style={{
                 borderColor: `color-mix(in srgb, ${platformAccentColor} 40%, rgb(255 255 255 / 0.1))`,
                 backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.85))`,
@@ -1037,9 +1043,10 @@ function PlatformQueueColumn({
         </div>
       ) : null}
 
-      {showPlannedSection ? <div ref={queueEntriesVirtualizerRef} className="relative" style={{ height: virtualQueueEntries.totalSize }}>
+      {showPlannedSection ? <div>
+        <div ref={queueEntriesVirtualizerRef} className="qs-queue-virtual-window relative min-w-0" style={{ minHeight: displayedQueueEntries.length > 0 ? virtualQueueEntries.totalSize : undefined }}>
         {queueEntries.length > 0 ? (
-          <div className="absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
+          <div className="qs-queue-virtual-items absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
             {renderedQueueEntries.map((entry) => {
               const game = gamesById.get(entry.gameId);
               const isFirstEntry = entry.queuePosition <= 1;
@@ -1081,6 +1088,27 @@ function PlatformQueueColumn({
             <p>{t('queue.noQueuePlatform').replace('{platform}', platform)}</p>
           </div>
         )}
+        </div>
+        {shouldCollapsePlannedQueue ? (
+          <button
+            aria-expanded={isPlannedQueueExpanded}
+            className="qs-planned-queue-toggle mt-2 flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition"
+            onClick={() => setIsPlannedQueueExpanded((currentIsExpanded) => !currentIsExpanded)}
+            style={{
+              borderColor: `color-mix(in srgb, ${platformAccentColor} 24%, rgb(255 255 255 / 0.08))`,
+              color: `color-mix(in srgb, ${platformAccentColor} 72%, rgb(203 213 225))`,
+              backgroundColor: `color-mix(in srgb, ${platformAccentColor} 8%, rgb(2 6 23 / 0.72))`,
+            }}
+            type="button"
+          >
+            <Icon name={isPlannedQueueExpanded ? 'chevron-up' : 'chevron-down'} size={14} />
+            <span>
+              {isPlannedQueueExpanded
+                ? t('queue.showLess')
+                : t('queue.showMore').replace('{count}', String(hiddenPlannedQueueCount))}
+            </span>
+          </button>
+        ) : null}
       </div> : null}
     </section>
 
@@ -1435,47 +1463,43 @@ function QueueGameRow({
 }
 
 function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'tiny' }) {
-  const coverSources = useMemo(() => getPreferredArtworkSources(game, 'portrait'), [game]);
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const activeCoverSource = coverSources[coverSourceIndex];
+  const [activeCoverSource, setActiveCoverSource] = useState<string | null>(null);
   const isPlayingSize = size === 'playing';
+  const shouldShowMetadataBadges = isPlayingSize;
+  const metacriticScore = shouldShowMetadataBadges ? formatQueueMetacriticScore(game.metacriticScore) : null;
+  const rawgPlaytime = shouldShowMetadataBadges ? formatQueueRawgPlaytime(game.rawgPlaytimeHours) : null;
 
   useEffect(() => {
-    setCoverSourceIndex(0);
     setIsCoverLoaded(false);
-  }, [coverSources]);
+  }, [activeCoverSource]);
 
   return (
     <span
       aria-hidden="true"
-      className={`relative block shrink-0 overflow-hidden rounded-md border bg-ink-800 ${
+      className={`qs-queue-cover-thumb relative block shrink-0 overflow-hidden rounded-md border bg-ink-800 ${
         isPlayingSize ? 'qs-platform-playing-cover h-20 w-[3.75rem] shadow-panel' : 'h-11 w-[2.0625rem] border-skyglass/15'
       }`}
     >
-      {activeCoverSource ? (
-        <>
-          {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-          <img
-            alt=""
-            className={`h-full w-full object-cover transition-opacity duration-200 ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
-            decoding="async"
-            height={isPlayingSize ? 80 : 44}
-            loading="lazy"
-            onError={() => {
-              setIsCoverLoaded(false);
-              setCoverSourceIndex((currentIndex) => currentIndex + 1);
-            }}
-            onLoad={() => setIsCoverLoaded(true)}
-            src={activeCoverSource}
-            width={isPlayingSize ? 60 : 33}
-          />
-        </>
-      ) : (
-        <span className={`grid h-full w-full place-items-center font-semibold ${isPlayingSize ? 'qs-platform-playing-cover-fallback text-xl' : 'text-mint/80 text-xs'}`}>
-          {game.title.slice(0, 1).toUpperCase()}
+      {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
+      <GameCoverImage
+        alt=""
+        className="relative z-[1] h-full w-full object-cover"
+        diagnosticsContext="quest-queue"
+        game={game}
+        height={isPlayingSize ? 80 : 44}
+        loading="lazy"
+        onLoad={() => setIsCoverLoaded(true)}
+        onResolvedSourceChange={setActiveCoverSource}
+        usage="portrait"
+        width={isPlayingSize ? 60 : 33}
+      />
+      {metacriticScore || rawgPlaytime ? (
+        <span className="pointer-events-none absolute bottom-0 left-0 z-[2] flex max-w-full flex-wrap items-end gap-0.5 bg-gradient-to-tr from-ink-950/85 via-ink-950/45 to-transparent p-0.5 pr-2 pt-2">
+          {metacriticScore ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">MC {metacriticScore}</span> : null}
+          {rawgPlaytime ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">~{rawgPlaytime}</span> : null}
         </span>
-      )}
+      ) : null}
     </span>
   );
 }
@@ -1485,6 +1509,14 @@ const platformPlanGhostMessages = [
   'Queue Ghost recommends adding an adventure.',
   'The future awaits.',
 ] as const;
+
+function formatQueueMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+}
+
+function formatQueueRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
+}
 
 function pickQueueGhostMessage(messages: readonly string[]) {
   return messages[Math.floor(Math.random() * messages.length)];

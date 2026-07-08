@@ -5,8 +5,7 @@ import { HomeAchievementsShowcase } from './HomeAchievementsShowcase';
 import { HomeSteamAchievementsWidget } from './HomeSteamAchievementsWidget';
 import { QueueGhost, getQueueGhostVariant, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhost, type QueueGhostAchievement, type QueueGhostCover, type QueueGhostVariant } from './QueueGhost';
 import { formatDealPrice } from './DealCoverBadges';
-import { getPreferredArtworkSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
-import { GameCoverImage } from './GameCoverImage';
+import { getPreferredArtworkSources, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { compareQueueEntries, type PlatformQueueEntry, type PlatformQueueState } from '../lib/platformQueueStorage';
 import { getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
 import { loadAchievementCounters } from '../lib/achievementCounters';
@@ -18,9 +17,15 @@ import type { SteamAchievementSyncState, SteamPlaytimeRefreshState } from '../ty
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
-import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QSActionSheet } from './QSActionSheet';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
+import { HomeRecommendationsSection } from './home/HomeRecommendationsSection';
+import { GamePosterButton } from './home/GamePosterButton';
+import { NextAdventureCard } from './home/NextAdventureCard';
+import { WishlistDealCard, WishlistDealActionSheet } from './home/WishlistDealCard';
+import { useHomeWidgetPreferences } from '../hooks/useHomeWidgetPreferences';
+import { homeWidgetRegistry, orderedWidgetIdsForColumn, type HomeWidgetId } from '../lib/homeWidgetPreferences';
+import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -40,13 +45,20 @@ type HomePanelProps = {
   onOpenLibrary: () => void;
   onOpenQueue: (platform?: GamePlatform) => void;
   onOpenReviewMode: (source: ReviewSource) => void;
+  onOpenSettings?: () => void;
   onOpenWishlist: () => void;
   onPlayToday: (game: Game) => void;
   onQuickNote: (gameId: string, note: string) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
   onSyncItadDeals?: () => void;
+  onImportNewSteamGames?: () => void;
+  onOpenAchievementTimeline?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
+  isImportingNewSteamGames?: boolean;
+  onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
+  onOpenDiscoveryPreview?: (candidate: DiscoveryCandidate) => void;
+  discoveryInboxRawgIds?: Set<number>;
 };
 
 type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
@@ -72,15 +84,23 @@ export function HomePanel({
   onOpenLibrary,
   onOpenQueue,
   onOpenReviewMode,
+  onOpenSettings,
   onOpenWishlist,
   onPlayToday,
   onQuickNote,
   onStatusChange,
   onSyncItadDeals,
+  onImportNewSteamGames,
+  onOpenAchievementTimeline,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
+  isImportingNewSteamGames = false,
+  onSelectDiscoveryGame,
+  onOpenDiscoveryPreview,
+  discoveryInboxRawgIds = new Set(),
 }: HomePanelProps) {
   const { t } = useI18n();
+  const { preferences: homeWidgets } = useHomeWidgetPreferences();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
   const [dealSheetGame, setDealSheetGame] = useState<Game | null>(null);
   const [syncSheetOpen, setSyncSheetOpen] = useState(false);
@@ -92,8 +112,7 @@ export function HomePanel({
   const continuePlayingGames = useMemo(() => {
     return libraryGames
       .filter((game) => game.status === 'Playing')
-      .sort((a, b) => getActivityTime(b) - getActivityTime(a))
-      .slice(0, 4);
+      .sort((a, b) => getActivityTime(b) - getActivityTime(a));
   }, [libraryGames]);
 
   const nextAdventureEntries = useMemo<NextAdventureEntry[]>(() => {
@@ -177,8 +196,8 @@ export function HomePanel({
 
   const isSteamAchievementSyncing = steamAchievementSyncState?.status === 'loading';
   const isSteamPlaytimeSyncing = steamPlaytimeRefreshState?.status === 'loading';
-  const isSteamSyncing = isSteamAchievementSyncing || isSteamPlaytimeSyncing;
-  const hasSyncActions = (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
+  const isSteamSyncing = isSteamAchievementSyncing || isSteamPlaytimeSyncing || isImportingNewSteamGames;
+  const hasSyncActions = !!onImportNewSteamGames || (hasSteamGames && (!!onSyncSteamAchievements || !!onSyncSteamPlaytime)) || !!onSyncItadDeals;
   const isAnySyncing = isSteamSyncing || itadDealSyncState?.status === 'loading';
 
   const wishlistGames = useMemo(() => games.filter((g) => g.collectionType === 'wishlist'), [games]);
@@ -357,15 +376,228 @@ export function HomePanel({
     return () => window.removeEventListener('keydown', handleHomeKeyDown);
   }, [actionSheetGame, onOpenLibrary, onOpenQueue, onOpenReviewMode]);
 
+  // Per-widget visibility: user preference AND (existing) data conditions.
+  const enabledWidgets = homeWidgets.enabled;
+  const widgetVisible: Record<HomeWidgetId, boolean> = {
+    continuePlaying: enabledWidgets.continuePlaying,
+    nextAdventure: enabledWidgets.nextAdventure,
+    questoryAchievements: enabledWidgets.questoryAchievements,
+    steamAchievements: enabledWidgets.steamAchievements,
+    wishlistDeals: enabledWidgets.wishlistDeals && wishlistGames.length > 0,
+    dailyQuest: enabledWidgets.dailyQuest && libraryGames.length > 0,
+    achievementQuiz: enabledWidgets.achievementQuiz && libraryGames.length > 0,
+    questoryJourney: enabledWidgets.questoryJourney,
+    questQueue: enabledWidgets.questQueue && libraryGames.length > 0,
+    recommendations: enabledWidgets.recommendations && !!onSelectDiscoveryGame && libraryGames.length > 0,
+  };
+
+  const mainWidgetOrder = orderedWidgetIdsForColumn(homeWidgets, 'main');
+  const sidebarWidgetOrder = orderedWidgetIdsForColumn(homeWidgets, 'sidebar');
+  const leftColumnHasContent = mainWidgetOrder.some((id) => widgetVisible[id]);
+  const rightColumnHasContent = sidebarWidgetOrder.some((id) => widgetVisible[id]);
+  const useTwoColumn = leftColumnHasContent && rightColumnHasContent;
+  // Empty-state fallback is keyed on preferences only, so a brand-new user (who has
+  // data-driven empty states but all widgets enabled) never sees it.
+  const anyWidgetEnabled = homeWidgetRegistry.some((widget) => enabledWidgets[widget.id]);
+
+  // Renders a single widget by id (in the user's chosen order). Returns null when
+  // the widget is disabled or has no data to show, so empty slots never leave gaps.
+  function renderWidget(id: HomeWidgetId): ReactNode {
+    if (!widgetVisible[id]) return null;
+
+    switch (id) {
+      case 'continuePlaying':
+        return (
+          <HomeSection key={id} title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
+            {continuePlayingGames.length > 0 ? (
+              <div className="qs-home-continue-playing-grid">
+                {continuePlayingGames.map((game) => (
+                  <GamePosterButton
+                    key={game.id}
+                    game={game}
+                    hero={continuePlayingGames.length === 1}
+                    activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
+                    onClick={() => setActionSheetGame(game)}
+                    queueState={queueState}
+                  />
+                ))}
+              </div>
+            ) : libraryGames.length > 0 ? (
+              <NoActiveGamesGuide
+                libraryGamesCount={libraryGames.length}
+                onOpenLibrary={onOpenLibrary}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+              />
+            ) : (
+              <OnboardingSteps
+                onOpenLibrary={onOpenLibrary}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+                t={t}
+              />
+            )}
+          </HomeSection>
+        );
+
+      case 'nextAdventure':
+        return (
+          <HomeSection key={id} title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
+            {nextAdventureEntries.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {nextAdventureEntries.map(({ entry, game }) => (
+                  <NextAdventureCard
+                    key={entry.gameId}
+                    entry={entry}
+                    game={game}
+                    queueState={queueState}
+                    onPlay={() => setActionSheetGame(game)}
+                    onOpenPlan={() => onOpenQueue(entry.targetPlatform)}
+                    t={t}
+                  />
+                ))}
+              </div>
+            ) : (
+              <NoNextAdventureGuide
+                hasLibraryGames={libraryGames.length > 0}
+                hasProcessedGames={queueEntries.length > 0 || continuePlayingGames.length > 0}
+                topPlatforms={topLibraryPlatforms}
+                onOpenQueue={onOpenQueue}
+                onOpenReviewMode={() => onOpenReviewMode('backlog')}
+              />
+            )}
+          </HomeSection>
+        );
+
+      case 'questoryAchievements':
+        return (
+          <HomeWidgetErrorBoundary key={id} title={t('home.qsAchievements')}>
+            <HomeAchievementsShowcase
+              games={games}
+              queueState={queueState}
+              reviewModeState={reviewModeState}
+            />
+          </HomeWidgetErrorBoundary>
+        );
+
+      case 'steamAchievements':
+        return (
+          <HomeWidgetErrorBoundary key={id} title={t('home.steamAchievements')}>
+            <HomeSteamAchievementsWidget
+              games={games}
+              isSteamAchievementSyncing={isSteamAchievementSyncing}
+              onOpenTimeline={onOpenAchievementTimeline}
+              onSyncSteamAchievements={onSyncSteamAchievements}
+            />
+          </HomeWidgetErrorBoundary>
+        );
+
+      case 'wishlistDeals':
+        return (
+          <HomeSection key={id} compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
+            {wishlistDeals.length > 0 ? (
+              <div className="space-y-3">
+                <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
+                <div className="border-t border-skyglass/10" />
+                <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
+                  {wishlistDeals.map((game) => (
+                    <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <WishlistNoDealsState
+                wishlistCount={wishlistGames.length}
+                canSync={!!onSyncItadDeals}
+                onOpenWishlist={onOpenWishlist}
+                onSyncDeals={onSyncItadDeals}
+              />
+            )}
+          </HomeSection>
+        );
+
+      case 'dailyQuest':
+        return <DailyQuestCard key={id} games={games} />;
+
+      case 'achievementQuiz':
+        return <AchievementQuizCard key={id} games={games} />;
+
+      case 'questoryJourney':
+        return (
+          <JourneyProgressCard
+            key={id}
+            importedCount={libraryGames.length}
+            platformPlanCount={activePlatformCount}
+            reviewedCount={reviewedCount}
+            reviewStats={reviewModeState.stats}
+            startedAdventureCount={startedAdventureCount}
+            unratedFinishedCount={unratedFinishedCount}
+            nextReviewTarget={nextReviewTarget}
+            onOpenReviewMode={() => onOpenReviewMode('backlog')}
+          />
+        );
+
+      case 'questQueue':
+        return (
+          <section key={id} className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+            <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
+            <button
+              className="mt-2 cursor-pointer text-left transition hover:opacity-75 focus:outline-none"
+              onClick={() => onOpenReviewMode('backlog')}
+              type="button"
+              aria-label="Open Quest Queue"
+            >
+              <div className="text-3xl font-semibold tabular-nums text-white">{reviewRemainingCount}</div>
+            </button>
+            <p className="mt-1 text-sm text-slate-300">
+              {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
+            </p>
+            {nextReviewCandidate ? (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-skyglass/15 bg-ink-950/50 px-3 py-2">
+                <span className="qs-home-next-candidate-label shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">{nextReviewCandidate.title}</span>
+              </div>
+            ) : null}
+            <button
+              className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
+              data-home-focus="true"
+              onClick={() => onOpenReviewMode('backlog')}
+              type="button"
+            >
+              {t('home.reviewNextGame')}
+            </button>
+            {reviewRemainingCount > 10 && (
+              <p className="mt-2 text-xs text-slate-600">
+                {t('home.reviewMoreHint')}
+              </p>
+            )}
+          </section>
+        );
+
+      case 'recommendations':
+        return (
+          <HomeRecommendationsSection
+            key={id}
+            games={games}
+            libraryGameCount={libraryGames.length}
+            inboxRawgIds={discoveryInboxRawgIds}
+            onSelectGame={onSelectDiscoveryGame}
+            onOpenPreview={onOpenDiscoveryPreview}
+          />
+        );
+
+      default:
+        return null;
+    }
+  }
+
   return (
-    <section ref={shellRef} className="qs-home-shell space-y-4 pb-4 pt-2">
+    <section ref={shellRef} className={`qs-home-shell space-y-4 pb-4 pt-2${homeWidgets.compact ? ' qs-home-compact' : ''}`}>
       {/* Compact Hero — full width */}
       <section className="qs-home-hero relative flex items-center gap-3 rounded-xl border border-skyglass/15 bg-gradient-to-r from-ink-900 to-ink-950 px-4 py-2 shadow-panel">
         {avatar}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">{appTitle}</div>
           {shelfTitle ? <div className="text-xs font-semibold text-mint">{shelfTitle}</div> : null}
-          <div className="mt-0.5 text-xs leading-snug text-slate-500 whitespace-pre-line">{greeting.current}</div>
+          <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-500 whitespace-pre-line">{greeting.current}</div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <div className="flex items-center gap-3">
@@ -448,173 +680,21 @@ export function HomePanel({
         />
       )}
 
-      {/* Two-column layout on desktop — no overflow on either column, window scroll only */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4">
-        {/* Left: main content */}
-        <div className="space-y-4">
-          <JourneyProgressCard
-            importedCount={libraryGames.length}
-            platformPlanCount={activePlatformCount}
-            reviewedCount={reviewedCount}
-            reviewStats={reviewModeState.stats}
-            startedAdventureCount={startedAdventureCount}
-            unratedFinishedCount={unratedFinishedCount}
-            nextReviewTarget={nextReviewTarget}
-            onOpenReviewMode={() => onOpenReviewMode('backlog')}
-          />
-
-          {/* Continue Playing */}
-          <HomeSection title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
-            {continuePlayingGames.length > 0 ? (
-              <div className={`grid gap-3 ${continuePlayingGames.length === 1 ? '' : continuePlayingGames.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                {continuePlayingGames.map((game) => (
-                  <GamePosterButton
-                    key={game.id}
-                    game={game}
-
-                    hero={continuePlayingGames.length === 1}
-                    activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
-                    onClick={() => setActionSheetGame(game)}
-                    queueState={queueState}
-                  />
-                ))}
-              </div>
-            ) : libraryGames.length > 0 ? (
-              <NoActiveGamesGuide
-                libraryGamesCount={libraryGames.length}
-                onOpenLibrary={onOpenLibrary}
-                onOpenReviewMode={() => onOpenReviewMode('backlog')}
-              />
-            ) : (
-              <OnboardingSteps
-                onOpenLibrary={onOpenLibrary}
-                onOpenReviewMode={() => onOpenReviewMode('backlog')}
-                t={t}
-              />
-            )}
-          </HomeSection>
-
-          {/* Next Adventure — top candidate per active Platform Plan */}
-          <HomeSection title={t('home.nextAdventure')} subtitle={t('home.sectionSourcePlatformPlans')} actionLabel={t('home.allPlatforms')} onAction={() => onOpenQueue()}>
-            {nextAdventureEntries.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {nextAdventureEntries.map(({ entry, game }) => (
-                  <NextAdventureCard
-                    key={entry.gameId}
-                    entry={entry}
-                    game={game}
-                    queueState={queueState}
-                    onPlay={() => setActionSheetGame(game)}
-                    onOpenPlan={() => onOpenQueue(entry.targetPlatform)}
-                    t={t}
-                  />
-                ))}
-              </div>
-            ) : (
-              <NoNextAdventureGuide
-                hasLibraryGames={libraryGames.length > 0}
-                hasProcessedGames={queueEntries.length > 0 || continuePlayingGames.length > 0}
-                topPlatforms={topLibraryPlatforms}
-                onOpenQueue={onOpenQueue}
-                onOpenReviewMode={() => onOpenReviewMode('backlog')}
-              />
-            )}
-          </HomeSection>
-
-          {/* Questory Achievements showcase */}
-          <HomeWidgetErrorBoundary title={t('home.qsAchievements')}>
-            <HomeAchievementsShowcase
-              games={games}
-              queueState={queueState}
-              reviewModeState={reviewModeState}
-            />
-          </HomeWidgetErrorBoundary>
-
-          {/* Steam Achievements progress companion */}
-          <HomeWidgetErrorBoundary title={t('home.steamAchievements')}>
-            <HomeSteamAchievementsWidget
-              games={games}
-              isSteamAchievementSyncing={isSteamAchievementSyncing}
-              onSyncSteamAchievements={onSyncSteamAchievements}
-            />
-          </HomeWidgetErrorBoundary>
-
-        </div>
+      {!anyWidgetEnabled ? (
+        <HomeWidgetsEmptyState onOpenSettings={onOpenSettings} t={t} />
+      ) : (
+      /* Two-column layout on desktop — no overflow on either column, window scroll only */
+      <div className={useTwoColumn ? 'lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-4' : ''}>
+        {leftColumnHasContent ? (
+          <div className="space-y-4">{mainWidgetOrder.map(renderWidget)}</div>
+        ) : null}
 
         {/* Right sidebar — stacks below main on mobile, sits beside it on desktop */}
-        <div className="mt-4 space-y-4 lg:mt-0">
-          {/* Wishlist Deals */}
-          <HomeSection compact title={t('home.wishlistDeals')} actionLabel={t('wishlist.title')} onAction={onOpenWishlist}>
-            {wishlistDeals.length > 0 ? (
-              <div className="space-y-3">
-                <DealAlertCard deals={wishlistDeals} onViewDeals={onOpenWishlist} />
-                <div className="border-t border-skyglass/10" />
-                <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2">
-                  {wishlistDeals.map((game) => (
-                    <WishlistDealCard key={game.id} game={game} onClick={() => setDealSheetGame(game)} t={t} />
-                  ))}
-                </div>
-              </div>
-            ) : wishlistGames.length === 0 ? (
-              <EmptyState
-                title="No wishlist yet"
-                text="Save games to your Wishlist to track deals when they go on sale."
-                actionLabel={t('home.openWishlist')}
-                onAction={onOpenWishlist}
-              />
-            ) : (
-              <WishlistNoDealsState
-                wishlistCount={wishlistGames.length}
-                canSync={!!onSyncItadDeals}
-                onOpenWishlist={onOpenWishlist}
-                onSyncDeals={onSyncItadDeals}
-              />
-            )}
-          </HomeSection>
-
-          {/* Daily Quest */}
-          {libraryGames.length > 0 ? <DailyQuestCard games={games} /> : null}
-
-          {/* Achievement Quiz */}
-          <AchievementQuizCard games={games} />
-
-          {/* Quest Queue Remaining */}
-          <section className="qs-home-queue-widget rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
-            <div className="text-xs font-semibold uppercase tracking-spread text-mint">{t('home.reviewRemaining')}</div>
-            <button
-              className="mt-2 cursor-pointer text-left transition hover:opacity-75 focus:outline-none"
-              onClick={() => onOpenReviewMode('backlog')}
-              type="button"
-              aria-label="Open Quest Queue"
-            >
-              <div className="text-3xl font-semibold tabular-nums text-white">{reviewRemainingCount}</div>
-            </button>
-            <p className="mt-1 text-sm text-slate-300">
-              {reviewRemainingCount === 1 ? t('home.gameReadyReview') : t('home.gamesReadyReview')}
-            </p>
-            {nextReviewCandidate ? (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-skyglass/15 bg-ink-950/50 px-3 py-2">
-                <span className="qs-home-next-candidate-label shrink-0 text-xs text-slate-500">{t('home.nextCandidate')}</span>
-                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">{nextReviewCandidate.title}</span>
-              </div>
-            ) : null}
-            <button
-              className="mt-4 min-h-11 w-full rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-              data-home-focus="true"
-              onClick={() => onOpenReviewMode('backlog')}
-              type="button"
-            >
-              {t('home.reviewNextGame')}
-            </button>
-            {reviewRemainingCount > 10 && (
-              <p className="mt-2 text-xs text-slate-600">
-                Reviewing more games improves recommendations in the Recommendations tab.
-              </p>
-            )}
-          </section>
-
-        </div>
+        {rightColumnHasContent ? (
+          <div className={`space-y-4${useTwoColumn ? ' mt-4 lg:mt-0' : ''}`}>{sidebarWidgetOrder.map(renderWidget)}</div>
+        ) : null}
       </div>
+      )}
 
       {/* Deal sheet for wishlist deal cards */}
       {dealSheetGame ? (
@@ -634,12 +714,14 @@ export function HomePanel({
           hasSteamGames={hasSteamGames}
           isSteamAchievementSyncing={isSteamAchievementSyncing}
           isSteamPlaytimeSyncing={isSteamPlaytimeSyncing}
+          isImportingNewSteamGames={isImportingNewSteamGames}
           itadDealSyncState={itadDealSyncState}
           lastAchievementSyncAt={lastAchievementSyncAt}
           lastItadSyncAt={lastItadSyncAt}
           lastPlaytimeSyncAt={lastPlaytimeSyncAt}
           onClose={() => setSyncSheetOpen(false)}
           onSyncItadDeals={onSyncItadDeals}
+          onImportNewSteamGames={onImportNewSteamGames}
           onSyncSteamAchievements={onSyncSteamAchievements}
           onSyncSteamPlaytime={onSyncSteamPlaytime}
         />
@@ -673,6 +755,34 @@ export function HomePanel({
   );
 }
 
+function HomeWidgetsEmptyState({
+  onOpenSettings,
+  t,
+}: {
+  onOpenSettings?: () => void;
+  t: ReturnType<typeof useI18n>['t'];
+}) {
+  return (
+    <section className="rounded-2xl border border-dashed border-skyglass/20 bg-ink-900/60 p-5 text-center shadow-panel">
+      <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-skyglass/20 bg-ink-950/60 text-slate-400">
+        <Icon name="sparkles" size={18} />
+      </span>
+      <h3 className="mt-3 text-base font-semibold text-white">{t('home.allWidgetsHiddenTitle')}</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-slate-400">{t('home.allWidgetsHiddenText')}</p>
+      {onOpenSettings ? (
+        <button
+          className="mt-4 min-h-11 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"
+          data-home-focus="true"
+          onClick={onOpenSettings}
+          type="button"
+        >
+          {t('home.allWidgetsHiddenAction')}
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 function JourneyProgressCard({
   importedCount,
   platformPlanCount,
@@ -701,10 +811,10 @@ function JourneyProgressCard({
 
   return (
     <section className="rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-spread text-mint">Your Questory Journey</div>
-          <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2 text-sm text-slate-300">
             <span>✓ Imported <strong className="text-white">{importedCount}</strong> games</span>
             <span>✓ Reviewed <strong className="text-white">{reviewedCount}</strong> games</span>
             <span>✓ Created <strong className="text-white">{platformPlanCount}</strong> Platform Plans</span>
@@ -722,7 +832,7 @@ function JourneyProgressCard({
           ) : null}
         </div>
         <button
-          className="rounded-xl border border-mint/30 bg-mint/10 px-4 py-3 text-left text-sm text-mint transition hover:bg-mint/20"
+          className="w-full rounded-xl border border-mint/30 bg-mint/10 px-4 py-3 text-left text-sm text-mint transition hover:bg-mint/20"
           data-home-focus="true"
           onClick={onOpenReviewMode}
           type="button"
@@ -734,11 +844,6 @@ function JourneyProgressCard({
     </section>
   );
 }
-
-function getGamePlatformLabel(game: Game, queueState: PlatformQueueState): GamePlatform {
-  return queueState.entries.find((entry) => entry.gameId === game.id)?.targetPlatform ?? game.platform;
-}
-
 
 type HomeWidgetErrorBoundaryProps = {
   children: ReactNode;
@@ -848,158 +953,6 @@ function WorkflowOrientationStrip({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function GamePosterButton({
-  game,
-  eyebrow,
-  hero = false,
-  onClick,
-  queueState,
-  activitySignal = null,
-}: {
-  game: Game;
-  eyebrow?: string;
-  hero?: boolean;
-  onClick: () => void;
-  queueState: PlatformQueueState;
-  activitySignal?: string | null;
-}) {
-  const { t } = useI18n();
-  const ambientSource = getPreferredArtworkSources(game, 'landscape')[0] ?? null;
-  const logoUrl = getPreferredLogoUrl(game);
-  const playtime = game.playtimeHours > 0 ? `${Math.round(game.playtimeHours)}${t('home.hoursPlayed')}` : null;
-
-  return (
-    <button
-      className="group relative flex w-full gap-3 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950 p-3 text-left shadow-panel transition hover:border-mint/40 hover:shadow-glow"
-      data-home-focus="true"
-      onClick={onClick}
-      type="button"
-    >
-      {/* Ambient background — landscape/hero art at low opacity for depth */}
-      {ambientSource ? (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-          <img
-            alt=""
-            className="h-full w-full scale-105 object-cover opacity-[0.12] blur-sm"
-            decoding="async"
-            loading="lazy"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            src={ambientSource}
-          />
-          <div className="absolute inset-0 bg-ink-950/60" />
-        </div>
-      ) : null}
-
-      {/* Portrait cover */}
-      <span className={`relative shrink-0 overflow-hidden rounded-lg border border-skyglass/15 bg-ink-800 ${hero ? 'h-24 w-16' : 'h-20 w-[3.25rem]'}`}>
-        <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
-      </span>
-
-      {/* Text + metadata */}
-      <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-2">
-        <div className="min-w-0">
-          {eyebrow ? (
-            <span className="mb-1.5 inline-flex w-fit items-center rounded-full border border-mint/30 bg-ink-950/78 px-2.5 py-1 qs-label-caps text-accent">
-              {eyebrow}
-            </span>
-          ) : null}
-          {logoUrl ? (
-            <img
-              alt=""
-              aria-hidden="true"
-              className="mb-1 block max-h-6 max-w-[110px] object-contain object-left drop-shadow"
-              decoding="async"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              src={logoUrl}
-            />
-          ) : null}
-          <span className={`line-clamp-2 block font-semibold leading-tight text-white drop-shadow ${hero ? 'text-base' : 'text-sm'}`}>
-            {game.title}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <PlatformIdentityBadge
-              className="w-fit rounded-full px-2.5 py-1 text-xs font-semibold"
-              platform={getGamePlatformLabel(game, queueState)}
-              queueState={queueState}
-            />
-            {playtime ? <span className="text-xs text-slate-400">{playtime}</span> : null}
-          </div>
-          {activitySignal ? (
-            <div className="mt-1 text-xs leading-none text-slate-400">
-              {activitySignal}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function NextAdventureCard({
-  entry,
-  game,
-  queueState,
-  onPlay,
-  onOpenPlan,
-  t,
-}: {
-  entry: PlatformQueueEntry;
-  game: Game;
-  queueState: PlatformQueueState;
-  onPlay: () => void;
-  onOpenPlan: () => void;
-  t: ReturnType<typeof useI18n>['t'];
-}) {
-  const coverSource = getPreferredArtworkSources(game, 'background')[0];
-
-  return (
-    <button
-      className="qs-home-next-adventure-card relative w-full overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
-      data-home-focus="true"
-      onClick={onOpenPlan}
-      type="button"
-    >
-      {coverSource ? (
-        <div className="absolute inset-0">
-          <img
-            alt=""
-            className="h-full w-full object-cover opacity-15"
-            decoding="async"
-            loading="lazy"
-            src={coverSource}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 to-transparent" />
-        </div>
-      ) : null}
-      <div className="relative flex h-full flex-col gap-3 p-4">
-        <PlatformIdentityBadge
-          className="w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold"
-          platform={entry.targetPlatform}
-          queueState={queueState}
-        />
-        <div>
-          <div className="qs-home-next-candidate-label text-xs text-slate-500">{t('home.nextCandidate')}</div>
-          <h3 className="mt-0.5 text-lg font-bold leading-snug text-white">{game.title}</h3>
-        </div>
-        <div className="mt-auto">
-          <button
-            className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-            data-home-focus="true"
-            onClick={(e) => { e.stopPropagation(); onPlay(); }}
-            type="button"
-          >
-            <Icon name="play-circle" size={16} strokeWidth={2.5} />
-            {t('home.playToday')}
-          </button>
-        </div>
-      </div>
-    </button>
-  );
-}
-
 function DealAlertCard({
   deals,
   onViewDeals,
@@ -1045,157 +998,6 @@ function DealAlertCard({
       >
         View Deals
       </button>
-    </div>
-  );
-}
-
-function WishlistDealCard({
-  game,
-  onClick,
-  t,
-}: {
-  game: Game;
-  onClick: () => void;
-  t: ReturnType<typeof useI18n>['t'];
-}) {
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
-  const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
-      : null;
-
-  return (
-    <button
-      className="w-36 shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-950/70 text-left transition hover:border-mint/35"
-      data-home-focus="true"
-      onClick={onClick}
-      type="button"
-    >
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-ink-800">
-        <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
-        {discount ? (
-          <div className="absolute left-1.5 top-1.5 rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">
-            {discount}
-          </div>
-        ) : null}
-        {game.itadIsHistoricalLow ? (
-          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-amber-950">
-            <Icon name="trophy" size={9} strokeWidth={2.5} />
-            {t('itad.historicalLow')}
-          </div>
-        ) : null}
-      </div>
-      <div className="p-2">
-        <p className="line-clamp-2 text-xs font-semibold text-white">{game.title}</p>
-        {price ? <p className="mt-1 text-xs font-semibold text-mint">{price}</p> : null}
-        {game.itadCurrentBestShop ? (
-          <p className="mt-0.5 truncate text-xs text-slate-500">{game.itadCurrentBestShop}</p>
-        ) : null}
-      </div>
-    </button>
-  );
-}
-
-function WishlistDealActionSheet({
-  game,
-  onClose,
-  onOpenDetails,
-}: {
-  game: Game;
-  onClose: () => void;
-  onOpenDetails: (game: Game) => void;
-}) {
-  const { t } = useI18n();
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose });
-  const discount = typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : null;
-  const price =
-    typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
-      ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
-      : null;
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Deal for ${game.title}`}
-    >
-      <div className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
-        ref={panelRef}
-        style={{ paddingBottom: 'max(1.25rem, var(--qs-safe-bottom))', ...dragStyle }}
-      >
-        <div className="qs-sheet-drag-region flex justify-center pb-2 pt-3" {...dragHandleProps}>
-          <div className="qs-sheet-handle h-1.5 w-16 rounded-full bg-skyglass/35" title="Swipe down to dismiss" />
-        </div>
-        <div className="px-4 pb-2 pt-1">
-          <div className="mb-5 flex gap-3.5">
-            <div className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-xl border border-skyglass/15 bg-ink-800 shadow-panel">
-              <GameCoverImage className="h-full w-full object-cover" game={game} />
-            </div>
-            <div className="min-w-0 flex-1 py-0.5">
-              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{game.title}</h3>
-              {game.itadCurrentBestShop ? (
-                <p className="mt-1 text-sm text-slate-400">{game.itadCurrentBestShop}</p>
-              ) : null}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {discount ? (
-                  <span className="rounded bg-mint/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{discount}</span>
-                ) : null}
-                {price ? <span className="text-sm font-semibold text-mint">{price}</span> : null}
-                {game.itadIsHistoricalLow ? (
-                  <span className="flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-400">
-                    <Icon name="trophy" size={10} strokeWidth={2.5} />
-                    {t('itad.historicalLow')}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {game.itadCurrentBestUrl ? (
-            <a
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-2xl bg-mint px-4 text-base font-bold text-ink-950 shadow-glow transition active:scale-[0.97] hover:bg-mint/90"
-              href={game.itadCurrentBestUrl}
-              rel="noreferrer"
-              target="_blank"
-              onClick={onClose}
-            >
-              🛒 {t('itad.openDeal')}
-            </a>
-          ) : null}
-
-          <div className="mt-3.5 overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60">
-            <button
-              className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10]"
-              onClick={() => { onOpenDetails(game); onClose(); }}
-              type="button"
-            >
-              <Icon name="external-link" size={18} strokeWidth={2} className="shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1 text-sm font-medium text-slate-200">{t('home.openDetails')}</span>
-              <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
-            </button>
-          </div>
-
-          <button
-            className="mt-3 min-h-11 w-full rounded-2xl text-sm text-slate-500 transition hover:text-slate-300"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1550,33 +1352,6 @@ function FirstDayProgressPanel({
   );
 }
 
-function EmptyState({
-  actionLabel,
-  text,
-  title,
-  onAction,
-}: {
-  actionLabel: string;
-  text: string;
-  title: string;
-  onAction: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-skyglass/15 bg-ink-950/55 p-4 text-center">
-      <h4 className="text-base font-semibold text-white">{title}</h4>
-      <p className="mt-1 text-sm text-slate-400">{text}</p>
-      <button
-        className="mt-4 min-h-10 rounded-lg border border-mint/30 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20"
-        data-home-focus="true"
-        onClick={onAction}
-        type="button"
-      >
-        {actionLabel}
-      </button>
-    </div>
-  );
-}
-
 function isBacklogReviewCandidate(game: Game) {
   return game.collectionType === 'library' && game.status !== 'Finished' && game.status !== 'Dropped' && game.status !== 'Playing';
 }
@@ -1628,8 +1403,8 @@ function getGameActivitySignal(
       if (streak >= 2) return `🔥 ${streak}-day streak`;
 
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      if (dates[0] === todayStr) return 'Played today';
-      return 'Played yesterday';
+      if (dates[0] === todayStr) return 'Last played today';
+      return 'Last played yesterday';
     }
   }
 
@@ -1638,8 +1413,8 @@ function getGameActivitySignal(
     const parsed = parseLocalDateStr(lastPlayedAt);
     if (isNaN(parsed.getTime())) return null;
     const days = localDayDiff(parsed, now);
-    if (days === 0) return 'Played today';
-    if (days === 1) return 'Played yesterday';
+    if (days === 0) return 'Last played today';
+    if (days === 1) return 'Last played yesterday';
     if (days <= 6) return `Last played ${days} days ago`;
     if (days <= 14) return 'Last played last week';
     if (days <= 30) return 'Last played this month';
@@ -1732,8 +1507,10 @@ function SyncMaintenanceSheet({
   lastPlaytimeSyncAt,
   onClose,
   onSyncItadDeals,
+  onImportNewSteamGames,
   onSyncSteamAchievements,
   onSyncSteamPlaytime,
+  isImportingNewSteamGames = false,
 }: {
   hasSteamGames: boolean;
   isSteamAchievementSyncing: boolean;
@@ -1744,8 +1521,10 @@ function SyncMaintenanceSheet({
   lastPlaytimeSyncAt: Date | null;
   onClose: () => void;
   onSyncItadDeals?: () => void;
+  onImportNewSteamGames?: () => void;
   onSyncSteamAchievements?: () => void;
   onSyncSteamPlaytime?: () => void;
+  isImportingNewSteamGames?: boolean;
 }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -1768,6 +1547,9 @@ function SyncMaintenanceSheet({
         <div className="px-4 pb-2 pt-1">
           <h3 className="mb-4 text-base font-bold text-white">{t('home.syncMaintenance')}</h3>
           <div className="overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/60 divide-y divide-[var(--border)]">
+            {onImportNewSteamGames ? (
+              <SyncSheetButton icon="steam" label="Import new Steam games" syncingLabel="Finding newly owned Steam games…" isSyncing={isImportingNewSteamGames} lastSyncAt={null} subtitle="Find newly owned Steam games" onClick={onImportNewSteamGames} neverLabel={t('home.neverSynced')} />
+            ) : null}
             {hasSteamGames && onSyncSteamAchievements ? (
               <SyncSheetButton icon="trophy" label="Sync Achievements" syncingLabel="Syncing achievements…" isSyncing={isSteamAchievementSyncing} lastSyncAt={lastAchievementSyncAt} onClick={onSyncSteamAchievements} neverLabel={t('home.neverSynced')} />
             ) : null}
@@ -1790,13 +1572,13 @@ function SyncMaintenanceSheet({
   );
 }
 
-function SyncSheetButton({ icon, isSyncing, label, lastSyncAt, neverLabel, onClick, syncingLabel }: { icon: Parameters<typeof Icon>[0]['name']; isSyncing: boolean; label: string; lastSyncAt: Date | string | null; neverLabel: string; onClick: () => void; syncingLabel: string }) {
+function SyncSheetButton({ icon, isSyncing, label, lastSyncAt, neverLabel, onClick, syncingLabel, subtitle }: { icon: Parameters<typeof Icon>[0]['name']; isSyncing: boolean; label: string; lastSyncAt: Date | string | null; neverLabel: string; onClick: () => void; syncingLabel: string; subtitle?: string }) {
   return (
     <button className="flex min-h-[60px] w-full items-center gap-3.5 px-4 text-left transition hover:bg-mint/[0.07] active:bg-mint/[0.10] disabled:opacity-50" disabled={isSyncing} onClick={onClick} type="button">
       <Icon name={isSyncing ? 'refresh-cw' : icon} size={18} strokeWidth={2} className={`shrink-0 text-slate-400 ${isSyncing ? 'animate-spin' : ''}`} />
       <div className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-slate-200">{label}</span>
-        <span className={`block text-xs ${isSyncing ? 'text-mint' : 'text-slate-500'}`}>{isSyncing ? syncingLabel : lastSyncAt ? formatRelativeTime(lastSyncAt, neverLabel) : neverLabel}</span>
+        <span className={`block text-xs ${isSyncing ? 'text-mint' : 'text-slate-500'}`}>{isSyncing ? syncingLabel : subtitle ?? (lastSyncAt ? formatRelativeTime(lastSyncAt, neverLabel) : neverLabel)}</span>
       </div>
       {!isSyncing ? <Icon name="chevrons-right" size={14} strokeWidth={2} className="shrink-0 text-slate-600" /> : null}
     </button>

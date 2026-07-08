@@ -2,7 +2,6 @@ import { postIntegration } from '../lib/integrationProxy';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 import type { RawgGameDetails, RawgMetadata, RawgScreenshotList, RawgSearchResult } from '../types/rawg';
 
-const RAWG_API_BASE_URL = 'https://api.rawg.io/api';
 
 type RawgSearchResponse = {
   results?: RawgSearchResult[];
@@ -33,7 +32,7 @@ async function requestRawg<T>(path: string, params: Record<string, string> = {})
   const apiKey = getRawgApiKey();
   if (!import.meta.env.DEV || import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL?.trim()) {
     try {
-      const route = path === '/games' ? '/games' : path.endsWith('/screenshots') ? '/games/{id}/screenshots' : '/games/{id}';
+      const route = path === '/games' ? '/games' : path.endsWith('/screenshots') ? '/games/{id}/screenshots' : path.endsWith('/suggested') ? '/games/{id}/suggested' : path.endsWith('/game-series') ? '/games/{id}/game-series' : '/games/{id}';
       const rawgId = path.match(/^\/games\/(\d+)/)?.[1];
       const payload = await postIntegration<{ response: T }>('rawg', 'request', { apiKey, route, rawgId, params });
       return payload.response;
@@ -42,15 +41,20 @@ async function requestRawg<T>(path: string, params: Record<string, string> = {})
     }
   }
 
-  const url = new URL(`${RAWG_API_BASE_URL}${path}`);
-  url.searchParams.set('key', apiKey);
-  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-  let response: Response;
-  try { response = await fetch(url); } catch { throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure'); }
-  if (response.status === 429 || response.status === 503) throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
-  if (response.status === 401 || response.status === 403) throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
-  if (!response.ok) throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
-  return (await response.json()) as T;
+  if (import.meta.env.DEV) {
+    const rawgApiBaseUrl = 'https://api.rawg.io/api';
+    const url = new URL(`${rawgApiBaseUrl}${path}`);
+    url.searchParams.set('key', apiKey);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    let response: Response;
+    try { response = await fetch(url); } catch { throw new RawgApiError('RAWG request failed. Check network access and try again.', 'api-failure'); }
+    if (response.status === 429 || response.status === 503) throw new RawgApiError('RAWG is rate limited or temporarily unavailable. Try again later.', 'rate-limit');
+    if (response.status === 401 || response.status === 403) throw new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key');
+    if (!response.ok) throw new RawgApiError('RAWG request failed. Check the key and try again.', 'api-failure');
+    return (await response.json()) as T;
+  }
+
+  throw new RawgApiError('RAWG production requests must use the integration proxy.', 'api-failure');
 }
 
 function mapRawgProxyError(error: unknown): RawgApiError {
@@ -91,7 +95,68 @@ export async function getGameScreenshots(rawgId: number): Promise<string[]> {
   return data.results.map((s) => s.image);
 }
 
+export async function fetchSuggestedGames(rawgId: number): Promise<RawgSearchResult[]> {
+  try {
+    const data = await requestRawg<{ results?: RawgSearchResult[] }>(`/games/${rawgId}/suggested`, { page_size: '10' });
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchGameSeries(rawgId: number): Promise<RawgSearchResult[]> {
+  try {
+    const data = await requestRawg<{ results?: RawgSearchResult[] }>(`/games/${rawgId}/game-series`, { page_size: '10' });
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export interface RecommendedGamesParams {
+  /** Comma-separated RAWG genre slugs, e.g. "action,role-playing-games-rpg" */
+  genres?: string;
+  /** Comma-separated RAWG tag slugs, e.g. "deckbuilding,roguelite" */
+  tags?: string;
+  /** Optional lower bound for metacritic filter */
+  metacriticMin?: number;
+  /** Optional upper bound for metacritic filter */
+  metacriticMax?: number;
+  /** RAWG ordering param, e.g. "-rating", "-added", "-released". Defaults to "-rating". */
+  ordering?: string;
+  /** RAWG dates range filter, e.g. "2025-01-01,2025-12-31" */
+  dates?: string;
+  pageSize?: number;
+}
+
+export async function fetchRecommendedGames(
+  params: RecommendedGamesParams,
+): Promise<RawgSearchResult[]> {
+  try {
+    const queryParams: Record<string, string> = {
+      page_size: String(params.pageSize ?? 24),
+      ordering: params.ordering ?? '-rating',
+    };
+    if (params.genres) queryParams.genres = params.genres;
+    if (params.tags) queryParams.tags = params.tags;
+    if (params.metacriticMin != null || params.metacriticMax != null) {
+      queryParams.metacritic = `${params.metacriticMin ?? 0},${params.metacriticMax ?? 100}`;
+    }
+    if (params.dates) queryParams.dates = params.dates;
+    const data = await requestRawg<{ results?: RawgSearchResult[] }>('/games', queryParams);
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function getPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {
+  const metacriticScore = getPositiveNumber(details.metacritic);
+  const rawgPlaytimeHours = getPositiveNumber(details.playtime);
   return {
     rawgId: details.id,
     rawgSlug: details.slug,
@@ -103,6 +168,8 @@ export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata
     released: details.released,
     metacritic: details.metacritic,
     averagePlaytime: details.playtime ?? null,
+    ...(metacriticScore ? { metacriticScore } : {}),
+    ...(rawgPlaytimeHours ? { rawgPlaytimeHours } : {}),
     backgroundImage: details.background_image,
     metadataSource: 'rawg',
     metadataUpdatedAt: new Date().toISOString(),

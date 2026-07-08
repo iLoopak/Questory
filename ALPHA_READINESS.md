@@ -153,7 +153,7 @@ Brand-new users who skip Steam and visit Platform Plans immediately land in a de
 | Library (import, browse, filter) | Ready |
 | Quest Queue (triage, decisions) | Ready with minor copy gaps |
 | Platform Plans (backlog per platform) | Ready — naming consistency needed |
-| Playing Now (active game tracking) | Ready |
+| Home active gameplay dashboard | Ready |
 | Home (dashboard, orientation) | Ready — stiff phrase in new strip |
 | Onboarding | Near-ready — Steam step copy needs warmth |
 | Wishlist + Deals | Functional — no loading state during sync |

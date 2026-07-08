@@ -3,7 +3,13 @@ import { createPortal } from 'react-dom';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { getRecentSteamActivityForGame, type PlayActivityRecord } from '../lib/playActivityStorage';
 import type { PlatformQueueState } from '../lib/platformQueueStorage';
-import { canUseRawgImageAsCover, getGameCoverSources, getPreferredLogoUrl, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
+import { canUseRawgImageAsCover } from '../lib/gameCoverImages';
+import { FullscreenGameShell } from './game-detail/FullscreenGameShell';
+import { GameHero, HeroStat, getDisplayTitle } from './game-detail/GameHero';
+import { EditTitleModal } from './game-detail/EditTitleModal';
+import { DetailSection } from './game-detail/DetailSection';
+import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from './game-detail/GameDetailActions';
+import { GameInformationSection, formatMetacriticScore, formatRawgPlaytime } from './game-detail/GameInformationSection';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
@@ -18,10 +24,13 @@ import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { ContextualRecommendationsSection } from './discovery/ContextualRecommendationsSection';
+import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type GameDetailViewProps = {
   activity?: PlayActivityRecord[];
   game: Game;
+  allGames?: Game[];
   onAddToQueue?: (game: Game) => void;
   onAddToWishlist?: (game: Game) => void;
   onBack: () => void;
@@ -34,15 +43,11 @@ type GameDetailViewProps = {
   onTrackingChange: (gameId: string, tracking: Pick<Game, 'notes' | 'status' | 'tags'> & Partial<Pick<Game, 'artworkSource' | 'artworkUpdatedAt' | 'coverImage'>>) => void;
   onGameEdit?: (gameId: string, changes: Partial<Game>) => void;
   onGameEditSaved?: (game: Game) => void;
+  onSelectDiscoveryGame?: (game: DiscoveryGame) => void;
+  onAddDiscoveryGameToInbox?: (game: DiscoveryGame, reason: string) => void;
+  discoveryInboxRawgIds?: Set<number>;
+  onOpenDiscoveryPreview?: (candidate: DiscoveryCandidate) => void;
   platformQueueState?: PlatformQueueState;
-};
-
-type GameDetailAction = {
-  icon: IconName;
-  label: string;
-  onClick: () => void;
-  tone: 'accent' | 'neutral' | 'danger';
-  disabled?: boolean;
 };
 
 export function GameDetailView({
@@ -61,13 +66,16 @@ export function GameDetailView({
   platformQueueState,
   onGameEdit,
   onGameEditSaved,
+  allGames = [],
+  onSelectDiscoveryGame,
+  onAddDiscoveryGameToInbox,
+  discoveryInboxRawgIds = new Set(),
+  onOpenDiscoveryPreview,
 }: GameDetailViewProps) {
   const { t } = useI18n();
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
-  const [heroBgSourceIndex, setHeroBgSourceIndex] = useState(0);
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
   const [editError, setEditError] = useState('');
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
@@ -80,18 +88,6 @@ export function GameDetailView({
   const [pausedGhostSlot] = useState(() => pickQueueGhostSlot('gameDetail'));
   const [showPausedGhost, setShowPausedGhost] = useState(() => Boolean(pausedGhostSlot) && isLongPausedGame(game) && shouldShowQueueGhostInHabitat('gameDetail'));
 
-  const coverSources = useMemo(() => getGameCoverSources(game), [game]);
-
-  const heroBgSources = useMemo(() => {
-    const candidates = [
-      game.heroImage?.trim(),
-      game.wideCoverImage?.trim(),
-      game.backgroundImage?.trim(),
-      !isMissingOrGeneratedCover(game.coverImage) ? game.coverImage?.trim() : null,
-    ].filter((s): s is string => Boolean(s));
-    return [...new Set(candidates)];
-  }, [game.heroImage, game.wideCoverImage, game.backgroundImage, game.coverImage]);
-
   useEffect(() => () => releaseQueueGhostHabitat('gameDetail'), []);
 
   useLayoutEffect(() => {
@@ -99,25 +95,18 @@ export function GameDetailView({
   }, [game.id]);
 
   useEffect(() => {
-    setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
-    setHeroBgSourceIndex(0);
     setTagText(game.tags.join(', '));
     setEditDraft(createEditDraft(game));
     setIsEditing(false);
+    setIsEditingTitle(false);
     setEditError('');
-  }, [coverSources, heroBgSources, game.id, game.tags]);
+  }, [game.id, game.tags]);
 
-  const activeCoverSource = coverSources[coverSourceIndex];
-  const activeHeroBgSource = heroBgSources[heroBgSourceIndex] ?? null;
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
   const canApplyRawgCover = canUseRawgImageAsCover(game);
   const isSteamLibraryGame = game.collectionType === 'library' && typeof game.steamAppId === 'number';
   const hasPlaytime = game.playtimeHours > 0;
   const achievementSummary = formatSteamAchievementSummary(game);
-  const logoUrl = getPreferredLogoUrl(game);
-  const isArtworkMissing = isMissingOrGeneratedCover(game.coverImage);
-  const canFindArtwork = isArtworkMissing || game.metadataSource !== 'rawg';
   const currentItadPrice = typeof game.itadCurrentBestPrice === 'number' && game.itadCurrentBestCurrency
     ? formatDealPrice(game.itadCurrentBestPrice, game.itadCurrentBestCurrency)
     : undefined;
@@ -125,6 +114,8 @@ export function GameDetailView({
     ? formatDealPrice(game.itadHistoricalLowPrice, game.itadHistoricalLowCurrency)
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
+  const metacriticScore = formatMetacriticScore(game.metacriticScore ?? game.metacritic);
+  const rawgPlaytime = formatRawgPlaytime(game.rawgPlaytimeHours ?? game.averagePlaytime);
   const canEditGame = isGameEditable(game);
   const recentSteamActivity = useMemo(() => getRecentSteamActivityForGame(activity, game.id), [activity, game.id]);
   const lastSteamActivityAt = recentSteamActivity?.detectedAt ?? game.lastSteamActivityAt;
@@ -139,12 +130,20 @@ export function GameDetailView({
   }
 
   function saveArtworkFromPicker(changes: Partial<Game>) {
-    onGameEdit?.(game.id, {
-      notes: game.notes,
-      status: game.status,
-      tags: game.tags,
-      ...changes,
-    });
+    const artworkChanges = pickArtworkChanges(changes);
+    if (Object.keys(artworkChanges).length === 0) return;
+    onGameEdit?.(game.id, artworkChanges);
+  }
+
+  async function handleRefreshArtwork() {
+    if (!onFindArtwork) return;
+    const result = await onFindArtwork(game, 'artwork');
+    // When the automatic lookup applies nothing, flow straight into the manual
+    // SteamGridDB picker (the same one "Change Artwork" opens) instead of dead-ending
+    // on a toast and making the user reopen the menu.
+    if (result === 'no-match' || result === 'error') {
+      setIsArtworkPickerOpen(true);
+    }
   }
 
 
@@ -164,6 +163,14 @@ export function GameDetailView({
     setIsEditing(false);
     setEditError('');
     onGameEditSaved?.({ ...game, ...getGameEditChanges(game, editDraft) });
+  }
+
+  function saveTitleCorrection(rawTitle: string) {
+    const changes = getTitleCorrectionChanges(game, rawTitle);
+    if (!changes.title) return;
+    onGameEdit?.(game.id, changes);
+    onGameEditSaved?.({ ...game, ...changes });
+    setIsEditingTitle(false);
   }
 
   function linkRawgGame(result: RawgSearchResult) {
@@ -198,7 +205,7 @@ export function GameDetailView({
   const primaryActions: GameDetailAction[] = [
     {
       icon: 'list-plus',
-      label: 'Quest Queue',
+      label: t('action.platformPlans'),
       onClick: () => onAddToQueue?.(game),
       tone: 'accent',
       disabled: !onAddToQueue,
@@ -226,403 +233,403 @@ export function GameDetailView({
     },
   ];
 
+  // Escape peels one layer at a time: inner surfaces that don't intercept
+  // Escape themselves (they would stop propagation) close before the hub
+  // itself navigates back.
+  function handleShellClose() {
+    if (isRawgLinkOpen) {
+      setIsRawgLinkOpen(false);
+      return;
+    }
+    if (isAchievementsOpen) {
+      setIsAchievementsOpen(false);
+      return;
+    }
+    if (isEditing) {
+      setEditDraft(createEditDraft(game));
+      setEditError('');
+      setIsEditing(false);
+      return;
+    }
+    onBack();
+  }
+
   return (
-    <section className="relative h-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-ink-950 lg:h-[calc(100vh-116px)]">
-      {showPausedGhost && pausedGhostSlot ? (
+    <FullscreenGameShell
+      ariaLabel={`${t('detail.dashboard')}: ${getDisplayTitle(game)}`}
+      floating={showPausedGhost && pausedGhostSlot ? (
         <div className={`queue-ghost-habitat queue-ghost-habitat--game-detail queue-ghost-slot--${pausedGhostSlot}`}>
           <QueueGhost variant="sleepy" message={pickQueueGhostMessage(pausedGameGhostMessages)} onVanish={() => { releaseQueueGhostHabitat('gameDetail'); setShowPausedGhost(false); }} />
         </div>
       ) : null}
-      <div className="flex h-full min-h-0 flex-col">
-        <div ref={detailScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
-          <div className="space-y-3 sm:space-y-4">
-            <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-panel">
-              {activeHeroBgSource ? (
-                <div className="absolute inset-0" aria-hidden="true">
-                  <img
-                    alt=""
-                    className="h-full w-full object-cover opacity-[0.85]"
-                    decoding="async"
-                    loading="lazy"
-                    onError={() => setHeroBgSourceIndex((i) => i + 1)}
-                    src={activeHeroBgSource}
-                  />
-                </div>
-              ) : null}
-              {/* Left-to-right veil: solid over cover/title area, fades to ~25% on far right so hero is clearly visible */}
-              <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/75 to-ink-950/25" aria-hidden="true" />
-              {/* Bottom vignette: light darkening only where stat cards sit */}
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/50 to-transparent" aria-hidden="true" />
+      onClose={handleShellClose}
+      scrollRef={detailScrollRef}
+    >
+      <GameHero
+        game={game}
+        kicker={t('detail.dashboard')}
+        onBack={onBack}
+        stats={<>
+          <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
+          <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
+          {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+          {achievementSummary ? (
+            <HeroStat
+              label={t('collection.achievements')}
+              value={achievementSummary}
+              onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
+            />
+          ) : null}
+          {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+          {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
+          {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
+        </>}
+      />
 
-              <div className="relative grid gap-4 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center xl:grid-cols-[150px_minmax(0,1fr)] xl:p-5">
-                <div className="mx-auto w-32 overflow-hidden rounded-xl border border-white/10 bg-ink-800 shadow-panel sm:mx-0 sm:w-full">
-                  <div className="aspect-[2/3] bg-ink-700">
-                    {activeCoverSource ? (
-                      <div className="relative h-full">
-                        {!isCoverLoaded ? <div className="absolute inset-0 animate-pulse bg-white/5" /> : null}
-                        <img
-                          alt=""
-                          className={`h-full w-full bg-ink-950 object-contain transition-opacity duration-300 ${
-                            isCoverLoaded ? 'opacity-100' : 'opacity-0'
-                          }`}
-                          decoding="async"
-                          loading="lazy"
-                          onError={() => {
-                            setIsCoverLoaded(false);
-                            setCoverSourceIndex((currentIndex) => currentIndex + 1);
-                          }}
-                          onLoad={() => setIsCoverLoaded(true)}
-                          src={activeCoverSource}
-                        />
-                      </div>
-                    ) : (
-                      <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">
-                        <div>
-                          <div className="mx-auto grid h-16 w-16 place-items-center rounded-md border border-white/10 bg-ink-900 text-2xl font-semibold text-mint">
-                            {game.title.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div className="mt-3 text-xs font-medium uppercase tracking-caps text-slate-500">{t('common.noCover')}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+      <GameDetailActionBar
+        ariaLabel={t('detail.actionsA11y')}
+        menu={isOverflowOpen ? (
+          <GameDetailOverflowMenu
+            anchorRef={overflowButtonRef}
+            canEditGame={canEditGame}
+            currentItadPrice={currentItadPrice}
+            game={game}
+            isFindingArtwork={isFindingArtwork}
+            isSteamDataSyncing={isSteamDataSyncing}
+            isSteamLibraryGame={isSteamLibraryGame}
+            menuId={overflowMenuId}
+            onChangeArtwork={() => setIsArtworkPickerOpen(true)}
+            onClose={() => setIsOverflowOpen(false)}
+            onEdit={() => setIsEditing(true)}
+            onFindArtwork={onFindArtwork}
+            onRefreshArtwork={handleRefreshArtwork}
+            onIgnore={onIgnore}
+            onStatusChange={onStatusChange}
+            onSyncSteamData={onSyncSteamData}
+            t={t}
+          />
+        ) : null}
+      >
+        {primaryActions.map((action) => (
+          <GameDetailActionButton key={action.label} action={action} />
+        ))}
+        {game.collectionType === 'wishlist' ? (
+          <button
+            className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+            onClick={() => setIsEditingTitle(true)}
+            type="button"
+          >
+            <span className="flex items-center gap-2">
+              <Icon name="pencil" />
+              <span>Edit title</span>
+            </span>
+          </button>
+        ) : null}
+        <button
+          ref={overflowButtonRef}
+          aria-controls={isOverflowOpen ? overflowMenuId : undefined}
+          aria-expanded={isOverflowOpen}
+          aria-haspopup="dialog"
+          aria-label={t('action.moreActions')}
+          className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
+          onClick={() => setIsOverflowOpen(true)}
+          type="button"
+        >
+          <span className="flex items-center gap-2">
+            <Icon name="more-horizontal" />
+            <span>{t('action.more')}</span>
+          </span>
+        </button>
+      </GameDetailActionBar>
 
-                <div className="min-w-0 space-y-4">
-                  <button className="inline-flex items-center gap-1.5 text-sm font-medium text-mint transition hover:text-white" onClick={onBack} type="button">
-                    <Icon name="arrow-left" />
-                    <span>{t('detail.back')}</span>
-                  </button>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-spread text-slate-500">{t('detail.dashboard')}</div>
-                    {logoUrl ? (
-                      <img
-                        alt=""
-                        aria-hidden="true"
-                        className="mt-2 max-h-12 max-w-[180px] object-contain drop-shadow"
-                        decoding="async"
-                        loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        src={logoUrl}
-                      />
-                    ) : null}
-                    <h2 className="mt-1 min-w-0 text-3xl font-semibold leading-tight text-white sm:text-4xl xl:truncate">{getDisplayTitle(game)}</h2>
-                  </div>
+      {isEditingTitle ? (
+        <EditTitleModal
+          initialTitle={getDisplayTitle(game)}
+          originalImportedTitle={game.originalImportedTitle}
+          onCancel={() => setIsEditingTitle(false)}
+          onSave={saveTitleCorrection}
+        />
+      ) : null}
 
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:max-w-4xl">
-                    <HeroStat label={t('detail.platformSource')} value={formatPlatformSource(game)} />
-                    <HeroStat label={t('detail.currentStatus')} value={translateOption(game.status, t)} accent />
-                    {hasPlaytime ? <HeroStat label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                    {achievementSummary ? (
-                      <HeroStat
-                        label={t('collection.achievements')}
-                        value={achievementSummary}
-                        onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
-                      />
-                    ) : null}
-{hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                  </div>
-                </div>
-              </div>
-            </section>
+      {isRawgLinkOpen ? (
+        <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
+      ) : null}
 
-            <section className="rounded-2xl border border-white/10 bg-ink-950/80 p-3" aria-label={t('detail.actionsA11y')}>
-              <div className="flex flex-wrap items-center gap-2">
-                {primaryActions.map((action) => (
-                  <GameDetailActionButton key={action.label} action={action} />
-                ))}
-                <button
-                  ref={overflowButtonRef}
-                  aria-controls={isOverflowOpen ? overflowMenuId : undefined}
-                  aria-expanded={isOverflowOpen}
-                  aria-haspopup="dialog"
-                  aria-label={t('action.moreActions')}
-                  className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-                  onClick={() => setIsOverflowOpen(true)}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon name="more-horizontal" />
-                    <span>{t('action.more')}</span>
+      {isArtworkPickerOpen ? (
+        <SteamGridDbArtworkPickerModal game={game} onClose={() => setIsArtworkPickerOpen(false)} onSave={saveArtworkFromPicker} />
+      ) : null}
+
+      {isAchievementsOpen && game.steamAchievements ? (
+        <SteamAchievementsPanel
+          achievements={game.steamAchievements}
+          gameTitle={game.title}
+          onClose={() => setIsAchievementsOpen(false)}
+        />
+      ) : null}
+
+      {isEditing ? (
+        <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
+      ) : null}
+
+      <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
+          <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
+            <span className="qs-label-caps text-accent">{t('detail.tags')}</span>
+            <input
+              className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
+              value={tagText}
+              onBlur={() => {
+                setTagText(parsedTags.join(', '));
+                updateTracking({ tags: parsedTags });
+              }}
+              onChange={(event) => setTagText(event.target.value)}
+              placeholder="cozy, backlog, handheld"
+              type="text"
+            />
+            {parsedTags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {parsedTags.map((tag) => (
+                  <span key={tag} className="rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
+                    {tag}
                   </span>
-                </button>
+                ))}
               </div>
-              {isOverflowOpen ? (
-                <GameDetailOverflowMenu
-                  anchorRef={overflowButtonRef}
-                  canEditGame={canEditGame}
-                  canFindArtwork={canFindArtwork}
-                  currentItadPrice={currentItadPrice}
-                  game={game}
-                  isArtworkMissing={isArtworkMissing}
-                  isFindingArtwork={isFindingArtwork}
-                  isSteamDataSyncing={isSteamDataSyncing}
-                  isSteamLibraryGame={isSteamLibraryGame}
-                  menuId={overflowMenuId}
-                  onChangeArtwork={() => setIsArtworkPickerOpen(true)}
-                  onClose={() => setIsOverflowOpen(false)}
-                  onEdit={() => setIsEditing(true)}
-                  onFindArtwork={onFindArtwork}
-                  onIgnore={onIgnore}
-                  onStatusChange={onStatusChange}
-                  onSyncSteamData={onSyncSteamData}
-                  t={t}
-                />
-              ) : null}
-            </section>
-
-            {isRawgLinkOpen ? (
-              <RawgLinkDialog game={game} onClose={() => setIsRawgLinkOpen(false)} onSelect={linkRawgGame} />
             ) : null}
+          </label>
 
-            {isArtworkPickerOpen ? (
-              <SteamGridDbArtworkPickerModal game={game} onClose={() => setIsArtworkPickerOpen(false)} onSave={saveArtworkFromPicker} />
-            ) : null}
+          <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
+            <span className="qs-label-caps text-accent">{t('detail.myNotes')}</span>
+            <NotesField
+              key={game.id}
+              placeholder={t('detail.notesPlaceholder')}
+              value={game.notes}
+              onCommit={(notes) => updateTracking({ notes })}
+            />
+          </label>
+        </div>
 
-            {isAchievementsOpen && game.steamAchievements ? (
-              <SteamAchievementsPanel
-                achievements={game.steamAchievements}
-                gameTitle={game.title}
-                onClose={() => setIsAchievementsOpen(false)}
-              />
-            ) : null}
-
-            {isEditing ? (
-              <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
-            ) : null}
-
-            <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
-                <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="qs-label-caps text-accent">{t('detail.tags')}</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
-                    value={tagText}
-                    onBlur={() => {
-                      setTagText(parsedTags.join(', '));
-                      updateTracking({ tags: parsedTags });
-                    }}
-                    onChange={(event) => setTagText(event.target.value)}
-                    placeholder="cozy, backlog, handheld"
-                    type="text"
-                  />
-                  {parsedTags.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {parsedTags.map((tag) => (
-                        <span key={tag} className="rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </label>
-
-                <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
-                  <span className="qs-label-caps text-accent">{t('detail.myNotes')}</span>
-                  <textarea
-                    className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
-                    value={game.notes}
-                    onChange={(event) => updateTracking({ notes: event.target.value })}
-                    placeholder={t('detail.notesPlaceholder')}
-                  />
-                </label>
-              </div>
-
-              <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
-                <div>
-                  <div className="qs-label-caps text-accent">{t('detail.activity')}</div>
-                  {isSteamLibraryGame ? <p className="mt-1 text-xs text-slate-500">{t('detail.steamActivityHelp')}</p> : null}
-                </div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
-                  {isSteamLibraryGame ? <PersonalStatField label={t('detail.lastSteamActivity')} value={formatRelativeActivityDate(lastSteamActivityAt)} /> : null}
-                  {isSteamLibraryGame ? <PersonalStatField label={t('detail.recentDelta')} value={formatDeltaMinutes(recentSteamDeltaMinutes)} /> : null}
-                  {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
-                  {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
-                </div>
-              </div>
-            </DetailSection>
-
-            <section className="space-y-2" aria-label={t('detail.importedMetadata')}>
-              <div className="px-1 text-xs font-semibold uppercase tracking-spread text-slate-500">{t('detail.importedMetadata')}</div>
-
-              {game.collectionType === 'wishlist' ? (
-                <MetadataAccordion title={t('detail.wishlistPlanning')} summary={t('detail.wishlistPlanningSummary')}>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label={t('detail.priority')} value={t(`priority.${game.priority ?? 'medium'}` as 'priority.low' | 'priority.medium' | 'priority.high')} />
-                    <ReadOnlyField label={t('detail.expectedPlaytime')} value={formatHours(game.expectedPlaytime, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.priceTarget')} value={game.priceTarget || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.releaseDate')} value={game.releaseDate || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.steamPrice')} value={game.steamPriceInfo || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.steamDiscount')} value={game.steamDiscountInfo || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.steamReviews')} value={game.steamReviewInfo || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.dealStore')} value={game.itadCurrentBestShop || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.discount')} value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.historicalLowStatus')} value={game.itadIsHistoricalLow ? t('itad.historicalLow') : t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.wishlistImported')} value={formatDateTime(game.wishlistImportedAt, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.wishlistSynced')} value={formatDateTime(game.wishlistSyncedAt, t('detail.notAvailable'))} />
-                    <ReadOnlyLink label={t('detail.storeUrl')} value={game.storeUrl} />
-                    <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
-                  </div>
-                </MetadataAccordion>
-              ) : null}
-
-              {isRetroGame(game) ? (
-                <MetadataAccordion title="Retro ROM source" summary="Original import files preserved read-only">
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label="Original imported title" value={game.originalImportedTitle ?? game.romFileName ?? game.title} />
-                    <ReadOnlyField label="ROM file name" value={game.romFileName ?? t('detail.notAvailable')} />
-                    <ReadOnlyField label="ROM path" value={game.romPath ?? t('detail.notAvailable')} />
-                    {(game.romFiles ?? []).map((file, index) => (
-                      <ReadOnlyField key={`${file.path}-${index}`} label={`ROM file ${index + 1}${file.role ? ` · ${file.role}` : ''}`} value={file.path} />
-                    ))}
-                  </div>
-                </MetadataAccordion>
-              ) : null}
-
-              <MetadataAccordion title={t('detail.steamData')} summary={t('detail.steamDataSummary')}>
-                {game.externalSource === 'steam' || typeof game.steamAppId === 'number' || game.externalUrl ? (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.imported')} value={formatDateTime(game.importedAt, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.source')} value={game.externalSource ?? t('detail.notAvailable')} />
-                    {achievementSummary ? (
-                      <ReadOnlyField
-                        label={t('collection.achievements')}
-                        value={achievementSummary}
-                        onClick={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
-                      />
-                    ) : null}
-                    {game.steamLastAchievementUnlockTime ? (
-                      <ReadOnlyField label={t('detail.lastAchievementUnlock')} value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString(), t('detail.notAvailable'))} />
-                    ) : null}
-                    <ReadOnlyLink label={t('detail.externalUrl')} value={game.externalUrl} />
-                  </div>
-                ) : (
-                  <EmptyState text={t('detail.noSteamMetadata')} />
-                )}
-              </MetadataAccordion>
-
-
-              {hasHltbData(game) ? (
-                <MetadataAccordion title="HowLongToBeat" summary={t('hltb.estimatedTime')}>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.matchedTitle')} value={game.hltbTitle ?? t('detail.notAvailable')} />
-                    <ReadOnlyField label={t('detail.matchConfidence')} value={formatConfidence(game.hltbMatchConfidence, t('detail.notAvailable'))} />
-                    <ReadOnlyField label={t('detail.lastSynced')} value={formatDateTime(game.hltbLastSyncedAt, t('detail.notAvailable'))} />
-                    {game.hltbSourceUrl ? <ReadOnlyLink label={t('detail.source')} value={game.hltbSourceUrl} /> : null}
-                  </div>
-                </MetadataAccordion>
-              ) : null}
-
-              <MetadataSourceSection game={game} isFindingArtwork={isFindingArtwork} onChangeLink={() => setIsRawgLinkOpen(true)} onFindArtwork={onFindArtwork} />
-
-              <MetadataAccordion title={t('detail.rawgMetadata')} summary={t('detail.rawgSummary')}>
-                {game.metadataSource === 'rawg' ? (
-                  <div className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <ReadOnlyField label={t('detail.released')} value={game.released ?? t('detail.unknown')} />
-                      <ReadOnlyField label="Metacritic" value={game.metacritic?.toString() ?? t('detail.notAvailable')} />
-                      <ReadOnlyField label={t('detail.averagePlaytime')} value={formatHours(game.averagePlaytime, t('detail.notAvailable'))} />
-                      <ReadOnlyField label={t('detail.updated')} value={formatDateTime(game.metadataUpdatedAt, t('detail.notAvailable'))} />
-                      <ReadOnlyField label={t('detail.developers')} value={formatList(game.developers, t('detail.notAvailable'))} />
-                      <ReadOnlyField label={t('detail.publishers')} value={formatList(game.publishers, t('detail.notAvailable'))} />
-                    </div>
-
-                    <ChipGroup label={t('detail.genres')} values={game.genres} accent="mint" />
-                    <ChipGroup label={t('detail.rawgTags')} values={game.rawgTags} />
-                    {canApplyRawgCover ? (
-                      <button
-                        className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20"
-                        onClick={useRawgImageAsCover}
-                        type="button"
-                      >
-                        {t('detail.useRawgCover')}
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <EmptyState text={t('detail.noRawgMetadata')} />
-                    {onFindArtwork ? (
-                      <button
-                        className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={isFindingArtwork}
-                        onClick={() => void onFindArtwork(game)}
-                        type="button"
-                      >
-                        {isFindingArtwork ? t('artwork.searching') : t('artwork.enrichMetadata')}
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </MetadataAccordion>
-            </section>
+        <div className="space-y-2 rounded-xl border border-mint/20 bg-ink-950/60 p-3 shadow-inner shadow-mint/5">
+          <div>
+            <div className="qs-label-caps text-accent">{t('detail.activity')}</div>
+            {isSteamLibraryGame ? <p className="mt-1 text-xs text-slate-500">{t('detail.steamActivityHelp')}</p> : null}
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <PersonalStatField label={t('detail.lastPlayed')} value={formatDate(game.lastPlayedAt, t('detail.notStarted'))} />
+            {isSteamLibraryGame ? <PersonalStatField label={t('detail.lastSteamActivity')} value={formatRelativeActivityDate(lastSteamActivityAt)} /> : null}
+            {isSteamLibraryGame ? <PersonalStatField label={t('detail.recentDelta')} value={formatDeltaMinutes(recentSteamDeltaMinutes)} /> : null}
+            {!hasPlaytime ? <PersonalStatField label={t('detail.playtime')} value={`${game.playtimeHours}h`} /> : null}
+            {hltbBadge ? <PersonalStatField label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
           </div>
         </div>
-      </div>
-    </section>
+      </DetailSection>
+
+      <GameInformationSection
+        game={game}
+        metacriticScore={metacriticScore}
+        rawgPlaytime={rawgPlaytime}
+        t={t}
+      />
+      <DeveloperToolsSection
+        achievementSummary={achievementSummary}
+        canApplyRawgCover={canApplyRawgCover}
+        currentItadPrice={currentItadPrice}
+        game={game}
+        historicalItadPrice={historicalItadPrice}
+        isFindingArtwork={isFindingArtwork}
+        onChangeLink={() => setIsRawgLinkOpen(true)}
+        onFindArtwork={onFindArtwork}
+        onUseRawgCover={useRawgImageAsCover}
+        onViewAchievements={game.steamAchievements ? () => setIsAchievementsOpen(true) : undefined}
+        t={t}
+      />
+      <ContextualRecommendationsSection
+        game={game}
+        userGames={allGames}
+        inboxRawgIds={discoveryInboxRawgIds}
+        onSelectGame={onSelectDiscoveryGame ?? (() => undefined)}
+        onAddToInbox={onAddDiscoveryGameToInbox}
+        onOpenPreview={onOpenDiscoveryPreview}
+      />
+    </FullscreenGameShell>
   );
 }
 
-function MetadataSourceSection({
+function DeveloperToolsSection({
+  achievementSummary,
+  canApplyRawgCover,
+  currentItadPrice,
   game,
+  historicalItadPrice,
   isFindingArtwork,
   onChangeLink,
   onFindArtwork,
+  onUseRawgCover,
+  onViewAchievements,
+  t,
 }: {
+  achievementSummary: string | null;
+  canApplyRawgCover: boolean;
+  currentItadPrice?: string;
   game: Game;
+  historicalItadPrice?: string;
   isFindingArtwork: boolean;
   onChangeLink: () => void;
   onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>;
+  onUseRawgCover: () => void;
+  onViewAchievements?: () => void;
+  t: TFunction;
 }) {
   const rawgUrl = getRawgUrl(game);
   const linkedTitle = game.rawgTitle?.trim() || game.metadataSearchTitle?.trim() || game.title;
+  const hasSteamData = game.externalSource === 'steam' || typeof game.steamAppId === 'number' || Boolean(game.externalUrl);
 
   return (
-    <MetadataAccordion title="Metadata Source" summary={game.rawgId ? `RAWG #${game.rawgId}` : 'Not linked'}>
-      {typeof game.rawgId === 'number' ? (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <ReadOnlyField label="Linked RAWG title" value={linkedTitle} />
-            <ReadOnlyField label="RAWG ID" value={game.rawgId.toString()} />
-            <ReadOnlyField label="RAWG slug" value={game.rawgSlug || 'Optional'} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {onFindArtwork ? (
-              <>
-                <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">
-                  {isFindingArtwork ? 'Refreshing…' : 'Refresh Metadata'}
-                </button>
-                <button className="h-10 rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'artwork')} type="button">
-                  {isFindingArtwork ? 'Refreshing…' : 'Refresh Artwork'}
-                </button>
-              </>
-            ) : null}
-            {rawgUrl ? (
-              <a className="grid h-10 place-items-center rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" href={rawgUrl} rel="noreferrer" target="_blank">
-                Open RAWG
-              </a>
-            ) : null}
-            <button className="h-10 rounded-md border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={onChangeLink} type="button">
-              Change Link
-            </button>
-          </div>
+    <details className="group rounded-2xl border border-white/10 bg-ink-950/65 text-slate-300">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
+        <Icon className="shrink-0 text-slate-600 transition group-open:rotate-90" name="chevrons-right" />
+        <div className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-400">Developer Tools</span>
+          <span className="block text-xs text-slate-600 truncate">Steam · RAWG · Artwork</span>
         </div>
-      ) : (
-        <div className="space-y-3">
-          <EmptyState text="Not linked" />
-          <button className="h-10 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20" onClick={onChangeLink} type="button">
-            Link RAWG Game
-          </button>
-        </div>
-      )}
-    </MetadataAccordion>
+      </summary>
+
+      <div className="border-t border-white/10 p-4 space-y-6">
+        {hasSteamData ? (
+          <DevToolsSubSection title="Steam">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label="Steam App ID" value={game.steamAppId?.toString() ?? t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.source')} value={game.externalSource ?? t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.imported')} value={formatDateTime(game.importedAt, t('detail.notAvailable'))} />
+              {achievementSummary ? (
+                <ReadOnlyField
+                  label={t('collection.achievements')}
+                  value={achievementSummary}
+                  onClick={onViewAchievements}
+                />
+              ) : null}
+              {game.steamLastAchievementUnlockTime ? (
+                <ReadOnlyField
+                  label={t('detail.lastAchievementUnlock')}
+                  value={formatDateTime(new Date(game.steamLastAchievementUnlockTime * 1000).toISOString(), t('detail.notAvailable'))}
+                />
+              ) : null}
+              <ReadOnlyLink label={t('detail.externalUrl')} value={game.externalUrl} />
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+
+        <DevToolsSubSection title="RAWG">
+          {typeof game.rawgId === 'number' ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <ReadOnlyField label="Linked title" value={linkedTitle} />
+                <ReadOnlyField label="RAWG ID" value={game.rawgId.toString()} />
+                <ReadOnlyField label="RAWG slug" value={game.rawgSlug ?? t('detail.notAvailable')} />
+                <ReadOnlyField label={t('detail.updated')} value={formatDateTime(game.metadataUpdatedAt, t('detail.notAvailable'))} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {onFindArtwork ? (
+                  <>
+                    <button className="h-9 rounded-lg border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">
+                      {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
+                    </button>
+                    <button className="h-9 rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'artwork')} type="button">
+                      {isFindingArtwork ? t('artwork.searching') : t('artwork.refreshArtwork')}
+                    </button>
+                  </>
+                ) : null}
+                {rawgUrl ? (
+                  <a className="grid h-9 place-items-center rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" href={rawgUrl} rel="noreferrer" target="_blank">
+                    Open RAWG
+                  </a>
+                ) : null}
+                <button className="h-9 rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white" onClick={onChangeLink} type="button">
+                  Change Link
+                </button>
+                {canApplyRawgCover ? (
+                  <button className="h-9 rounded-lg border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20" onClick={onUseRawgCover} type="button">
+                    {t('detail.useRawgCover')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <EmptyState text={t('detail.noRawgMetadata')} />
+              <div className="flex flex-wrap gap-2">
+                <button className="h-9 rounded-lg border border-mint/30 bg-mint/10 px-3 text-sm font-medium text-mint transition hover:bg-mint/20" onClick={onChangeLink} type="button">
+                  Link RAWG Game
+                </button>
+                {onFindArtwork ? (
+                  <button className="h-9 rounded-lg border border-skyglass/15 bg-ink-950 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">
+                    {isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </DevToolsSubSection>
+
+        {hasHltbData(game) ? (
+          <DevToolsSubSection title="HowLongToBeat">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label={t('hltb.mainStory')} value={formatHours(game.hltbMainHours, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('hltb.mainExtra')} value={formatHours(game.hltbMainExtraHours, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('hltb.completionist')} value={formatHours(game.hltbCompletionistHours, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.matchedTitle')} value={game.hltbTitle ?? t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.matchConfidence')} value={formatConfidence(game.hltbMatchConfidence, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.lastSynced')} value={formatDateTime(game.hltbLastSyncedAt, t('detail.notAvailable'))} />
+              {game.hltbSourceUrl ? <ReadOnlyLink label={t('detail.source')} value={game.hltbSourceUrl} /> : null}
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+
+        {game.collectionType === 'wishlist' ? (
+          <DevToolsSubSection title={t('detail.wishlistPlanning')}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label={t('detail.priority')} value={t(`priority.${game.priority ?? 'medium'}` as 'priority.low' | 'priority.medium' | 'priority.high')} />
+              <ReadOnlyField label={t('detail.expectedPlaytime')} value={formatHours(game.expectedPlaytime, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.priceTarget')} value={game.priceTarget || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.releaseDate')} value={game.releaseDate || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.steamPrice')} value={game.steamPriceInfo || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.steamDiscount')} value={game.steamDiscountInfo || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.steamReviews')} value={game.steamReviewInfo || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('itad.bestPrice')} value={currentItadPrice || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.dealStore')} value={game.itadCurrentBestShop || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.discount')} value={typeof game.itadDiscountPercent === 'number' ? `-${game.itadDiscountPercent}%` : t('detail.notAvailable')} />
+              <ReadOnlyField label={t('itad.historicalLow')} value={historicalItadPrice || t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.historicalLowStatus')} value={game.itadIsHistoricalLow ? t('itad.historicalLow') : t('detail.notAvailable')} />
+              <ReadOnlyField label={t('detail.wishlistImported')} value={formatDateTime(game.wishlistImportedAt, t('detail.notAvailable'))} />
+              <ReadOnlyField label={t('detail.wishlistSynced')} value={formatDateTime(game.wishlistSyncedAt, t('detail.notAvailable'))} />
+              <ReadOnlyLink label={t('detail.storeUrl')} value={game.storeUrl} />
+              <ReadOnlyLink label={t('itad.openDeal')} value={game.itadCurrentBestUrl} />
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+
+        {isRetroGame(game) ? (
+          <DevToolsSubSection title="Retro ROM">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnlyField label="Original imported title" value={game.originalImportedTitle ?? game.romFileName ?? game.title} />
+              <ReadOnlyField label="ROM file name" value={game.romFileName ?? t('detail.notAvailable')} />
+              <ReadOnlyField label="ROM path" value={game.romPath ?? t('detail.notAvailable')} />
+              {(game.romFiles ?? []).map((file, index) => (
+                <ReadOnlyField key={`${file.path}-${index}`} label={`ROM file ${index + 1}${file.role ? ` · ${file.role}` : ''}`} value={file.path} />
+              ))}
+            </div>
+          </DevToolsSubSection>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function DevToolsSubSection({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-semibold uppercase tracking-spread text-slate-600">{title}</div>
+      {children}
+    </div>
   );
 }
 
@@ -643,7 +650,22 @@ type GameEditDraft = {
   hltbCompletionistHours: string;
 };
 
-function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game) => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
+function pickArtworkChanges(changes: Partial<Game>): Partial<Game> {
+  const artworkChanges: Partial<Game> = {};
+
+  if (changes.coverImage !== undefined) artworkChanges.coverImage = changes.coverImage;
+  if (changes.wideCoverImage !== undefined) artworkChanges.wideCoverImage = changes.wideCoverImage;
+  if (changes.heroImage !== undefined) artworkChanges.heroImage = changes.heroImage;
+  if (changes.logoImage !== undefined) artworkChanges.logoImage = changes.logoImage;
+  if (changes.iconImage !== undefined) artworkChanges.iconImage = changes.iconImage;
+  if (changes.artworkSource !== undefined) artworkChanges.artworkSource = changes.artworkSource;
+  if (changes.artworkSourceMetadata !== undefined) artworkChanges.artworkSourceMetadata = changes.artworkSourceMetadata;
+  if (changes.artworkUpdatedAt !== undefined) artworkChanges.artworkUpdatedAt = changes.artworkUpdatedAt;
+
+  return artworkChanges;
+}
+
+function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindArtwork, onSave, onUpdate }: { draft: GameEditDraft; error: string; game: Game; isFindingArtwork: boolean; onCancel: () => void; onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>; onSave: () => void; onUpdate: <K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) => void }) {
   return (
     <DetailSection kicker="Edit mode" title="Edit game details" description="Update user-managed display data. Source IDs, Steam fields, and ROM paths stay read-only.">
       {error ? <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div> : null}
@@ -672,7 +694,7 @@ function GameEditForm({ draft, error, game, isFindingArtwork, onCancel, onFindAr
       <div className="flex flex-wrap gap-2">
         <button className="min-h-10 rounded-xl border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-bold text-mint" onClick={onSave} type="button">Save</button>
         <button className="min-h-10 rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200" onClick={onCancel} type="button">Cancel</button>
-        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game)} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh metadata'}</button> : null}
+        {onFindArtwork ? <button className="min-h-10 rounded-xl border border-skyglass/15 bg-ink-950 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-50" disabled={isFindingArtwork} onClick={() => void onFindArtwork(game, 'metadata')} type="button">{isFindingArtwork ? 'Refreshing…' : 'Refresh Metadata'}</button> : null}
       </div>
     </DetailSection>
   );
@@ -686,58 +708,12 @@ function EditSelect({ label, onChange, options, value }: { label: string; onChan
   return <label className="block rounded-xl border border-white/10 bg-ink-950/80 p-3"><span className="qs-label-caps text-slate-400">{label}</span><select className="mt-2 h-11 w-full rounded-lg border border-white/15 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
-function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {
-  const className = `rounded-xl border px-3 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;
-  const content = (
-    <>
-      <div className="qs-label-caps text-muted">{label}</div>
-      <div className={`mt-1 truncate text-sm font-semibold ${accent ? 'text-mint' : 'text-slate-100'}`}>{value}</div>
-    </>
-  );
-  return onClick ? (
-    <button className={className} type="button" onClick={onClick}>{content}</button>
-  ) : (
-    <div className={className}>{content}</div>
-  );
-}
-
-function GameDetailActionButton({ action }: { action: GameDetailAction }) {
-  return (
-    <button
-      className={`min-h-10 rounded-xl border px-3 py-2 text-left text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${getGameDetailActionClassName(
-        action.tone,
-      )}`}
-      disabled={action.disabled}
-      onClick={action.onClick}
-      type="button"
-    >
-      <span className="flex items-center gap-2">
-        <Icon name={action.icon} />
-        <span>{action.label}</span>
-      </span>
-    </button>
-  );
-}
-
-function getGameDetailActionClassName(tone: GameDetailAction['tone']) {
-  if (tone === 'accent') {
-    return 'border-mint/30 bg-mint/10 text-mint hover:bg-mint/20 hover:shadow-glow';
-  }
-
-  if (tone === 'danger') {
-    return 'border-red-400/30 bg-red-500/10 text-red-100 hover:bg-red-500/20';
-  }
-
-  return 'border-skyglass/15 bg-ink-950/70 text-slate-200 hover:bg-mint/10 hover:text-white';
-}
 
 type GameDetailOverflowMenuProps = {
   anchorRef: RefObject<HTMLButtonElement | null>;
   canEditGame: boolean;
-  canFindArtwork: boolean;
   currentItadPrice?: string;
   game: Game;
-  isArtworkMissing: boolean;
   isFindingArtwork: boolean;
   isSteamDataSyncing: boolean;
   isSteamLibraryGame: boolean;
@@ -746,6 +722,7 @@ type GameDetailOverflowMenuProps = {
   onClose: () => void;
   onEdit: () => void;
   onFindArtwork?: (game: Game, mode?: 'metadata' | 'artwork') => void | Promise<unknown>;
+  onRefreshArtwork: () => void;
   onIgnore?: (game: Game) => void;
   onStatusChange?: (gameId: string, status: GameStatus) => void;
   onSyncSteamData?: (game: Game) => void;
@@ -755,10 +732,8 @@ type GameDetailOverflowMenuProps = {
 function GameDetailOverflowMenu({
   anchorRef,
   canEditGame,
-  canFindArtwork,
   currentItadPrice,
   game,
-  isArtworkMissing,
   isFindingArtwork,
   isSteamDataSyncing,
   isSteamLibraryGame,
@@ -767,6 +742,7 @@ function GameDetailOverflowMenu({
   onClose,
   onEdit,
   onFindArtwork,
+  onRefreshArtwork,
   onIgnore,
   onStatusChange,
   onSyncSteamData,
@@ -836,16 +812,20 @@ function GameDetailOverflowMenu({
     });
   }
 
-  if (canFindArtwork) {
+  if (onFindArtwork) {
+    toolItems.push({
+      icon: 'refresh-cw',
+      label: isFindingArtwork ? t('action.refreshingMetadata') : t('action.refreshMetadata'),
+      disabled: isFindingArtwork,
+      onClick: () => closeAndRun(() => { void onFindArtwork(game, 'metadata'); }),
+    });
     toolItems.push({
       icon: 'image',
-      label: isFindingArtwork
-        ? t('artwork.searching')
-        : isArtworkMissing
-          ? t('artwork.findArtwork')
-          : t('artwork.enrichMetadata'),
-      disabled: !onFindArtwork || isFindingArtwork,
-      onClick: () => closeAndRun(() => { void onFindArtwork?.(game); }),
+      label: isFindingArtwork ? t('artwork.searching') : t('artwork.refreshArtwork'),
+      disabled: isFindingArtwork,
+      // Automatic lookup first; if nothing is applied, handleRefreshArtwork opens the
+      // Change Artwork picker so the user can pick without reopening the menu.
+      onClick: () => closeAndRun(onRefreshArtwork),
     });
   }
 
@@ -989,25 +969,39 @@ function GameDetailOverflowMenu({
   );
 }
 
-type DetailSectionProps = {
-  children: ReactNode;
-  description?: string;
-  kicker?: string;
-  title: string;
-};
+/**
+ * Notes editor with local draft state. Typing only re-renders this field;
+ * the global games array is updated on blur (and on unmount as a safety
+ * net, e.g. navigating away mid-edit). Keyed by game.id at the call site
+ * so switching games commits the outgoing draft via unmount.
+ */
+function NotesField({ onCommit, placeholder, value }: { onCommit: (notes: string) => void; placeholder: string; value: string }) {
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
 
-function DetailSection({ children, description, kicker, title }: DetailSectionProps) {
+  useEffect(() => () => {
+    if (draftRef.current !== valueRef.current) {
+      onCommitRef.current(draftRef.current);
+    }
+  }, []);
+
   return (
-    <section className="rounded-2xl border border-mint/20 bg-ink-800 p-4 shadow-panel">
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          {kicker ? <div className="qs-label-caps text-accent">{kicker}</div> : null}
-          <h3 className={kicker ? 'mt-1 text-lg font-semibold text-white' : 'text-lg font-semibold text-white'}>{title}</h3>
-          {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
-        </div>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
+    <textarea
+      className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
+      value={draft}
+      onBlur={() => {
+        if (draft !== value) {
+          onCommit(draft);
+        }
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      placeholder={placeholder}
+    />
   );
 }
 
@@ -1020,30 +1014,6 @@ function PersonalStatField({ label, value }: { label: string; value: string }) {
   );
 }
 
-type MetadataAccordionProps = {
-  children: ReactNode;
-  summary: string;
-  title: string;
-};
-
-function MetadataAccordion({ children, summary, title }: MetadataAccordionProps) {
-  return (
-    <details className="group rounded-xl border border-white/10 bg-ink-950/65 text-slate-300">
-      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
-        <Icon className="text-slate-500 transition group-open:rotate-90" name="chevrons-right" />
-        <Icon className="text-slate-500" name="lock" />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold text-slate-200">{title}</span>
-          <span className="block truncate text-xs text-slate-500">{summary}</span>
-        </span>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 qs-label-caps text-muted">
-          Read-only
-        </span>
-      </summary>
-      <div className="border-t border-white/10 p-4">{children}</div>
-    </details>
-  );
-}
 
 type ReadOnlyFieldProps = {
   label: string;
@@ -1086,36 +1056,6 @@ function ReadOnlyLink({ label, value }: ReadOnlyLinkProps) {
   );
 }
 
-type ChipGroupProps = {
-  accent?: 'mint';
-  label: string;
-  values?: string[];
-};
-
-function ChipGroup({ accent, label, values }: ChipGroupProps) {
-  if (!values || values.length === 0) {
-    return null;
-  }
-
-  return (
-    <div>
-      <div className="text-xs font-medium uppercase tracking-caps text-slate-500">{label}</div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {values.map((value) => (
-          <span
-            key={value}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              accent === 'mint' ? 'bg-mint/10 text-mint' : 'bg-white/10 text-slate-300'
-            }`}
-          >
-            {value}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function EmptyState({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed border-white/15 bg-ink-900/50 p-4 text-sm text-slate-400">{text}</div>;
 }
@@ -1129,10 +1069,6 @@ function parseTags(value: string) {
         .filter(Boolean),
     ),
   );
-}
-
-function getDisplayTitle(game: Game) {
-  return game.displayTitleOverride?.trim() || game.title;
 }
 
 function isRetroGame(game: Game) {
@@ -1198,6 +1134,27 @@ function getGameEditChanges(game: Game, draft: GameEditDraft): Partial<Game> {
   };
 }
 
+/**
+ * Changes for the focused title-correction flow. The corrected title becomes the
+ * canonical `title` (used by screenshot search + cache key) and the metadata
+ * search title (used by RAWG/artwork matching), and any stale display override is
+ * cleared. The raw imported title is preserved once for reference. IDs, notes,
+ * status, platform and plans are untouched, so no duplicate is created.
+ */
+export function getTitleCorrectionChanges(game: Game, rawTitle: string): Partial<Game> {
+  const title = rawTitle.trim();
+  if (!title || title === getDisplayTitle(game)) {
+    return {};
+  }
+
+  return {
+    title,
+    metadataSearchTitle: title,
+    displayTitleOverride: undefined,
+    originalImportedTitle: game.originalImportedTitle ?? game.title,
+  };
+}
+
 function validateEditDraft(draft: GameEditDraft) {
   if (!draft.title.trim()) return 'Title cannot be empty.';
   if (!gamePlatforms.includes(draft.platform as never)) return 'Platform must be valid.';
@@ -1250,10 +1207,6 @@ function formatDateTime(value: string | undefined, unavailableText: string) {
 
 function formatHours(value: number | null | undefined, unavailableText: string) {
   return typeof value === 'number' ? `${value}h` : unavailableText;
-}
-
-function formatList(value: string[] | undefined, unavailableText: string) {
-  return value && value.length > 0 ? value.join(', ') : unavailableText;
 }
 
 function formatConfidence(value: number | undefined, unavailableText: string) {

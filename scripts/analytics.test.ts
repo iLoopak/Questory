@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bucketCount } from '../src/lib/analytics/buckets';
 import { defaultAnalyticsSettings, analyticsSettingsStorageKey } from '../src/lib/analytics/settings';
-import { isAnalyticsConfigured, sendAnalyticsEvent, validateAnalyticsEvent } from '../src/lib/analytics/client';
+import { isAnalyticsConfigured, runTelemetrySelfTest, sendAnalyticsEvent, validateAnalyticsEvent } from '../src/lib/analytics/client';
 import type { MinimalAnalyticsEvent } from '../src/lib/analytics/types';
 import { runPlatformQueueUniquenessRegressionAssertions } from '../src/lib/platformQueueStorage.regression';
 
@@ -120,6 +120,43 @@ test('no send when local setting is disabled', async () => {
   assert.equal(calls, 0);
 });
 
+test('telemetry self-test does not send when local setting is disabled', async () => {
+  installLocalStorage(defaultAnalyticsSettings);
+  let calls = 0;
+  const result = await runTelemetrySelfTest(async () => {
+    calls += 1;
+    return new Response(null, { status: 200 });
+  });
+  assert.equal(calls, 0);
+  assert.equal(result.sent, false);
+  assert.equal(result.telemetryEnabled, false);
+});
+
+test('telemetry self-test sends one privacy-safe POST with no-store cache', async () => {
+  enableLocalAnalytics();
+  let calls = 0;
+  const result = await runTelemetrySelfTest(async (url, init) => {
+    calls += 1;
+    assert.equal(url, configuredAnalytics.webhookUrl);
+    assert.equal(init?.method, 'POST');
+    const headers = init?.headers as Record<string, string>;
+    assert.equal(headers['Content-Type'], 'application/json');
+    assert.equal(headers['x-make-apikey'], 'real-test-key');
+    assert.equal(init?.cache, 'no-store');
+    assert.equal(init?.credentials, 'omit');
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.eventName, 'telemetry_test');
+    assert.equal(Object.hasOwn(body, 'gameTitle'), false);
+    assert.equal(Object.hasOwn(body, 'notes'), false);
+    return new Response('ok', { status: 202, headers: { 'content-type': 'text/plain' } });
+  }, configuredAnalytics);
+  assert.equal(calls, 1);
+  assert.equal(result.sent, true);
+  assert.equal(result.status, 202);
+  assert.equal(result.requestHost, 'analytics.example.test');
+  assert.equal(result.responseText, 'ok');
+});
+
 test('x-make-apikey header is used for Make.com API key auth', async () => {
   enableLocalAnalytics();
   await sendAnalyticsEvent(baseEvent, configuredAnalytics, async (_url, init) => {
@@ -136,6 +173,16 @@ test('send failures are swallowed', async () => {
   await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
     throw new Error('network failed');
   }));
+});
+
+test('a non-2xx response never throws or blocks', async () => {
+  enableLocalAnalytics();
+  let calls = 0;
+  await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
+    calls += 1;
+    return new Response('nope', { status: 500 });
+  }));
+  assert.equal(calls, 1);
 });
 
 test('platform queue regression assertions', () => {

@@ -12,6 +12,7 @@ const sharedConfig = {
   platform: 'node',
   format: 'esm',
   define: {
+    'import.meta.env.DEV': JSON.stringify(false),
     'import.meta.env.VITE_QS_ANALYTICS_ENABLED': JSON.stringify('false'),
     'import.meta.env.VITE_QS_ANALYTICS_WEBHOOK_URL': JSON.stringify('https://example.invalid/questshelf-analytics'),
     'import.meta.env.VITE_QS_ANALYTICS_KEY': JSON.stringify('replace-with-alpha-analytics-key'),
@@ -24,6 +25,8 @@ const testFiles = [
   { entry: 'scripts/analytics.test.ts', out: 'analytics.test.mjs' },
   { entry: 'scripts/retroTitleResolver.test.ts', out: 'retroTitleResolver.test.mjs' },
   { entry: 'scripts/settingsEntrypoints.test.ts', out: 'settingsEntrypoints.test.mjs' },
+  { entry: 'scripts/backupStorage.test.ts', out: 'backupStorage.test.mjs' },
+  { entry: 'scripts/reviewQueueOrder.test.ts', out: 'reviewQueueOrder.test.mjs' },
 ];
 
 await Promise.all(

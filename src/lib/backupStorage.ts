@@ -1,10 +1,11 @@
+import { normalizeAchievementCounters } from './achievementCounters';
 import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
-import { loadGames, normalizeLoadedGames } from './gameStorage';
+import { gameRepository, loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
 import { normalizePlatformQueueState } from './platformQueueStorage';
-import { normalizePlayActivityRecords } from './playActivityStorage';
-import { normalizeRawgMetadataCache } from './rawgMetadataCache';
+import { loadPlayActivity, normalizePlayActivityRecords, playActivityRepository } from './playActivityStorage';
+import { loadRawgMetadataCache, normalizeRawgMetadataCache, rawgMetadataCacheRepository } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
 import { normalizeReviewModeState } from './reviewModeStorage';
 import { normalizeIsThereAnyDealSettings } from './isThereAnyDealSettingsStorage';
@@ -78,6 +79,25 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
       schemaVersion: questShelfBackupVersion,
     },
     data: keys.reduce<QuestShelfBackup['data']>((backupData, key) => {
+      // Wave 3: games come from the IndexedDB repository (the blob is inert), but the
+      // backup shape is unchanged — still data['questshelf.games.v1'] = Game[].
+      if (key === 'questshelf.games.v1') {
+        backupData[key] = normalizeLoadedGames(loadGames());
+        return backupData;
+      }
+
+      // Wave 4: RAWG cache also comes from its IndexedDB repository; same blob shape.
+      if (key === 'questshelf.rawgMetadataCache.v1') {
+        backupData[key] = normalizeRawgMetadataCache(loadRawgMetadataCache());
+        return backupData;
+      }
+
+      // Wave 4b: play activity also comes from its IndexedDB repository; same blob shape.
+      if (key === 'questshelf.playActivity.v1') {
+        backupData[key] = normalizePlayActivityRecords(loadPlayActivity());
+        return backupData;
+      }
+
       const value = readStorageJson(key);
 
       if (typeof value !== 'undefined') {
@@ -120,6 +140,15 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
   const removes: Array<(typeof allBackupStorageKeys)[number]> = [];
 
   allBackupStorageKeys.forEach((key) => {
+    // Collection-backed keys (games, RAWG cache, play activity) are written through their
+    // IndexedDB repositories below; everything else uses the localStorage + Preferences path.
+    if (
+      key === 'questshelf.games.v1' ||
+      key === 'questshelf.rawgMetadataCache.v1' ||
+      key === 'questshelf.playActivity.v1'
+    ) {
+      return;
+    }
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
       writes.push([key, normalizeBackupDataSection(key, backup.data[key])]);
     } else if (!integrationBackupStorageKeys.includes(key as (typeof integrationBackupStorageKeys)[number])) {
@@ -129,6 +158,30 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
 
   writes.forEach(([key, value]) => savePersistedJson(key, value));
   void removePersistedKeys(removes);
+
+  // Replace the game collection through the repository (IndexedDB + in-memory snapshot).
+  // A backup without a games section clears it.
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.games.v1')) {
+    gameRepository.replaceAll(normalizeLoadedGames(backup.data['questshelf.games.v1']));
+  } else {
+    void gameRepository.clear();
+  }
+
+  // Replace the RAWG metadata cache through its repository. A backup without the section
+  // clears the cache (restore has replace semantics); it will simply repopulate on demand.
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
+    rawgMetadataCacheRepository.replaceAll(normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']));
+  } else {
+    void rawgMetadataCacheRepository.clear();
+  }
+
+  // Replace play activity through its repository. A backup without the section clears it
+  // (restore has replace semantics).
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.playActivity.v1')) {
+    playActivityRepository.replaceAll(normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']));
+  } else {
+    void playActivityRepository.clear();
+  }
 
   return {
     games: loadGames(),
@@ -140,10 +193,14 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
   // Pre-normalize before touching storage so an unexpected normalize error cannot leave
   // storage in a partially-written state.
   const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
-  const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [['questshelf.games.v1', mergedGames]];
+  const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
 
   allBackupStorageKeys.forEach((key) => {
-    if (key === 'questshelf.games.v1') {
+    if (
+      key === 'questshelf.games.v1' ||
+      key === 'questshelf.rawgMetadataCache.v1' ||
+      key === 'questshelf.playActivity.v1'
+    ) {
       return;
     }
 
@@ -154,6 +211,21 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 
   writes.forEach(([key, value]) => savePersistedJson(key, value));
 
+  // Merged games go through the repository (IndexedDB + snapshot).
+  gameRepository.replaceAll(mergedGames);
+
+  // A present RAWG cache section overwrites the cache through its repository (merge only
+  // adds/overwrites present sections; an absent section leaves the existing cache intact).
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
+    rawgMetadataCacheRepository.replaceAll(normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']));
+  }
+
+  // A present play activity section overwrites the store through its repository (merge only
+  // adds/overwrites present sections; an absent section leaves the existing records intact).
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.playActivity.v1')) {
+    playActivityRepository.replaceAll(normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']));
+  }
+
   return {
     games: loadGames(),
     ignoredSteamGames: loadIgnoredSteamGames(),
@@ -161,6 +233,11 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 }
 
 export async function resetQuestShelfLocalData() {
+  // Clear the IndexedDB collection stores + snapshots first so reset does not leave
+  // orphaned records in IndexedDB after the legacy blobs are removed.
+  await gameRepository.clear();
+  await rawgMetadataCacheRepository.clear();
+  await playActivityRepository.clear();
   await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys]);
 }
 
@@ -322,6 +399,12 @@ function getGameUpdatedAt(game: Game) {
 
 function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], value: unknown) {
   switch (key) {
+    case 'questshelf.achievementCounters.v1':
+      // Non-critical event counters. Any shape is tolerated here and repaired to safe
+      // defaults by normalizeAchievementCounters on write, so a missing, partial, or
+      // corrupt counters section never blocks importing games/playActivity/RAWG data.
+      // Critical sections below stay strictly validated.
+      return true;
     case 'questshelf.games.v1':
     case 'questshelf.steamIgnoredGames.v1':
     case 'questshelf.playActivity.v1':
@@ -348,6 +431,8 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
   // Backups are user-editable JSON. Normalize every section before writing so restore/merge
   // cannot persist malformed data that later crashes startup.
   switch (key) {
+    case 'questshelf.achievementCounters.v1':
+      return normalizeAchievementCounters(value);
     case 'questshelf.games.v1':
       return normalizeLoadedGames(value);
     case 'questshelf.steamIgnoredGames.v1':
@@ -390,6 +475,7 @@ function isPlainObject(value: unknown) {
 
 function getBackupSectionDisplayName(key: string): string {
   const displayNames: Record<string, string> = {
+    'questshelf.achievementCounters.v1': 'achievement counters',
     'questshelf.games.v1': 'game library',
     'questshelf.steamIgnoredGames.v1': 'ignored Steam games',
     'questshelf.rawgMetadataCache.v1': 'RAWG metadata cache',

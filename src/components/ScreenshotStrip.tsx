@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Game } from '../types/game';
 import { isMissingOrGeneratedCover } from '../lib/gameCoverImages';
 import { useGameScreenshots } from '../hooks/useGameScreenshots';
+import { useDiscoveryScreenshots } from '../hooks/useDiscoveryScreenshots';
 import { Icon } from './Icon';
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -188,6 +189,66 @@ export function ScreenshotStrip({ game, className = '' }: ScreenshotStripProps) 
       {lightboxIndex !== null && (
         <ScreenshotLightbox
           gameTitle={game.title}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          screenshots={screenshots}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Discovery variant ────────────────────────────────────────────────────────
+// Same thumbnail strip + lightbox, but accepts a rawgId instead of a Game.
+// Shares the screenshot cache with ScreenshotStrip so entries are reused.
+
+type DiscoveryScreenshotStripProps = {
+  rawgId: number;
+  title: string;
+  className?: string;
+};
+
+export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: DiscoveryScreenshotStripProps) {
+  const { screenshots, loading } = useDiscoveryScreenshots(rawgId);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  if (!loading && screenshots.length === 0) return null;
+
+  return (
+    <div className={`screenshot-strip ${className}`}>
+      {loading ? (
+        <div aria-hidden="true" className="flex gap-1.5 overflow-hidden">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-12 w-[5.5rem] flex-shrink-0 animate-pulse rounded-lg bg-white/8" />
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+          {screenshots.map((url, i) => (
+            <button
+              key={url}
+              aria-label={`View screenshot ${i + 1} of ${screenshots.length} for ${title}`}
+              className="group flex-shrink-0 overflow-hidden rounded-lg border border-white/10 transition hover:border-white/30 focus-visible:border-accent focus-visible:outline-none"
+              onClick={() => setLightboxIndex(i)}
+              type="button"
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                className="h-12 w-[5.5rem] object-cover transition group-hover:brightness-110"
+                decoding="async"
+                draggable={false}
+                loading="lazy"
+                src={url}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {lightboxIndex !== null && (
+        <ScreenshotLightbox
+          gameTitle={title}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           screenshots={screenshots}

@@ -15,7 +15,6 @@ docs/screenshots/home.png
 docs/screenshots/library.png
 docs/screenshots/quest-queue.png
 docs/screenshots/platform-plans.png
-docs/screenshots/playing-now.png
 ```
 
 When screenshots are added, this section can become:
@@ -65,7 +64,7 @@ These are grouped honestly based on the current codebase. “Available now” me
 - **Quest Queue / Review Mode** — a one-game-at-a-time triage flow for processing imported/backlog/recent games into status changes, Platform Plans, Wishlist, ignores, or other actions.
 - **Quest Queue batch review support** — review state, queue ordering, ignored review items, restore ignored items, and source switching for backlog/recent imports.
 - **Platform Plans** — platform-specific queues, active platform selection, per-platform limits, reordering, moving entries between platforms, and “play now” actions.
-- **Playing Now hub** — focused view for current/active games, quick notes, daily play logging, Steam playtime refresh hooks, and return navigation from the shelf profile/home flows.
+- **Home active gameplay dashboard** — focused current-game view, quick notes, daily play logging, Steam playtime refresh hooks, and active gameplay management in one place.
 - **Recommendations** — local “What should I play?” recommendations based on status, playtime, last played date, HLTB/RAWG-style metadata when available, platform, mood, and session length.
 - **Stats dashboard** — local backlog totals, progress, playtime, platform/source breakdowns, metadata coverage, and useful lists.
 - **RAWG metadata enrichment** — user-provided RAWG API key, per-game search, suggested/manual matches, batch enrichment, local cache, and safe writes that avoid overwriting user-owned tracking fields.
@@ -112,7 +111,7 @@ Grounded in the current direction of the app:
 3. **Clean up the shelf.** Use filters, metadata enrichment, artwork repair, details editing, and bulk actions.
 4. **Triage the backlog.** Use Quest Queue / Review Mode to make quick decisions instead of endlessly scrolling.
 5. **Plan by platform.** Send games into Platform Plans, set active platforms, reorder queues, and keep active game limits realistic.
-6. **Play something.** Use Playing Now, Recommendations, Daily Quest, stats, and achievements to keep momentum.
+6. **Play something.** Use Home, Recommendations, Daily Quest, stats, and achievements to keep momentum.
 7. **Back up your data.** Export/import JSON backups or use the sync-folder foundation where supported.
 
 ## Why not just Playnite / Backloggd / spreadsheets?

@@ -1,6 +1,7 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
 import { hasSteamAchievementSummary } from '../../lib/steamAchievementSummary';
+import { getSteamProviderState } from '../../lib/gameSelectors';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import { appendSteamPlaytimeDeltaActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { saveGames } from '../../lib/gameStorage';
@@ -483,6 +484,7 @@ export function useAppSyncActions({
     }
 
     const settings = loadIsThereAnyDealSettings();
+    console.debug('[ITAD] hasItadKeyWhenSyncStarts:', Boolean(settings.apiKey.trim()));
     const targetGames = games.filter((game) => game.collectionType === 'wishlist' && gameIds.includes(game.id));
 
     if (targetGames.length === 0) {
@@ -681,8 +683,10 @@ function mergeSteamAchievementUpdates(currentGames: Game[], syncedGames: Game[],
       return game;
     }
 
-    const hasAchievementSummary = typeof syncedGame.steamAchievementsTotal === 'number' && syncedGame.steamAchievementsTotal > 0;
-    const hasCurrentAchievementSummary = typeof game.steamAchievementsTotal === 'number' && game.steamAchievementsTotal > 0;
+    const syncedSteamState = getSteamProviderState(syncedGame);
+    const currentSteamState = getSteamProviderState(game);
+    const hasAchievementSummary = typeof syncedSteamState.achievementsTotal === 'number' && syncedSteamState.achievementsTotal > 0;
+    const hasCurrentAchievementSummary = typeof currentSteamState.achievementsTotal === 'number' && currentSteamState.achievementsTotal > 0;
 
     if (!hasAchievementSummary) {
       if (syncedGame.steamAchievementsUnsupported === true && !hasCurrentAchievementSummary) {

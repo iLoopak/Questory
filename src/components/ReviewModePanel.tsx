@@ -13,6 +13,7 @@ import { getControllerButtonLabels, type ConfirmCancelConvention } from '../lib/
 import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
 import { getGameCoverSources, getGeneratedFallbackCover, hasFallbackArtwork } from '../lib/gameCoverImages';
+import { getProviderLinks } from '../lib/gameSelectors';
 import { GameCoverImage } from './GameCoverImage';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { useBottomSheetDragToClose } from '../hooks/useBottomSheetDragToClose';
@@ -25,6 +26,7 @@ import { Icon, type IconName } from './Icon';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ScreenshotStrip } from './ScreenshotStrip';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
+import { useQuestQueuePrefetch } from '../hooks/useQuestQueuePrefetch';
 
 export type ReviewModeAction =
   | 'queue'
@@ -40,7 +42,10 @@ export type ReviewModeAction =
   | 'note';
 
 export type ReviewModeActionContext = {
+  /** Active 20-game session batch. */
   queueGameIds?: string[];
+  /** Full pending, unprocessed Quest Queue candidate order for the current source/filter. */
+  pendingGameIds?: string[];
 };
 
 type ReviewModePanelProps = {
@@ -53,6 +58,7 @@ type ReviewModePanelProps = {
   reviewModeState: ReviewModeState;
   source: ReviewSource;
   onAction: (game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform, context?: ReviewModeActionContext) => void;
+  onEnsureRawgMetadata?: (game: Game) => void;
   onAddPlatform: (platform: GamePlatform) => void;
   onOpenQueue: () => void;
   onReturnToLibrary: () => void;
@@ -62,6 +68,9 @@ type ReviewModePanelProps = {
 
 const anyPlatform = 'Any platform';
 const reviewSessionBatchSize = 20;
+
+// Stable no-op so the prefetch hook always receives a callable metadata runner.
+const noopEnsureMetadata = () => {};
 
 const negativeActions: Array<{
   action: ReviewModeAction;
@@ -148,6 +157,7 @@ export function ReviewModePanel({
   reviewModeState,
   source,
   onAction,
+  onEnsureRawgMetadata,
   onAddPlatform,
   onOpenQueue,
   onReturnToLibrary,
@@ -247,6 +257,25 @@ export function ReviewModePanel({
   }, [games]);
 
   const activeGame = reviewQueue[0] ?? null;
+
+  // Games beyond the current session, ordered — used to warm the next batch once
+  // the current one is nearly exhausted.
+  const lookaheadGames = useMemo(() => {
+    const sessionIds = new Set(sessionGameIds);
+    return baseSourceGames.filter((game) => !sessionIds.has(game.id)).slice(0, reviewSessionBatchSize);
+  }, [baseSourceGames, sessionGameIds]);
+
+  // Background prefetch: prepare metadata + screenshots for the current card first,
+  // then the next few, then the rest of the batch (and the next batch when close to
+  // done) so swiping through cards rarely hits a loading state. Replaces the old
+  // active-card-only metadata fetch.
+  useQuestQueuePrefetch({
+    enabled: reviewQueue.length > 0,
+    upcomingGames: reviewQueue,
+    lookaheadGames,
+    ensureMetadata: onEnsureRawgMetadata ?? noopEnsureMetadata,
+  });
+
   const isRefreshingCurrentGame = activeGame ? refreshingMetadataGameIds.has(activeGame.id) : false;
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = sessionGameIds.filter((gameId) => processedGameIds.has(gameId)).length;
@@ -407,7 +436,10 @@ export function ReviewModePanel({
   }, { enabled: canReceiveControllerActions });
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
-    onAction(game, action, note, targetPlatform, { queueGameIds: sessionGameIds });
+    onAction(game, action, note, targetPlatform, {
+      queueGameIds: sessionGameIds,
+      pendingGameIds: baseSourceGames.map((pendingGame) => pendingGame.id),
+    });
     setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
     setReviewHistory((currentHistory) => [...currentHistory, { action, gameId: game.id }]);
     setActionStats((currentStats) => getNextActionStats(currentStats, action));
@@ -704,6 +736,8 @@ function FocusedReviewCard({
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
   const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
+  const metacriticScore = formatReviewMetacriticScore(game.metacriticScore);
+  const rawgPlaytime = formatReviewRawgPlaytime(game.rawgPlaytimeHours);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -960,6 +994,12 @@ function FocusedReviewCard({
                   </div>
                 </div>
               )}
+              {metacriticScore || rawgPlaytime ? (
+                <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-1.5">
+                  {metacriticScore ? <span className="rounded-full border border-mint/35 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-mint shadow-glow backdrop-blur-md">Metacritic {metacriticScore}</span> : null}
+                  {rawgPlaytime ? <span className="rounded-full border border-skyglass/30 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-white shadow-panel backdrop-blur-md">~{rawgPlaytime}</span> : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -1248,9 +1288,10 @@ function getGameActionExternalLinks(game: Game, t: TFunction) {
     links.push({ href: game.externalUrl, label: t('detail.externalUrl') });
   }
 
-  if (typeof game.steamAppId === 'number') {
-    links.push({ href: `https://store.steampowered.com/app/${game.steamAppId}`, label: 'Steam' });
-  }
+  getProviderLinks(game).forEach((providerLink) => {
+    if (!providerLink.url) return;
+    links.push({ href: providerLink.url, label: providerLink.provider === 'rawg' ? 'RAWG' : providerLink.provider === 'steam' ? 'Steam' : providerLink.provider });
+  });
 
   return links.filter((link, index, allLinks) => allLinks.findIndex((candidate) => candidate.href === link.href) === index);
 }
@@ -1630,6 +1671,14 @@ function matchesReviewSource(game: Game, source: ReviewSource) {
   }
 
   return game.collectionType === 'library' && game.playtimeHours === 0 && !game.lastPlayedAt;
+}
+
+function formatReviewMetacriticScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
+}
+
+function formatReviewRawgPlaytime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? `${Math.round(value)}h` : null;
 }
 
 function compareReviewGames(firstGame: Game, secondGame: Game) {

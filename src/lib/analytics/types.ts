@@ -5,10 +5,10 @@ export const analyticsEventNames = [
   'first_run_completed',
   'import_completed',
   'quest_queue_opened',
-  'playing_now_opened',
   'platform_plans_opened',
   'backup_exported',
   'backup_imported',
+  'telemetry_test',
 ] as const;
 
 export type AnalyticsEventName = (typeof analyticsEventNames)[number];

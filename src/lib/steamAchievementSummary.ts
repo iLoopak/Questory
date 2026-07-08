@@ -1,8 +1,8 @@
 import type { Game } from '../types/game';
 
-export function hasSteamAchievementSummary(
-  game: Pick<Game, 'steamAchievementsTotal' | 'steamAchievementsUnlocked' | 'steamAchievementsPercent'>,
-) {
+type SteamAchievementSummaryFields = Pick<Game, 'steamAchievementsTotal' | 'steamAchievementsUnlocked' | 'steamAchievementsPercent'>;
+
+export function hasSteamAchievementSummary(game: SteamAchievementSummaryFields) {
   return (
     typeof game.steamAchievementsTotal === 'number' &&
     game.steamAchievementsTotal > 0 &&
@@ -11,9 +11,7 @@ export function hasSteamAchievementSummary(
   );
 }
 
-export function formatSteamAchievementSummary(
-  game: Pick<Game, 'steamAchievementsTotal' | 'steamAchievementsUnlocked' | 'steamAchievementsPercent'>,
-) {
+export function formatSteamAchievementSummary(game: SteamAchievementSummaryFields) {
   if (!hasSteamAchievementSummary(game)) {
     return null;
   }

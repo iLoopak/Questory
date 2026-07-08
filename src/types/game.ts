@@ -37,7 +37,7 @@ export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
 export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
-export type ArtworkSource = 'user' | 'steam' | 'steamgriddb' | 'rawg' | 'imported' | 'generated-fallback';
+export type ArtworkSource = 'custom' | 'user' | 'steamgriddb' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
 
 export type SteamAchievement = {
   apiName: string;
@@ -153,6 +153,8 @@ export type Game = {
   released?: string | null;
   metacritic?: number | null;
   averagePlaytime?: number | null;
+  metacriticScore?: number;
+  rawgPlaytimeHours?: number;
   backgroundImage?: string | null;
   metadataSource?: 'rawg';
   metadataUpdatedAt?: string;

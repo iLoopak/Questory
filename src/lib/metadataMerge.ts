@@ -32,6 +32,32 @@ function hasExistingArtworkValue(game: Game, key: string) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function getPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function preservePositiveExternalNumber(
+  metadataRecord: Record<string, unknown>,
+  existingRecord: Record<string, unknown>,
+  mergedRecord: Record<string, unknown>,
+  targetField: 'metacriticScore' | 'rawgPlaytimeHours',
+  legacyField: 'metacritic' | 'averagePlaytime',
+) {
+  const nextValue = getPositiveNumber(metadataRecord[targetField] ?? metadataRecord[legacyField]);
+
+  if (nextValue) {
+    mergedRecord[targetField] = nextValue;
+    return;
+  }
+
+  const existingValue = getPositiveNumber(existingRecord[targetField]);
+  if (existingValue) {
+    mergedRecord[targetField] = existingValue;
+  } else {
+    delete mergedRecord[targetField];
+  }
+}
+
 function hasAcceptedArtworkUrl(metadata: RawgMetadata, mergedGame: Game) {
   const metadataRecord = metadata as Record<string, unknown>;
 
@@ -44,7 +70,25 @@ function hasAcceptedArtworkUrl(metadata: RawgMetadata, mergedGame: Game) {
   });
 }
 
-export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata): Game {
+type MergeRawgMetadataOptions = {
+  /**
+   * Metadata-only refreshes must not change artwork state. RAWG may return
+   * background images that are useful artwork candidates, but Quest Queue's
+   * Refresh Metadata action should only update descriptive metadata.
+   */
+  preserveArtwork?: boolean;
+};
+
+const preservedArtworkFields = [
+  ...artworkUrlFields,
+  'wideCoverImage',
+  'heroImage',
+  'logoImage',
+  'iconImage',
+  'artworkSourceMetadata',
+] as const;
+
+export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata, options: MergeRawgMetadataOptions = {}): Game {
   const metadataRecord = metadata as Record<string, unknown>;
   const mergedGame = {
     ...game,
@@ -52,7 +96,27 @@ export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata): G
   };
   const mergedRecord = mergedGame as Record<string, unknown>;
   const existingRecord = game as Record<string, unknown>;
+  preservePositiveExternalNumber(metadataRecord, existingRecord, mergedRecord, 'metacriticScore', 'metacritic');
+  preservePositiveExternalNumber(metadataRecord, existingRecord, mergedRecord, 'rawgPlaytimeHours', 'averagePlaytime');
   const protectsCoverImage = hasProtectedArtwork(game);
+
+  if (options.preserveArtwork) {
+    preservedArtworkFields.forEach((field) => {
+      if (hasOwnValue(game, field)) {
+        mergedRecord[field] = existingRecord[field];
+      } else {
+        delete mergedRecord[field];
+      }
+    });
+    artworkMetadataFields.forEach((field) => {
+      if (hasOwnValue(game, field)) {
+        mergedRecord[field] = existingRecord[field];
+      } else {
+        delete mergedRecord[field];
+      }
+    });
+    return mergedGame;
+  }
 
   artworkUrlFields.forEach((field) => {
     if (!hasOwnValue(metadata, field)) {

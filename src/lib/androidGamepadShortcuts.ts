@@ -448,7 +448,15 @@ function installFocusGuard() {
 function ensureFocus() {
   const activeElement = document.activeElement;
   if (activeElement instanceof HTMLElement && isFocusable(activeElement) && isVisible(activeElement)) {
-    activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    // The focus guard's MutationObserver fires on every DOM change, including the
+    // constant row mount/unmount of the virtualized collection grids. Only nudge the
+    // already-visible focused element into view for controller/D-pad navigation —
+    // for pointer/keyboard scrolling it is redundant (the element is already visible)
+    // and actively fights the user's scroll: a card refocused after returning from the
+    // Game Hub would be dragged back into view on every scroll frame.
+    if (document.body.classList.contains('qs-controller-active')) {
+      activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
     return;
   }
 

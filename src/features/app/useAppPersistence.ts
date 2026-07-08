@@ -53,18 +53,31 @@ export function useAppPersistence({
     }, 400);
   }, [games]);
 
-  // Flush on tab hide (prevents data loss on mobile / browser close)
+  // Flush on page unload. beforeunload fires synchronously before the page tears down and is
+  // the last reliable hook for location.reload() (e.g. Vite HMR full-reload) and browser
+  // close. visibilitychange to 'hidden' is a second-line guard for cases (mobile, bfcache)
+  // where beforeunload is suppressed.
   useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden' && saveGamesTimerRef.current !== null) {
+    function flushPendingSave() {
+      if (saveGamesTimerRef.current !== null) {
         clearTimeout(saveGamesTimerRef.current);
         saveGamesTimerRef.current = null;
         saveGames(gamesRef.current);
       }
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        flushPendingSave();
+      }
+    }
+
+    window.addEventListener('beforeunload', flushPendingSave);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {

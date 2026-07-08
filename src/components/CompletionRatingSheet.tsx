@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 import type { Game } from '../types/game';
@@ -12,19 +12,43 @@ type CompletionRatingSheetProps = {
 
 export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRatingSheetProps) {
   const { t } = useI18n();
-  const [selected, setSelected] = useState(game.rating ?? 0);
   const [hovered, setHovered] = useState(0);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose: onSkip });
-  const displayRating = hovered || selected;
+  const firstStarRef = useRef<HTMLButtonElement | null>(null);
+  // Once the sheet has committed a rating or been dismissed, ignore any further
+  // input so a rapid double tap can't rate/close twice or affect the next game.
+  const actedRef = useRef(false);
+
+  const close = useCallback(() => {
+    if (actedRef.current) return;
+    actedRef.current = true;
+    onSkip();
+  }, [onSkip]);
+
+  const rate = useCallback((rating: number) => {
+    if (actedRef.current) return;
+    actedRef.current = true;
+    onRate(rating);
+  }, [onRate]);
+
+  const { dragHandleProps, dragStyle } = useBottomSheetDragToClose({ panelRef, onClose: close });
+  // Star tap is the commit action, so nothing is "selected" until it saves; show
+  // the game's existing rating (if any) as the resting fill, and hover as preview.
+  const displayRating = hovered || (game.rating ?? 0);
 
   useEffect(() => {
+    // Focus the first star so keyboard/controller users can commit with Enter/A.
+    firstStarRef.current?.focus({ preventScroll: true });
+
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onSkip();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
     }
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onSkip]);
+  }, [close]);
 
   return (
     <div
@@ -33,7 +57,7 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
       aria-modal="true"
       aria-label={t('completion.rateTitle')}
     >
-      <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" onClick={onSkip} />
+      <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" onClick={close} />
       <div
         className="relative rounded-t-3xl border-t border-skyglass/20 bg-ink-950 shadow-2xl"
         ref={panelRef}
@@ -58,11 +82,12 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
+                ref={star === 1 ? firstStarRef : undefined}
                 aria-label={`${star} ${star === 1 ? 'star' : 'stars'}`}
                 className="text-4xl leading-none transition-transform hover:scale-110 active:scale-90"
                 style={{ color: star <= displayRating ? '#F59E0B' : '#334155' }}
                 type="button"
-                onClick={() => setSelected(star)}
+                onClick={() => rate(star)}
                 onMouseEnter={() => setHovered(star)}
                 onMouseLeave={() => setHovered(0)}
               >
@@ -71,23 +96,11 @@ export function CompletionRatingSheet({ game, onRate, onSkip }: CompletionRating
             ))}
           </div>
 
-          <div className="mt-5 space-y-2.5">
-            <button
-              className={`w-full rounded-2xl py-3.5 text-base font-bold transition ${
-                selected > 0
-                  ? 'bg-mint text-ink-950 hover:bg-mint/90 active:scale-[0.98]'
-                  : 'cursor-not-allowed bg-ink-800 text-slate-500'
-              }`}
-              disabled={selected === 0}
-              type="button"
-              onClick={() => onRate(selected)}
-            >
-              {t('completion.saveRating')}
-            </button>
+          <div className="mt-5">
             <button
               className="w-full rounded-2xl py-3 text-sm text-slate-500 transition hover:text-slate-300"
               type="button"
-              onClick={onSkip}
+              onClick={close}
             >
               {t('completion.skip')}
             </button>

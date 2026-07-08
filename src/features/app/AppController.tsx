@@ -1,26 +1,36 @@
-﻿import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+﻿import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Icon } from '../../components/Icon';
 import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
 import { UndoToastStack } from '../../components/UndoToastStack';
 import { RawgLinkDialog } from '../../components/RawgLinkDialog';
 import { HomePanel } from '../../components/HomePanel';
-import { MetadataEnrichmentPanel } from '../../components/MetadataEnrichmentPanel';
 import { OnboardingChecklist } from '../../components/OnboardingChecklist';
 import { ShelfAvatar } from '../../components/ShelfIdentity';
 import { ShelfProfilePopover } from '../shelf-profile/ShelfProfilePopover';
 import { PwaStatusBanner } from '../../components/PwaStatusBanner';
 import { QueuePanel } from '../../components/QueuePanel';
-import { RecommendationPanel } from '../../components/RecommendationPanel';
+import { DiscoverPanel } from '../../components/DiscoverPanel';
+import { DiscoveryPreviewPanel } from '../../components/discovery/DiscoveryPreviewPanel';
 import { ReviewModePanel } from '../../components/ReviewModePanel';
-import { StatsPanel } from '../../components/StatsPanel';
-import { QuestRunnerGame } from '../../components/QuestRunnerGame';
+import { PanelLoadingFallback } from '../../components/PanelLoadingFallback';
+
+// Low-frequency nav screens are code-split so they stay out of the initial
+// bundle. Home / Library / Wishlist / Discover / Platform Plans load eagerly.
+const MetadataEnrichmentPanel = lazy(() =>
+  import('../../components/MetadataEnrichmentPanel').then((m) => ({ default: m.MetadataEnrichmentPanel })),
+);
+const StatsPanel = lazy(() =>
+  import('../../components/StatsPanel').then((m) => ({ default: m.StatsPanel })),
+);
+const QuestRunnerGame = lazy(() =>
+  import('../../components/QuestRunnerGame').then((m) => ({ default: m.QuestRunnerGame })),
+);
 import {
   getNavDescription,
   moreNavItems,
   navItemLabelKeys,
   type MoreNavItem,
-  type NavItem,
   type TopNavItem,
 } from '../../config/navigation';
 import type { SettingsCategory } from '../../config/settings';
@@ -35,7 +45,7 @@ import { loadGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
-import type { PlatformQueueState } from '../../lib/platformQueueStorage';
+import { addGameToPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
 import { formatLocalDate, loadPlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
@@ -73,30 +83,57 @@ import { usePlatformQueueController } from '../queue/usePlatformQueueController'
 import { useAppPreferencesController } from '../settings/useAppPreferencesController';
 import { useSyncController } from '../integrations/useSyncController';
 import { useMetadataController } from '../metadata/useMetadataController';
-import { PlayingNowHub } from '../playing-now/PlayingNowHub';
 import { AppGameDetailsView } from './AppGameDetailsView';
+import { DiscoveryInboxPanel } from '../../components/DiscoveryInboxPanel';
+import type { DiscoveryInboxItem } from '../../lib/discoveryInboxStorage';
 import { ArtworkBrowserView } from '../artwork/ArtworkBrowserView';
-import { SettingsView } from '../settings/SettingsView';
+import { AchievementTimelineView } from '../achievement-timeline/AchievementTimelineView';
+const SettingsView = lazy(() =>
+  import('../settings/SettingsView').then((m) => ({ default: m.SettingsView })),
+);
+import { buildSetupTasks } from '../../lib/setupTasks';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
 import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGhost';
 import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
 import { useControllerAction } from '../../lib/controllerActions';
+import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../../services/steamApi';
+import { useDiscoveryController } from './useDiscoveryController';
 import { QuestShelfLogo } from './components/QuestShelfLogo';
 import { AddGameDialog } from './components/AddGameDialog';
 import { AppStartupScreen } from './components/AppStartupScreen';
 import { PlaceholderPanel } from './components/PlaceholderPanel';
 import { touchGameRecord, getRetroDuplicateKey } from '../../lib/gameUtils';
 
+function normalizeImportMatchTitle(title: string) {
+  return title.trim().toLocaleLowerCase().replace(/[â„˘Â®Â©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getSafeWishlistTitleMatches(games: Game[]) {
+  const titleCounts = new Map<string, number>();
+  const titleIds = new Map<string, string>();
+
+  games
+    .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId !== 'number')
+    .forEach((game) => {
+      const title = normalizeImportMatchTitle(game.title);
+      if (!title) return;
+      titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
+      titleIds.set(title, game.id);
+    });
+
+  return new Map(
+    Array.from(titleIds.entries()).filter(([title]) => titleCounts.get(title) === 1),
+  );
+}
 
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
   const [playActivity, setPlayActivity] = useState<PlayActivityRecord[]>(() => loadPlayActivity());
-  const [activeUtilityView, setActiveUtilityView] = useState<'playing-now' | null>(null);
-  const [playingNowReturnContext, setPlayingNowReturnContext] = useState<{ activeNavItem: NavItem; selectedGameId: string | null } | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isImportingNewSteamGames, setIsImportingNewSteamGames] = useState(false);
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
   const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
   const [isRawgApiKeySet, setIsRawgApiKeySet] = useState(() => Boolean(loadRawgSettings().apiKey.trim()));
@@ -142,7 +179,6 @@ export function AppController() {
     visibleNavItems,
   } = useNavigationState({ onSectionChange: () => setSelectedGameId(null) });
   const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
-  const [detailReturnSection, setDetailReturnSection] = useState<NavItem | null>(null);
   const {
     activeQueuePlatforms,
     backlogPickerGame,
@@ -160,7 +196,6 @@ export function AppController() {
     isShelfProfileOpen,
     libraryOwnerNickname,
     personalizedQuestShelfTitle,
-    playingNowGame,
     setIsShelfProfileOpen,
     setLibraryOwnerNickname,
     setShelfIdentity,
@@ -190,7 +225,6 @@ export function AppController() {
     trackMinimalAnalyticsEvent(eventName, importSource);
   }
   const mainContentRef = useRef<HTMLElement | null>(null);
-  const selectedGameScrollRestoreRef = useRef<number | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
@@ -256,6 +290,7 @@ export function AppController() {
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
   const [pendingAchievementGhost, setPendingAchievementGhost] = useState<QueueGhostAchievement | null>(null);
+  const [isAchievementTimelineOpen, setIsAchievementTimelineOpen] = useState(false);
   const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
   const achievementCountersRef = useRef(achievementCounters);
   achievementCountersRef.current = achievementCounters;
@@ -285,11 +320,25 @@ export function AppController() {
     [games, platformQueueState, shelfIdentity.selectedActiveBadgeId, achievementCtx],
   );
   const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
+
+  const setupTasks = useMemo(
+    () => buildSetupTasks({
+      accentColorPreference,
+      games,
+      isRawgApiKeySet,
+      platformQueueState,
+      steamSettings: steamSettingsSnapshot,
+      themePreference,
+    }),
+    [accentColorPreference, games, isRawgApiKeySet, platformQueueState, steamSettingsSnapshot, themePreference],
+  );
+  const hasIncompleteSetupTasks = setupTasks.some((t) => t.status !== 'completed');
+
   const isAppMountedRef = useRef(true);
 
-  // ── Achievement counter tracking ──────────────────────────────────────────
+  // â”€â”€ Achievement counter tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  // Daily active days + night owl / early bird — runs once on mount
+  // Daily active days + night owl / early bird â€” runs once on mount
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const hour = new Date().getHours();
@@ -313,7 +362,7 @@ export function AppController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // libraryFirstCreatedAt — set once when games are first loaded
+  // libraryFirstCreatedAt â€” set once when games are first loaded
   useEffect(() => {
     const c = achievementCountersRef.current;
     if (c.libraryFirstCreatedAt) return;
@@ -327,7 +376,7 @@ export function AppController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [games.length]);
 
-  // Playing streak — update when the currently-playing game changes
+  // Playing streak â€” update when the currently-playing game changes
   useEffect(() => {
     const c = achievementCountersRef.current;
     const playing = games.filter((g) => g.collectionType === 'library' && g.status === 'Playing');
@@ -344,7 +393,7 @@ export function AppController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [games]);
 
-  // Unlock notification — fires a toast when a new achievement unlocks
+  // Unlock notification â€” fires a toast when a new achievement unlocks
   const prevUnlockedIdsRef = useRef<Set<string> | null>(null);
   const addToastRef = useRef<((n: { category: 'success'; dedupeKey: string; message: string; details?: string }) => void) | null>(null);
 
@@ -397,6 +446,15 @@ export function AppController() {
     setSelectedGameId,
   });
   addToastRef.current = addToastNotification;
+  const {
+    inboxItems: discoveryInboxItems,
+    inboxRawgIds: discoveryInboxRawgIds,
+    previewCandidate,
+    addToInbox: addToDiscoveryInbox,
+    closePreview: closeDiscoveryPreview,
+    openPreview: openDiscoveryPreview,
+    removeFromInbox: removeFromDiscoveryInbox,
+  } = useDiscoveryController({ games, t, addToastNotification });
 
   const {
     addManualGame,
@@ -438,6 +496,7 @@ export function AppController() {
   const {
     metadataSelectionRequest,
     refreshingMetadataGameIds,
+    ensureRawgMetadataForGame,
     refreshGameMetadataFromActions,
     startMetadataWorkflow,
     updateGameArtwork,
@@ -527,12 +586,6 @@ export function AppController() {
   }, [activeNavItem, analyticsCounts]);
 
   useEffect(() => {
-    if (activeUtilityView === 'playing-now') {
-      trackSessionAnalyticsEvent('playing_now_opened');
-    }
-  }, [activeUtilityView, analyticsCounts]);
-
-  useEffect(() => {
     if (activeNavItem === 'Settings' && activeSettingsCategory === 'Platforms') {
       trackSessionAnalyticsEvent('platform_plans_opened');
     }
@@ -548,37 +601,6 @@ export function AppController() {
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
-
-  useLayoutEffect(() => {
-    const isCollectionDetailOpen = Boolean(selectedGameId) && (activeNavItem === 'Library' || activeNavItem === 'Wishlist');
-    const el = mainContentRef.current;
-    if (!isCollectionDetailOpen || !el) return;
-
-    if (selectedGameScrollRestoreRef.current === null) {
-      selectedGameScrollRestoreRef.current = el.scrollTop;
-    }
-
-    const previousOverflow = el.style.overflow;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    el.scrollTo({ top: 0, behavior: 'auto' });
-    el.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-
-    return () => {
-      el.style.overflow = previousOverflow;
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-
-      const scrollTop = selectedGameScrollRestoreRef.current;
-      if (scrollTop !== null) {
-        el.scrollTo({ top: scrollTop, behavior: 'auto' });
-        selectedGameScrollRestoreRef.current = null;
-      }
-    };
-  }, [activeNavItem, selectedGameId]);
 
   useEffect(() => {
     markOnboardingItemsComplete([
@@ -640,8 +662,6 @@ export function AppController() {
   }, [lastRetroImportedGames, libraryFilters]);
 
   useControllerAction('openMenu', () => {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
     setActiveNavItem('Settings');
     setActiveSettingsCategory(null);
     setSelectedGameId(null);
@@ -681,9 +701,25 @@ export function AppController() {
         .map(getRetroDuplicateKey)
         .filter((key): key is string => Boolean(key)),
     );
+    // Duplicate guard for manual/discovery imports only â€” Steam and retro
+    // imports keep their own dedup keys, and a wishlist copy must not block
+    // a Steam library import of the same game.
+    const existingLibraryRawgIds = new Set(
+      games
+        .filter((game) => game.collectionType === 'library' && typeof game.rawgId === 'number')
+        .map((game) => game.rawgId as number),
+    );
 
     const newGames = importedGames.filter((game) => {
       if (typeof game.steamAppId === 'number' && existingSteamAppIds.has(game.steamAppId)) {
+        return false;
+      }
+
+      if (
+        game.externalSource === 'manual' &&
+        typeof game.rawgId === 'number' &&
+        existingLibraryRawgIds.has(game.rawgId)
+      ) {
         return false;
       }
 
@@ -730,6 +766,126 @@ export function AppController() {
       trackMinimalAnalyticsEvent('import_completed', 'steam');
     }
     return createdGames;
+  }
+
+  async function importNewSteamGames() {
+    if (isImportingNewSteamGames) return;
+
+    setIsImportingNewSteamGames(true);
+
+    try {
+      const settings = loadSteamSettings();
+      const [ownedGames, recentlyPlayedGames] = await Promise.all([
+        getOwnedGames(settings),
+        getRecentlyPlayedGames(settings).catch(() => []),
+      ]);
+      const importedAt = new Date().toISOString();
+      const librarySteamAppIds = new Set(
+        games
+          .filter((game) => game.collectionType === 'library')
+          .map((game) => game.steamAppId)
+          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+      );
+      const wishlistSteamAppIds = new Set(
+        games
+          .filter((game) => game.collectionType === 'wishlist')
+          .map((game) => game.steamAppId)
+          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+      );
+      const existingTitleMatches = getSafeWishlistTitleMatches(games);
+      const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
+      const newOwnedGames = ownedGames.filter(
+        (game) => !librarySteamAppIds.has(game.appid) && !ignoredSteamAppIds.has(game.appid),
+      );
+      const mappedGames = mapSteamGamesToLocalGames(newOwnedGames, recentlyPlayedGames, importedAt).map((game) =>
+        touchGameRecord({
+          ...game,
+          collectionType: 'library' as const,
+          notes: game.notes.replace('Imported from Steam API test results. Not saved to local library yet.', 'Imported from Steam owned games. Queued for triage.'),
+        }),
+      );
+      const mappedGamesByAppId = new Map(mappedGames.map((game) => [game.steamAppId, game]));
+      const mappedGameTitles = new Set(mappedGames.map((game) => normalizeImportMatchTitle(game.title)).filter(Boolean));
+      const removedWishlistIds = new Set(
+        games
+          .filter((game) => {
+            if (game.collectionType !== 'wishlist') return false;
+            if (typeof game.steamAppId === 'number') return newOwnedGames.some((ownedGame) => ownedGame.appid === game.steamAppId);
+            const normalizedTitle = normalizeImportMatchTitle(game.title);
+            return mappedGameTitles.has(normalizedTitle) && existingTitleMatches.get(normalizedTitle) === game.id;
+          })
+          .map((game) => game.id),
+      );
+      const createdGames = mappedGames;
+
+      setGames((currentGames) => {
+        const currentLibrarySteamAppIds = new Set(
+          currentGames
+            .filter((game) => game.collectionType === 'library')
+            .map((game) => game.steamAppId)
+            .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
+        );
+
+        const nextLibraryGames: Game[] = [];
+
+        for (const ownedGame of newOwnedGames) {
+          if (currentLibrarySteamAppIds.has(ownedGame.appid)) continue;
+          const mappedGame = mappedGamesByAppId.get(ownedGame.appid);
+          if (!mappedGame) continue;
+          nextLibraryGames.push(mappedGame);
+          currentLibrarySteamAppIds.add(ownedGame.appid);
+        }
+
+        const nextGames = currentGames.filter((game) => {
+          if (game.collectionType !== 'wishlist') return true;
+          if (typeof game.steamAppId === 'number' && nextLibraryGames.some((newGame) => newGame.steamAppId === game.steamAppId)) {
+            return false;
+          }
+
+          const matchingNewGame = nextLibraryGames.find((newGame) => normalizeImportMatchTitle(newGame.title) === normalizeImportMatchTitle(game.title));
+          if (!game.steamAppId && matchingNewGame && existingTitleMatches.get(normalizeImportMatchTitle(game.title)) === game.id) {
+            return false;
+          }
+
+          return true;
+        });
+
+        return [...nextGames, ...nextLibraryGames];
+      });
+
+      if (createdGames.length > 0) {
+        setPlatformQueueState((currentState) =>
+          createdGames.reduce((nextState, game) => addGameToPlatformQueue(nextState, game, game.platform), currentState),
+        );
+        trackMinimalAnalyticsEvent('import_completed', 'steam');
+      }
+
+      const duplicateCount = ownedGames.filter((game) => librarySteamAppIds.has(game.appid)).length;
+      const wishlistRemovedByAppIdCount = newOwnedGames.filter((game) => wishlistSteamAppIds.has(game.appid)).length;
+      const removedWishlistCount = Math.max(removedWishlistIds.size, wishlistRemovedByAppIdCount);
+      const message = [
+        `${createdGames.length} new Steam games imported`,
+        `${duplicateCount} already in library`,
+        `${removedWishlistCount} removed from Wishlist / marked owned`,
+        `${createdGames.length} added to Quest Queue`,
+      ].join(' Â· ');
+
+      addToastNotification({
+        actions: createdGames.length > 0 ? [getOpenQueueAction()] : undefined,
+        category: createdGames.length > 0 ? 'success' : 'info',
+        dedupeKey: 'steam-import-new-games',
+        message,
+      });
+    } catch (error) {
+      const isCredentialError = error instanceof SteamApiError && ['missing-api-key', 'missing-steamid64', 'invalid-steamid64'].includes(error.code);
+      addToastNotification({
+        category: isCredentialError ? 'warning' : 'error',
+        dedupeKey: 'steam-import-new-games:error',
+        message: error instanceof Error ? error.message : 'Steam owned games import failed. Check Steam credentials, profile privacy, and connection.',
+      });
+    } finally {
+      setIsImportingNewSteamGames(false);
+    }
   }
 
   function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
@@ -899,35 +1055,89 @@ export function AppController() {
     setActiveNavItem('Artwork');
   }
 
+  // The Game Hub opens as a fullscreen overlay, so the originating screen
+  // stays mounted behind it and back restores scroll/focus for free.
   function openGameFromHome(game: Game) {
-    setDetailReturnSection('Home');
     setSelectedGameId(game.id);
-    setActiveNavItem(game.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+  }
+
+  function handleSelectDiscoveryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const found = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    if (found) setSelectedGameId(found.id);
+  }
+
+
+  function promoteDiscoveryToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(discoveryGame, existingIds);
+    addToWishlist({ ...base, collectionType: 'wishlist' });
+    closeDiscoveryPreview();
+    addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToWishlist'), { game: discoveryGame.title }) });
+  }
+
+  function promoteDiscoveryToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    // If the game already exists in the collection, never create a second
+    // record: move the wishlist copy in place, or just open the library copy.
+    const existing = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    if (existing) {
+      if (existing.collectionType === 'wishlist') {
+        moveToLibrary(existing);
+      }
+      closeDiscoveryPreview();
+      setSelectedGameId(existing.id);
+      setActiveNavItem('Library');
+      return;
+    }
+
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(discoveryGame, existingIds);
+    importGames([base]);
+    closeDiscoveryPreview();
+    // Evolve the Preview into the Game Hub for the newly owned game so the
+    // transition reads as "this game is now mine", not a navigation.
+    setSelectedGameId(base.id);
+    setActiveNavItem('Library');
+    addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToLibrary'), { game: discoveryGame.title }) });
+  }
+
+  function handlePreviewOpenLibraryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const found = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    if (!found) return;
+    closeDiscoveryPreview();
+    setSelectedGameId(found.id);
+    setActiveNavItem(found.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
+  }
+
+  function promoteInboxDiscoveryToLibrary(item: DiscoveryInboxItem) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(item.game, existingIds);
+    importGames([base]);
+    removeFromDiscoveryInbox(item.id);
+  }
+
+  function promoteInboxDiscoveryToWishlist(item: DiscoveryInboxItem) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(item.game, existingIds);
+    addToWishlist({ ...base, collectionType: 'wishlist' });
+    removeFromDiscoveryInbox(item.id);
+  }
+
+  function promoteInboxDiscoveryToPlans(item: DiscoveryInboxItem) {
+    const existingIds = new Set(games.map((g) => g.id));
+    const base = createGameFromDiscovery(item.game, existingIds);
+    importGames([base]);
+    removeFromDiscoveryInbox(item.id);
+    openBacklogPicker(base);
+  }
+
+  function handleInboxIgnore(item: DiscoveryInboxItem) {
+    removeFromDiscoveryInbox(item.id);
   }
 
   function openQueue(platform?: GamePlatform) {
     setTargetQueuePlatform(platform);
     setSelectedGameId(null);
     setActiveNavItem('Queue');
-  }
-
-  function openPlayingNowHubFromShelfProfile() {
-    setPlayingNowReturnContext({ activeNavItem, selectedGameId });
-    setSelectedGameId(null);
-    setIsShelfProfileOpen(false);
-    setActiveUtilityView('playing-now');
-  }
-
-  function closePlayingNowHub() {
-    setActiveUtilityView(null);
-    if (playingNowReturnContext) {
-      setActiveNavItem(playingNowReturnContext.activeNavItem);
-      setSelectedGameId(playingNowReturnContext.selectedGameId);
-      setPlayingNowReturnContext(null);
-      return;
-    }
-    setActiveNavItem('Library');
-    setSelectedGameId(null);
   }
 
   function logPlayedToday(game: Game) {
@@ -945,16 +1155,7 @@ export function AppController() {
     );
   }
 
-  function openDetailsFromPlayingNow(gameId: string) {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
-    setSelectedGameId(gameId);
-    setActiveNavItem('Library');
-  }
-
   function openSettingsFromShelfProfile() {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
     setIsShelfProfileOpen(false);
     setSelectedGameId(null);
     setActiveNavItem('Settings');
@@ -962,9 +1163,6 @@ export function AppController() {
   }
 
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
-    setActiveUtilityView(null);
-    setPlayingNowReturnContext(null);
-    setDetailReturnSection(null);
     setSelectedGameId(null);
     setActiveNavItem(item);
     setIsMoreMenuOpen(false);
@@ -975,10 +1173,19 @@ export function AppController() {
   }, []);
 
   function handleBackFromDetail() {
+    const returningGameId = selectedGameId;
     setSelectedGameId(null);
-    if (detailReturnSection) {
-      setActiveNavItem(detailReturnSection);
-      setDetailReturnSection(null);
+    // Controller/keyboard flow: put focus back on the originating card.
+    // Scroll position is already preserved because the previous screen
+    // stays mounted behind the fullscreen Game Hub; scroll-mt on the card
+    // handles the edge case where it sits just outside the viewport.
+    if (returningGameId) {
+      window.setTimeout(() => {
+        const card = mainContentRef.current?.querySelector<HTMLElement>(
+          `[data-game-id="${CSS.escape(returningGameId)}"]`,
+        );
+        card?.focus();
+      }, 0);
     }
   }
 
@@ -1002,12 +1209,46 @@ export function AppController() {
     return <AppStartupScreen />;
   }
 
+  // Single source for the Game Hub detail route â€” rendered once as a
+  // fullscreen overlay whenever a game is selected, from any screen.
+  const renderGameDetailRoute = (game: Game) => (
+    <AppGameDetailsView
+      game={game}
+      allGames={games}
+      playActivity={playActivity}
+      refreshingMetadataGameIds={refreshingMetadataGameIds}
+      steamAchievementSyncState={steamAchievementSyncState}
+      steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+      platformQueueState={platformQueueState}
+      onAddToQueue={openBacklogPicker}
+      onAddToWishlist={addToWishlist}
+      onBack={handleBackFromDetail}
+      onFindArtwork={(targetGame, mode = 'artwork') => refreshGameMetadataFromActions(targetGame, mode as 'metadata' | 'artwork')}
+      onIgnore={removeAndIgnoreSteamGame}
+      onSyncSteamData={syncSteamDataForGame}
+      onStatusChange={updateGameStatusWithCompletion}
+      onTrackingChange={updateGameTracking}
+      onGameEdit={(gameId, changes) => updateGameTracking(gameId, changes)}
+      onGameEditSaved={(savedGame) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${savedGame.id}`, message: `${savedGame.title} details saved.` })}
+      onSelectDiscoveryGame={handleSelectDiscoveryGame}
+      onAddDiscoveryGameToInbox={addToDiscoveryInbox}
+      discoveryInboxRawgIds={discoveryInboxRawgIds}
+      onOpenDiscoveryPreview={openDiscoveryPreview}
+    />
+  );
+
   return (
     <I18nProvider language={language}>
     <main className={`qs-app-root bg-ink-950 text-slate-100 ${getAppTemplateClassName(appTemplatePreference)}`} style={accentThemeStyle}>
       <div className="qs-handheld-shell mx-auto flex w-full max-w-7xl flex-col px-3 py-2 sm:px-4 lg:px-5">
         <header className={`qs-compact-header qs-glass shrink-0 flex items-center gap-2 rounded-lg border px-2 transition-all duration-300 ${isScrolled ? 'qs-header-stuck py-1' : 'py-1.5'}`}>
           <div className="relative min-w-0 shrink-0" ref={shelfProfileRef}>
+            {hasIncompleteSetupTasks ? (
+              <span
+                className="pointer-events-none absolute right-0.5 top-0.5 z-10 h-2 w-2 rounded-full bg-mint ring-2 ring-ink-950"
+                aria-label="Setup incomplete"
+              />
+            ) : null}
             <button
               aria-expanded={isShelfProfileOpen}
               aria-haspopup="menu"
@@ -1025,8 +1266,6 @@ export function AppController() {
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
                 featuredGame={resolvedFeaturedGame}
                 onOpenSettings={openSettingsFromShelfProfile}
-                onOpenPlayingNow={openPlayingNowHubFromShelfProfile}
-                playingNowGame={playingNowGame}
                 shelfName={personalizedQuestShelfTitle}
                 shelfOverview={shelfOverview}
                 t={t}
@@ -1047,7 +1286,16 @@ export function AppController() {
                 title={getNavDescription(item)}
                 type="button"
               >
-                {t(navItemLabelKeys[item])}
+                {item === 'Discovery Inbox' && discoveryInboxItems.length > 0 ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    {t(navItemLabelKeys[item])}
+                    <span className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-bold leading-none text-ink-950">
+                      {discoveryInboxItems.length > 99 ? '99+' : discoveryInboxItems.length}
+                    </span>
+                  </span>
+                ) : (
+                  t(navItemLabelKeys[item])
+                )}
               </button>
             ))}
           </nav>
@@ -1080,7 +1328,7 @@ export function AppController() {
                       type="button"
                     >
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-mint/25 bg-mint/10 text-mint">
-                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Recommendation' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : 'image-frame'} size={15} strokeWidth={2.2} />
+                        <Icon name={item === 'Stats' ? 'panel-top-open' : item === 'Discover' ? 'sparkles' : item === 'Quest Runner' ? 'gamepad-2' : item === 'Settings' ? 'settings' : 'image-frame'} size={15} strokeWidth={2.2} />
                       </span>
                       <span className="whitespace-nowrap">{t(navItemLabelKeys[item])}</span>
                     </button>
@@ -1094,44 +1342,7 @@ export function AppController() {
         </header>
 
         <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
-          {activeUtilityView === 'playing-now' ? (
-            <div className="qs-playing-now-scroll overflow-y-auto overscroll-contain pb-8 pr-1">
-              <PlayingNowHub
-                activity={playActivity}
-                featuredGame={resolvedFeaturedGame}
-                games={games}
-                onBack={closePlayingNowHub}
-                onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-                onOpenDetails={openDetailsFromPlayingNow}
-                onPlayToday={logPlayedToday}
-                onRefreshSteamActivity={(gameIds) => { void refreshSteamPlaytime(gameIds, { showToast: false }); }}
-                onStatusChange={updateGameStatusWithCompletion}
-                queue={platformQueueState}
-                queueSummary={queueSummary}
-                shelfNickname={shelfIdentity.shelfName}
-                t={t}
-              />
-            </div>
-          ) : activeNavItem === 'Review Mode' && selectedGame ? (
-            <AppGameDetailsView
-              game={selectedGame}
-              playActivity={playActivity}
-              refreshingMetadataGameIds={refreshingMetadataGameIds}
-              steamAchievementSyncState={steamAchievementSyncState}
-              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-              platformQueueState={platformQueueState}
-              onAddToQueue={openBacklogPicker}
-              onAddToWishlist={addToWishlist}
-              onBack={handleBackFromDetail}
-              onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-              onIgnore={removeAndIgnoreSteamGame}
-              onSyncSteamData={syncSteamDataForGame}
-              onStatusChange={updateGameStatusWithCompletion}
-              onTrackingChange={updateGameTracking}
-              onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
-              onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-            />
-          ) : activeNavItem === 'Home' ? (
+          {activeNavItem === 'Home' ? (
             <HomePanel
               appTitle={personalizedQuestShelfTitle}
               shelfTitle={computedShelfTitle}
@@ -1146,6 +1357,7 @@ export function AppController() {
               itadDealSyncState={itadDealSyncState}
               steamAchievementSyncState={steamAchievementSyncState}
               steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+              isImportingNewSteamGames={isImportingNewSteamGames}
               onOpenDetails={openGameFromHome}
               onOpenLibrary={() => {
                 setSelectedGameId(null);
@@ -1153,6 +1365,11 @@ export function AppController() {
               }}
               onOpenQueue={openQueue}
               onOpenReviewMode={startReviewMode}
+              onOpenSettings={() => {
+                setSelectedGameId(null);
+                setActiveNavItem('Settings');
+                setActiveSettingsCategory('Personalization');
+              }}
               onOpenWishlist={() => {
                 setSelectedGameId(null);
                 setActiveNavItem('Wishlist');
@@ -1178,6 +1395,10 @@ export function AppController() {
                 const wishlistIds = games.filter((g) => g.collectionType === 'wishlist').map((g) => g.id);
                 void syncWishlistDeals(wishlistIds);
               }}
+              onImportNewSteamGames={() => {
+                void importNewSteamGames();
+              }}
+              onOpenAchievementTimeline={() => setIsAchievementTimelineOpen(true)}
               onSyncSteamAchievements={() => {
                 void syncSteamAchievements(homeSteamSyncGameIds, {
                   emptyToastMessage: 'No Playing Now or Platform Plan Steam games are eligible for achievement sync.',
@@ -1190,156 +1411,129 @@ export function AppController() {
                   showToast: true,
                 });
               }}
+              onSelectDiscoveryGame={handleSelectDiscoveryGame}
+              onOpenDiscoveryPreview={openDiscoveryPreview}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
             />
           ) : activeNavItem === 'Library' ? (
-            <div className="relative h-full">
-              {selectedGame && (
-                <div className="absolute inset-0 z-10">
-                  <AppGameDetailsView
-                    game={selectedGame}
-                    playActivity={playActivity}
-                    refreshingMetadataGameIds={refreshingMetadataGameIds}
-                    steamAchievementSyncState={steamAchievementSyncState}
-                    steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-                    platformQueueState={platformQueueState}
-                    onAddToQueue={openBacklogPicker}
-                    onAddToWishlist={addToWishlist}
-                    onBack={handleBackFromDetail}
-                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-                    onIgnore={removeAndIgnoreSteamGame}
-                    onSyncSteamData={syncSteamDataForGame}
-                    onStatusChange={updateGameStatusWithCompletion}
-                    onTrackingChange={updateGameTracking}
-                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
-                    onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-                  />
-                </div>
-              )}
-              <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
-                <CollectionPanel
-                  collectionType="library"
-                  contentScrollRef={mainContentRef}
-                  filters={libraryFilters}
-                  steamAchievementSyncState={steamAchievementSyncState}
-                  steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-                  games={filteredLibraryGames}
-                  allGames={games}
-                  ignoredReviewGameIds={reviewIgnoredGameIds}
-                  reviewModeState={reviewModeState}
-                  platformOptions={platformOptions}
-                  tags={tags}
-                  platformQueueState={platformQueueState}
-                  onAddGame={() => setIsAddGameOpen(true)}
-                  onAddToWishlist={addToWishlist}
-                  onAddManyToWishlist={addManyToWishlist}
-                  onAddToQueue={openBacklogPicker}
-                  onPlayNow={playGameFromCompactRow}
-                  onFinish={finishGameFromCompactRow}
-                  onDrop={dropGameFromCompactRow}
-                  onBulkEnrich={startMetadataWorkflow}
-                  isHltbSyncing={isHltbSyncing}
-                  onBulkSyncHltb={syncHltb}
-                  onBulkRemove={removeManyGames}
-                  onBulkSyncSteamAchievements={(gameIds, options) =>
-                    syncSteamAchievements(gameIds, {
-                      completionToastMessage: formatSteamAchievementSyncSummary,
-                      emptyToastMessage: options?.emptyToastMessage,
-                      force: options?.force,
-                      showToast: true,
-                    })
-                  }
-                  onBulkRefreshSteamPlaytime={(gameIds, options) =>
-                    refreshSteamPlaytime(gameIds, {
-                      completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
-                      emptyToastMessage: options?.emptyToastMessage,
-                      showToast: true,
-                    })
-                  }
-                  onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-                  onBulkStatusChange={updateManyGameStatuses}
-                  onClearFilters={handleClearLibraryFilters}
-                  onFiltersChange={handleLibraryFiltersChange}
-                  onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-                  onFindMetadata={refreshGameMetadataFromActions}
-                  onMoveToLibrary={moveToLibrary}
-                  onOpenDetails={handleOpenDetailsFromCollection}
-                  onRemove={removeGame}
-                  onRemoveAndIgnore={removeAndIgnoreSteamGame}
-                  onOpenQueue={() => startReviewMode('backlog')}
-                  onStartReview={startReviewMode}
-                  onStatusChange={updateGameStatusWithCompletion}
-                  onOpenOnboarding={openOnboarding}
-                  onOpenRetro={() => {
-                    setActiveNavItem('Settings');
-                    setActiveSettingsCategory('Retro');
-                  }}
-                />
-              </div>
-            </div>
+            <CollectionPanel
+              collectionType="library"
+              contentScrollRef={mainContentRef}
+              filters={libraryFilters}
+              steamAchievementSyncState={steamAchievementSyncState}
+              steamPlaytimeRefreshState={steamPlaytimeRefreshState}
+              games={filteredLibraryGames}
+              allGames={games}
+              ignoredReviewGameIds={reviewIgnoredGameIds}
+              reviewModeState={reviewModeState}
+              platformOptions={platformOptions}
+              tags={tags}
+              platformQueueState={platformQueueState}
+              isHltbSyncing={isHltbSyncing}
+              collectionActions={{
+                addGame: () => setIsAddGameOpen(true),
+                addToWishlist,
+                addManyToWishlist,
+                findArtwork: (game) => refreshGameMetadataFromActions(game, 'artwork'),
+                findMetadata: refreshGameMetadataFromActions,
+                moveToLibrary,
+                openDetails: handleOpenDetailsFromCollection,
+                remove: removeGame,
+                removeAndIgnore: removeAndIgnoreSteamGame,
+                statusChange: updateGameStatusWithCompletion,
+              }}
+              bulkActions={{
+                enrich: startMetadataWorkflow,
+                remove: removeManyGames,
+                removeAndIgnore: removeAndIgnoreManyGames,
+                statusChange: updateManyGameStatuses,
+                syncHltb,
+                syncSteamAchievements: (gameIds, options) =>
+                  syncSteamAchievements(gameIds, {
+                    completionToastMessage: formatSteamAchievementSyncSummary,
+                    emptyToastMessage: options?.emptyToastMessage,
+                    force: options?.force,
+                    showToast: true,
+                  }),
+                refreshSteamPlaytime: (gameIds, options) =>
+                  refreshSteamPlaytime(gameIds, {
+                    completionToastMessage: (summary) => formatMessageTemplate(t('app.updatedPlaytimeForGames'), { count: summary.updatedCount }),
+                    emptyToastMessage: options?.emptyToastMessage,
+                    showToast: true,
+                  }),
+              }}
+              queueActions={{
+                addToQueue: openBacklogPicker,
+                openQueue: () => startReviewMode('backlog'),
+                playNow: playGameFromCompactRow,
+                finish: finishGameFromCompactRow,
+                drop: dropGameFromCompactRow,
+              }}
+              reviewActions={{ startReview: startReviewMode }}
+              filterActions={{
+                clearFilters: handleClearLibraryFilters,
+                filtersChange: handleLibraryFiltersChange,
+              }}
+              navigationActions={{
+                openOnboarding,
+                openIntegrations: () => {
+                  setActiveNavItem('Settings');
+                  setActiveSettingsCategory('Integrations');
+                },
+                openRetro: () => {
+                  setActiveNavItem('Settings');
+                  setActiveSettingsCategory('Retro');
+                },
+              }}
+            />
           ) : activeNavItem === 'Wishlist' ? (
-            <div className="relative h-full">
-              {selectedGame && (
-                <div className="absolute inset-0 z-10">
-                  <AppGameDetailsView
-                    game={selectedGame}
-                    playActivity={playActivity}
-                    refreshingMetadataGameIds={refreshingMetadataGameIds}
-                    steamAchievementSyncState={steamAchievementSyncState}
-                    steamPlaytimeRefreshState={steamPlaytimeRefreshState}
-                    platformQueueState={platformQueueState}
-                    onAddToQueue={openBacklogPicker}
-                    onAddToWishlist={addToWishlist}
-                    onBack={handleBackFromDetail}
-                    onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-                    onIgnore={removeAndIgnoreSteamGame}
-                    onSyncSteamData={syncSteamDataForGame}
-                    onStatusChange={updateGameStatusWithCompletion}
-                    onTrackingChange={updateGameTracking}
-                    onGameEdit={(gameId, changes) => updateGameTracking(gameId, { notes: changes.notes ?? '', status: changes.status ?? 'Want to play', tags: changes.tags ?? [], ...changes })}
-                    onGameEditSaved={(game) => addToastNotification({ category: 'success', dedupeKey: `game-edit:${game.id}`, message: `${game.title} details saved.` })}
-                  />
-                </div>
-              )}
-              <div inert={Boolean(selectedGame)} aria-hidden={Boolean(selectedGame)}>
-                <CollectionPanel
-                  collectionType="wishlist"
-                  contentScrollRef={mainContentRef}
-                  filters={wishlistFilters}
-                  games={filteredWishlistGames}
-                  platformOptions={platformOptions}
-                  steamWishlistSyncState={steamWishlistSyncState}
-                  itadDealSyncState={itadDealSyncState}
-                  tags={tags}
-                  platformQueueState={platformQueueState}
-                  onAddGame={() => setIsAddGameOpen(true)}
-                  onAddToWishlist={addToWishlist}
-                  onAddManyToWishlist={addManyToWishlist}
-                  onAddToQueue={openBacklogPicker}
-                  onPlayNow={playGameFromCompactRow}
-                  onFinish={finishGameFromCompactRow}
-                  onDrop={dropGameFromCompactRow}
-                  onBulkEnrich={startMetadataWorkflow}
-                  isHltbSyncing={isHltbSyncing}
-                  onBulkSyncHltb={syncHltb}
-                  onBulkRemove={removeManyGames}
-                  onBulkRemoveAndIgnore={removeAndIgnoreManyGames}
-                  onBulkStatusChange={updateManyGameStatuses}
-                  onClearFilters={handleClearWishlistFilters}
-                  onFiltersChange={handleWishlistFiltersChange}
-                  onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-                  onFindMetadata={refreshGameMetadataFromActions}
-                  onMoveToLibrary={moveToLibrary}
-                  onOpenDetails={handleOpenDetailsFromCollection}
-                  onRemove={removeGame}
-                  onRemoveAndIgnore={removeAndIgnoreSteamGame}
-                  onStartReview={startReviewMode}
-                  onStatusChange={updateGameStatusWithCompletion}
-                  onSyncSteamWishlist={syncSteamWishlist}
-                  onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
-                  onSyncItadDeals={syncWishlistDeals}
-                />
-              </div>
-            </div>
+            <CollectionPanel
+              collectionType="wishlist"
+              contentScrollRef={mainContentRef}
+              filters={wishlistFilters}
+              games={filteredWishlistGames}
+              platformOptions={platformOptions}
+              steamWishlistSyncState={steamWishlistSyncState}
+              itadDealSyncState={itadDealSyncState}
+              tags={tags}
+              platformQueueState={platformQueueState}
+              isHltbSyncing={isHltbSyncing}
+              collectionActions={{
+                addGame: () => setIsAddGameOpen(true),
+                addToWishlist,
+                addManyToWishlist,
+                findArtwork: (game) => refreshGameMetadataFromActions(game, 'artwork'),
+                findMetadata: refreshGameMetadataFromActions,
+                moveToLibrary,
+                openDetails: handleOpenDetailsFromCollection,
+                remove: removeGame,
+                removeAndIgnore: removeAndIgnoreSteamGame,
+                statusChange: updateGameStatusWithCompletion,
+              }}
+              bulkActions={{
+                enrich: startMetadataWorkflow,
+                remove: removeManyGames,
+                removeAndIgnore: removeAndIgnoreManyGames,
+                statusChange: updateManyGameStatuses,
+                syncHltb,
+              }}
+              queueActions={{
+                addToQueue: openBacklogPicker,
+                playNow: playGameFromCompactRow,
+                finish: finishGameFromCompactRow,
+                drop: dropGameFromCompactRow,
+              }}
+              reviewActions={{ startReview: startReviewMode }}
+              filterActions={{
+                clearFilters: handleClearWishlistFilters,
+                filtersChange: handleWishlistFiltersChange,
+              }}
+              syncActions={{
+                syncSteamWishlist,
+                importSteamWishlistHtml: importSteamWishlistHtmlItemsWithAnalytics,
+                syncItadDeals: syncWishlistDeals,
+              }}
+            />
           ) : activeNavItem === 'Queue' ? (
             <QueuePanel
               games={games}
@@ -1354,12 +1548,7 @@ export function AppController() {
               onMoveEntryToPlatform={moveQueueGameToPlatform}
               onPlayNow={playQueueGameNow}
               onPlayingAction={updateCurrentlyPlayingGame}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Queue');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
+              onOpenDetails={setSelectedGameId}
               onRemoveEntry={removeQueueGame}
               onStartReview={() => startReviewMode('backlog')}
             />
@@ -1374,74 +1563,74 @@ export function AppController() {
               confirmCancelConvention={confirmCancelConvention}
               source={activeReviewSource}
               onAction={handleReviewAction}
+              onEnsureRawgMetadata={ensureRawgMetadataForGame}
               onAddPlatform={addQueuePlatform}
               onOpenQueue={() => setActiveNavItem('Queue')}
               onRestoreIgnored={restoreReviewIgnoredGames}
               onReturnToLibrary={() => setActiveNavItem('Library')}
               onSourceChange={setReviewSource}
             />
-          ) : activeNavItem === 'Metadata' ? (
-            <MetadataEnrichmentPanel
-              games={games}
-              initialSelectedGameIds={metadataSelectionRequest?.ids}
-              onMetadataManagementChange={updateGameMetadataManagement}
-              onMetadataEnriched={() => markOnboardingItemComplete('metadata-enriched')}
-              onMetadataUpdate={updateGameMetadata}
-              selectionRequestId={metadataSelectionRequest?.requestId}
+          ) : activeNavItem === 'Discovery Inbox' ? (
+            <DiscoveryInboxPanel
+              items={discoveryInboxItems}
+              onAddToLibrary={promoteInboxDiscoveryToLibrary}
+              onAddToWishlist={promoteInboxDiscoveryToWishlist}
+              onAddToPlans={promoteInboxDiscoveryToPlans}
+              onIgnore={handleInboxIgnore}
             />
+          ) : activeNavItem === 'Metadata' ? (
+            <Suspense fallback={<PanelLoadingFallback />}>
+              <MetadataEnrichmentPanel
+                games={games}
+                initialSelectedGameIds={metadataSelectionRequest?.ids}
+                onMetadataManagementChange={updateGameMetadataManagement}
+                onMetadataEnriched={() => markOnboardingItemComplete('metadata-enriched')}
+                onMetadataUpdate={updateGameMetadata}
+                selectionRequestId={metadataSelectionRequest?.requestId}
+              />
+            </Suspense>
           ) : activeNavItem === 'Artwork' ? (
             <ArtworkBrowserView
               games={games}
               onApplyArtworkUpdate={updateGameArtwork}
               onEnrichGames={startMetadataWorkflow}
               onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Artwork');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
+              onOpenDetails={setSelectedGameId}
             />
-          ) : activeNavItem === 'Recommendation' ? (
-            <RecommendationPanel
+          ) : activeNavItem === 'Discover' ? (
+            <DiscoverPanel
               games={games}
-              contentScrollRef={mainContentRef}
-              queueState={platformQueueState}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Recommendation');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
-              onStartReview={startReviewMode}
-              onStatusChange={updateGameStatusWithCompletion}
-              onAddToQueue={openBacklogPicker}
-              onAddToWishlist={addToWishlist}
-              onMoveToLibrary={moveToLibrary}
-              onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')}
-              onFindMetadata={(game) => startMetadataWorkflow([game.id])}
-              onRemove={removeGame}
-              onRemoveAndIgnore={removeAndIgnoreSteamGame}
+              discoveryInboxRawgIds={discoveryInboxRawgIds}
+              onAddToInbox={addToDiscoveryInbox}
+              onOpenGame={openDiscoveryPreview}
             />
           ) : activeNavItem === 'Stats' ? (
-            <StatsPanel
-              games={games}
-              queueSummary={queueSummary}
-              onOpenDetails={(gameId) => {
-                const targetGame = games.find((game) => game.id === gameId);
-                setDetailReturnSection('Stats');
-                setSelectedGameId(gameId);
-                setActiveNavItem(targetGame?.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
-              }}
-            />
+            <Suspense fallback={<PanelLoadingFallback />}>
+              <StatsPanel
+                games={games}
+                queueSummary={queueSummary}
+                onOpenDetails={setSelectedGameId}
+              />
+            </Suspense>
           ) : activeNavItem === 'Quest Runner' ? (
             <div className="px-4 py-4">
-              <QuestRunnerGame games={games} />
+              <Suspense fallback={<PanelLoadingFallback />}>
+                <QuestRunnerGame games={games} />
+              </Suspense>
             </div>
           ) : activeNavItem === 'Settings' ? (
+            <Suspense fallback={<PanelLoadingFallback />}>
             <SettingsView
               activeCategory={activeSettingsCategory}
               autoBackupSignal={autoBackupSignal}
+              setupTasks={setupTasks}
+              onAddGame={() => setIsAddGameOpen(true)}
+              onSyncAchievements={() => {
+                const allSteamGameIds = games
+                  .filter((g) => g.collectionType === 'library' && typeof g.steamAppId === 'number')
+                  .map((g) => g.id);
+                void syncSteamAchievements(allSteamGameIds, { showToast: true });
+              }}
               completedOnboardingItemIds={completedOnboardingItemIds}
               skippedOnboardingItemIds={skippedOnboardingItemIds}
               games={games}
@@ -1522,6 +1711,7 @@ export function AppController() {
               onUnignoreSteamGame={unignoreSteamGame}
               onViewRetroImportedGames={viewRetroImportedGames}
             />
+            </Suspense>
           ) : (
             <PlaceholderPanel title={activeNavItem} />
           )}
@@ -1534,8 +1724,6 @@ export function AppController() {
         onOpenQueue={openQueueFromToast}
         onLinkRawgGame={openRawgRecoveryDialog}
         onOpenSteamSettings={() => {
-          setActiveUtilityView(null);
-          setPlayingNowReturnContext(null);
           setActiveNavItem('Settings');
           setActiveSettingsCategory('Integrations');
           setSelectedGameId(null);
@@ -1576,6 +1764,27 @@ export function AppController() {
           onAddPlatform={addQueuePlatform}
           onClose={() => setBacklogPickerGame(null)}
           onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
+        />
+      ) : null}
+
+      {/* Game Hub â€” fullscreen overlay over the app shell, sharing the
+          FullscreenGameShell presentation with Discovery Preview. The
+          originating screen stays mounted behind it, so back restores
+          scroll/focus. Rendered before the preview so a preview opened
+          from the hub's recommendations stacks on top. */}
+      {selectedGame ? renderGameDetailRoute(selectedGame) : null}
+
+      {previewCandidate ? (
+        <DiscoveryPreviewPanel
+          candidate={previewCandidate}
+          userGames={games}
+          discoveryInboxRawgIds={discoveryInboxRawgIds}
+          onClose={() => closeDiscoveryPreview()}
+          onAddToInbox={addToDiscoveryInbox}
+          onAddToWishlist={promoteDiscoveryToWishlist}
+          onAddToLibrary={promoteDiscoveryToLibrary}
+          onOpenPreview={openDiscoveryPreview}
+          onOpenLibraryGame={handlePreviewOpenLibraryGame}
         />
       ) : null}
 
@@ -1631,7 +1840,22 @@ export function AppController() {
           />
         </div>
       ) : null}
+
+      {isAchievementTimelineOpen ? (
+        <AchievementTimelineView
+          games={games}
+          onClose={() => setIsAchievementTimelineOpen(false)}
+          steamAchievementSyncState={steamAchievementSyncState}
+          onSyncFullHistory={() => {
+            const allSteamGameIds = games
+              .filter((g) => g.collectionType === 'library' && typeof g.steamAppId === 'number')
+              .map((g) => g.id);
+            void syncSteamAchievements(allSteamGameIds, { showToast: true });
+          }}
+        />
+      ) : null}
     </main>
     </I18nProvider>
   );
 }
+

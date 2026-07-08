@@ -198,6 +198,10 @@ body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   background: var(--body-background);
+  /* Crisper light-on-dark text on macOS/iOS WebKit & Blink. No-op elsewhere and
+     cheaper than text-rendering: optimizeLegibility (avoided for handheld perf). */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
@@ -794,6 +798,41 @@ img {
     max(0px, var(--qs-safe-left));
 }
 
+
+
+.qs-home-continue-playing-grid {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+}
+
+@media (min-width: 1024px) {
+  .qs-home-continue-playing-grid {
+    max-width: calc((20rem * 3) + (0.75rem * 2));
+  }
+}
+
+/* Compact Home density — tighter gaps, padding, and smaller posters so more fits
+   on small handheld screens. Applied when the "Compact Home" preference is on. */
+.qs-home-compact.qs-home-shell > * + *,
+.qs-home-compact .space-y-4 > * + * {
+  margin-top: 0.625rem !important;
+}
+
+.qs-home-compact .qs-home-section,
+.qs-home-compact .qs-home-queue-widget {
+  padding: 0.75rem;
+}
+
+.qs-home-compact .qs-home-section .mb-3 {
+  margin-bottom: 0.5rem;
+}
+
+.qs-home-compact .qs-home-continue-playing-grid {
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+}
 
 .qs-game-grid > * {
   content-visibility: auto;
@@ -2606,6 +2645,22 @@ textarea,
   color: rgb(var(--qs-accent-secondary-rgb) / 0.45);
 }
 
+.qs-planned-queue-toggle {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.qs-planned-queue-toggle:hover,
+.qs-planned-queue-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--platform-accent) 42%, rgb(255 255 255 / 0.14)) !important;
+  background-color: color-mix(in srgb, var(--platform-accent) 13%, rgb(2 6 23 / 0.84)) !important;
+  color: color-mix(in srgb, var(--platform-accent) 86%, white) !important;
+}
+
+.qs-planned-queue-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--platform-accent) 70%, white);
+  outline-offset: 2px;
+}
+
 /* Planned queue entry rows — secondary accent glass within the rail */
 .qs-template-neon-deck .qs-platform-column article {
   border-color: rgb(var(--qs-accent-secondary-rgb) / 0.18) !important;
@@ -2769,10 +2824,6 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.qs-playing-now-scroll {
-  height: 100%;
-  -webkit-overflow-scrolling: touch;
-}
 
 .qs-queue-list,
 .qs-game-action-scroll,
@@ -3496,48 +3547,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
   text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.36);
 }
 
-.playing-now-card {
-  border-left-color: color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 72%, rgb(var(--skyglass-rgb) / 0.45));
-  border-left-width: 3px;
-}
-
-.playing-now-card::before {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  content: '';
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 16%, transparent), transparent 38%),
-    radial-gradient(circle at 0 0, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 12%, transparent), transparent 42%);
-  opacity: 0.72;
-}
-
-.playing-now-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.playing-now-card > .playing-now-hero-bg {
-  position: absolute;
-  z-index: 0;
-}
-
-.playing-now-play-button {
-  background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 78%, var(--qs-accent-primary));
-  color: var(--accent-contrast);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--playing-now-platform-accent, rgb(var(--skyglass-rgb))) 28%, transparent);
-}
-
-:root[data-theme='light'] .playing-now-card::before {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 9%, transparent), transparent 34%),
-    radial-gradient(circle at 0 0, color-mix(in srgb, var(--playing-now-platform-accent, transparent) 8%, transparent), transparent 42%);
-  opacity: 0.58;
-}
-
-:root[data-theme='light'] .playing-now-play-button {
-  background: color-mix(in srgb, var(--playing-now-platform-accent, var(--qs-accent-primary)) 70%, var(--qs-accent-primary));
-}
 
 .qs-sheet-drag-region {
   touch-action: none;
@@ -4149,4 +4158,200 @@ body.qs-controller-active .qs-compact-card:focus-within {
     margin-top: max(0.5rem, var(--qs-safe-top));
     margin-bottom: max(0.5rem, var(--qs-safe-bottom));
   }
+}
+
+/* Platform Plans handheld audit fixes: keep identity visible while avoiding Retroid-class GPU overdraw. */
+.qs-platform-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.qs-platform-column {
+  max-width: 100%;
+  min-width: 0;
+  contain: layout paint style;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--platform-accent, var(--accent)) var(--platform-column-glow-strength, 0%), transparent);
+}
+
+.qs-platform-column--highlighted {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--platform-accent, var(--accent)) 38%, transparent),
+    0 0 32px color-mix(in srgb, var(--platform-accent, var(--accent)) var(--platform-column-glow-strength, 18%), transparent);
+}
+
+.qs-platform-progress {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+@media (orientation: landscape) and (max-height: 760px), (pointer: coarse) and (max-width: 1100px) {
+  .qs-template-neon-deck .qs-queue-shell {
+    border-top-color: rgb(var(--qs-accent-secondary-rgb) / 0.26) !important;
+    background: rgb(3 7 22 / 0.88) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(var(--qs-accent-secondary-rgb) / 0.1),
+      0 10px 28px rgb(0 0 0 / 0.32) !important;
+    backdrop-filter: none !important;
+  }
+
+  .qs-platform-grid,
+  .qs-platform-grid.grid-cols-2,
+  .qs-platform-grid.xl\:grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .qs-platform-summary,
+  .qs-platform-progress {
+    margin-bottom: 0.5rem;
+  }
+
+  .qs-platform-progress > button {
+    min-width: min(8rem, 42vw);
+    max-width: min(10rem, 48vw);
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  .qs-template-neon-deck .qs-platform-column {
+    border-color: color-mix(in srgb, var(--platform-accent, var(--qs-accent-secondary-rgb)) 26%, rgb(255 255 255 / 0.06)) !important;
+    background:
+      linear-gradient(180deg, rgb(var(--qs-accent-secondary-rgb) / 0.035), transparent 5rem),
+      rgb(3 7 22 / 0.9) !important;
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--platform-accent, var(--accent)) 5%, transparent), transparent 5rem) !important;
+    box-shadow: 0 8px 20px rgb(0 0 0 / 0.26) !important;
+    backdrop-filter: none !important;
+  }
+
+  .qs-template-neon-deck .qs-platform-column--highlighted {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, transparent),
+      0 8px 22px rgb(0 0 0 / 0.28) !important;
+  }
+
+  .qs-platform-artwork-header {
+    height: 3.25rem;
+  }
+
+  .qs-platform-artwork-header img {
+    opacity: 0.42;
+  }
+
+  .qs-platform-artwork-header .bg-gradient-to-r {
+    background: linear-gradient(90deg, rgb(2 6 23 / 0.92), rgb(2 6 23 / 0.58)) !important;
+  }
+
+  .qs-platform-artwork-title {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .qs-template-neon-deck .qs-platform-playing-panel {
+    background:
+      linear-gradient(180deg, rgb(var(--qs-accent-primary-rgb) / 0.055), transparent),
+      rgb(7 11 27 / 0.9) !important;
+    box-shadow: 0 8px 20px rgb(0 0 0 / 0.24) !important;
+  }
+
+  .qs-template-neon-deck .qs-platform-playing-panel .qs-platform-playing-row,
+  .qs-template-neon-deck .qs-platform-column article {
+    background: rgb(2 5 18 / 0.82) !important;
+    box-shadow: none !important;
+  }
+
+  .qs-platform-playing-row,
+  .qs-queue-entry {
+    transition-property: border-color, background-color, color;
+  }
+
+  .qs-queue-entry:hover,
+  .qs-queue-entry:focus-within {
+    box-shadow: none;
+  }
+}
+
+/* Platform Plans regression guardrails: keep the route on the app shell's single
+   vertical scroller, reserve stable card/cover geometry, and make decorative
+   identity layers transparent to wheel/touch hit testing. */
+.qs-queue-shell,
+.qs-queue-list,
+.qs-platform-grid,
+.qs-platform-column,
+.qs-queue-virtual-window {
+  overflow: visible;
+  min-width: 0;
+}
+
+.qs-queue-shell {
+  touch-action: pan-y pinch-zoom;
+}
+
+.qs-queue-list {
+  overflow-x: clip;
+  touch-action: pan-y pinch-zoom;
+}
+
+.qs-platform-column {
+  isolation: isolate;
+  contain: layout style;
+}
+
+.qs-platform-column::before,
+.qs-platform-column::after,
+.qs-platform-artwork-header img,
+.qs-platform-artwork-header .bg-gradient-to-r,
+.qs-platform-artwork-title::before,
+.qs-platform-artwork-title::after,
+.qs-queue-cover-thumb::before,
+.qs-queue-cover-thumb > span {
+  pointer-events: none;
+}
+
+.qs-queue-entry {
+  min-height: 7.25rem;
+}
+
+.qs-queue-entry > .grid {
+  grid-template-columns: 2rem 2.0625rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.qs-queue-cover-thumb {
+  inline-size: 2.0625rem;
+  block-size: 2.75rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--platform-accent, var(--accent)) 18%, transparent), transparent 48%),
+    rgb(15 23 42);
+}
+
+.qs-platform-playing-cover.qs-queue-cover-thumb {
+  inline-size: 3.75rem;
+  block-size: 5rem;
+}
+
+.qs-queue-cover-thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--platform-accent, var(--accent)) 34%, transparent), transparent 35%),
+    linear-gradient(180deg, transparent, rgb(0 0 0 / 0.28));
+}
+
+@media (min-width: 640px) {
+  .qs-queue-entry > .grid {
+    grid-template-columns: 2rem 2.0625rem minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+/* Performance: grid cards render over the opaque collection surface, so their
+   glass backdrop-filter blurs a solid colour — no visible effect, but it costs
+   a per-card GPU backdrop pass on every scroll frame (worst on handhelds with
+   ~24 cards in view). Drop the blur on cards only; they keep their own
+   background, border and shadow. Modals, popovers and the list shell that sit
+   over real content keep .qs-glass blur. */
+.qs-game-card.qs-glass,
+.qs-template-neon-deck .qs-game-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }

@@ -8,11 +8,13 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
 import { GameActionMenu } from './GameActionMenu';
 import { GameCard } from './GameCard';
+import { GameCardShell } from './GameCardShell';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { HltbBadge } from './HltbBadge';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
+import { useCoverImageLoaded } from '../hooks/useCoverImageLoaded';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -123,6 +125,9 @@ export function CollectionGrid({
     }
 
     let animationFrame = 0;
+    // Row gap comes from a stable CSS class; read it once per column config
+    // instead of calling getComputedStyle (a style recalc) on every measure.
+    let rowGap = -1;
 
     function measureRowHeight() {
       const grid = renderedGridRef.current;
@@ -131,15 +136,21 @@ export function CollectionGrid({
         return;
       }
 
-      const renderedRowCount = Math.ceil(renderedGames.length / Math.max(1, columns));
+      // Count from the live DOM rather than the renderedGames prop so this effect
+      // does not need to re-run (and re-subscribe its observer) on every scroll
+      // boundary as the virtual window slides.
+      const renderedRowCount = Math.ceil(grid.children.length / Math.max(1, columns));
 
       if (renderedRowCount <= 0) {
         setRowHeight(getVirtualGridRowHeight());
         return;
       }
 
-      const computedStyle = window.getComputedStyle(grid);
-      const rowGap = Number.parseFloat(computedStyle.rowGap || computedStyle.gap || '0') || 0;
+      if (rowGap < 0) {
+        const computedStyle = window.getComputedStyle(grid);
+        rowGap = Number.parseFloat(computedStyle.rowGap || computedStyle.gap || '0') || 0;
+      }
+
       const measuredRowHeight = Math.ceil((grid.scrollHeight + rowGap) / renderedRowCount);
 
       if (!Number.isFinite(measuredRowHeight) || measuredRowHeight <= 0) {
@@ -156,9 +167,11 @@ export function CollectionGrid({
 
     scheduleMeasure();
 
+    // Observe only the grid container. Its auto height already reflects any child
+    // height change, so we no longer need a per-child observer (whose set churned
+    // on every scroll frame as rows mounted/unmounted).
     const resizeObserver = typeof ResizeObserver !== 'undefined' && renderedGridRef.current ? new ResizeObserver(scheduleMeasure) : null;
     resizeObserver?.observe(renderedGridRef.current as Element);
-    Array.from(renderedGridRef.current?.children ?? []).forEach((child) => resizeObserver?.observe(child));
     window.addEventListener('resize', scheduleMeasure);
 
     return () => {
@@ -166,7 +179,7 @@ export function CollectionGrid({
       resizeObserver?.disconnect();
       window.removeEventListener('resize', scheduleMeasure);
     };
-  }, [columns, renderedGames.length]);
+  }, [columns]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -640,9 +653,9 @@ const ShelfGameCard = memo(function ShelfGameCard({
   const { t } = useI18n();
   const { coverSourceSignature, coverSources } = useStableCollectionCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
+  const { imgRef, isLoaded: isCoverLoaded, markLoaded, markBroken } = useCoverImageLoaded(activeCoverSource);
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
   const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
   const openDetails = useCallback(() => onOpenDetails(game.id), [game.id, onOpenDetails]);
@@ -650,7 +663,6 @@ const ShelfGameCard = memo(function ShelfGameCard({
 
   useEffect(() => {
     setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
   }, [coverSourceSignature]);
 
   function handleShelfCardKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -672,36 +684,35 @@ const ShelfGameCard = memo(function ShelfGameCard({
   }
 
   return (
-    <div
-      ref={refCallback}
-      aria-label={`${isMultiSelectMode ? t('collection.select') : 'Open'} ${game.title}`}
-      aria-posinset={index + 1}
-      aria-selected={isMultiSelectMode ? isSelected : undefined}
-      className={`qs-shelf-card group relative flex w-[clamp(11rem,22vw,16rem)] shrink-0 snap-center flex-col rounded-xl border bg-ink-950/80 p-2 text-left shadow-panel transition duration-200 hover:-translate-y-1 hover:border-mint/45 hover:shadow-glow focus-visible:-translate-y-1 focus-visible:border-mint/80 focus-visible:shadow-glow ${
+    <GameCardShell
+      ariaLabel={`${isMultiSelectMode ? t('collection.select') : 'Open'} ${game.title}`}
+      ariaPosinset={index + 1}
+      ariaSelected={isMultiSelectMode ? isSelected : undefined}
+      dataGameId={game.id}
+      className={`qs-shelf-card snap-center ${
         isSelected ? 'border-mint/80 shadow-glow ring-2 ring-mint/40' : highlightLabel ? 'border-amber-300/70 ring-1 ring-amber-300/30' : 'border-skyglass/18'
       }`}
       onClick={isMultiSelectMode ? toggleSelected : openDetails}
       onKeyDown={handleShelfCardKeyDown}
-      role="button"
-      tabIndex={0}
-    >
-      {isMultiSelectMode ? (
-        <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
-          {isSelected ? <Icon name="check" /> : null}
-        </span>
-      ) : null}
-
-      {highlightLabel ? (
-        <span className="absolute right-4 top-4 z-20 rounded-full border border-amber-300/40 bg-amber-300 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-glow">
-          {highlightLabel}
-        </span>
-      ) : null}
-
-      <span className="relative block aspect-[3/4] overflow-hidden rounded-lg bg-ink-700">
+      refCallback={refCallback}
+      cardOverlays={<>
+        {isMultiSelectMode ? (
+          <span className="absolute left-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-mint/45 bg-ink-950/95 text-sm font-bold text-mint shadow-glow">
+            {isSelected ? <Icon name="check" /> : null}
+          </span>
+        ) : null}
+        {highlightLabel ? (
+          <span className="absolute right-4 top-4 z-20 rounded-full border border-amber-300/40 bg-amber-300 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-glow">
+            {highlightLabel}
+          </span>
+        ) : null}
+      </>}
+      coverContent={<>
         {activeCoverSource ? (
           <>
             {!isCoverLoaded ? <span className="absolute inset-0 animate-pulse bg-white/5" /> : null}
             <img
+              ref={imgRef}
               alt=""
               className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] ${
                 isCoverLoaded ? 'opacity-100' : 'opacity-0'
@@ -709,43 +720,41 @@ const ShelfGameCard = memo(function ShelfGameCard({
               decoding="async"
               loading="lazy"
               onError={() => {
-                setIsCoverLoaded(false);
+                markBroken();
                 setCoverSourceIndex((currentIndex) => currentIndex + 1);
               }}
-              onLoad={() => setIsCoverLoaded(true)}
+              onLoad={markLoaded}
               src={activeCoverSource}
             />
           </>
         ) : (
           <MissingCover title={game.title} />
         )}
-        <span className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink-950/90 to-transparent" />
-        <span className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5">
-          <PlatformIdentityBadge
-            className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
-            platform={platformLabel}
-            queueState={platformQueueState}
-          />
-          {shouldShowStatusBadge ? (
-            <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
-              <span className="platform-badge__label">{translateOption(game.status, t)}</span>
-            </span>
-          ) : null}
-        </span>
-        {game.status === 'Playing' || game.status === 'Paused' ? (
-          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
+      </>}
+      coverBadgesBottom={<>
+        <PlatformIdentityBadge
+          className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold"
+          platform={platformLabel}
+          queueState={platformQueueState}
+        />
+        {shouldShowStatusBadge ? (
+          <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
+            <span className="platform-badge__label">{translateOption(game.status, t)}</span>
+          </span>
         ) : null}
+      </>}
+      coverBadgeTopRight={
+        (game.status === 'Playing' || game.status === 'Paused') ? (
+          <span className="absolute right-3 top-3 h-3 w-3 rounded-full border border-white/70 bg-mint shadow-glow" title={translateOption(game.status, t)} />
+        ) : null
+      }
+      coverOverlays={<>
         <DealCoverBadges game={game} variant="shelf" />
         {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} compact /> : null}
-      </span>
-
-      <span className="mt-2.5 block min-h-[2.75rem]">
-        <span className="line-clamp-2 text-base font-semibold leading-6 text-white">{game.title}</span>
-
-      </span>
-
-      {!isMultiSelectMode ? (
-        <span className="mt-2.5 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+      </>}
+      title={game.title}
+      action={!isMultiSelectMode ? (
+        <>
           {onAddToQueue ? (
             <button
               className="min-h-10 flex-1 rounded-md border border-mint/30 bg-mint/10 px-3 text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow focus-visible:bg-mint focus-visible:text-ink-950"
@@ -772,9 +781,9 @@ const ShelfGameCard = memo(function ShelfGameCard({
             onStatusChange={onStatusChange}
             variant="shelf"
           />
-        </span>
+        </>
       ) : null}
-    </div>
+    />
   );
 }, areVirtualCardPropsEqual);
 
@@ -830,8 +839,8 @@ const CompactGameRow = memo(function CompactGameRow({
   const { t } = useI18n();
   const { coverSourceSignature, coverSources } = useStableCollectionCoverSources(game);
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const activeCoverSource = coverSources[coverSourceIndex];
+  const { imgRef, isLoaded: isCoverLoaded, markLoaded, markBroken } = useCoverImageLoaded(activeCoverSource);
   const highlightLabel = hideRecommendationBadge ? undefined : getHighlightLabel?.(game);
   const shouldShowStatusBadge = game.status !== 'Want to play' || (game.collectionType === 'library' && !suppressWantToPlayStatus);
   const openDetails = useCallback(() => onOpenDetails(game.id), [game.id, onOpenDetails]);
@@ -842,7 +851,6 @@ const CompactGameRow = memo(function CompactGameRow({
 
   useEffect(() => {
     setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
   }, [coverSourceSignature]);
 
   return (
@@ -882,15 +890,16 @@ const CompactGameRow = memo(function CompactGameRow({
         <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-md bg-ink-700">
           {activeCoverSource ? (
             <img
+              ref={imgRef}
               alt=""
               className={`h-full w-full object-cover transition-opacity ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
               decoding="async"
               loading="lazy"
               onError={() => {
-                setIsCoverLoaded(false);
+                markBroken();
                 setCoverSourceIndex((currentIndex) => currentIndex + 1);
               }}
-              onLoad={() => setIsCoverLoaded(true)}
+              onLoad={markLoaded}
               src={activeCoverSource}
             />
           ) : (

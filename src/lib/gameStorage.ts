@@ -1,19 +1,68 @@
 import { mockGameIds, mockGames } from '../data/mockGames';
-import { loadLocalJson, loadPersistedJson, savePersistedJson } from './localPersistence';
+import { loadLocalJson, loadPersistedJson, removePersistedKeys, savePersistedJson } from './localPersistence';
+import {
+  createIndexedDbGameRepository,
+  type GameRepositoryStatus,
+  type GameSnapshotRepairResult,
+  type GameStorageVerification,
+  type LegacyRecoveryMode,
+  type LegacyRecoveryPreview,
+  type LegacyRecoveryResult,
+} from './indexedDbGameRepository';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
+/**
+ * Wave 3 seam. Games live in IndexedDB via this repository, with an in-memory snapshot
+ * so loadGames() stays synchronous. The legacy `questshelf.games.v1` blob is now a
+ * read-only import fallback only — normal saves no longer write it. The public
+ * loadGames/saveGames API below delegates here, so no caller changed.
+ */
+export const gameRepository = createIndexedDbGameRepository({
+  legacyLoadSync: () => loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames),
+  legacyLoadDurable: () => loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames),
+  legacyClear: () => removePersistedKeys([STORAGE_KEY]),
+  normalize: normalizeLoadedGames,
+  legacySaveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
+});
+
+/** Awaited once at boot (before React renders) so getAllSync() is correct on first paint. */
+export function initGameRepository(): Promise<void> {
+  return gameRepository.ready();
+}
+
+export function getGameRepositoryStatus(): GameRepositoryStatus {
+  return gameRepository.getStatus();
+}
+
 export function loadGames(): Game[] {
-  return loadLocalJson(STORAGE_KEY, [], normalizeLoadedGames);
+  return gameRepository.getAllSync();
 }
 
 export function loadGamesFromPersistentStorage(): Promise<Game[]> {
-  return loadPersistedJson(STORAGE_KEY, [], normalizeLoadedGames);
+  return gameRepository.loadDurable();
 }
 
 export function saveGames(games: Game[]) {
-  savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games));
+  gameRepository.replaceAll(games);
+}
+
+// Wave 5: storage verification / repair / recovery (games). See indexedDbGameRepository.
+export function verifyGameStorage(): Promise<GameStorageVerification> {
+  return gameRepository.verify();
+}
+
+export function repairGameSnapshot(): Promise<GameSnapshotRepairResult> {
+  return gameRepository.repairSnapshot();
+}
+
+export function previewLegacyGameRecovery(): Promise<LegacyRecoveryPreview> {
+  return gameRepository.previewLegacyRecovery();
+}
+
+export function recoverGamesFromLegacyBlob(mode: LegacyRecoveryMode): Promise<LegacyRecoveryResult> {
+  return gameRepository.recoverFromLegacyBlob(mode);
 }
 
 export function getMockGames(): Game[] {
@@ -63,6 +112,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     lastSteamActivityAt: typeof game.lastSteamActivityAt === 'string' ? game.lastSteamActivityAt : undefined,
     lastSteamActivityDeltaMinutes: getOptionalNonNegativeNumber(game.lastSteamActivityDeltaMinutes),
     metadataSearchTitle: typeof game.metadataSearchTitle === 'string' ? game.metadataSearchTitle : undefined,
+    metacriticScore: getOptionalPositiveNumber(game.metacriticScore ?? game.metacritic),
     notes: typeof game.notes === 'string' ? game.notes : '',
     originalImportedTitle: typeof game.originalImportedTitle === 'string' ? game.originalImportedTitle : undefined,
     platform: normalizeLoadedPlatform(game.platform),
@@ -70,6 +120,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     rawgId: getOptionalNonNegativeNumber(game.rawgId),
     rawgSlug: typeof game.rawgSlug === 'string' ? game.rawgSlug : undefined,
     rawgTitle: typeof game.rawgTitle === 'string' ? game.rawgTitle : undefined,
+    rawgPlaytimeHours: getOptionalPositiveNumber(game.rawgPlaytimeHours ?? game.averagePlaytime),
     steamPlaytimeMinutes: getOptionalNonNegativeNumber(game.steamPlaytimeMinutes),
     priority: normalizeWishlistPriority(game.priority),
     romFiles: normalizeRomFiles(game.romFiles),
@@ -147,6 +198,10 @@ function getNonNegativeNumber(value: unknown) {
 }
 function getOptionalNonNegativeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function getOptionalPositiveNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 function normalizeRomFiles(value: unknown): Game['romFiles'] {

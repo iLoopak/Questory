@@ -1,4 +1,4 @@
-const CACHE_NAME = 'questshelf-app-shell-v7';
+const CACHE_NAME = 'questshelf-app-shell-v8';
 const APP_SHELL_ASSETS = [
   '/',
   '/favicon.ico',

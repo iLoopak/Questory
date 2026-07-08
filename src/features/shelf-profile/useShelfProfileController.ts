@@ -15,7 +15,6 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
   const legacyQuestShelfTitle = useMemo(() => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName), [libraryOwnerNickname, steamProfileName]);
   const personalizedQuestShelfTitle = useMemo(() => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle, language), [language, legacyQuestShelfTitle, shelfIdentity.shelfName]);
   const resolvedFeaturedGame = useMemo(() => getResolvedFeaturedGame(games, shelfIdentity), [games, shelfIdentity]);
-  const playingNowGame = useMemo(() => games.find((game) => game.collectionType === 'library' && game.status === 'Playing') ?? null, [games]);
   const shelfOverview = useMemo(() => ({
     games: games.filter((game) => game.collectionType === 'library').length,
     platforms: platformQueueState.activePlatforms.length,
@@ -40,5 +39,5 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
     return () => { document.removeEventListener('pointerdown', handlePointerDown); document.removeEventListener('keydown', handleKeyDown); };
   }, [isShelfProfileOpen]);
 
-  return { resolvedFeaturedGame, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, playingNowGame, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
+  return { resolvedFeaturedGame, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
 }

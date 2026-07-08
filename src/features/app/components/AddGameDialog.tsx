@@ -82,7 +82,7 @@ export function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialo
       platform: resolvedPlatform as GamePlatform,
       status,
       coverImage: coverImage.trim(),
-      artworkSource: coverImage.trim() ? 'user' : undefined,
+      artworkSource: coverImage.trim() ? 'custom' : undefined,
       artworkUpdatedAt: coverImage.trim() ? importedAt : undefined,
       playtimeHours: parsedPlaytime,
       tags: parseTagInput(tagText),

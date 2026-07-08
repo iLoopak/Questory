@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createQuestShelfBackup,
   getQuestShelfBackupSummary,
@@ -10,11 +10,42 @@ import {
   type QuestShelfBackupSummary,
 } from '../lib/backupStorage';
 import {
+  previewLegacyGameRecovery,
+  recoverGamesFromLegacyBlob,
+  repairGameSnapshot,
+  verifyGameStorage,
+} from '../lib/gameStorage';
+import {
+  previewLegacyRawgMetadataCacheRecovery,
+  recoverRawgMetadataCacheFromLegacyBlob,
+  repairRawgMetadataCacheSnapshot,
+  verifyRawgMetadataCache,
+} from '../lib/rawgMetadataCache';
+import {
+  previewLegacyPlayActivityRecovery,
+  recoverPlayActivityFromLegacyBlob,
+  repairPlayActivitySnapshot,
+  verifyPlayActivityStorage,
+} from '../lib/playActivityStorage';
+import type {
+  CollectionLegacyRecoveryMode,
+  CollectionLegacyRecoveryPreview,
+  CollectionLegacyRecoveryResult,
+  CollectionSnapshotRepairResult,
+  CollectionVerification,
+} from '../lib/indexedDbCollectionRepository';
+import {
   clearLocalStorageIssues,
   exportRawQuestShelfLocalData,
   getLocalStorageIssues,
+  storageIssueEventName,
   type LocalStorageIssue,
 } from '../lib/localPersistence';
+import {
+  formatBytes,
+  getStorageDiagnostics,
+  type StorageDiagnostics,
+} from '../lib/storageDiagnostics';
 import { portableSyncProviders } from '../lib/portableSync';
 import {
   chooseBackupFileHandle,
@@ -60,6 +91,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   );
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<StorageDiagnostics | null>(null);
   const autoBackupTimeoutRef = useRef<number | null>(null);
   const autoBackupSignalRef = useRef(autoBackupSignal);
   const supportsFileSystemAccess = useMemo(
@@ -71,6 +103,36 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   useEffect(() => {
     saveSyncFolderSettings(syncSettings);
   }, [syncSettings]);
+
+  // Wave 0: load the storage-health snapshot and keep issues live so a quota/write
+  // failure surfaces here immediately instead of only after a reload.
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    let active = true;
+    void getStorageDiagnostics().then((snapshot) => {
+      if (active) {
+        setDiagnostics(snapshot);
+      }
+    });
+
+    function refreshIssues() {
+      setStorageIssues(getLocalStorageIssues());
+      void getStorageDiagnostics().then((snapshot) => {
+        if (active) {
+          setDiagnostics(snapshot);
+        }
+      });
+    }
+
+    window.addEventListener(storageIssueEventName, refreshIssues);
+    return () => {
+      active = false;
+      window.removeEventListener(storageIssueEventName, refreshIssues);
+    };
+  }, []);
 
   useEffect(() => {
     if (!syncSettings.autoBackupEnabled || !supportsFileSystemAccess || !autoBackupSignal) {
@@ -98,6 +160,10 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       }
     };
   }, [autoBackupSignal, supportsFileSystemAccess, syncSettings.autoBackupEnabled, syncSettings.includeIntegrationSettings]);
+
+  const refreshDiagnostics = useCallback(() => {
+    void getStorageDiagnostics().then(setDiagnostics);
+  }, []);
 
   function showMessage(nextMessage: string, tone: 'error' | 'info' | 'success' = 'info') {
     setMessage(nextMessage);
@@ -317,6 +383,14 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
         issues={storageIssues}
         onClearWarnings={clearRecoveryWarnings}
         onExportRawData={downloadRawLocalData}
+      />
+
+      <StorageHealthPanel diagnostics={diagnostics} />
+
+      <StorageToolsPanel
+        diagnostics={diagnostics}
+        onChanged={refreshDiagnostics}
+        onCreateBackup={() => void downloadBackup()}
       />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -668,6 +742,352 @@ function StorageRecoveryPanel({
             <div className="mt-1 text-amber-100/80">{issue.message}</div>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics | null }) {
+  if (!diagnostics) {
+    return null;
+  }
+
+  const { local, device } = diagnostics;
+  // localStorage is capped near ~5 MB per origin; warn before writes start failing.
+  const localSoftLimitBytes = 5 * 1024 * 1024;
+  const localFraction = Math.min(local.totalBytes / localSoftLimitBytes, 1);
+  const localWarning = local.totalBytes > localSoftLimitBytes * 0.8;
+  const deviceWarning = device?.usedFraction != null && device.usedFraction > 0.8;
+  const tone = localWarning || deviceWarning ? 'border-amber-300/30 bg-amber-300/10' : 'border-skyglass/15 bg-ink-950/80';
+
+  return (
+    <section className={`mt-4 rounded-lg border p-4 text-sm text-slate-300 ${tone}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-white">Storage health</h3>
+        <span className="text-xs text-slate-500">Local diagnostics</span>
+      </div>
+
+      <div className="mt-3 text-xs text-slate-500">
+        IndexedDB: {diagnostics.indexedDbAvailable ? 'available' : 'unavailable (using legacy fallback)'}
+      </div>
+
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+        <div className="text-xs uppercase tracking-wide text-slate-500">Games store</div>
+        <div className="mt-1 text-sm text-slate-200">
+          {diagnostics.gameStore.backend === 'indexeddb' ? 'IndexedDB' : 'Legacy blob (fallback)'}
+          <span className="text-slate-500">
+            {' · '}{diagnostics.gameStore.gameCount} records{' · '}schema v{diagnostics.gameStore.schemaVersion}
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Legacy blob: {diagnostics.gameStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
+          {diagnostics.gameStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
+        </div>
+        {diagnostics.gameStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.gameStore.lastError}</div>
+        ) : null}
+      </div>
+
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+        <div className="text-xs uppercase tracking-wide text-slate-500">RAWG cache</div>
+        <div className="mt-1 text-sm text-slate-200">
+          {diagnostics.rawgCacheStore.backend === 'indexeddb' ? 'IndexedDB' : 'Legacy blob (fallback)'}
+          <span className="text-slate-500">
+            {' · '}{diagnostics.rawgCacheStore.recordCount} records{' · '}schema v{diagnostics.rawgCacheStore.schemaVersion}
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Legacy blob: {diagnostics.rawgCacheStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
+          {diagnostics.rawgCacheStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
+        </div>
+        {diagnostics.rawgCacheStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.rawgCacheStore.lastError}</div>
+        ) : null}
+      </div>
+
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+        <div className="text-xs uppercase tracking-wide text-slate-500">Play activity</div>
+        <div className="mt-1 text-sm text-slate-200">
+          {diagnostics.playActivityStore.backend === 'indexeddb' ? 'IndexedDB' : 'Legacy blob (fallback)'}
+          <span className="text-slate-500">
+            {' · '}{diagnostics.playActivityStore.recordCount} records{' · '}schema v{diagnostics.playActivityStore.schemaVersion}
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Legacy blob: {diagnostics.playActivityStore.legacyBlobPresent ? 'present (import fallback, inert)' : 'absent'}.
+          {diagnostics.playActivityStore.migratedFromLegacy ? ' Migrated from legacy this session.' : ''}
+        </div>
+        {diagnostics.playActivityStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.playActivityStore.lastError}</div>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Questory local data</div>
+          <div className="mt-1 text-lg font-semibold tabular-nums text-white">{formatBytes(local.totalBytes)}</div>
+          <div className="mt-1 text-xs text-slate-500">{local.keyCount} keys · games {formatBytes(local.gamesBytes)}</div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink-900">
+            <div
+              className={`h-full rounded-full ${localWarning ? 'bg-amber-300' : 'bg-mint'}`}
+              style={{ width: `${Math.max(localFraction * 100, 1)}%` }}
+            />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">~{Math.round(localFraction * 100)}% of the ~5 MB localStorage limit</div>
+        </div>
+
+        <div className="rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Device storage estimate</div>
+          {device ? (
+            <>
+              <div className="mt-1 text-lg font-semibold tabular-nums text-white">
+                {formatBytes(device.usageBytes)}
+                {device.quotaBytes > 0 ? <span className="text-sm font-normal text-slate-500"> / {formatBytes(device.quotaBytes)}</span> : null}
+              </div>
+              {device.usedFraction != null ? (
+                <div className="mt-1 text-xs text-slate-500">~{Math.round(device.usedFraction * 100)}% of the browser quota used</div>
+              ) : null}
+            </>
+          ) : (
+            <div className="mt-1 text-xs text-slate-500">Not available in this environment.</div>
+          )}
+        </div>
+      </div>
+
+      {localWarning ? (
+        <p className="mt-3 text-xs text-amber-200/90">
+          Local storage is close to the browser limit. Export a backup; a future update will move the library to a
+          larger-capacity store.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+type ToolResult = { tone: 'ok' | 'warn' | 'error'; text: string };
+
+type StoreToolsActions = {
+  verify: () => Promise<CollectionVerification>;
+  repair: () => Promise<CollectionSnapshotRepairResult>;
+  previewRecovery: () => Promise<CollectionLegacyRecoveryPreview>;
+  recover: (mode: CollectionLegacyRecoveryMode) => Promise<CollectionLegacyRecoveryResult>;
+};
+
+const toolButtonClass =
+  'h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50';
+
+function StoreToolsRow({
+  label,
+  noun,
+  legacyBlobPresent,
+  actions,
+  onChanged,
+}: {
+  label: string;
+  noun: string;
+  legacyBlobPresent: boolean;
+  actions: StoreToolsActions;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<ToolResult | null>(null);
+  const [preview, setPreview] = useState<CollectionLegacyRecoveryPreview | null>(null);
+
+  const resultTone =
+    result?.tone === 'error' ? 'text-rose-200' : result?.tone === 'warn' ? 'text-amber-200' : 'text-emerald-200';
+
+  async function runVerify() {
+    setBusy('verify');
+    setResult(null);
+    try {
+      const v = await actions.verify();
+      const clean = v.invalidCount === 0 && v.duplicateIds.length === 0;
+      setResult({
+        tone: clean ? 'ok' : 'warn',
+        text:
+          `IndexedDB ${v.idbAvailable ? 'available' : 'unavailable'} · ${v.idbRowCount} rows · ` +
+          `${v.validCount} valid · ${v.invalidCount} invalid · ${v.duplicateIds.length} duplicate ids · ` +
+          `snapshot ${v.snapshotCount} · legacy blob ${v.legacyBlobPresent ? `${v.legacyBlobCount} records` : 'absent'}.`,
+      });
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Verification failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runRepair() {
+    setBusy('repair');
+    setResult(null);
+    try {
+      const r = await actions.repair();
+      setResult({
+        tone: 'ok',
+        text: `Rebuilt snapshot from IndexedDB: ${r.after} records${r.removedInvalid > 0 ? ` (excluded ${r.removedInvalid} invalid row${r.removedInvalid === 1 ? '' : 's'})` : ''}.`,
+      });
+      onChanged();
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Repair failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startRecovery() {
+    setBusy('recover');
+    setResult(null);
+    try {
+      const pv = await actions.previewRecovery();
+      if (!pv.legacyBlobPresent || pv.legacyCount === 0) {
+        setResult({ tone: 'warn', text: `No legacy ${noun} blob to recover from.` });
+        setPreview(null);
+        return;
+      }
+      setPreview(pv);
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Recovery preview failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function doRecover(mode: CollectionLegacyRecoveryMode) {
+    if (
+      mode === 'replace' &&
+      !window.confirm(
+        `Replace all ${preview?.idbCount ?? 0} ${noun} records in IndexedDB with ${preview?.legacyCount ?? 0} from the legacy blob? This overwrites current data.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(mode);
+    try {
+      const res = await actions.recover(mode);
+      setResult({
+        tone: 'ok',
+        text:
+          `${mode === 'merge' ? 'Merged' : 'Replaced'}: imported ${res.importedCount}, total ${res.totalCount}` +
+          `${res.skippedExistingCount > 0 ? `, kept ${res.skippedExistingCount} existing` : ''}.`,
+      });
+      setPreview(null);
+      onChanged();
+    } catch (error) {
+      setResult({ tone: 'error', text: error instanceof Error ? error.message : 'Recovery failed.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button className={toolButtonClass} disabled={busy !== null} onClick={() => void runVerify()} type="button">
+          {busy === 'verify' ? 'Verifying…' : 'Verify'}
+        </button>
+        <button className={toolButtonClass} disabled={busy !== null} onClick={() => void runRepair()} type="button">
+          {busy === 'repair' ? 'Repairing…' : 'Repair snapshot'}
+        </button>
+        <button
+          className={toolButtonClass}
+          disabled={busy !== null || !legacyBlobPresent}
+          onClick={() => void startRecovery()}
+          title={legacyBlobPresent ? undefined : `No legacy ${noun} blob present.`}
+          type="button"
+        >
+          {busy === 'recover' ? 'Checking…' : 'Recover from legacy blob'}
+        </button>
+      </div>
+
+      {preview ? (
+        <div className="mt-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-amber-100">
+          <div className="text-sm">
+            Legacy blob: {preview.legacyCount} records · IndexedDB: {preview.idbCount} records ·{' '}
+            {preview.onlyInLegacyCount} only in legacy · {preview.conflictCount} already present.
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button className={toolButtonClass} disabled={busy !== null} onClick={() => void doRecover('merge')} type="button">
+              {busy === 'merge' ? 'Merging…' : `Merge (add ${preview.onlyInLegacyCount})`}
+            </button>
+            <button className={toolButtonClass} disabled={busy !== null} onClick={() => void doRecover('replace')} type="button">
+              {busy === 'replace' ? 'Replacing…' : 'Replace all'}
+            </button>
+            <button className={toolButtonClass} disabled={busy !== null} onClick={() => setPreview(null)} type="button">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {result ? <p className={`mt-2 text-xs leading-5 ${resultTone}`}>{result.text}</p> : null}
+    </div>
+  );
+}
+
+function StorageToolsPanel({
+  diagnostics,
+  onChanged,
+  onCreateBackup,
+}: {
+  diagnostics: StorageDiagnostics | null;
+  onChanged: () => void;
+  onCreateBackup: () => void;
+}) {
+  return (
+    <section className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-4 text-sm text-slate-300">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-white">Storage tools</h3>
+        <span className="text-xs text-slate-500">Verify · repair · recover</span>
+      </div>
+
+      <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-500">
+        Non-destructive checks for the IndexedDB-backed stores. Repair only rebuilds the in-memory snapshot; recovery
+        imports the legacy blob and never overwrites it. Export a backup first if you plan to replace data.
+      </p>
+
+      <StoreToolsRow
+        label="Games"
+        noun="games"
+        legacyBlobPresent={diagnostics?.gameStore.legacyBlobPresent ?? false}
+        actions={{
+          verify: verifyGameStorage,
+          repair: repairGameSnapshot,
+          previewRecovery: previewLegacyGameRecovery,
+          recover: recoverGamesFromLegacyBlob,
+        }}
+        onChanged={onChanged}
+      />
+
+      <StoreToolsRow
+        label="RAWG cache"
+        noun="RAWG cache"
+        legacyBlobPresent={diagnostics?.rawgCacheStore.legacyBlobPresent ?? false}
+        actions={{
+          verify: verifyRawgMetadataCache,
+          repair: repairRawgMetadataCacheSnapshot,
+          previewRecovery: previewLegacyRawgMetadataCacheRecovery,
+          recover: recoverRawgMetadataCacheFromLegacyBlob,
+        }}
+        onChanged={onChanged}
+      />
+
+      <StoreToolsRow
+        label="Play activity"
+        noun="play activity"
+        legacyBlobPresent={diagnostics?.playActivityStore.legacyBlobPresent ?? false}
+        actions={{
+          verify: verifyPlayActivityStorage,
+          repair: repairPlayActivitySnapshot,
+          previewRecovery: previewLegacyPlayActivityRecovery,
+          recover: recoverPlayActivityFromLegacyBlob,
+        }}
+        onChanged={onChanged}
+      />
+
+      <div className="mt-3">
+        <button className={toolButtonClass} onClick={onCreateBackup} type="button">
+          Create backup now
+        </button>
       </div>
     </section>
   );
