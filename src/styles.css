@@ -2624,6 +2624,12 @@ textarea,
   border-bottom-color: rgb(var(--qs-accent-secondary-rgb) / 0.24) !important;
 }
 
+.qs-platform-artwork-overlay {
+  background:
+    linear-gradient(90deg, rgb(2 6 23 / 0.56) 0%, rgb(2 6 23 / 0.22) 46%, rgb(2 6 23 / 0.5) 100%),
+    linear-gradient(0deg, rgb(2 6 23 / 0.22) 0%, transparent 58%);
+}
+
 /* Playing Now section separator — primary accent signals active zone */
 .qs-template-neon-deck .qs-platform-playing-section {
   border-bottom-color: rgb(var(--qs-accent-primary-rgb) / 0.24) !important;
@@ -4244,11 +4250,13 @@ body.qs-controller-active .qs-compact-card:focus-within {
   }
 
   .qs-platform-artwork-header img {
-    opacity: 0.42;
+    opacity: 0.82;
   }
 
-  .qs-platform-artwork-header .bg-gradient-to-r {
-    background: linear-gradient(90deg, rgb(2 6 23 / 0.92), rgb(2 6 23 / 0.58)) !important;
+  .qs-platform-artwork-overlay {
+    background:
+      linear-gradient(90deg, rgb(2 6 23 / 0.62) 0%, rgb(2 6 23 / 0.28) 58%, rgb(2 6 23 / 0.5) 100%),
+      linear-gradient(0deg, rgb(2 6 23 / 0.24) 0%, transparent 62%) !important;
   }
 
   .qs-platform-artwork-title {
@@ -4309,7 +4317,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 .qs-platform-column::before,
 .qs-platform-column::after,
 .qs-platform-artwork-header img,
-.qs-platform-artwork-header .bg-gradient-to-r,
+.qs-platform-artwork-overlay,
 .qs-platform-artwork-title::before,
 .qs-platform-artwork-title::after,
 .qs-queue-cover-thumb::before,
