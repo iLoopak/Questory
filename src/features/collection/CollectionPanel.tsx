@@ -8,6 +8,7 @@ import { ViewportModal } from '../../components/ViewportModal';
 import { CollectionGrid, CollectionList, CollectionShelf } from '../../components/CollectionViews';
 import { Icon } from '../../components/Icon';
 import { SteamWishlistHtmlImportModal } from '../../components/settings/WishlistSettingsPanel';
+import { MultiGameImportModal } from '../../components/MultiGameImportModal';
 import { QueueGhost, pickQueueGhostSlot, pickSimpleVariant, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from '../../components/QueueGhost';
 import { useI18n } from '../../i18n';
 import { translateOption } from '../../i18n';
@@ -32,6 +33,7 @@ import { isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
 import { isSteamAchievementSyncableGame } from '../../lib/steamAchievementsSync';
 import { isRefreshableSteamGame } from '../../lib/steamPlaytimeRefresh';
 import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
+import type { MultiGameImportParseResult, MultiGameImportSummary } from '../../lib/multiGameImport';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import { useCollectionViewMode } from '../../hooks/useCollectionUiState';
 import {
@@ -92,6 +94,7 @@ export type CollectionPanelReviewActions = {
 
 export type CollectionPanelSyncActions = {
   syncSteamWishlist?: () => void;
+  importMultiGames?: (parsed: MultiGameImportParseResult) => MultiGameImportSummary;
   importSteamWishlistHtml?: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
   syncItadDeals?: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
 };
@@ -186,7 +189,7 @@ export function CollectionPanel({
   } = queueActions;
   const { startReview: onStartReview } = reviewActions;
   const { clearFilters: onClearFilters, filtersChange: onFiltersChange } = filterActions;
-  const { syncSteamWishlist: onSyncSteamWishlist, importSteamWishlistHtml: onImportSteamWishlistHtml, syncItadDeals: onSyncItadDeals } = syncActions ?? {};
+  const { syncSteamWishlist: onSyncSteamWishlist, importMultiGames: onImportMultiGames, importSteamWishlistHtml: onImportSteamWishlistHtml, syncItadDeals: onSyncItadDeals } = syncActions ?? {};
   const { openOnboarding: onOpenOnboarding, openIntegrations: onOpenIntegrations, openRetro: onOpenRetro } = navigationActions ?? {};
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
@@ -194,6 +197,7 @@ export function CollectionPanel({
   const { setViewMode, viewMode } = useCollectionViewMode(collectionType);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] = useState(false);
+  const [isMultiGameImportOpen, setIsMultiGameImportOpen] = useState(false);
   const [isCollectionSteamAchievementSyncVisible, setIsCollectionSteamAchievementSyncVisible] = useState(false);
   const [isCollectionSteamPlaytimeSyncVisible, setIsCollectionSteamPlaytimeSyncVisible] = useState(false);
   const [wishlistGhostSlot] = useState(() => collectionType === 'wishlist' ? pickQueueGhostSlot('wishlist') : null);
@@ -205,6 +209,7 @@ export function CollectionPanel({
   const advancedFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersCloseRef = useRef<HTMLButtonElement | null>(null);
   const steamWishlistHtmlImportButtonRef = useRef<HTMLButtonElement | null>(null);
+  const multiGameImportButtonRef = useRef<HTMLButtonElement | null>(null);
   const collectionPanelRef = useRef<HTMLElement | null>(null);
   const { t } = useI18n();
   const title = collectionType === 'wishlist' ? t('collection.wishlist') : t('collection.library');
@@ -568,6 +573,16 @@ export function CollectionPanel({
             >
               {collectionType === 'wishlist' ? t('collection.reviewWishlist') : t('collection.reviewQueue')}
             </button>
+            {collectionType === 'library' && onImportMultiGames ? (
+              <button
+                className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
+                onClick={() => setIsMultiGameImportOpen(true)}
+                ref={multiGameImportButtonRef}
+                type="button"
+              >
+                Multi Game Import
+              </button>
+            ) : null}
             {collectionType === 'wishlist' && onImportSteamWishlistHtml ? (
               <button
                 className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20 hover:shadow-glow"
@@ -687,6 +702,13 @@ export function CollectionPanel({
         <SteamPlaytimeRefreshNotice refreshState={steamPlaytimeRefreshState} />
       ) : null}
 
+      {isMultiGameImportOpen && onImportMultiGames ? (
+        <MultiGameImportModal
+          onClose={() => setIsMultiGameImportOpen(false)}
+          onImport={onImportMultiGames}
+          restoreFocusRef={multiGameImportButtonRef}
+        />
+      ) : null}
       {isSteamWishlistHtmlImportOpen && onImportSteamWishlistHtml ? (
         <SteamWishlistHtmlImportModal
           existingSteamAppIds={games

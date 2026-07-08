@@ -435,7 +435,7 @@ export function WishlistSettingsPanel({
         </p>
       </div>
 
-      <div className="rounded-lg border border-mint/25 bg-mint/10 p-4">
+      <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
             <h3 className="text-lg font-semibold text-white">Multi Game Import</h3>

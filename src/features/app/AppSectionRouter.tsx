@@ -568,6 +568,9 @@ export function AppSectionRouter({
             drop: dropGameFromCompactRow,
           }}
           reviewActions={{ startReview: startReviewMode }}
+          syncActions={{
+            importMultiGames: importMultiGameItemsWithAnalytics,
+          }}
           filterActions={{
             clearFilters: handleClearLibraryFilters,
             filtersChange: handleLibraryFiltersChange,
