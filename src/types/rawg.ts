@@ -11,6 +11,14 @@ export type RawgSearchResult = {
   released: string | null;
   background_image: string | null;
   metacritic: number | null;
+  rating?: number | null;
+  ratings_count?: number | null;
+  ratings?: Array<{
+    id: number;
+    title: string;
+    count: number;
+    percent: number;
+  }>;
   genres?: RawgListItem[];
   platforms?: Array<{
     platform: RawgListItem;
@@ -58,6 +66,8 @@ export type RawgMetadata = Pick<
   | 'released'
   | 'metacritic'
   | 'metacriticScore'
+  | 'rawgRating'
+  | 'rawgRatingsCount'
   | 'backgroundImage'
   | 'metadataSource'
   | 'metadataUpdatedAt'

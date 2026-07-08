@@ -163,6 +163,8 @@ export type Game = {
   released?: string | null;
   metacritic?: number | null;
   metacriticScore?: number;
+  rawgRating?: number;
+  rawgRatingsCount?: number;
   backgroundImage?: string | null;
   metadataSource?: 'rawg';
   metadataUpdatedAt?: string;

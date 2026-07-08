@@ -33,6 +33,7 @@ import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { PlatformIdentityFields } from './PlatformIdentityFields';
 import { HltbBadge } from './HltbBadge';
+import { RawgRatingBadge, getRawgRatingDisplay } from './RawgRatingBadge';
 import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
@@ -1466,6 +1467,7 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
   const isPlayingSize = size === 'playing';
   const shouldShowMetadataBadges = isPlayingSize;
   const metacriticScore = shouldShowMetadataBadges ? formatQueueMetacriticScore(game.metacriticScore) : null;
+  const rawgRating = shouldShowMetadataBadges ? getRawgRatingDisplay(game) : null;
 
   useEffect(() => {
     setIsCoverLoaded(false);
@@ -1491,9 +1493,10 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
         usage="portrait"
         width={isPlayingSize ? 60 : 33}
       />
-      {metacriticScore ? (
+      {metacriticScore || rawgRating ? (
         <span className="pointer-events-none absolute bottom-0 left-0 z-[2] flex max-w-full flex-wrap items-end gap-0.5 bg-gradient-to-tr from-ink-950/85 via-ink-950/45 to-transparent p-0.5 pr-2 pt-2">
           {metacriticScore ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">MC {metacriticScore}</span> : null}
+          <RawgRatingBadge game={game} />
         </span>
       ) : null}
     </span>

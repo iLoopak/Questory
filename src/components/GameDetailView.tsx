@@ -23,6 +23,7 @@ import { SteamGridDbArtworkPickerModal } from './SteamGridDbArtworkPickerModal';
 import { SteamAchievementsPanel } from './SteamAchievementsPanel';
 import { Icon, type IconName } from './Icon';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
+import { RawgRatingBadge, getRawgRatingDisplay } from './RawgRatingBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ContextualRecommendationsSection } from './discovery/ContextualRecommendationsSection';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
@@ -115,6 +116,7 @@ export function GameDetailView({
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
   const metacriticScore = formatMetacriticScore(game.metacriticScore ?? game.metacritic);
+  const rawgRating = getRawgRatingDisplay(game);
   const canEditGame = isGameEditable(game);
   const recentSteamActivity = useMemo(() => getRecentSteamActivityForGame(activity, game.id), [activity, game.id]);
   const lastSteamActivityAt = recentSteamActivity?.detectedAt ?? game.lastSteamActivityAt;
@@ -280,6 +282,7 @@ export function GameDetailView({
             />
           ) : null}
           {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+          {rawgRating ? <HeroStat label="RAWG" value={`★ ${rawgRating.ratingLabel}`} /> : null}
           {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
         </>}
       />
@@ -424,6 +427,7 @@ export function GameDetailView({
       <GameInformationSection
         game={game}
         metacriticScore={metacriticScore}
+        rawgRatingBadge={<RawgRatingBadge game={game} variant="detail" />}
         t={t}
       />
       <DeveloperToolsSection

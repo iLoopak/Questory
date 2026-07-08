@@ -154,8 +154,14 @@ function getPositiveNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
+function getNonNegativeInteger(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined;
+}
+
 export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {
   const metacriticScore = getPositiveNumber(details.metacritic);
+  const rawgRating = getPositiveNumber(details.rating);
+  const rawgRatingsCount = getNonNegativeInteger(details.ratings_count);
   return {
     rawgId: details.id,
     rawgSlug: details.slug,
@@ -167,6 +173,8 @@ export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata
     released: details.released,
     metacritic: details.metacritic,
     ...(metacriticScore ? { metacriticScore } : {}),
+    ...(rawgRating ? { rawgRating } : {}),
+    ...(rawgRatingsCount !== undefined ? { rawgRatingsCount } : {}),
     backgroundImage: details.background_image,
     metadataSource: 'rawg',
     metadataUpdatedAt: new Date().toISOString(),
