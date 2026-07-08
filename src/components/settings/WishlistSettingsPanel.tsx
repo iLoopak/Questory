@@ -14,6 +14,7 @@ import {
   steamWishlistBookmarklet,
   type ParsedSteamWishlistImportItem,
 } from "../../lib/steamWishlistHtmlImport";
+import { parseMultiGameImportInput, playStationLibraryBookmarklet, type MultiGameImportSummary, type MultiGameImportParseResult } from "../../lib/multiGameImport";
 import type { SteamWishlistSyncState } from "../../types/steam";
 
 export function SteamWishlistSyncNotice({
@@ -360,6 +361,7 @@ export function SteamWishlistHtmlImportModal({
 type WishlistSettingsPanelProps = {
   existingSteamAppIds: number[];
   steamWishlistSyncState: SteamWishlistSyncState;
+  onImportMultiGames: (parsed: MultiGameImportParseResult) => MultiGameImportSummary;
   onImportSteamWishlistHtml: (
     items: ParsedSteamWishlistImportItem[],
     skippedCount?: number
@@ -370,12 +372,15 @@ type WishlistSettingsPanelProps = {
 export function WishlistSettingsPanel({
   existingSteamAppIds,
   steamWishlistSyncState,
+  onImportMultiGames,
   onImportSteamWishlistHtml,
   onSyncSteamWishlist,
 }: WishlistSettingsPanelProps) {
   const { t } = useI18n();
   const [isSteamWishlistHtmlImportOpen, setIsSteamWishlistHtmlImportOpen] =
     useState(false);
+  const [multiImportText, setMultiImportText] = useState('');
+  const [multiImportMessage, setMultiImportMessage] = useState('');
   const [clipboardMessage, setClipboardMessage] = useState("");
   const [clipboardError, setClipboardError] = useState("");
   const importButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -384,7 +389,18 @@ export function WishlistSettingsPanel({
   const hasConfiguredSteamWishlistUrl =
     steamWishlistUrl !== genericSteamWishlistUrl;
 
-  async function copyBookmarklet() {
+  async function copyPlayStationBookmarklet() {
+    try {
+      await navigator.clipboard.writeText(playStationLibraryBookmarklet);
+      setClipboardMessage('PlayStation Library bookmarklet copied. Paste it into a browser bookmark URL.');
+      setClipboardError("");
+    } catch {
+      setClipboardMessage("");
+      setClipboardError(t("wishlist.bookmarkletCopyFailed"));
+    }
+  }
+
+  async function copySteamBookmarklet() {
     try {
       await navigator.clipboard.writeText(steamWishlistBookmarklet);
       setClipboardMessage(t("wishlist.bookmarkletCopied"));
@@ -393,6 +409,19 @@ export function WishlistSettingsPanel({
       setClipboardMessage("");
       setClipboardError(t("wishlist.bookmarkletCopyFailed"));
     }
+  }
+
+
+  const multiImportParseResult = useMemo(() => parseMultiGameImportInput(multiImportText), [multiImportText]);
+
+  function handleMultiImport() {
+    const parsed = parseMultiGameImportInput(multiImportText);
+    if (!parsed.ok) {
+      setMultiImportMessage(parsed.error ?? 'No games were found to import.');
+      return;
+    }
+    const summary = onImportMultiGames(parsed);
+    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.invalidRows} skipped · source: ${summary.source}`);
   }
 
   return (
@@ -407,6 +436,29 @@ export function WishlistSettingsPanel({
       </div>
 
       <div className="rounded-lg border border-mint/25 bg-mint/10 p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <h3 className="text-lg font-semibold text-white">Multi Game Import</h3>
+            <p className="text-sm leading-6 text-slate-300">Paste one game title per line, or use a supported bookmarklet and paste the copied JSON. Plain text imports into your Library and never overwrites existing user data.</p>
+          </div>
+          <button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400" disabled={!multiImportParseResult.ok} onClick={handleMultiImport} type="button">Import games</button>
+        </div>
+        <textarea className="mt-4 min-h-44 w-full resize-y rounded-lg border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-mint/50 focus:ring-2 focus:ring-mint/20" onChange={(event) => { setMultiImportText(event.target.value); setMultiImportMessage(''); }} placeholder={"Elden Ring\nAlan Wake 2\nNine Sols\n\n…or paste PlayStation Library JSON"} value={multiImportText} />
+        {multiImportText.trim() ? <div className="mt-3 rounded-lg border border-skyglass/15 bg-ink-950/50 p-3 text-sm text-slate-300">{multiImportParseResult.ok ? <span className="font-semibold text-mint">Detected {multiImportParseResult.source}: {multiImportParseResult.items.length} games · {multiImportParseResult.duplicateCount} pasted duplicates · {multiImportParseResult.skippedCount} skipped rows</span> : <span className="font-semibold text-amber-300">{multiImportParseResult.error}</span>}</div> : null}
+        {multiImportMessage ? <p className="mt-3 text-sm font-semibold text-mint">{multiImportMessage}</p> : null}
+        <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
+          <h4 className="text-sm font-semibold uppercase tracking-caps text-mint">PlayStation Library bookmarklet</h4>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>Open <a className="text-mint underline" href="https://library.playstation.com/recently-purchased/1" rel="noreferrer" target="_blank">PlayStation Library recently purchased</a>.</li>
+            <li>Run the bookmarklet on each page, such as /recently-purchased/1, /2, and so on.</li>
+            <li>Paste the copied JSON above and repeat for each page.</li>
+          </ol>
+          <div className="mt-3 flex flex-wrap gap-2"><button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90" onClick={() => void copyPlayStationBookmarklet()} type="button">Copy PlayStation bookmarklet</button></div>
+          <textarea className="mt-3 h-24 w-full resize-y rounded-md border border-skyglass/15 bg-ink-950/80 p-2 font-mono text-xs text-slate-300 outline-none focus:border-mint/50" readOnly value={playStationLibraryBookmarklet} />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
             <h3 className="text-lg font-semibold text-white">
@@ -432,7 +484,7 @@ export function WishlistSettingsPanel({
             </a>
             <button
               className="h-10 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-100 transition hover:border-mint/40 hover:bg-mint/10"
-              onClick={() => void copyBookmarklet()}
+              onClick={() => void copySteamBookmarklet()}
               type="button"
             >
               {t("wishlist.copyBookmarklet")}
