@@ -126,6 +126,8 @@ export interface RecommendedGamesParams {
   ordering?: string;
   /** RAWG dates range filter, e.g. "2025-01-01,2025-12-31" */
   dates?: string;
+  /** Comma-separated RAWG platform ids, e.g. "4,187" for PC and PS5. */
+  platforms?: string;
   pageSize?: number;
 }
 
@@ -139,6 +141,7 @@ export async function fetchRecommendedGames(
     };
     if (params.genres) queryParams.genres = params.genres;
     if (params.tags) queryParams.tags = params.tags;
+    if (params.platforms) queryParams.platforms = params.platforms;
     if (params.metacriticMin != null || params.metacriticMax != null) {
       queryParams.metacritic = `${params.metacriticMin ?? 0},${params.metacriticMax ?? 100}`;
     }

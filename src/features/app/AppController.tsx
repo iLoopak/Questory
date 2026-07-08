@@ -916,6 +916,17 @@ export function AppController() {
     addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToLibrary'), { game: discoveryGame.title }) });
   }
 
+
+  function promoteDiscoveryToPlans(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    const existing = games.find((g) => g.rawgId === discoveryGame.rawgId);
+    const target = existing ?? createGameFromDiscovery(discoveryGame, new Set(games.map((g) => g.id)));
+    if (!existing) {
+      importGames([target]);
+    }
+    closeDiscoveryPreview();
+    openBacklogPicker(target);
+  }
+
   function handlePreviewOpenLibraryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
     const found = games.find((g) => g.rawgId === discoveryGame.rawgId);
     if (!found) return;
@@ -1250,6 +1261,8 @@ export function AppController() {
           handleSelectDiscoveryGame={handleSelectDiscoveryGame}
           openDiscoveryPreview={openDiscoveryPreview}
           addToDiscoveryInbox={addToDiscoveryInbox}
+          promoteDiscoveryToWishlist={promoteDiscoveryToWishlist}
+          promoteDiscoveryToPlans={promoteDiscoveryToPlans}
           promoteInboxDiscoveryToLibrary={promoteInboxDiscoveryToLibrary}
           promoteInboxDiscoveryToWishlist={promoteInboxDiscoveryToWishlist}
           promoteInboxDiscoveryToPlans={promoteInboxDiscoveryToPlans}
