@@ -1477,10 +1477,11 @@ function createGameFromDiscovery(
     rawgTitle: dg.title,
     metacritic: dg.metacritic,
     metacriticScore: dg.metacritic ?? undefined,
+    rawgRating: dg.rawgRating,
+    rawgRatingsCount: dg.rawgRatingsCount,
     released: dg.released,
     genres: dg.genres.length > 0 ? dg.genres : undefined,
     metadataSource: 'rawg',
     metadataUpdatedAt: now,
   };
 }
-

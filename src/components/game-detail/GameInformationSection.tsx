@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Game } from '../../types/game';
 import type { TFunction } from '../../i18n';
 import { getMetadataSummary } from '../../lib/gameSelectors';
@@ -18,10 +19,12 @@ function formatList(value: string[] | undefined, unavailableText: string) {
 export function GameInformationSection({
   game,
   metacriticScore,
+  rawgRatingBadge,
   t,
 }: {
   game: Game;
   metacriticScore: string | null;
+  rawgRatingBadge?: ReactNode;
   t: TFunction;
 }) {
   const metadata = getMetadataSummary(game);
@@ -30,6 +33,7 @@ export function GameInformationSection({
     metadata.developers.length > 0 ||
     metadata.publishers.length > 0 ||
     metacriticScore ||
+    rawgRatingBadge ||
     metadata.genres.length > 0 ||
     metadata.tags.length > 0;
 
@@ -43,6 +47,7 @@ export function GameInformationSection({
             <InfoCard label={t('detail.developers')} value={formatList(metadata.developers, t('detail.notAvailable'))} />
             <InfoCard label={t('detail.publishers')} value={formatList(metadata.publishers, t('detail.notAvailable'))} />
             {metacriticScore ? <InfoCard label="Metacritic" value={metacriticScore} /> : null}
+            {rawgRatingBadge ? <InfoCard label="RAWG community" value={rawgRatingBadge} /> : null}
           </div>
           <ChipGroup label={t('detail.genres')} values={metadata.genres} accent="mint" />
           <ChipGroup label={t('detail.rawgTags')} values={metadata.tags} />
@@ -54,7 +59,7 @@ export function GameInformationSection({
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+function InfoCard({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="text-xs font-medium uppercase tracking-caps text-slate-600">{label}</div>

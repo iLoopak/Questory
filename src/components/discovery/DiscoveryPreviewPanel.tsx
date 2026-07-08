@@ -11,6 +11,7 @@ import { GameHero, HeroStat } from '../game-detail/GameHero';
 import { DetailSection } from '../game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from '../game-detail/GameDetailActions';
 import { GameInformationSection, formatMetacriticScore } from '../game-detail/GameInformationSection';
+import { RawgRatingBadge, getRawgRatingDisplay } from '../RawgRatingBadge';
 import { DiscoveryScreenshotStrip } from '../ScreenshotStrip';
 import { ContextualRecommendationsSection } from './ContextualRecommendationsSection';
 
@@ -102,9 +103,12 @@ export function DiscoveryPreviewPanel({
     developers: previewModel.metadata.developers,
     publishers: previewModel.metadata.publishers,
     rawgTags: previewModel.metadata.tags,
+    rawgRating: typeof details?.rating === 'number' ? details.rating : previewModel.metadata.rawgRating,
+    rawgRatingsCount: typeof details?.ratings_count === 'number' ? details.ratings_count : previewModel.metadata.rawgRatingsCount,
   }), [candidate, userGames, previewArtwork, previewModel]);
 
   const metacriticScore = formatMetacriticScore(previewMetadata.metacritic);
+  const rawgRating = getRawgRatingDisplay(previewGame);
   const releaseYear = previewMetadata.releaseYear;
   const description = details?.description_raw?.trim();
 
@@ -187,6 +191,7 @@ export function DiscoveryPreviewPanel({
           <HeroStat label={t('detail.currentStatus')} value={collectionStatus} accent={isInLibrary || isInWishlist} />
           {releaseYear ? <HeroStat label={t('preview.released')} value={releaseYear} /> : null}
           {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
+          {rawgRating ? <HeroStat label="RAWG" value={`★ ${rawgRating.ratingLabel}`} /> : null}
         </>}
       />
 
@@ -229,6 +234,7 @@ export function DiscoveryPreviewPanel({
       <GameInformationSection
         game={previewGame}
         metacriticScore={metacriticScore}
+        rawgRatingBadge={<RawgRatingBadge game={previewGame} variant="detail" />}
         t={t}
       />
 

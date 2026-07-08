@@ -36,6 +36,8 @@ export function mapRawgResult(result: RawgSearchResult): DiscoveryGame {
     title: result.name,
     coverUrl: result.background_image,
     metacritic: result.metacritic,
+    rawgRating: typeof result.rating === 'number' && Number.isFinite(result.rating) && result.rating > 0 ? result.rating : undefined,
+    rawgRatingsCount: typeof result.ratings_count === 'number' && Number.isFinite(result.ratings_count) && result.ratings_count >= 0 ? Math.floor(result.ratings_count) : undefined,
     platforms,
     hasSteamVersion,
     genres,

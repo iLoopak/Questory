@@ -118,6 +118,8 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     platform: normalizeLoadedPlatform(game.platform),
     playtimeHours: getNonNegativeNumber(game.playtimeHours),
     rawgId: getOptionalNonNegativeNumber(game.rawgId),
+    rawgRating: getOptionalPositiveNumber(game.rawgRating),
+    rawgRatingsCount: getOptionalNonNegativeNumber(game.rawgRatingsCount),
     rawgSlug: typeof game.rawgSlug === 'string' ? game.rawgSlug : undefined,
     rawgTitle: typeof game.rawgTitle === 'string' ? game.rawgTitle : undefined,
     steamPlaytimeMinutes: getOptionalNonNegativeNumber(game.steamPlaytimeMinutes),

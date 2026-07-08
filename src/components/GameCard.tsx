@@ -9,6 +9,7 @@ import { GameActionMenu } from './GameActionMenu';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { CardOverlayBadge, getCardStatusBadgeVariant } from './CardOverlayBadge';
 import { DealCoverBadges } from './DealCoverBadges';
+import { RawgRatingBadge } from './RawgRatingBadge';
 import { translateOption, useI18n } from '../i18n';
 import { useCoverImageLoaded } from '../hooks/useCoverImageLoaded';
 
@@ -244,6 +245,7 @@ function GameCardComponent({
               {translateOption(game.status, t)}
             </CardOverlayBadge>
           ) : null}
+          <RawgRatingBadge game={game} />
         </div>
         <DealCoverBadges game={game} variant="grid" />
         {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} /> : null}

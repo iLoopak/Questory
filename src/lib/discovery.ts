@@ -5,6 +5,8 @@ export interface DiscoveryGame {
   title: string;
   coverUrl: string | null;
   metacritic: number | null;
+  rawgRating?: number;
+  rawgRatingsCount?: number;
   platforms: string[];
   hasSteamVersion: boolean;
   genres: string[];
@@ -27,7 +29,7 @@ export type DiscoveryCardModel = {
   rawgId: number;
   title: string;
   artwork: { coverUrl: string | null };
-  metadata: { metacritic: number | null; platforms: string[]; genres: string[]; released: string | null };
+  metadata: { metacritic: number | null; rawgRating?: number; rawgRatingsCount?: number; platforms: string[]; genres: string[]; released: string | null };
   badges: string[];
   reason?: string;
   context?: string;
@@ -46,6 +48,8 @@ export type GamePreviewModel = {
     tags: string[];
     released: string | null;
     metacritic: number | null;
+    rawgRating?: number;
+    rawgRatingsCount?: number;
     developers?: string[];
     publishers?: string[];
   };
@@ -90,6 +94,8 @@ export function discoveryGameToGame(game: DiscoveryGame, idPrefix: string): Game
     rawgSlug: game.slug ?? undefined,
     genres: game.genres,
     metacritic: game.metacritic ?? null,
+    rawgRating: game.rawgRating,
+    rawgRatingsCount: game.rawgRatingsCount,
     released: game.released,
   };
 }
@@ -120,6 +126,8 @@ export function discoveryCandidateToCardModel(candidate: DiscoveryCandidate): Di
     artwork: { coverUrl: candidate.game.coverUrl },
     metadata: {
       metacritic: candidate.game.metacritic,
+      rawgRating: candidate.game.rawgRating,
+      rawgRatingsCount: candidate.game.rawgRatingsCount,
       platforms: candidate.game.platforms,
       genres: candidate.game.genres,
       released: candidate.game.released,
@@ -155,6 +163,8 @@ export function discoveryCandidateToPreviewModel(
       tags: candidate.game.tags,
       released: candidate.game.released,
       metacritic: candidate.game.metacritic,
+      rawgRating: candidate.game.rawgRating,
+      rawgRatingsCount: candidate.game.rawgRatingsCount,
       developers: options.developers,
       publishers: options.publishers,
     },
