@@ -1,8 +1,5 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { useScrollLock } from '../../hooks/useScrollLock';
+﻿import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Icon } from '../../components/Icon';
-
-import type { FormEvent, ReactNode, RefObject } from 'react';
 import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
 import { UndoToastStack } from '../../components/UndoToastStack';
@@ -41,12 +38,11 @@ import {
   initialCollectionFilters,
   type CollectionFilters,
 } from '../../config/collection';
-import { I18nProvider, createTranslator, useI18n, translateOption } from '../../i18n';
+import { I18nProvider } from '../../i18n';
 import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import { loadAchievementCounters, saveAchievementCounters, type AchievementCounters } from '../../lib/achievementCounters';
 import { loadGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
-import { loadLanguagePreference } from '../../lib/languagePreference';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import { addGameToPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
@@ -57,7 +53,6 @@ import {
   formatMessageTemplate,
   formatSteamAchievementSyncSummary,
 } from '../../utils/summaryFormatters';
-import { parseTagInput } from '../../utils/gameFilters';
 import { filterGames, getVisibleCollectionGames } from '../../utils/collectionFilters';
 import {
   getMoveQueueToastMessage,
@@ -69,9 +64,8 @@ import { loadReviewModeState, type ReviewModeState, type ReviewSource } from '..
 import { getAppTemplateClassName, type AccentColorPreference, type AppTemplatePreference, type ResolvedTheme, type ThemePreference } from '../../lib/themePreferences';
 import { type UndoActionHistoryEntry } from '../../lib/undoHistoryStorage';
 import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
-import type { Game, GameCollectionType, GamePlatform, GameStatus, WishlistPriority } from '../../types/game';
+import type { Game, GamePlatform, GameStatus } from '../../types/game';
 import type { RawgSearchResult } from '../../types/rawg';
-import { gamePlatforms, gameStatuses, wishlistPriorities } from '../../types/game';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState, SteamWishlistSyncState } from '../../types/steam';
 import { useAppPersistence } from './useAppPersistence';
 import { useAppSyncActions } from './useAppSyncActions';
@@ -105,11 +99,14 @@ import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../li
 import { useControllerAction } from '../../lib/controllerActions';
 import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../../services/steamApi';
 import { useDiscoveryController } from './useDiscoveryController';
-
-const appLogo = '/icons/questshelf-icon.png';
+import { QuestShelfLogo } from './components/QuestShelfLogo';
+import { AddGameDialog } from './components/AddGameDialog';
+import { AppStartupScreen } from './components/AppStartupScreen';
+import { PlaceholderPanel } from './components/PlaceholderPanel';
+import { touchGameRecord, getRetroDuplicateKey } from '../../lib/gameUtils';
 
 function normalizeImportMatchTitle(title: string) {
-  return title.trim().toLocaleLowerCase().replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return title.trim().toLocaleLowerCase().replace(/[â„˘Â®Â©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function getSafeWishlistTitleMatches(games: Game[]) {
@@ -127,22 +124,6 @@ function getSafeWishlistTitleMatches(games: Game[]) {
 
   return new Map(
     Array.from(titleIds.entries()).filter(([title]) => titleCounts.get(title) === 1),
-  );
-}
-
-
-
-function QuestShelfLogo({ className, fallbackClassName = 'text-2xs' }: { className: string; fallbackClassName?: string }) {
-  const [hasImageError, setHasImageError] = useState(false);
-
-  return (
-    <div className={`grid shrink-0 place-items-center overflow-hidden bg-ink-950 text-mint shadow-glow ${className}`} aria-hidden="true">
-      {hasImageError ? (
-        <span className={`font-semibold leading-none ${fallbackClassName}`}>Questory</span>
-      ) : (
-        <img className="qs-logo-glow h-full w-full object-cover" src={appLogo} alt="" onError={() => setHasImageError(true)} />
-      )}
-    </div>
   );
 }
 
@@ -355,9 +336,9 @@ export function AppController() {
 
   const isAppMountedRef = useRef(true);
 
-  // ── Achievement counter tracking ──────────────────────────────────────────
+  // â”€â”€ Achievement counter tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  // Daily active days + night owl / early bird — runs once on mount
+  // Daily active days + night owl / early bird â€” runs once on mount
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const hour = new Date().getHours();
@@ -381,7 +362,7 @@ export function AppController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // libraryFirstCreatedAt — set once when games are first loaded
+  // libraryFirstCreatedAt â€” set once when games are first loaded
   useEffect(() => {
     const c = achievementCountersRef.current;
     if (c.libraryFirstCreatedAt) return;
@@ -395,7 +376,7 @@ export function AppController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [games.length]);
 
-  // Playing streak — update when the currently-playing game changes
+  // Playing streak â€” update when the currently-playing game changes
   useEffect(() => {
     const c = achievementCountersRef.current;
     const playing = games.filter((g) => g.collectionType === 'library' && g.status === 'Playing');
@@ -412,7 +393,7 @@ export function AppController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [games]);
 
-  // Unlock notification — fires a toast when a new achievement unlocks
+  // Unlock notification â€” fires a toast when a new achievement unlocks
   const prevUnlockedIdsRef = useRef<Set<string> | null>(null);
   const addToastRef = useRef<((n: { category: 'success'; dedupeKey: string; message: string; details?: string }) => void) | null>(null);
 
@@ -720,7 +701,7 @@ export function AppController() {
         .map(getRetroDuplicateKey)
         .filter((key): key is string => Boolean(key)),
     );
-    // Duplicate guard for manual/discovery imports only — Steam and retro
+    // Duplicate guard for manual/discovery imports only â€” Steam and retro
     // imports keep their own dedup keys, and a wishlist copy must not block
     // a Steam library import of the same game.
     const existingLibraryRawgIds = new Set(
@@ -887,7 +868,7 @@ export function AppController() {
         `${duplicateCount} already in library`,
         `${removedWishlistCount} removed from Wishlist / marked owned`,
         `${createdGames.length} added to Quest Queue`,
-      ].join(' · ');
+      ].join(' Â· ');
 
       addToastNotification({
         actions: createdGames.length > 0 ? [getOpenQueueAction()] : undefined,
@@ -1228,7 +1209,7 @@ export function AppController() {
     return <AppStartupScreen />;
   }
 
-  // Single source for the Game Hub detail route — rendered once as a
+  // Single source for the Game Hub detail route â€” rendered once as a
   // fullscreen overlay whenever a game is selected, from any screen.
   const renderGameDetailRoute = (game: Game) => (
     <AppGameDetailsView
@@ -1786,7 +1767,7 @@ export function AppController() {
         />
       ) : null}
 
-      {/* Game Hub — fullscreen overlay over the app shell, sharing the
+      {/* Game Hub â€” fullscreen overlay over the app shell, sharing the
           FullscreenGameShell presentation with Discovery Preview. The
           originating screen stays mounted behind it, so back restores
           scroll/focus. Rendered before the preview so a preview opened
@@ -1878,365 +1859,6 @@ export function AppController() {
   );
 }
 
-
-
-type AddGameDialogProps = {
-  existingGameIds: Set<string>;
-  onClose: () => void;
-  onSave: (game: Game) => void;
-};
-
-function AddGameDialog({ existingGameIds, onClose, onSave }: AddGameDialogProps) {
-  const { t } = useI18n();
-  const [title, setTitle] = useState('');
-  const [collectionType, setCollectionType] = useState<GameCollectionType>('library');
-  const [platform, setPlatform] = useState<GamePlatform>('Steam');
-  const [customPlatform, setCustomPlatform] = useState('');
-  const [status, setStatus] = useState<GameStatus>('Want to play');
-  const [playtimeHours, setPlaytimeHours] = useState('0');
-  const [coverImage, setCoverImage] = useState('');
-  const [tagText, setTagText] = useState('');
-  const [notes, setNotes] = useState('');
-  const [priority, setPriority] = useState<WishlistPriority>('medium');
-  const [expectedPlaytime, setExpectedPlaytime] = useState('');
-  const [priceTarget, setPriceTarget] = useState('');
-  const [releaseDate, setReleaseDate] = useState('');
-  const [storeUrl, setStoreUrl] = useState('');
-  const [error, setError] = useState('');
-
-  useScrollLock();
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  function submitForm(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const trimmedTitle = title.trim();
-    const parsedPlaytime = Number(playtimeHours);
-    const parsedExpectedPlaytime = expectedPlaytime ? Number(expectedPlaytime) : null;
-    const resolvedPlatform = platform === 'Other' ? customPlatform.trim() : platform;
-
-    if (!trimmedTitle) {
-      setError(t('addGame.errorTitleRequired'));
-      return;
-    }
-
-    if (!resolvedPlatform) {
-      setError(t('addGame.errorCustomPlatformRequired'));
-      return;
-    }
-
-    if (!Number.isFinite(parsedPlaytime) || parsedPlaytime < 0) {
-      setError(t('addGame.errorPlaytimePositive'));
-      return;
-    }
-
-    if (parsedExpectedPlaytime !== null && (!Number.isFinite(parsedExpectedPlaytime) || parsedExpectedPlaytime < 0)) {
-      setError(t('addGame.errorExpectedPlaytimePositive'));
-      return;
-    }
-
-    const importedAt = new Date().toISOString();
-    const id = createManualGameId(trimmedTitle, existingGameIds);
-
-    onSave({
-      id,
-      title: trimmedTitle,
-      platform: resolvedPlatform as GamePlatform,
-      status,
-      coverImage: coverImage.trim(),
-      artworkSource: coverImage.trim() ? 'custom' : undefined,
-      artworkUpdatedAt: coverImage.trim() ? importedAt : undefined,
-      playtimeHours: parsedPlaytime,
-      tags: parseTagInput(tagText),
-      lastPlayedAt: status === 'Playing' ? importedAt.slice(0, 10) : null,
-      notes: notes.trim(),
-      collectionType,
-      externalSource: 'manual',
-      importedAt,
-      priority: collectionType === 'wishlist' ? priority : undefined,
-      expectedPlaytime: collectionType === 'wishlist' ? parsedExpectedPlaytime : undefined,
-      priceTarget: collectionType === 'wishlist' ? priceTarget.trim() : undefined,
-      releaseDate: collectionType === 'wishlist' ? releaseDate : undefined,
-      storeUrl: collectionType === 'wishlist' ? storeUrl.trim() : undefined,
-    });
-  }
-
-  return (
-    <div className="fixed inset-0 z-30 grid touch-none place-items-center overscroll-none bg-black/80 p-3 backdrop-blur-sm">
-      <section aria-modal="true" className="qs-modal-panel qs-glass max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-lg border shadow-panel" role="dialog">
-        <div className="flex items-center justify-between gap-3 border-b border-skyglass/15 bg-ink-950/80 p-4">
-          <div>
-            <h2 className="text-xl font-semibold text-white">{t('addGame.title')}</h2>
-            <p className="mt-1 text-sm text-slate-400">{t('addGame.help')}</p>
-          </div>
-          <button
-            className="h-9 rounded-md border border-skyglass/15 px-3 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
-            onClick={onClose}
-            type="button"
-          >
-            {t('action.close')}
-          </button>
-        </div>
-
-        <form className="max-h-[calc(92dvh-73px)] overflow-y-auto p-4" onSubmit={submitForm}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="block md:col-span-2">
-              <span className="qs-label-caps text-muted">{t('addGame.addTo')}</span>
-              <select
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
-                onChange={(event) => setCollectionType(event.target.value as GameCollectionType)}
-                value={collectionType}
-              >
-                <option value="library">{t('collection.library')}</option>
-                <option value="wishlist">{t('wishlist.title')}</option>
-              </select>
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="qs-label-caps text-muted">{t('addGame.titleLabel')}</span>
-              <input
-                autoFocus
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder={t('addGame.titlePlaceholder')}
-                value={title}
-              />
-            </label>
-
-            <label className="block">
-              <span className="qs-label-caps text-muted">{t('addGame.platform')}</span>
-              <select
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
-                onChange={(event) => setPlatform(event.target.value as GamePlatform)}
-                value={platform}
-              >
-                {gamePlatforms.map((option) => (
-                  <option key={option} value={option}>
-                    {translateOption(option, t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {platform === 'Other' ? (
-              <label className="block">
-                <span className="qs-label-caps text-muted">{t('addGame.customPlatform')}</span>
-                <input
-                  className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                  onChange={(event) => setCustomPlatform(event.target.value)}
-                  placeholder={t('addGame.customPlatformPlaceholder')}
-                  value={customPlatform}
-                />
-              </label>
-            ) : null}
-
-            <label className="block">
-              <span className="qs-label-caps text-muted">{t('addGame.status')}</span>
-              <select
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
-                onChange={(event) => setStatus(event.target.value as GameStatus)}
-                value={status}
-              >
-                {gameStatuses.map((option) => (
-                  <option key={option} value={option}>
-                    {translateOption(option, t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="qs-label-caps text-muted">{t('addGame.playtimeHours')}</span>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                min="0"
-                onChange={(event) => setPlaytimeHours(event.target.value)}
-                step="0.1"
-                type="number"
-                value={playtimeHours}
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="qs-label-caps text-muted">{t('addGame.coverUrl')}</span>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                onChange={(event) => setCoverImage(event.target.value)}
-                placeholder="https://..."
-                type="url"
-                value={coverImage}
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="qs-label-caps text-muted">{t('addGame.tags')}</span>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                onChange={(event) => setTagText(event.target.value)}
-                placeholder={t('addGame.tagsPlaceholder')}
-                value={tagText}
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="qs-label-caps text-muted">{t('addGame.notes')}</span>
-              <textarea
-                className="mt-2 min-h-28 w-full resize-y rounded-md border border-white/10 bg-ink-950 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder={t('addGame.notesPlaceholder')}
-                value={notes}
-              />
-            </label>
-
-            {collectionType === 'wishlist' ? (
-              <>
-                <label className="block">
-                  <span className="qs-label-caps text-muted">{t('addGame.priority')}</span>
-                  <select
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition focus:border-mint"
-                    onChange={(event) => setPriority(event.target.value as WishlistPriority)}
-                    value={priority}
-                  >
-                    {wishlistPriorities.map((option) => (
-                      <option key={option} value={option}>
-                        {t(`priority.${option}` as 'priority.low' | 'priority.medium' | 'priority.high')}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="qs-label-caps text-muted">{t('addGame.expectedPlaytime')}</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                    min="0"
-                    onChange={(event) => setExpectedPlaytime(event.target.value)}
-                    placeholder={t('addGame.hours')}
-                    step="0.1"
-                    type="number"
-                    value={expectedPlaytime}
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="qs-label-caps text-muted">{t('addGame.priceTarget')}</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                    onChange={(event) => setPriceTarget(event.target.value)}
-                    placeholder={t('addGame.priceTargetPlaceholder')}
-                    value={priceTarget}
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="qs-label-caps text-muted">{t('addGame.releaseDate')}</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                    onChange={(event) => setReleaseDate(event.target.value)}
-                    type="date"
-                    value={releaseDate}
-                  />
-                </label>
-
-                <label className="block md:col-span-2">
-                  <span className="qs-label-caps text-muted">{t('addGame.storeUrl')}</span>
-                  <input
-                    className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
-                    onChange={(event) => setStoreUrl(event.target.value)}
-                    placeholder="https://..."
-                    type="url"
-                    value={storeUrl}
-                  />
-                </label>
-              </>
-            ) : null}
-          </div>
-
-          {error ? (
-            <div className="mt-4 rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
-            <button
-              className="h-9 rounded-md border border-skyglass/15 px-4 text-sm font-medium text-slate-200 transition hover:bg-mint/10 hover:text-white"
-              onClick={onClose}
-              type="button"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              className="h-9 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-              type="submit"
-            >
-              {t('common.saveGame')}
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
-}
-
-function AppStartupScreen() {
-  return (
-    <main className="grid min-h-screen place-items-center bg-ink-950 px-4 text-slate-100">
-      <div className="qs-glass w-full max-w-md rounded-lg border p-5 shadow-panel">
-        <div className="flex items-center gap-3">
-          <QuestShelfLogo className="h-12 w-12 rounded-lg border border-mint/30" fallbackClassName="text-sm" />
-          <div>
-            <div className="text-sm font-semibold uppercase tracking-spread text-mint">Questory</div>
-            <h1 className="mt-1 text-2xl font-semibold text-white">{createTranslator(loadLanguagePreference())('common.loadingLibrary')}</h1>
-          </div>
-        </div>
-        <div className="mt-5 space-y-3">
-          <div className="h-3 w-2/3 animate-pulse rounded bg-white/10" />
-          <div className="h-3 w-full animate-pulse rounded bg-white/10" />
-          <div className="h-3 w-4/5 animate-pulse rounded bg-white/10" />
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function touchGameRecord(game: Game): Game {
-  return {
-    ...game,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function getRetroDuplicateKey(game: Game) {
-  if (game.externalSource !== 'retro-rom') {
-    return null;
-  }
-
-  const path = (game.romPath ?? game.romUri ?? '').trim().toLowerCase();
-  if (path) {
-    return `path:${path}`;
-  }
-
-  const extension = game.romExtension?.trim().toLowerCase();
-  if (!extension) {
-    return null;
-  }
-
-  return `fallback:${game.platform}:${game.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}:${extension}`;
-}
-
 function createGameFromDiscovery(
   dg: import('../../lib/discovery').DiscoveryGame,
   existingIds: Set<string>,
@@ -2275,37 +1897,3 @@ function createGameFromDiscovery(
   };
 }
 
-function createManualGameId(title: string, existingGameIds: Set<string>) {
-  const baseId =
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'manual-game';
-  let id = `manual-${baseId}`;
-  let suffix = 2;
-
-  while (existingGameIds.has(id)) {
-    id = `manual-${baseId}-${suffix}`;
-    suffix += 1;
-  }
-
-  return id;
-}
-
-
-type PlaceholderPanelProps = {
-  title: string;
-};
-
-function PlaceholderPanel({ title }: PlaceholderPanelProps) {
-  return (
-    <section className="qs-glass grid min-w-0 place-items-center rounded-lg border p-8 text-center lg:h-[calc(100vh-116px)]">
-      <div>
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-        <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-          This section is intentionally waiting for a later foundation pass.
-        </p>
-      </div>
-    </section>
-  );
-}
