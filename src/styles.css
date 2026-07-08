@@ -851,6 +851,15 @@ img {
     transform 180ms ease;
 }
 
+.qs-game-card,
+.qs-shelf-card,
+.qs-compact-card {
+  /* Collection cards move through the viewport while scrolling. Keep them on
+     opaque/composited surfaces instead of asking mobile GPUs to blur the page
+     behind every Wishlist deal/card badge on each frame. */
+  backdrop-filter: none;
+}
+
 .qs-game-card:hover,
 .qs-game-card:focus-within,
 .qs-shelf-card:hover,
@@ -959,8 +968,40 @@ img {
   background: linear-gradient(135deg, color-mix(in srgb, var(--card-overlay-badge-accent) 12%, var(--badge-bg)), var(--badge-bg));
   color: var(--badge-text);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-overlay-badge-accent) 9%, transparent), var(--badge-shadow);
-  backdrop-filter: blur(10px) saturate(1.18);
   vertical-align: middle;
+}
+
+.qs-deal-cover-badge {
+  backdrop-filter: none;
+}
+
+@media (hover: none), (pointer: coarse), (orientation: landscape) and (max-height: 640px) {
+  .qs-game-card,
+  .qs-shelf-card,
+  .qs-compact-card {
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .qs-game-card:hover,
+  .qs-game-card:focus-within,
+  .qs-shelf-card:hover,
+  .qs-shelf-card:focus-visible,
+  .qs-compact-card:hover,
+  .qs-compact-card:focus-within,
+  .qs-game-card:active,
+  .qs-shelf-card:active,
+  .qs-compact-card:active {
+    box-shadow: none;
+    transform: none;
+  }
+
+  .qs-shelf-card img,
+  .qs-game-card img,
+  .qs-compact-card img {
+    transition-duration: 1ms;
+  }
 }
 
 .card-overlay-badge__dot {
