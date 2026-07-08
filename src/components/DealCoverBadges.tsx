@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useI18n, type TFunction } from '../i18n';
 import type { Game } from '../types/game';
 import { Icon } from './Icon';
@@ -9,7 +9,7 @@ type DealCoverBadgesProps = {
   variant?: 'grid' | 'shelf' | 'compact';
 };
 
-export function DealCoverBadges({ game, isInteractive = true, variant = 'grid' }: DealCoverBadgesProps) {
+function DealCoverBadgesComponent({ game, isInteractive = true, variant = 'grid' }: DealCoverBadgesProps) {
   const { t } = useI18n();
 
   const dealSummary = useMemo(() => getDealSummary(game, t), [game, t]);
@@ -24,8 +24,8 @@ export function DealCoverBadges({ game, isInteractive = true, variant = 'grid' }
     ? 'absolute inset-x-1 bottom-1 z-10 flex max-w-[calc(100%-0.5rem)] flex-col items-start gap-0.5'
     : 'absolute bottom-3 right-3 z-10 flex max-w-[58%] flex-col items-end gap-1.5 sm:max-w-[52%]';
   const badgeClass = isCompact
-    ? 'max-w-full truncate rounded-full border border-white/20 bg-ink-950/88 px-1.5 py-0.5 text-2xs font-extrabold leading-none text-white shadow-panel backdrop-blur-md'
-    : 'max-w-full truncate rounded-full border border-white/20 bg-ink-950/88 px-2.5 py-1 text-xs font-extrabold leading-none text-white shadow-panel backdrop-blur-md';
+    ? 'qs-deal-cover-badge max-w-full truncate rounded-full border border-white/20 bg-ink-950/90 px-1.5 py-0.5 text-2xs font-extrabold leading-none text-white shadow-panel'
+    : 'qs-deal-cover-badge max-w-full truncate rounded-full border border-white/20 bg-ink-950/90 px-2.5 py-1 text-xs font-extrabold leading-none text-white shadow-panel';
   const priceBadgeClass = `${badgeClass} border-mint/35 bg-mint/20 text-mint`;
   const discountBadgeClass = `${badgeClass} border-amber-300/45 bg-amber-300/95 text-ink-950`;
   const historicalBadgeClass = `${badgeClass} border-fuchsia-200/45 bg-fuchsia-500/30 text-fuchsia-50`;
@@ -88,10 +88,25 @@ function getDealSummary(game: Game, t: TFunction) {
   };
 }
 
+const dealPriceFormatters = new Map<string, Intl.NumberFormat>();
+
 export function formatDealPrice(amount: number, currency: string) {
   try {
-    return new Intl.NumberFormat(undefined, { currency, style: 'currency' }).format(amount);
+    let formatter = dealPriceFormatters.get(currency);
+
+    if (!formatter) {
+      formatter = new Intl.NumberFormat(undefined, { currency, style: 'currency' });
+      dealPriceFormatters.set(currency, formatter);
+    }
+
+    return formatter.format(amount);
   } catch {
     return `${amount.toFixed(2)} ${currency}`;
   }
 }
+
+export const DealCoverBadges = memo(DealCoverBadgesComponent, (previousProps, nextProps) => (
+  previousProps.game === nextProps.game &&
+  previousProps.isInteractive === nextProps.isInteractive &&
+  previousProps.variant === nextProps.variant
+));
