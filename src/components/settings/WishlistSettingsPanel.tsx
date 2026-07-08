@@ -14,7 +14,7 @@ import {
   steamWishlistBookmarklet,
   type ParsedSteamWishlistImportItem,
 } from "../../lib/steamWishlistHtmlImport";
-import { parseMultiGameImportInput, playStationLibraryBookmarklet, type MultiGameImportSummary, type MultiGameImportParseResult } from "../../lib/multiGameImport";
+import { parseMultiGameImportInput, nintendoVirtualGameCardsBookmarklet, playStationLibraryBookmarklet, type MultiGameImportSummary, type MultiGameImportParseResult } from "../../lib/multiGameImport";
 import type { SteamWishlistSyncState } from "../../types/steam";
 
 export function SteamWishlistSyncNotice({
@@ -389,6 +389,17 @@ export function WishlistSettingsPanel({
   const hasConfiguredSteamWishlistUrl =
     steamWishlistUrl !== genericSteamWishlistUrl;
 
+  async function copyNintendoBookmarklet() {
+    try {
+      await navigator.clipboard.writeText(nintendoVirtualGameCardsBookmarklet);
+      setClipboardMessage('Nintendo Virtual Game Cards bookmarklet copied. Paste it into a browser bookmark URL.');
+      setClipboardError('');
+    } catch {
+      setClipboardMessage('');
+      setClipboardError('Could not copy bookmarklet. Select and copy the script manually.');
+    }
+  }
+
   async function copyPlayStationBookmarklet() {
     try {
       await navigator.clipboard.writeText(playStationLibraryBookmarklet);
@@ -421,7 +432,7 @@ export function WishlistSettingsPanel({
       return;
     }
     const summary = onImportMultiGames(parsed);
-    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.invalidRows} skipped · source: ${summary.source}`);
+    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.invalidRows} skipped · source: ${summary.source === 'nintendo-virtual-game-cards' ? 'Nintendo Virtual Game Cards' : summary.source}`);
   }
 
   return (
@@ -443,9 +454,19 @@ export function WishlistSettingsPanel({
           </div>
           <button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400" disabled={!multiImportParseResult.ok} onClick={handleMultiImport} type="button">Import games</button>
         </div>
-        <textarea className="mt-4 min-h-44 w-full resize-y rounded-lg border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-mint/50 focus:ring-2 focus:ring-mint/20" onChange={(event) => { setMultiImportText(event.target.value); setMultiImportMessage(''); }} placeholder={"Elden Ring\nAlan Wake 2\nNine Sols\n\n…or paste PlayStation Library JSON"} value={multiImportText} />
-        {multiImportText.trim() ? <div className="mt-3 rounded-lg border border-skyglass/15 bg-ink-950/50 p-3 text-sm text-slate-300">{multiImportParseResult.ok ? <span className="font-semibold text-mint">Detected {multiImportParseResult.source}: {multiImportParseResult.items.length} games · {multiImportParseResult.duplicateCount} pasted duplicates · {multiImportParseResult.skippedCount} skipped rows</span> : <span className="font-semibold text-amber-300">{multiImportParseResult.error}</span>}</div> : null}
+        <textarea className="mt-4 min-h-44 w-full resize-y rounded-lg border border-skyglass/15 bg-ink-950/80 p-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-mint/50 focus:ring-2 focus:ring-mint/20" onChange={(event) => { setMultiImportText(event.target.value); setMultiImportMessage(''); }} placeholder={"Elden Ring\nAlan Wake 2\nNine Sols\n\n…or paste PlayStation or Nintendo JSON"} value={multiImportText} />
+        {multiImportText.trim() ? <div className="mt-3 rounded-lg border border-skyglass/15 bg-ink-950/50 p-3 text-sm text-slate-300">{multiImportParseResult.ok ? <span className="font-semibold text-mint">Detected {multiImportParseResult.source === 'nintendo-virtual-game-cards' ? 'Nintendo Virtual Game Cards' : multiImportParseResult.source}: {multiImportParseResult.items.length} games · {multiImportParseResult.duplicateCount} pasted duplicates · {multiImportParseResult.skippedCount} skipped rows</span> : <span className="font-semibold text-amber-300">{multiImportParseResult.error}</span>}</div> : null}
         {multiImportMessage ? <p className="mt-3 text-sm font-semibold text-mint">{multiImportMessage}</p> : null}
+        <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
+          <h4 className="text-sm font-semibold uppercase tracking-caps text-mint">Nintendo Virtual Game Cards bookmarklet</h4>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>Open your Nintendo Account Virtual Game Cards page.</li>
+            <li>Run the bookmarklet on that page. Nintendo may lazy-load cards, so scroll to the bottom first if needed; the bookmarklet also attempts to scroll and collect rendered cards.</li>
+            <li>Paste the copied JSON above to import Nintendo Switch games. If JSON copy fails, you can still paste one title per line.</li>
+          </ol>
+          <div className="mt-3 flex flex-wrap gap-2"><button className="h-10 rounded-md bg-mint px-3 text-sm font-semibold text-ink-950 shadow-glow transition hover:bg-mint/90" onClick={() => void copyNintendoBookmarklet()} type="button">Copy Nintendo bookmarklet</button></div>
+          <textarea className="mt-3 h-24 w-full resize-y rounded-md border border-skyglass/15 bg-ink-950/80 p-2 font-mono text-xs text-slate-300 outline-none focus:border-mint/50" readOnly value={nintendoVirtualGameCardsBookmarklet} />
+        </div>
         <div className="mt-4 rounded-lg border border-skyglass/15 bg-ink-950/50 p-3">
           <h4 className="text-sm font-semibold uppercase tracking-caps text-mint">PlayStation Library bookmarklet</h4>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">

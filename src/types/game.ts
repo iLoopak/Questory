@@ -100,8 +100,18 @@ export type Game = {
   steamAchievements?: SteamAchievement[];
   lastSteamActivityAt?: string;
   lastSteamActivityDeltaMinutes?: number;
-  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom' | 'playstation-library';
+  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom' | 'playstation-library' | 'nintendo-virtual-game-cards';
   externalUrl?: string;
+  nintendoVirtualGameCard?: {
+    source: 'nintendo-virtual-game-cards';
+    version: 1;
+    detailUrl?: string;
+    vgcId?: string;
+    cardType?: string;
+    exportedAt?: string;
+    pageUrl?: string;
+    coverUrl?: string;
+  };
   importedAt?: string;
   updatedAt?: string;
   finishedAt?: string;

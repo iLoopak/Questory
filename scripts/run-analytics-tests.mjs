@@ -27,6 +27,7 @@ const testFiles = [
   { entry: 'scripts/settingsEntrypoints.test.ts', out: 'settingsEntrypoints.test.mjs' },
   { entry: 'scripts/backupStorage.test.ts', out: 'backupStorage.test.mjs' },
   { entry: 'scripts/reviewQueueOrder.test.ts', out: 'reviewQueueOrder.test.mjs' },
+  { entry: 'scripts/multiGameImport.test.ts', out: 'multiGameImport.test.mjs' },
 ];
 
 await Promise.all(
