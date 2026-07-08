@@ -468,6 +468,11 @@ export function AppSectionRouter({
             setActiveNavItem('Settings');
             setActiveSettingsCategory('Personalization');
           }}
+          onOpenIntegrationsSettings={() => {
+            setSelectedGameId(null);
+            setActiveNavItem('Settings');
+            setActiveSettingsCategory('Integrations');
+          }}
           onOpenWishlist={() => {
             setSelectedGameId(null);
             setActiveNavItem('Wishlist');
