@@ -1,18 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
-import { getActiveQueuePlatforms, getQueuePlatforms, getQueueSummary, loadPlatformQueueState, removeCurrentlyPlayingFromPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
+import { useCallback, useEffect, useMemo, useState, type SetStateAction } from 'react';
+import { getActiveQueuePlatforms, getQueuePlatforms, getQueueSummary, loadPlatformQueueState, removeCurrentlyPlayingFromPlatformQueue, savePlatformQueueState, type PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../../types/game';
 
 export function usePlatformQueueController(games: Game[]) {
-  const [platformQueueState, setPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
+  const [platformQueueState, setRawPlatformQueueState] = useState<PlatformQueueState>(() => loadPlatformQueueState());
   const [targetQueuePlatform, setTargetQueuePlatform] = useState<GamePlatform | undefined>(undefined);
   const [backlogPickerGame, setBacklogPickerGame] = useState<Game | null>(null);
+
+  const setPlatformQueueState = useCallback((nextStateAction: SetStateAction<PlatformQueueState>) => {
+    setRawPlatformQueueState((currentState) => {
+      const nextState = typeof nextStateAction === 'function'
+        ? (nextStateAction as (currentState: PlatformQueueState) => PlatformQueueState)(currentState)
+        : nextStateAction;
+
+      if (nextState !== currentState) {
+        savePlatformQueueState(nextState);
+      }
+
+      return nextState;
+    });
+  }, []);
 
   useEffect(() => {
     setPlatformQueueState((currentState) => {
       const normalizedState = removeCurrentlyPlayingFromPlatformQueue(currentState, games);
       return normalizedState.entries.length === currentState.entries.length ? currentState : normalizedState;
     });
-  }, [games]);
+  }, [games, setPlatformQueueState]);
 
   const queueSummary = useMemo(() => getQueueSummary(platformQueueState, games), [games, platformQueueState]);
   const queuePlatforms = useMemo(() => getQueuePlatforms(games, platformQueueState), [games, platformQueueState]);

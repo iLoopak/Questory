@@ -1,4 +1,5 @@
 import {
+  addActiveQueuePlatform,
   addGameToPlatformQueue,
   addGameToPlatformQueueTop,
   getVisiblePlatformQueueEntries,
@@ -76,10 +77,7 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
 
   const normalized = normalizePlatformQueueState({
     ...state,
-    entries: [
-      ...state.entries,
-      { ...state.entries[0], queuePosition: 99, queueNotes: 'duplicate note' },
-    ],
+    entries: [...state.entries, { ...state.entries[0], queuePosition: 99, queueNotes: 'duplicate note' }],
   });
   assertPlatformEntryCount(normalized, baseGame.id, 'PS2', 1);
 
@@ -121,4 +119,20 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
   assertPlatformEntryCount(reorderState, secondGame.id, 'PS2', 1);
   assertPlatformEntryCount(reorderState, thirdGame.id, 'PS2', 1);
 
+  const customEmptyState = addActiveQueuePlatform({ activePlatforms: [], entries: [], schemaVersion: 1, settings: [] }, 'Analogue Pocket');
+  const hydratedCustomEmptyState = normalizePlatformQueueState(JSON.parse(JSON.stringify(customEmptyState)));
+  if (!hydratedCustomEmptyState.activePlatforms.includes('Analogue Pocket')) {
+    throw new Error('Expected empty custom platform to survive normalization/hydration.');
+  }
+
+  const existingCustomState = addActiveQueuePlatform(customEmptyState, 'Retroid');
+  const qqAddedState = addGameToPlatformQueue(existingCustomState, baseGame, 'Analogue Pocket');
+  if (!qqAddedState.activePlatforms.includes('Retroid') || !qqAddedState.activePlatforms.includes('Analogue Pocket')) {
+    throw new Error('Expected Quest Queue add to preserve existing custom platforms while activating the target platform.');
+  }
+  const hydratedQqAddedState = normalizePlatformQueueState(JSON.parse(JSON.stringify(qqAddedState)));
+  assertPlatformEntryCount(hydratedQqAddedState, baseGame.id, 'Analogue Pocket', 1);
+  if (!hydratedQqAddedState.activePlatforms.includes('Retroid') || !hydratedQqAddedState.activePlatforms.includes('Analogue Pocket')) {
+    throw new Error('Expected custom platform and QQ-added game assignment to survive reload hydration.');
+  }
 }

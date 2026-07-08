@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ViewportModal } from "../ViewportModal";
 import { PlatformIdentityFields } from "../PlatformIdentityFields";
 import { useI18n } from "../../i18n";
@@ -29,7 +29,7 @@ export function QueuePlatformsSettingsPanel({
 }: {
   games: Game[];
   queueState: PlatformQueueState;
-  onQueueStateChange: (state: PlatformQueueState) => void;
+  onQueueStateChange: Dispatch<SetStateAction<PlatformQueueState>>;
 }) {
   const { t } = useI18n();
   const [customPlatformName, setCustomPlatformName] = useState("");
@@ -46,7 +46,7 @@ export function QueuePlatformsSettingsPanel({
   );
 
   function addPlatform(platform: GamePlatform) {
-    onQueueStateChange(addActiveQueuePlatform(queueState, platform));
+    onQueueStateChange((currentState) => addActiveQueuePlatform(currentState, platform));
     setCustomPlatformName("");
   }
 
@@ -60,10 +60,10 @@ export function QueuePlatformsSettingsPanel({
   }
 
   function togglePlatform(platform: GamePlatform, isEnabled: boolean) {
-    onQueueStateChange(
+    onQueueStateChange((currentState) =>
       isEnabled
-        ? addActiveQueuePlatform(queueState, platform)
-        : hideQueuePlatform(queueState, platform)
+        ? addActiveQueuePlatform(currentState, platform)
+        : hideQueuePlatform(currentState, platform)
     );
   }
 

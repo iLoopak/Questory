@@ -1,7 +1,7 @@
 import { Icon } from './Icon';
 import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
+import type { CSSProperties, Dispatch, FormEvent, KeyboardEvent, ReactNode, RefObject, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import {
   addActiveQueuePlatform,
@@ -46,7 +46,7 @@ type QueuePanelProps = {
   onAddGameToQueue: (game: Game, platform: GamePlatform) => void;
   onFindArtwork?: (game: Game) => void;
   onLimitChange: (platform: GamePlatform, maxActiveGames: number) => void;
-  onQueueStateChange: (state: PlatformQueueState) => void;
+  onQueueStateChange: Dispatch<SetStateAction<PlatformQueueState>>;
   onMoveEntry: (gameId: string, platform: GamePlatform, direction: 'top' | 'up' | 'down') => void;
   onMoveEntryToPlatform: (gameId: string, sourcePlatform: GamePlatform, platform: GamePlatform) => void;
   onPlayNow: (gameId: string, platform: GamePlatform) => void;
@@ -181,8 +181,7 @@ export function QueuePanel({
   }, [activeQueuePlatforms, selectedPlatform]);
 
   function addQueuePlatform(platform: GamePlatform) {
-    const nextState = addActiveQueuePlatform(queueState, platform);
-    onQueueStateChange(nextState);
+    onQueueStateChange((currentState) => addActiveQueuePlatform(currentState, platform));
     setSelectedPlatform(platform);
     setCustomPlatformName('');
   }
@@ -190,12 +189,11 @@ export function QueuePanel({
   function addSuggestedPlatform(platform: GamePlatform) {
     const nextAccentColor = getDefaultPlatformAccentColor(platform);
     const artworkUrl = createPlatformArtworkPreset(platform, nextAccentColor, 'Aurora');
-    const nextState = updatePlatformQueueVisualSettings(
-      addActiveQueuePlatform(queueState, platform),
+    onQueueStateChange((currentState) => updatePlatformQueueVisualSettings(
+      addActiveQueuePlatform(currentState, platform),
       platform,
       { accentColor: nextAccentColor, artworkUrl, platformTag: '' },
-    );
-    onQueueStateChange(nextState);
+    ));
     setSelectedPlatform(platform);
   }
 
