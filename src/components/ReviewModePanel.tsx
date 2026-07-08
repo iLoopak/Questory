@@ -42,7 +42,10 @@ export type ReviewModeAction =
   | 'note';
 
 export type ReviewModeActionContext = {
+  /** Active 20-game session batch. */
   queueGameIds?: string[];
+  /** Full pending, unprocessed Quest Queue candidate order for the current source/filter. */
+  pendingGameIds?: string[];
 };
 
 type ReviewModePanelProps = {
@@ -433,7 +436,10 @@ export function ReviewModePanel({
   }, { enabled: canReceiveControllerActions });
 
   function advanceReview(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform) {
-    onAction(game, action, note, targetPlatform, { queueGameIds: sessionGameIds });
+    onAction(game, action, note, targetPlatform, {
+      queueGameIds: sessionGameIds,
+      pendingGameIds: baseSourceGames.map((pendingGame) => pendingGame.id),
+    });
     setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
     setReviewHistory((currentHistory) => [...currentHistory, { action, gameId: game.id }]);
     setActionStats((currentStats) => getNextActionStats(currentStats, action));
