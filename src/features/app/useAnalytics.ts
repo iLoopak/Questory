@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
-import type { MoreNavItem, TopNavItem } from '../../config/navigation';
+import type { NavItem } from '../../config/navigation';
 import type { SettingsCategory } from '../../config/settings';
 import type { Game, GamePlatform } from '../../types/game';
 
 type UseAnalyticsParams = {
-  activeNavItem: TopNavItem | MoreNavItem;
+  activeNavItem: NavItem;
   activeQueuePlatforms: GamePlatform[];
   activeSettingsCategory: SettingsCategory | null;
   games: Game[];
