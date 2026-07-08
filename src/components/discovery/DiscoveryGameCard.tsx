@@ -1,8 +1,7 @@
 import { discoveryCandidateToCardModel, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { getArtworkSet } from '../../lib/gameSelectors';
 import { Icon } from '../Icon';
-import { MetacriticBadge } from '../MetacriticBadge';
-import { RawgRatingBadge } from '../RawgRatingBadge';
+import { RatingBadgeStack } from '../RatingBadgeStack';
 import { useI18n } from '../../i18n';
 
 // ---------------------------------------------------------------------------
@@ -56,10 +55,11 @@ export function DiscoveryCompactCard({ candidate, onClick }: CompactProps) {
             <Icon name="gamepad-2" size={24} className="text-slate-700" />
           </div>
         )}
-        {model.metadata.metacritic ? <MetacriticBadge score={model.metadata.metacritic} variant="chip" /> : null}
-        <span className="absolute left-1.5 top-1.5 z-10">
-          <RawgRatingBadge game={model.metadata} />
-        </span>
+        <RatingBadgeStack
+          className="absolute left-1.5 top-1.5 z-10"
+          game={model.metadata}
+          metacriticScore={model.metadata.metacritic}
+        />
         {statusBadge}
       </div>
       <div className="p-2">

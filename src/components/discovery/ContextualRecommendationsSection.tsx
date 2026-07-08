@@ -4,7 +4,7 @@ import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame }
 import { profileFingerprint } from '../../lib/userProfile';
 import { fetchContextualRecommendations } from '../../services/contextualRecommendationsService';
 import { GameCard } from '../GameCard';
-import { MetacriticBadge } from '../MetacriticBadge';
+import { RatingBadgeStack } from '../RatingBadgeStack';
 import { useI18n } from '../../i18n';
 
 const SKELETON_COUNT = 5;
@@ -123,7 +123,14 @@ export function ContextualRecommendationsSection({
                         }
                       : undefined
                   }
-                  coverBadgeTopRight={metacritic ? <MetacriticBadge score={metacritic} variant="overlay" /> : undefined}
+                  coverBadgeTopRight={
+                    <RatingBadgeStack
+                      className="absolute right-3 top-3 z-10 items-end"
+                      game={adaptedGame}
+                      metacriticScore={metacritic}
+                    />
+                  }
+                  suppressRawgRatingBadge
                   discoveryContext={candidate.reason}
                 />
               </div>
