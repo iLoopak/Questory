@@ -945,22 +945,59 @@ img {
   filter: drop-shadow(0 0 12px rgb(var(--accent-rgb) / 0.34));
 }
 
-.platform-badge {
+.card-overlay-badge {
+  --card-overlay-badge-accent: rgb(var(--skyglass-rgb));
   display: inline-flex;
-  align-items: center;
+  min-height: 1.625rem;
   max-width: 100%;
-  border: 1px solid var(--badge-border);
-  background: var(--badge-bg);
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--card-overlay-badge-accent) 30%, var(--badge-border));
+  border-radius: 999px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-overlay-badge-accent) 12%, var(--badge-bg)), var(--badge-bg));
   color: var(--badge-text);
-  box-shadow: var(--badge-shadow);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-overlay-badge-accent) 9%, transparent), var(--badge-shadow);
+  backdrop-filter: blur(10px) saturate(1.18);
   vertical-align: middle;
 }
 
+.card-overlay-badge__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 0.45rem;
+  border-radius: 999px;
+  background: var(--card-overlay-badge-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--card-overlay-badge-accent) 58%, transparent);
+}
+
+.card-overlay-badge__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-overlay-badge--platform,
 .platform-badge--identity {
-  border-color: color-mix(in srgb, var(--platform-badge-accent) 58%, var(--badge-border));
-  background: linear-gradient(135deg, color-mix(in srgb, var(--platform-badge-accent) 18%, transparent), color-mix(in srgb, var(--platform-badge-accent) 8%, var(--badge-bg)));
-  color: var(--badge-text);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--platform-badge-accent) 18%, transparent), 0 8px 18px rgb(var(--overlay-rgb) / 0.22);
+  --card-overlay-badge-accent: var(--platform-badge-accent);
+  border-color: color-mix(in srgb, var(--card-overlay-badge-accent) 58%, var(--badge-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-overlay-badge-accent) 18%, transparent), color-mix(in srgb, var(--card-overlay-badge-accent) 8%, var(--badge-bg)));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-overlay-badge-accent) 18%, transparent), 0 8px 18px rgb(var(--overlay-rgb) / 0.22);
+}
+
+.card-overlay-badge--finished { --card-overlay-badge-accent: rgb(74 222 128); }
+.card-overlay-badge--planned { --card-overlay-badge-accent: rgb(56 189 248); }
+.card-overlay-badge--playing { --card-overlay-badge-accent: rgb(var(--accent-rgb)); }
+.card-overlay-badge--dropped { --card-overlay-badge-accent: rgb(248 113 113); }
+.card-overlay-badge--muted { --card-overlay-badge-accent: rgb(148 163 184); }
+.card-overlay-badge--wishlist { --card-overlay-badge-accent: rgb(251 191 36); }
+.card-overlay-badge--later { --card-overlay-badge-accent: rgb(168 85 247); }
+
+.platform-badge,
+.qs-status-badge {
+  display: inline-flex;
 }
 
 .platform-badge__dot {
@@ -980,25 +1017,33 @@ img {
   white-space: nowrap;
 }
 
-
 .qs-status-badge {
-  display: inline-flex;
-  align-items: center;
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 1px solid rgb(var(--skyglass-rgb) / 0.45);
-  background: rgb(var(--ink-950-rgb) / 0.78);
-  color: var(--badge-text);
-  backdrop-filter: blur(10px);
-  vertical-align: middle;
 }
 
-:root[data-theme='light'] .qs-status-badge {
-  border-color: rgb(var(--skyglass-rgb) / 0.4);
+:root[data-theme='light'] .card-overlay-badge {
+  border-color: color-mix(in srgb, var(--card-overlay-badge-accent) 26%, var(--badge-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-overlay-badge-accent) 11%, var(--badge-bg)), var(--badge-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-overlay-badge-accent) 8%, transparent), 0 6px 14px rgb(var(--overlay-rgb) / 0.08);
 }
+
+:root[data-theme='light'] .card-overlay-badge--platform,
+:root[data-theme='light'] .platform-badge--identity {
+  border-color: color-mix(in srgb, var(--card-overlay-badge-accent) 34%, var(--badge-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-overlay-badge-accent) 14%, var(--badge-bg)), color-mix(in srgb, var(--card-overlay-badge-accent) 6%, var(--badge-bg)));
+  color: color-mix(in srgb, var(--card-overlay-badge-accent) 38%, var(--text-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-overlay-badge-accent) 10%, transparent), 0 6px 14px rgb(var(--overlay-rgb) / 0.08);
+}
+
+:root[data-theme='light'] .card-overlay-badge__dot,
+:root[data-theme='light'] .platform-badge__dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--card-overlay-badge-accent) 16%, transparent);
+}
+
 
 .qs-highlight-badge {
   background: var(--qs-accent-primary);

@@ -11,6 +11,7 @@ import { GameCard } from './GameCard';
 import { GameCardShell } from './GameCardShell';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
+import { CardOverlayBadge, getCardStatusBadgeVariant } from './CardOverlayBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { HltbBadge } from './HltbBadge';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
@@ -738,9 +739,13 @@ const ShelfGameCard = memo(function ShelfGameCard({
           queueState={platformQueueState}
         />
         {shouldShowStatusBadge ? (
-          <span className="platform-badge max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold" title={translateOption(game.status, t)}>
-            <span className="platform-badge__label">{translateOption(game.status, t)}</span>
-          </span>
+          <CardOverlayBadge
+            className="max-w-full truncate px-2.5 py-1 text-xs font-semibold"
+            title={translateOption(game.status, t)}
+            variant={getCardStatusBadgeVariant(game.status)}
+          >
+            {translateOption(game.status, t)}
+          </CardOverlayBadge>
         ) : null}
       </>}
       coverBadgeTopRight={
@@ -918,7 +923,11 @@ const CompactGameRow = memo(function CompactGameRow({
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <PlatformIdentityBadge className="rounded-full px-2 py-0.5 font-semibold" platform={platformLabel} queueState={platformQueueState} />
-            {shouldShowStatusBadge ? <span className="platform-badge rounded-full px-2 py-0.5 font-semibold">{translateOption(game.status, t)}</span> : null}
+            {shouldShowStatusBadge ? (
+              <CardOverlayBadge className="px-2 py-0.5 font-semibold" title={translateOption(game.status, t)} variant={getCardStatusBadgeVariant(game.status)}>
+                {translateOption(game.status, t)}
+              </CardOverlayBadge>
+            ) : null}
             {game.collectionType === 'wishlist' ? <span>{t('collection.wishlist')}</span> : null}
 
           </span>
