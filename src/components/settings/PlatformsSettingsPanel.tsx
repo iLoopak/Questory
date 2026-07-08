@@ -374,10 +374,10 @@ function QueuePlatformManagementRow({
             : "Hidden from Platform Plans but available for imports/metadata"}
         </div>
         {artworkUrl ? (
-          <div className="mt-2 h-12 overflow-hidden rounded border border-white/10">
+          <div className="qs-platform-artwork-banner mt-2 overflow-hidden rounded border border-white/10">
             <img
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover object-center"
               src={artworkUrl}
             />
           </div>

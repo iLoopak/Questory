@@ -645,8 +645,8 @@ function AddPlatformModal({
         </div>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-ink-950/70">
-          <div className="relative h-24">
-            {previewArtworkUrl ? <img alt="" className="h-full w-full object-cover" src={previewArtworkUrl} /> : null}
+          <div className="qs-platform-artwork-banner relative">
+            {previewArtworkUrl ? <img alt="" className="h-full w-full object-cover object-center" src={previewArtworkUrl} /> : null}
             <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 to-ink-950/15" />
             <div className="absolute inset-x-0 bottom-0 p-3">
               <div className="inline-flex items-center gap-2 rounded-full bg-ink-950/75 px-3 py-1 text-sm font-semibold text-white">
@@ -959,8 +959,8 @@ function PlatformQueueColumn({
     <>
     <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
-        <div className="qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 h-16 overflow-hidden rounded-t-lg border-b border-white/10">
-          <img alt="" className="h-full w-full object-cover opacity-65" src={displayArtworkUrl} />
+        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 overflow-hidden rounded-t-lg border-b border-white/10">
+          <img alt="" className="h-full w-full object-cover object-center opacity-65" src={displayArtworkUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
             <h3
@@ -1229,8 +1229,8 @@ function PlatformIdentityModal({
         </div>
 
         <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-ink-950/70">
-          <div className="relative h-20">
-            <img alt="" className="h-full w-full object-cover" src={previewArtworkUrl} />
+          <div className="qs-platform-artwork-banner relative">
+            <img alt="" className="h-full w-full object-cover object-center" src={previewArtworkUrl} />
             <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 to-ink-950/15" />
             <div className="absolute inset-x-0 bottom-0 p-3">
               <div
