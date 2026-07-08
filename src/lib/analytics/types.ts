@@ -8,6 +8,7 @@ export const analyticsEventNames = [
   'platform_plans_opened',
   'backup_exported',
   'backup_imported',
+  'telemetry_test',
 ] as const;
 
 export type AnalyticsEventName = (typeof analyticsEventNames)[number];

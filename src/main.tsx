@@ -20,10 +20,12 @@ import {
   loadSecondaryAccentColorPreference,
   loadThemePreference,
 } from './lib/themePreferences';
+import { installTelemetryDebugSelfTest } from './lib/analytics';
 import { registerServiceWorker } from './lib/serviceWorkerRegistration';
 import './styles.css';
 
 registerServiceWorker();
+installTelemetryDebugSelfTest();
 void configureHandheldImmersiveMode();
 const removeAndroidGamepadShortcuts = configureAndroidGamepadShortcuts();
 window.addEventListener('beforeunload', removeAndroidGamepadShortcuts, { once: true });

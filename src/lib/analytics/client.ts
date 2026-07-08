@@ -34,6 +34,7 @@ const allowedBaseFields = new Set([
   'queueCountBucket',
 ]);
 const allowedImportFields = new Set([...allowedBaseFields, 'importSource']);
+const telemetryDebugStorageKey = 'questshelf.telemetryDebug.v1';
 
 export type AnalyticsConfig = {
   enabled: boolean;
@@ -45,6 +46,17 @@ export type TrackAnalyticsOptions = {
   importSource?: AnalyticsImportSource;
   fetcher?: typeof fetch;
   now?: () => Date;
+};
+
+export type TelemetryDebugResult = {
+  sent: boolean;
+  telemetryEnabled: boolean;
+  endpointConfigured: boolean;
+  requestHost: string | null;
+  status?: number;
+  responseText?: string;
+  error?: string;
+  configProblem?: string;
 };
 
 export function getAnalyticsConfig(): AnalyticsConfig {
@@ -75,14 +87,45 @@ export function isAnalyticsConfigured(config: AnalyticsConfig) {
 
 // Dev-only diagnostics. Analytics failures are silent by design in production, which
 // also makes a misconfigured/disabled build indistinguishable from a working one.
-// These logs (gated on Vite dev mode) surface *why* nothing was sent, without any
-// production logging.
+// These logs (gated on Vite dev mode or an explicit local debug flag) surface
+// *why* nothing was sent, without always-on production logging.
+export function isTelemetryDebugMode() {
+  if (import.meta.env.DEV) return true;
+  if (typeof window === 'undefined') return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('qsTelemetryDebug') === '1') {
+      window.localStorage.setItem(telemetryDebugStorageKey, '1');
+      return true;
+    }
+    return window.localStorage.getItem(telemetryDebugStorageKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function analyticsDebug(message: string, ...details: unknown[]) {
-  if (import.meta.env.DEV) console.debug('[Questory analytics]', message, ...details);
+  if (isTelemetryDebugMode()) console.debug('[Questory analytics]', message, ...details);
 }
 
 function analyticsWarn(message: string) {
-  if (import.meta.env.DEV) console.warn('[Questory analytics]', message);
+  if (isTelemetryDebugMode()) console.warn('[Questory analytics]', message);
+}
+
+function getSafeWebhookHost(webhookUrl: string) {
+  try {
+    return new URL(webhookUrl).host;
+  } catch {
+    return null;
+  }
+}
+
+async function readSafeResponseText(response: Response) {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType || /^(text\/|application\/(json|problem\+json))/.test(contentType)) {
+    return (await response.text()).slice(0, 500);
+  }
+  return `[response body omitted: ${contentType}]`;
 }
 
 export function getAnalyticsRuntime(): AnalyticsRuntime {
@@ -172,6 +215,8 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
       },
       body: JSON.stringify(event),
       keepalive: true,
+      cache: 'no-store',
+      credentials: 'omit',
     });
     if (!response.ok) {
       analyticsWarn(`Endpoint returned HTTP ${response.status} for "${event.eventName}". Check the webhook URL/API key and that it allows CORS + a custom header from this origin.`);
@@ -182,6 +227,68 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
     // Network error or (most often on web) a blocked CORS preflight. Silent in prod.
     analyticsDebug('Send failed (network or CORS preflight) — failing silently', error);
   }
+}
+
+
+export async function runTelemetrySelfTest(fetcher: typeof fetch = fetch, config = getAnalyticsConfig()): Promise<TelemetryDebugResult> {
+  const settings = loadAnalyticsSettings();
+  const configProblem = describeAnalyticsConfigProblem(config);
+  const result: TelemetryDebugResult = {
+    sent: false,
+    telemetryEnabled: settings.isAnalyticsEnabled,
+    endpointConfigured: !configProblem,
+    requestHost: getSafeWebhookHost(config.webhookUrl),
+    configProblem: configProblem ?? undefined,
+  };
+
+  analyticsDebug('Telemetry self-test starting', result);
+
+  if (!settings.isAnalyticsEnabled) {
+    analyticsDebug('Telemetry self-test skipped: telemetry disabled by user', result);
+    return result;
+  }
+
+  if (configProblem) {
+    analyticsWarn(`Telemetry self-test skipped: ${configProblem}. Vercel production builds must define VITE_QS_ANALYTICS_ENABLED=true, VITE_QS_ANALYTICS_WEBHOOK_URL, and VITE_QS_ANALYTICS_KEY.`);
+    return result;
+  }
+
+  const event = buildAnalyticsEvent('telemetry_test', {
+    librarySize: 0,
+    wishlistSize: 0,
+    platformCount: 0,
+    playingCount: 0,
+    queueCount: 0,
+  });
+
+  try {
+    const response = await fetcher(config.webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-make-apikey': config.analyticsKey,
+      },
+      body: JSON.stringify(event),
+      keepalive: true,
+      cache: 'no-store',
+      credentials: 'omit',
+    });
+    result.sent = true;
+    result.status = response.status;
+    result.responseText = await readSafeResponseText(response);
+    analyticsDebug('Telemetry self-test completed', result);
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    analyticsWarn(`Telemetry self-test failed before an HTTP response was visible. Likely network, CORS/preflight, CSP, offline, or service-worker interference. Host: ${result.requestHost ?? 'unavailable'}. Error: ${result.error}`);
+  }
+
+  return result;
+}
+
+export function installTelemetryDebugSelfTest() {
+  if (typeof window === 'undefined' || !isTelemetryDebugMode()) return;
+  window.questShelfTelemetrySelfTest = () => runTelemetrySelfTest();
+  analyticsDebug('Telemetry self-test installed. Run window.questShelfTelemetrySelfTest() from DevTools. Add ?qsTelemetryDebug=1 once on Vercel to enable this debug hook.');
 }
 
 export function trackAnalyticsEvent(eventName: AnalyticsEventName, counts: AnalyticsCounts, options: TrackAnalyticsOptions = {}) {

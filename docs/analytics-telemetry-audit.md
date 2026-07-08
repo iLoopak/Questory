@@ -40,10 +40,10 @@ Payload is a strict allowlist (`validateAnalyticsEvent` rejects any extra key): 
 
 ## Fix implemented (low-risk, in this PR)
 
-Production send behavior is **unchanged**; only **dev-only** visibility was added (`src/lib/analytics/client.ts`), gated on `import.meta.env.DEV`:
+Original production send behavior was unchanged in that audit; current deployed-PWA troubleshooting adds explicit debug visibility (`src/lib/analytics/client.ts`), gated on `import.meta.env.DEV` or the per-device `?qsTelemetryDebug=1` flag:
 
 - `describeAnalyticsConfigProblem(config)` — single source of truth for `isAnalyticsConfigured`; names the exact missing/placeholder env var.
-- `sendAnalyticsEvent` now logs, in dev only, the precise skip reason (opted-out is silent; **enabled-but-misconfigured warns**; invalid event debug-logs) and checks `response.ok` to warn on non-2xx / CORS. No production logging.
+- `sendAnalyticsEvent` now logs, in dev/debug mode only, the precise skip reason (opted-out is silent; **enabled-but-misconfigured warns**; invalid event debug-logs) and checks `response.ok` to warn on non-2xx / CORS. No production logging.
 - `.env.example` documents that these are build-time vars (Vercel env / Android build shell), not runtime, and that the endpoint must allow the cross-origin POST (CORS for `content-type` + `x-make-apikey`).
 
 ## Still requires external configuration (no secrets in repo)
@@ -62,3 +62,14 @@ Production send behavior is **unchanged**; only **dev-only** visibility was adde
 - Failures never affect app usage. ✅ (tests: _send failures swallowed_, _non-2xx never throws or blocks_)
 - Android/Capacitor explicitly documented. ✅ (above)
 - Report states status + what's fixed vs. needs external config. ✅ (this doc)
+
+## Vercel/PWA telemetry self-test
+
+A debug-only self-test is available for deployed browser/PWA diagnosis without adding ongoing tracking. To enable it on a Vercel deployment, open the app once with `?qsTelemetryDebug=1`; this stores a local debug flag on that device. Then either:
+
+- Open Settings → About → Anonymous usage analytics and click **Send telemetry test**; or
+- Run `window.questShelfTelemetrySelfTest()` in DevTools Console.
+
+The self-test sends exactly one `telemetry_test` event only if the in-app anonymous analytics opt-in is enabled and the Vite build contains valid `VITE_QS_ANALYTICS_*` values. It logs the opt-in state, whether an endpoint is configured, the webhook host (never the full secret URL), HTTP status, safe text responses, and caught network/CORS/offline errors. Telemetry fetches use `POST`, `Content-Type: application/json`, `cache: 'no-store'`, and no credentials so service-worker/app-shell caches should not serve or store them.
+
+For Vercel production builds, confirm these variables are set in Vercel Project → Settings → Environment Variables before deploying: `VITE_QS_ANALYTICS_ENABLED=true`, `VITE_QS_ANALYTICS_WEBHOOK_URL`, and `VITE_QS_ANALYTICS_KEY`. Vite inlines these at build time; changing them after a deploy requires a redeploy. `.env.production` must not contain the Make webhook or key.
