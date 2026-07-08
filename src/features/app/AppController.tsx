@@ -39,8 +39,6 @@ import {
   type CollectionFilters,
 } from '../../config/collection';
 import { I18nProvider } from '../../i18n';
-import { getActiveQuestShelfAchievement, getQuestShelfAchievements, type QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
-import { loadAchievementCounters, saveAchievementCounters, type AchievementCounters } from '../../lib/achievementCounters';
 import { loadGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
@@ -92,8 +90,7 @@ const SettingsView = lazy(() =>
 );
 import { buildSetupTasks } from '../../lib/setupTasks';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
-import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGhost';
-import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
+import { QueueGhost } from '../../components/QueueGhost';
 import { useControllerAction } from '../../lib/controllerActions';
 import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../../services/steamApi';
 import { useDiscoveryController } from './useDiscoveryController';
@@ -106,6 +103,7 @@ import { useMainScrollBehavior } from './useMainScrollBehavior';
 import { usePlayActivity } from './usePlayActivity';
 import { useCompletionRating } from './useCompletionRating';
 import { useAnalytics } from './useAnalytics';
+import { useAchievementSystem } from './useAchievementSystem';
 
 function normalizeImportMatchTitle(title: string) {
   return title.trim().toLocaleLowerCase().replace(/[â„˘Â®Â©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -278,37 +276,25 @@ export function AppController() {
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
-  const [pendingAchievementGhost, setPendingAchievementGhost] = useState<QueueGhostAchievement | null>(null);
-  const [isAchievementTimelineOpen, setIsAchievementTimelineOpen] = useState(false);
-  const [achievementCounters, setAchievementCounters] = useState<AchievementCounters>(() => loadAchievementCounters());
-  const achievementCountersRef = useRef(achievementCounters);
-  achievementCountersRef.current = achievementCounters;
-
-  function updateAchievementCounters(updates: Partial<AchievementCounters>) {
-    setAchievementCounters((prev) => {
-      const next = { ...prev, ...updates };
-      saveAchievementCounters(next);
-      return next;
-    });
-  }
-
-  const achievementCtx = useMemo(() => ({
+  const {
+    activeShelfAchievement,
+    addToastRef,
+    computedShelfTitle,
+    isAchievementTimelineOpen,
+    onBackupExported,
+    onBackupImported,
+    pendingAchievementGhost,
+    questShelfAchievements,
+    setIsAchievementTimelineOpen,
+    setPendingAchievementGhost,
+  } = useAchievementSystem({
+    games,
+    isOnboardingComplete,
     language,
-    counters: achievementCounters,
-    onboardingCompleted: isOnboardingComplete,
-    reviewStats: reviewModeState.stats,
-    reviewedGamesCount: Object.keys(reviewModeState.reviewedGames).length,
-  }), [language, achievementCounters, isOnboardingComplete, reviewModeState.stats, reviewModeState.reviewedGames]);
-
-  const questShelfAchievements = useMemo(
-    () => getQuestShelfAchievements(games, platformQueueState, achievementCtx),
-    [games, platformQueueState, achievementCtx],
-  );
-  const activeShelfAchievement = useMemo(
-    () => getActiveQuestShelfAchievement(games, shelfIdentity.selectedActiveBadgeId, platformQueueState, achievementCtx),
-    [games, platformQueueState, shelfIdentity.selectedActiveBadgeId, achievementCtx],
-  );
-  const computedShelfTitle = activeShelfAchievement ? activeShelfAchievement.title : '';
+    platformQueueState,
+    reviewModeState,
+    selectedActiveBadgeId: shelfIdentity.selectedActiveBadgeId,
+  });
 
   const setupTasks = useMemo(
     () => buildSetupTasks({
@@ -324,101 +310,6 @@ export function AppController() {
   const hasIncompleteSetupTasks = setupTasks.some((t) => t.status !== 'completed');
 
   const isAppMountedRef = useRef(true);
-
-  // â”€â”€ Achievement counter tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  // Daily active days + night owl / early bird â€” runs once on mount
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const hour = new Date().getHours();
-    const c = achievementCountersRef.current;
-    const updates: Partial<AchievementCounters> = {};
-
-    if (!c.activeDays.includes(today)) {
-      updates.activeDays = [...c.activeDays, today];
-    }
-    if (!c.nightOwlUnlocked && hour >= 0 && hour < 5) {
-      updates.nightOwlUnlocked = true;
-    }
-    if (!c.earlyBirdUnlocked && hour >= 5 && hour < 6) {
-      updates.earlyBirdUnlocked = true;
-    }
-    updates.justBrowsingOpens = c.justBrowsingOpens + 1;
-
-    if (Object.keys(updates).length > 0) {
-      updateAchievementCounters(updates);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // libraryFirstCreatedAt â€” set once when games are first loaded
-  useEffect(() => {
-    const c = achievementCountersRef.current;
-    if (c.libraryFirstCreatedAt) return;
-    const earliest = games
-      .map((g) => g.importedAt ?? g.updatedAt)
-      .filter((d): d is string => typeof d === 'string')
-      .sort()[0];
-    if (earliest) {
-      updateAchievementCounters({ libraryFirstCreatedAt: earliest });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [games.length]);
-
-  // Playing streak â€” update when the currently-playing game changes
-  useEffect(() => {
-    const c = achievementCountersRef.current;
-    const playing = games.filter((g) => g.collectionType === 'library' && g.status === 'Playing');
-    if (playing.length === 0) {
-      if (c.playingStreak !== null) {
-        updateAchievementCounters({ playingStreak: null });
-      }
-    } else {
-      const main = playing[0];
-      if (c.playingStreak?.gameId !== main.id) {
-        updateAchievementCounters({ playingStreak: { gameId: main.id, since: new Date().toISOString() } });
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [games]);
-
-  // Unlock notification â€” fires a toast when a new achievement unlocks
-  const prevUnlockedIdsRef = useRef<Set<string> | null>(null);
-  const addToastRef = useRef<((n: { category: 'success'; dedupeKey: string; message: string; details?: string }) => void) | null>(null);
-
-  useEffect(() => {
-    const currentUnlocked = new Set(questShelfAchievements.filter((a) => a.isUnlocked).map((a) => a.id));
-
-    if (prevUnlockedIdsRef.current === null) {
-      prevUnlockedIdsRef.current = currentUnlocked;
-      return;
-    }
-
-    const notify = addToastRef.current;
-    if (!notify) return;
-
-    let firstNewNonMeta: QuestShelfAchievementProgress | undefined;
-
-    for (const a of questShelfAchievements) {
-      if (a.isUnlocked && !prevUnlockedIdsRef.current.has(a.id)) {
-        notify({ category: 'success', dedupeKey: `achievement-unlock:${a.id}`, message: `Achievement unlocked: ${a.title}`, details: a.description });
-        if (!firstNewNonMeta && !a.isMeta) {
-          firstNewNonMeta = a;
-        }
-      }
-    }
-
-    if (firstNewNonMeta) {
-      const seen = getSeenAchievementGhostIds();
-      if (!seen.has(firstNewNonMeta.id)) {
-        const allUnlocked = questShelfAchievements.filter((a) => a.isUnlocked && !a.isMeta);
-        setSeenAchievementGhostIds(new Set([...seen, ...allUnlocked.map((a) => a.id)]));
-        setPendingAchievementGhost({ title: firstNewNonMeta.title, icon: firstNewNonMeta.icon });
-      }
-    }
-
-    prevUnlockedIdsRef.current = currentUnlocked;
-  }, [questShelfAchievements]);
 
   const { gamesRef } = useAppPersistence({ games, ignoredSteamGames, onboardingState, platformQueueState, playActivity });
   const { addToastNotification, addUndoAction, createUndoSnapshot, dismissToast, pendingUndoActions, undoAction } = useToastState({
@@ -844,17 +735,13 @@ export function AppController() {
   function handleBackupExported() {
     markOnboardingItemComplete('backup-exported');
     trackMinimalAnalyticsEvent('backup_exported');
-    if (!achievementCountersRef.current.backupExportedEver) {
-      updateAchievementCounters({ backupExportedEver: true });
-    }
+    onBackupExported();
   }
 
   function handleBackupImported() {
     trackMinimalAnalyticsEvent('backup_imported');
     trackMinimalAnalyticsEvent('import_completed', 'backup');
-    if (!achievementCountersRef.current.backupImportedEver) {
-      updateAchievementCounters({ backupImportedEver: true });
-    }
+    onBackupImported();
   }
 
   function viewRetroImportedGames(gameIds: string[]) {
