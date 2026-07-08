@@ -112,7 +112,41 @@ interface CacheEntry {
 }
 
 let cache: CacheEntry | null = null;
-const CACHE_TTL_MS = 20 * 60 * 1000;
+const CACHE_STORAGE_KEY = 'questshelf.personalRecommendations.v1';
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readStoredCache(): CacheEntry | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CacheEntry>;
+    if (!Array.isArray(parsed.candidates) || typeof parsed.fingerprint !== 'string' || typeof parsed.fetchedAt !== 'number') {
+      return null;
+    }
+    return { candidates: parsed.candidates as DiscoveryCandidate[], fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredCache(entry: CacheEntry): void {
+  cache = entry;
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entry));
+  } catch {
+    // In-memory cache still keeps the current session fast if persistent storage is unavailable.
+  }
+}
+
+function getFreshCacheEntry(fingerprint: string): CacheEntry | null {
+  const entry = cache?.fingerprint === fingerprint ? cache : readStoredCache();
+  if (!entry || entry.fingerprint !== fingerprint) return null;
+  if (Date.now() - entry.fetchedAt >= CACHE_TTL_MS) return null;
+  cache = entry;
+  return entry;
+}
 
 export async function fetchPersonalRecommendations(
   userGames: Game[],
@@ -121,14 +155,15 @@ export async function fetchPersonalRecommendations(
   const profile = buildUserProfile(userGames);
   const fp = profileFingerprint(userGames);
 
-  // Return cached result if fingerprint and TTL are still valid.
-  if (cache && cache.fingerprint === fp && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
+  // Return cached result if fingerprint and daily TTL are still valid.
+  const freshCache = getFreshCacheEntry(fp);
+  if (freshCache) {
     // Re-apply library/inbox status from current state (may have changed without profile change).
     // Preserve original reason strings from the cached pool.
     return applyLibraryStatus(
-      cache.candidates.map((c) => c.game),
+      freshCache.candidates.map((c) => c.game),
       userGames,
-      cache.candidates.map((c) => c.reason),
+      freshCache.candidates.map((c) => c.reason),
       inboxRawgIds,
     );
   }
@@ -154,7 +189,7 @@ export async function fetchPersonalRecommendations(
   });
 
   if (rawResults.length === 0) {
-    cache = { candidates: [], fingerprint: fp, fetchedAt: Date.now() };
+    writeStoredCache({ candidates: [], fingerprint: fp, fetchedAt: Date.now() });
     return [];
   }
 
@@ -181,7 +216,7 @@ export async function fetchPersonalRecommendations(
   // library/wishlist games so the pool drains gracefully as the user adds games.
   const pool = candidates.filter((c) => !c.excluded);
 
-  cache = { candidates: pool, fingerprint: fp, fetchedAt: Date.now() };
+  writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
   return pool;
 }
 

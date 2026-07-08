@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
-import { getUserProfileReadiness } from '../../lib/userProfile';
+import { getUserProfileReadiness, profileFingerprint } from '../../lib/userProfile';
 import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
 import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from './DiscoveryGameCard';
 import { useI18n, type TFunction } from '../../i18n';
@@ -60,11 +60,7 @@ function PersonalRecommendationsLoaded({
 
   const lastFingerprintRef = useRef<string | null>(null);
 
-  const fingerprint = useMemo(() => {
-    const finished = userGames.filter((g) => g.status === 'Finished').length;
-    const withGenres = userGames.filter((g) => (g.genres?.length ?? 0) > 0).length;
-    return `f${finished}:g${withGenres}`;
-  }, [userGames]);
+  const fingerprint = useMemo(() => profileFingerprint(userGames), [userGames]);
 
   useEffect(() => {
     if (fingerprint === lastFingerprintRef.current && candidates !== null) return;
@@ -98,32 +94,34 @@ function PersonalRecommendationsLoaded({
   if (candidates !== null && candidates.length === 0) return null;
 
   return (
-    <section aria-label={t('recommendations.forYouTitle')} className="space-y-3">
+    <section aria-label={t('recommendations.forYouTitle')} className="min-w-0 space-y-3">
       <div>
         <h3 className="text-sm font-semibold text-white">{t('recommendations.forYouTitle')}</h3>
         <p className="mt-0.5 text-xs text-slate-500">{t('recommendations.tapHint')}</p>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {candidates === null ? (
-          Array.from({ length: SKELETON_COUNT }, (_, i) => <DiscoveryCompactCardSkeleton key={i} />)
-        ) : (
-          candidates.map((candidate) => (
-            <DiscoveryCompactCard
-              key={candidate.game.rawgId}
-              candidate={candidate}
-              onClick={(game) => {
-                // Tap always opens the game — Preview for discovery games,
-                // Game Hub for owned ones. Saving to the inbox is an explicit
-                // "Review Later" action inside the Preview.
-                if (candidate.libraryStatus === 'library') {
-                  onSelectGame(game);
-                } else {
-                  onOpenPreview?.(candidate);
-                }
-              }}
-            />
-          ))
-        )}
+      <div className="min-w-0 touch-pan-x scroll-px-1 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
+        <div className="flex w-max gap-3 px-0.5">
+          {candidates === null ? (
+            Array.from({ length: SKELETON_COUNT }, (_, i) => <DiscoveryCompactCardSkeleton key={i} />)
+          ) : (
+            candidates.map((candidate) => (
+              <DiscoveryCompactCard
+                key={candidate.game.rawgId}
+                candidate={candidate}
+                onClick={(game) => {
+                  // Tap always opens the game — Preview for discovery games,
+                  // Game Hub for owned ones. Saving to the inbox is an explicit
+                  // "Review Later" action inside the Preview.
+                  if (candidate.libraryStatus === 'library') {
+                    onSelectGame(game);
+                  } else {
+                    onOpenPreview?.(candidate);
+                  }
+                }}
+              />
+            ))
+          )}
+        </div>
       </div>
     </section>
   );
