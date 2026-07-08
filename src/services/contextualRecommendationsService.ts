@@ -23,6 +23,7 @@ export interface ContextualScore {
   tagMatch: number;        // 0–40
   genreMatch: number;      // 0–15
   profileAffinity: number; // 0–20
+  profilePenalty: number;
   ownershipPenalty: number;
   total: number;
 }
@@ -85,16 +86,22 @@ function computeGenreMatchScore(
 
 function computeProfileAffinity(
   candidateGenres: string[],
-  profileGenres: Array<{ name: string; weight: number }>,
-): number {
-  const totalWeight = profileGenres.reduce((s, g) => s + g.weight, 0) || 1;
+  candidateTagSlugs: string[],
+  profile: ReturnType<typeof buildUserProfile>,
+): { affinity: number; penalty: number } {
+  const totalWeight = profile.topGenres.reduce((s, g) => s + g.weight, 0) || 1;
   let affinity = 0;
-  for (const pg of profileGenres) {
+  for (const pg of profile.topGenres) {
     if (candidateGenres.includes(pg.name)) {
       affinity += (pg.weight / totalWeight) * 20;
     }
   }
-  return Math.round(Math.min(20, affinity));
+  affinity += Math.min(12, profile.topTags.filter((tag) => candidateTagSlugs.includes(tag)).length * 3);
+
+  const negativeGenre = profile.negativeGenres.filter((ng) => candidateGenres.includes(ng.name)).reduce((sum, ng) => sum + ng.weight * 4, 0);
+  const negativeTag = profile.negativeTags.filter((nt) => candidateTagSlugs.includes(nt.name)).reduce((sum, nt) => sum + nt.weight * 2, 0);
+  const penalty = -Math.round(Math.min(35, negativeGenre + negativeTag));
+  return { affinity: Math.round(Math.min(25, affinity)), penalty };
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +321,9 @@ export async function fetchContextualRecommendations(
       const rawgSuggested = inSuggested ? 40 : 0;
       const tagMatch = computeTagMatchScore(candidateTagSlugs, currentTagSlugs);
       const genreMatch = computeGenreMatchScore(candidateGenres, currentGameGenres);
-      const profileAffinity = computeProfileAffinity(candidateGenres, profile.topGenres);
+      const profileScore = computeProfileAffinity(candidateGenres, candidateTagSlugs, profile);
+      const profileAffinity = profileScore.affinity;
+      const profilePenalty = profileScore.penalty;
 
       const score: ContextualScore = {
         franchise,
@@ -322,8 +331,9 @@ export async function fetchContextualRecommendations(
         tagMatch,
         genreMatch,
         profileAffinity,
+        profilePenalty,
         ownershipPenalty: 0,
-        total: franchise + rawgSuggested + tagMatch + genreMatch + profileAffinity,
+        total: franchise + rawgSuggested + tagMatch + genreMatch + profileAffinity + profilePenalty,
       };
 
       const reason = generateReason(
@@ -379,9 +389,9 @@ function buildCandidates(
 
       let excluded = false;
       let exclusionReason: DiscoveryExclusionReason | null = null;
-      if (match?.status === 'Finished') {
+      if (match) {
         excluded = true;
-        exclusionReason = 'finished';
+        exclusionReason = match.status === 'Dropped' ? 'dropped' : match.status === 'Finished' ? 'finished' : match.collectionType === 'wishlist' ? 'wishlist' : 'owned';
       }
 
       const ownershipPenalty = libraryStatus !== null ? -30 : 0;

@@ -20,7 +20,7 @@ export interface DiscoveryGame {
 // score is reserved for future ranking passes — currently 0 for non-owned,
 // -1 for owned so owned games naturally sort after unknowns.
 export type DiscoveryCandidateStatus = 'library' | 'wishlist' | null;
-export type DiscoveryExclusionReason = 'finished' | 'dropped';
+export type DiscoveryExclusionReason = 'finished' | 'dropped' | 'owned' | 'wishlist';
 
 export type DiscoveryCollectionStatus = DiscoveryCandidateStatus | 'inbox';
 

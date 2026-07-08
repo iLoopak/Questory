@@ -10,10 +10,20 @@ export interface GenreWeight {
   weight: number;
 }
 
+export interface SignalWeight {
+  name: string;
+  weight: number;
+}
+
 export interface UserProfile {
-  topGenres: GenreWeight[]; // sorted by weight, max 5
-  topTags: string[];        // top 8 RAWG tags
-  topDevelopers: string[];  // top 3 developers
+  topGenres: GenreWeight[]; // sorted by positive weight, max 5
+  topTags: string[];        // top 8 positively weighted RAWG tags
+  topDevelopers: string[];  // top 3 positively weighted developers
+  topPlatforms: string[];   // top 5 positively weighted platforms
+  negativeGenres: GenreWeight[];
+  negativeTags: SignalWeight[];
+  negativeDevelopers: SignalWeight[];
+  negativePlatforms: SignalWeight[];
   avgMetacritic: number | null;
   avgPlaytimeHours: number | null;
   sampleTitles: string[];   // up to 3 finished/playing titles for explanation copy
@@ -95,7 +105,30 @@ export function getUserProfileReadiness(games: Game[]): ProfileReadiness {
 // Profile building
 // ---------------------------------------------------------------------------
 
-type WeightedGame = { game: Game; weight: number };
+export type WeightedGame = { game: Game; weight: number; reason: string };
+
+export interface PreferenceProfileDebug {
+  positiveGames: WeightedGame[];
+  negativeGames: WeightedGame[];
+}
+
+export function getRecommendationSignalWeight(game: Game): { weight: number; reason: string } {
+  if (game.status === 'Dropped') return { weight: -5, reason: 'dropped' };
+  if (game.collectionType === 'wishlist') return { weight: 1, reason: 'wishlist/planned' };
+  if (game.status === 'Playing') return { weight: 3, reason: 'currently playing' };
+  if (game.status === 'Finished') {
+    if (typeof game.rating === 'number') {
+      if (game.rating >= 4) return { weight: 5, reason: 'high-rated finished' };
+      if (game.rating === 3) return { weight: 2, reason: 'mid-rated finished' };
+      if (game.rating > 0 && game.rating <= 2) return { weight: -3, reason: 'low-rated finished' };
+    }
+    return { weight: 2, reason: 'finished' };
+  }
+  if (game.status === 'Want to play') return { weight: 1, reason: 'planned' };
+  if (game.status === 'Paused') return { weight: -0.5, reason: 'paused/later' };
+  if (game.playtimeHours >= 20 && game.collectionType === 'library') return { weight: 1.5, reason: 'played a lot' };
+  return { weight: 0, reason: 'neutral' };
+}
 
 function buildFrequencyMap(
   items: WeightedGame[],
@@ -118,27 +151,23 @@ function topN<K>(map: Map<K, number>, n: number): K[] {
 }
 
 export function buildUserProfile(games: Game[]): UserProfile {
-  // Source games with descending priority weights.
-  // A game may qualify for multiple sets — add at highest weight only.
-  const seen = new Set<string>();
-  const weighted: WeightedGame[] = [];
+  const positive: WeightedGame[] = [];
+  const negative: WeightedGame[] = [];
 
-  function addIfUnseen(game: Game, weight: number) {
-    if (!seen.has(game.id)) {
-      seen.add(game.id);
-      weighted.push({ game, weight });
-    }
+  for (const game of games) {
+    const signal = getRecommendationSignalWeight(game);
+    if (signal.weight > 0) positive.push({ game, weight: signal.weight, reason: signal.reason });
+    if (signal.weight < 0) negative.push({ game, weight: Math.abs(signal.weight), reason: signal.reason });
   }
 
-  for (const g of games) if (g.status === 'Finished') addIfUnseen(g, 3);
-  for (const g of games) if (g.status === 'Playing') addIfUnseen(g, 2);
-  for (const g of games)
-    if (g.playtimeHours >= 20 && g.collectionType === 'library') addIfUnseen(g, 2);
-  for (const g of games) if (g.collectionType === 'wishlist') addIfUnseen(g, 1);
-
-  const genreMap = buildFrequencyMap(weighted, (g) => g.genres ?? []);
-  const tagMap = buildFrequencyMap(weighted, (g) => g.rawgTags ?? []);
-  const devMap = buildFrequencyMap(weighted, (g) => g.developers ?? []);
+  const genreMap = buildFrequencyMap(positive, (g) => g.genres ?? []);
+  const tagMap = buildFrequencyMap(positive, (g) => g.rawgTags ?? []);
+  const devMap = buildFrequencyMap(positive, (g) => g.developers ?? []);
+  const platformMap = buildFrequencyMap(positive, (g) => [g.platform]);
+  const negativeGenreMap = buildFrequencyMap(negative, (g) => g.genres ?? []);
+  const negativeTagMap = buildFrequencyMap(negative, (g) => g.rawgTags ?? []);
+  const negativeDevMap = buildFrequencyMap(negative, (g) => g.developers ?? []);
+  const negativePlatformMap = buildFrequencyMap(negative, (g) => [g.platform]);
 
   const topGenreNames = topN(genreMap, 5);
   const topGenres: GenreWeight[] = topGenreNames.map((name) => ({
@@ -147,13 +176,13 @@ export function buildUserProfile(games: Game[]): UserProfile {
     weight: genreMap.get(name) ?? 0,
   }));
 
-  const mcs = weighted
+  const mcs = positive
     .map(({ game }) => game.metacritic ?? game.metacriticScore)
     .filter((mc): mc is number => typeof mc === 'number' && mc > 0);
   const avgMetacritic =
     mcs.length > 0 ? Math.round(mcs.reduce((a, b) => a + b, 0) / mcs.length) : null;
 
-  const playtimes = weighted
+  const playtimes = positive
     .filter(({ game }) => game.playtimeHours > 0)
     .map(({ game }) => game.playtimeHours);
   const avgPlaytimeHours =
@@ -162,7 +191,7 @@ export function buildUserProfile(games: Game[]): UserProfile {
       : null;
 
   const sampleTitles = games
-    .filter((g) => g.status === 'Finished' || g.status === 'Playing')
+    .filter((g) => getRecommendationSignalWeight(g).weight > 0)
     .slice(0, 3)
     .map((g) => g.title);
 
@@ -170,6 +199,11 @@ export function buildUserProfile(games: Game[]): UserProfile {
     topGenres,
     topTags: topN(tagMap, 8),
     topDevelopers: topN(devMap, 3),
+    topPlatforms: topN(platformMap, 5),
+    negativeGenres: topN(negativeGenreMap, 5).map((name) => ({ name, slug: toSlug(name), weight: negativeGenreMap.get(name) ?? 0 })),
+    negativeTags: topN(negativeTagMap, 8).map((name) => ({ name, weight: negativeTagMap.get(name) ?? 0 })),
+    negativeDevelopers: topN(negativeDevMap, 3).map((name) => ({ name, weight: negativeDevMap.get(name) ?? 0 })),
+    negativePlatforms: topN(negativePlatformMap, 5).map((name) => ({ name, weight: negativePlatformMap.get(name) ?? 0 })),
     avgMetacritic,
     avgPlaytimeHours,
     sampleTitles,

@@ -11,38 +11,48 @@ import { fetchRecommendedGames } from './rawgApi';
 // ---------------------------------------------------------------------------
 
 export interface RecommendationScore {
-  genreMatch: number;      // 0–50: weighted overlap with user's top genres
+  genreMatch: number;      // 0–50: weighted overlap with user's liked genres
+  tagMatch: number;        // 0–30: weighted overlap with user's liked RAWG tags
+  developerMatch: number;  // 0–15: weighted overlap with liked developers when present
+  platformMatch: number;   // 0–10: platform-plan/library platform affinity
+  negativeMatch: number;   // penalty from low-rated/dropped signals
   metacriticMatch: number; // 0–10: closeness to user's avg MC
-  ownershipPenalty: number; // 0 or -30: already owned/wishlisted
+  ownershipPenalty: number; // 0 or negative: already owned/wishlisted
   total: number;
 }
 
-function scoreCandidate(
+export function scorePersonalRecommendationCandidate(
   result: RawgSearchResult,
   profile: UserProfile,
 ): RecommendationScore {
   const candidateGenres = (result.genres ?? []).map((g) => g.name);
+  const candidateTags = (result.tags ?? []).map((t) => t.slug ?? t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
+  const candidateDevelopers = (result as RawgSearchResult & { developers?: Array<{ name: string }> }).developers?.map((d) => d.name) ?? [];
+  const candidatePlatforms = (result.platforms ?? []).map((p) => p.platform.name);
 
-  // Genre match: each matching profile genre contributes weight-proportionally.
-  let genreMatch = 0;
-  const totalProfileWeight = profile.topGenres.reduce((s, g) => s + g.weight, 0) || 1;
-  for (const pg of profile.topGenres) {
-    if (candidateGenres.includes(pg.name)) {
-      // Contribution proportional to how dominant this genre is in the profile.
-      genreMatch += (pg.weight / totalProfileWeight) * 50;
-    }
-  }
-  genreMatch = Math.round(Math.min(50, genreMatch));
+  const totalGenreWeight = profile.topGenres.reduce((s, g) => s + g.weight, 0) || 1;
+  const genreMatch = Math.round(Math.min(50, profile.topGenres.reduce((sum, pg) => (
+    candidateGenres.includes(pg.name) ? sum + (pg.weight / totalGenreWeight) * 50 : sum
+  ), 0)));
 
-  // Metacritic match: reward games near the user's average.
+  const tagMatch = Math.min(30, profile.topTags.filter((tag) => candidateTags.includes(tag)).length * 6);
+  const developerMatch = Math.min(15, profile.topDevelopers.filter((dev) => candidateDevelopers.includes(dev)).length * 8);
+  const platformMatch = Math.min(10, profile.topPlatforms.filter((platform) => candidatePlatforms.includes(platform) || candidatePlatforms.includes(platform === 'Steam' ? 'PC' : platform)).length * 5);
+
+  const negativeGenre = profile.negativeGenres.filter((ng) => candidateGenres.includes(ng.name)).reduce((sum, ng) => sum + ng.weight * 5, 0);
+  const negativeTag = profile.negativeTags.filter((nt) => candidateTags.includes(nt.name)).reduce((sum, nt) => sum + nt.weight * 3, 0);
+  const negativeDeveloper = profile.negativeDevelopers.filter((nd) => candidateDevelopers.includes(nd.name)).reduce((sum, nd) => sum + nd.weight * 4, 0);
+  const negativePlatform = profile.negativePlatforms.filter((np) => candidatePlatforms.includes(np.name)).reduce((sum, np) => sum + np.weight * 2, 0);
+  const negativeMatch = -Math.round(Math.min(45, negativeGenre + negativeTag + negativeDeveloper + negativePlatform));
+
   let metacriticMatch = 0;
   if (result.metacritic && profile.avgMetacritic) {
     const diff = Math.abs(result.metacritic - profile.avgMetacritic);
     metacriticMatch = Math.round(Math.max(0, 10 - diff / 5));
   }
 
-  const total = genreMatch + metacriticMatch;
-  return { genreMatch, metacriticMatch, ownershipPenalty: 0, total };
+  const total = genreMatch + tagMatch + developerMatch + platformMatch + negativeMatch + metacriticMatch;
+  return { genreMatch, tagMatch, developerMatch, platformMatch, negativeMatch, metacriticMatch, ownershipPenalty: 0, total };
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +77,12 @@ function generateReason(
   }
   if (matched.length === 1) {
     return `Based on your ${matched[0]} history`;
+  }
+  if (score.negativeMatch < 0) {
+    return `Balanced against games you rated lower or dropped`;
+  }
+  if (score.tagMatch > 0 && profile.topTags.length > 0) {
+    return `Similar to tags from games you liked`;
   }
   if (score.metacriticMatch >= 8 && result.metacritic) {
     return `Critically acclaimed in your preferred range`;
@@ -196,7 +212,7 @@ export async function fetchPersonalRecommendations(
   // Score and sort.
   const scored = rawResults
     .map((result) => {
-      const score = scoreCandidate(result, profile);
+      const score = scorePersonalRecommendationCandidate(result, profile);
       const reason = generateReason(result, score, profile);
       return { result, score, reason };
     })
@@ -239,12 +255,12 @@ function applyLibraryStatus(
     let excluded = false;
     let exclusionReason: DiscoveryExclusionReason | null = null;
 
-    if (match?.status === 'Finished') {
+    if (match) {
       excluded = true;
-      exclusionReason = 'finished';
+      exclusionReason = match.status === 'Dropped' ? 'dropped' : match.status === 'Finished' ? 'finished' : match.collectionType === 'wishlist' ? 'wishlist' : 'owned';
     }
 
-    const score = libraryStatus === null ? 0 : -1;
+    const score = libraryStatus === null ? 0 : -30;
 
     return {
       game,
