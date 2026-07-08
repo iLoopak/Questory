@@ -2578,6 +2578,21 @@ textarea,
   background: rgb(var(--qs-accent-secondary-rgb) / 0.4);
 }
 
+
+/* Platform Plan Identity artwork uses a wide 1080×340 banner ratio. */
+.qs-platform-artwork-banner {
+  aspect-ratio: 1080 / 340;
+  width: 100%;
+  max-width: 100%;
+}
+
+.qs-platform-artwork-banner > img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
 /* ─── Platform Plans — Neon Deck visual identity ─── */
 
 /* Carry nav-tab secondary accent into the screen's top edge */
@@ -4226,10 +4241,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, transparent),
       0 8px 22px rgb(0 0 0 / 0.28) !important;
-  }
-
-  .qs-platform-artwork-header {
-    height: 3.25rem;
   }
 
   .qs-platform-artwork-header img {

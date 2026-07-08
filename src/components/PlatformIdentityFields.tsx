@@ -57,6 +57,7 @@ export function PlatformIdentityFields({
       <label className="grid gap-1">
         <span className="text-xs font-semibold text-slate-400">{t('settings.uploadImage')}</span>
         <input className="text-xs text-slate-300 file:mr-2 file:h-8 file:rounded file:border-0 file:bg-mint file:px-2 file:text-xs file:font-semibold file:text-ink-950" accept="image/*" type="file" onChange={uploadArtwork} />
+        <span className="text-xs text-slate-500">Recommended size: 1080 × 340 px</span>
       </label>
       <div>
         <span className="text-xs font-semibold text-slate-400">{t('settings.presetImage')}</span>
