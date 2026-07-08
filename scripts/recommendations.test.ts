@@ -3,7 +3,7 @@ import test from 'node:test';
 import { buildUserProfile } from '../src/lib/userProfile';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
 import { scorePersonalRecommendationCandidate } from '../src/services/personalRecommendationsService';
-import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds } from '../src/services/releaseCalendarService';
+import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds, rankReleaseCalendarResults } from '../src/services/releaseCalendarService';
 import type { Game } from '../src/types/game';
 import type { DiscoveryGame } from '../src/lib/discovery';
 import type { RawgSearchResult } from '../src/types/rawg';
@@ -109,4 +109,45 @@ test('release calendar ignored games are persisted as RAWG ids', () => {
   } as Storage;
   ignoreReleaseCalendarGame(1234);
   assert.deepEqual([...getIgnoredReleaseRawgIds()], [1234]);
+});
+
+
+test('release calendar relaxes thresholds to keep a healthy upcoming pool', () => {
+  const userGames = [
+    game({ id: 'liked', title: 'Loved Action', status: 'Finished', rating: 5, genres: ['Action'], rawgTags: ['roguelite'], platform: 'Steam' }),
+    game({ id: 'plan', title: 'Planned RPG', status: 'Want to play', genres: ['RPG'], rawgTags: ['party'], platform: 'Steam' }),
+  ];
+  const results = [
+    rawg({ id: 1, name: 'Strong Action', genres: [{ id: 1, name: 'Action', slug: 'action' }], tags: [{ id: 1, name: 'Roguelite', slug: 'roguelite' }], rating: 4.2, ratings_count: 900 }),
+    rawg({ id: 2, name: 'RPG Plan', genres: [{ id: 2, name: 'RPG', slug: 'role-playing-games-rpg' }], tags: [{ id: 2, name: 'Party', slug: 'party' }] }),
+    rawg({ id: 3, name: 'Puzzle North', genres: [{ id: 3, name: 'Puzzle', slug: 'puzzle' }], rating: 4.1, ratings_count: 1200 }),
+    rawg({ id: 4, name: 'Strategy East', genres: [{ id: 4, name: 'Strategy', slug: 'strategy' }], rating: 4.1, ratings_count: 1200 }),
+    rawg({ id: 5, name: 'Adventure South', genres: [{ id: 5, name: 'Adventure', slug: 'adventure' }], rating: 4.1, ratings_count: 1200 }),
+    rawg({ id: 6, name: 'Simulation West', genres: [{ id: 6, name: 'Simulation', slug: 'simulation' }], rating: 4.1, ratings_count: 1200 }),
+    rawg({ id: 7, name: 'Racing Nova', genres: [{ id: 7, name: 'Racing', slug: 'racing' }], rating: 4.1, ratings_count: 1200 }),
+    rawg({ id: 8, name: 'Sports Orbit', genres: [{ id: 8, name: 'Sports', slug: 'sports' }], platforms: [], rating: 4.1, ratings_count: 1200 }),
+  ];
+  const ranked = rankReleaseCalendarResults(results, userGames);
+  assert.equal(ranked.length, 8);
+  assert.equal(ranked[0].result.id, 1);
+  assert.ok(ranked.some((item) => item.pass === 'general'));
+});
+
+test('release calendar diversity avoids one genre or franchise taking over', () => {
+  const userGames = [game({ id: 'liked', status: 'Finished', rating: 5, genres: ['Action'], rawgTags: ['soulslike'], platform: 'Steam' })];
+  const results = Array.from({ length: 8 }, (_, index) => rawg({
+    id: index + 10,
+    name: `Dragon Quest ${index + 1}`,
+    slug: `dragon-quest-${index + 1}`,
+    genres: [{ id: 1, name: 'Action', slug: 'action' }],
+    tags: [{ id: 1, name: 'Soulslike', slug: 'soulslike' }],
+    rating: 4.5,
+    ratings_count: 2000,
+  })).concat([
+    rawg({ id: 30, name: 'Puzzle Star', genres: [{ id: 2, name: 'Puzzle', slug: 'puzzle' }], rating: 4.2, ratings_count: 1000 }),
+    rawg({ id: 31, name: 'Strategy Moon', genres: [{ id: 3, name: 'Strategy', slug: 'strategy' }], rating: 4.2, ratings_count: 1000 }),
+  ]);
+  const ranked = rankReleaseCalendarResults(results, userGames);
+  assert.ok(ranked.filter((item) => item.result.name.startsWith('Dragon Quest')).length <= 2);
+  assert.ok(new Set(ranked.map((item) => item.result.genres?.[0]?.name)).size > 1);
 });
