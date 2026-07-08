@@ -3,7 +3,7 @@ import type { Game } from '../types/game';
 import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../lib/discovery';
 import { GameCard } from './GameCard';
 import { EmptyState } from './EmptyState';
-import { MetacriticBadge } from './MetacriticBadge';
+import { RatingBadgeStack } from './RatingBadgeStack';
 import { useI18n, type TFunction } from '../i18n';
 import {
   fetchTrendingGames,
@@ -143,7 +143,14 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
                       }
                     : undefined
                 }
-                coverBadgeTopRight={metacritic ? <MetacriticBadge score={metacritic} variant="overlay" /> : undefined}
+                coverBadgeTopRight={
+                  <RatingBadgeStack
+                    className="absolute right-3 top-3 z-10 items-end"
+                    game={game}
+                    metacriticScore={metacritic}
+                  />
+                }
+                suppressRawgRatingBadge
                 discoveryContext={context}
               />
             );

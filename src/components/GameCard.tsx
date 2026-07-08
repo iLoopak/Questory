@@ -42,6 +42,8 @@ type GameCardProps = {
    * positioning classes. Designed for Discover-mode metacritic badges.
    */
   coverBadgeTopRight?: ReactNode;
+  /** Hide the default RAWG cover pill when a caller supplies a combined rating stack. */
+  suppressRawgRatingBadge?: boolean;
   /**
    * Small italic context line rendered between the title and the card footer.
    * Designed for Discover-mode reason text ("Trending", "Hidden Gem", …).
@@ -77,6 +79,7 @@ function GameCardComponent({
   suppressWantToPlayStatus = false,
   primaryAction,
   coverBadgeTopRight,
+  suppressRawgRatingBadge = false,
   discoveryContext,
   detailsLabel,
   hideActionMenu = false,
@@ -245,7 +248,7 @@ function GameCardComponent({
               {translateOption(game.status, t)}
             </CardOverlayBadge>
           ) : null}
-          <RawgRatingBadge game={game} />
+          {!suppressRawgRatingBadge ? <RawgRatingBadge game={game} /> : null}
         </div>
         <DealCoverBadges game={game} variant="grid" />
         {onFindArtwork ? <ArtworkRecoveryButton game={game} onFind={() => onFindArtwork(game)} /> : null}
