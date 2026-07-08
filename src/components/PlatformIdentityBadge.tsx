@@ -1,6 +1,6 @@
-import type { CSSProperties } from 'react';
 import { getDefaultPlatformAccentColor, getPlatformAccentColor, type PlatformQueueState } from '../lib/platformQueueStorage';
 import type { GamePlatform } from '../types/game';
+import { CardOverlayBadge } from './CardOverlayBadge';
 
 type PlatformIdentityBadgeProps = {
   className?: string;
@@ -21,13 +21,13 @@ export function PlatformIdentityBadge({
     getDefaultPlatformAccentColor(platform);
 
   return (
-    <span
+    <CardOverlayBadge
+      accentColor={accent}
       className={`platform-badge platform-badge--identity ${className}`.trim()}
-      style={{ '--platform-badge-accent': accent } as CSSProperties}
       title={platform}
+      variant="platform"
     >
-      <span aria-hidden="true" className="platform-badge__dot" />
-      <span className="platform-badge__label">{platform}</span>
-    </span>
+      {platform}
+    </CardOverlayBadge>
   );
 }

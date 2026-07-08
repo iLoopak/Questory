@@ -7,6 +7,7 @@ import type { PlatformQueueState } from '../lib/platformQueueStorage';
 import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import { GameActionMenu } from './GameActionMenu';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
+import { CardOverlayBadge, getCardStatusBadgeVariant } from './CardOverlayBadge';
 import { DealCoverBadges } from './DealCoverBadges';
 import { translateOption, useI18n } from '../i18n';
 import { useCoverImageLoaded } from '../hooks/useCoverImageLoaded';
@@ -235,9 +236,13 @@ function GameCardComponent({
             queueState={platformQueueState}
           />
           {shouldShowStatusBadge ? (
-            <span className="qs-status-badge max-w-full rounded-md px-2 py-0.5 text-xs font-medium" title={translateOption(game.status, t)}>
+            <CardOverlayBadge
+              className="qs-status-badge max-w-full px-2.5 py-1 text-xs font-semibold"
+              title={translateOption(game.status, t)}
+              variant={getCardStatusBadgeVariant(game.status)}
+            >
               {translateOption(game.status, t)}
-            </span>
+            </CardOverlayBadge>
           ) : null}
         </div>
         <DealCoverBadges game={game} variant="grid" />
