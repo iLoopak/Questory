@@ -288,3 +288,46 @@ test('export includes custom empty platform plans', () => {
   const exported = createQuestShelfBackup(false);
   assert.deepEqual(exported.data['questshelf.platformQueues.v1'], platformQueueState);
 });
+
+
+test('export -> restore roundtrip preserves platform identity Data URL artwork', () => {
+  const { store } = installMemoryStorage();
+  const persistentArtwork = 'data:image/png;base64,cGxhdGZvcm0tYXJ0d29yaw==';
+  const platformQueueState = {
+    activePlatforms: ['Analogue Pocket'],
+    entries: [],
+    schemaVersion: 1,
+    settings: [{ platform: 'Analogue Pocket', maxActiveGames: 3, accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' }],
+  };
+  store.set('questshelf.platformQueues.v1', JSON.stringify(platformQueueState));
+
+  const exported = createQuestShelfBackup(false);
+  assert.deepEqual(exported.data['questshelf.platformQueues.v1'], platformQueueState);
+
+  store.delete('questshelf.platformQueues.v1');
+  restoreQuestShelfBackup(parseOrThrow(exported));
+
+  const restored = JSON.parse(store.get('questshelf.platformQueues.v1')!);
+  assert.equal(restored.settings[0].artworkUrl, persistentArtwork);
+  assert.equal(restored.settings[0].platformTag, 'fpga');
+  assert.deepEqual(restored.activePlatforms, ['Analogue Pocket']);
+});
+
+test('backup import hydrates legacy platform identity settings without maxActiveGames', () => {
+  const { store } = installMemoryStorage();
+  const persistentArtwork = 'data:image/png;base64,bGVnYWN5LWFydA==';
+  const backup = parseOrThrow(makeFreshBackup({
+    'questshelf.platformQueues.v1': {
+      activePlatforms: ['Analogue Pocket'],
+      entries: [],
+      schemaVersion: 1,
+      settings: [{ platform: 'Analogue Pocket', accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' }],
+    },
+  }));
+
+  restoreQuestShelfBackup(backup);
+
+  const restored = JSON.parse(store.get('questshelf.platformQueues.v1')!);
+  assert.equal(restored.settings[0].artworkUrl, persistentArtwork);
+  assert.equal(restored.settings[0].maxActiveGames, 3);
+});

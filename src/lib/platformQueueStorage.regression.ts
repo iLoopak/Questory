@@ -6,6 +6,7 @@ import {
   moveQueueEntry,
   normalizePlatformQueueState,
   removeCurrentlyPlayingFromPlatformQueue,
+  updatePlatformQueueVisualSettings,
   removeGameFromPlatformQueue,
   type PlatformQueueState,
 } from './platformQueueStorage';
@@ -135,4 +136,38 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
   if (!hydratedQqAddedState.activePlatforms.includes('Retroid') || !hydratedQqAddedState.activePlatforms.includes('Analogue Pocket')) {
     throw new Error('Expected custom platform and QQ-added game assignment to survive reload hydration.');
   }
+
+  const persistentArtwork = 'data:image/png;base64,cGVyc2lzdGVudC1hcnR3b3Jr';
+  const identityState = updatePlatformQueueVisualSettings(
+    addActiveQueuePlatform({ activePlatforms: [], entries: [], schemaVersion: 1, settings: [] }, 'Analogue Pocket'),
+    'Analogue Pocket',
+    { accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' },
+  );
+  const hydratedIdentityState = normalizePlatformQueueState(JSON.parse(JSON.stringify(identityState)));
+  const hydratedIdentity = hydratedIdentityState.settings.find((setting) => setting.platform === 'Analogue Pocket');
+  if (!hydratedIdentityState.activePlatforms.includes('Analogue Pocket') || hydratedIdentity?.artworkUrl !== persistentArtwork || hydratedIdentity.platformTag !== 'fpga') {
+    throw new Error('Expected custom platform identity Data URL artwork, platform tag, and active platform to survive reload hydration.');
+  }
+
+  const legacyIdentityState = normalizePlatformQueueState({
+    activePlatforms: ['Analogue Pocket'],
+    entries: [],
+    schemaVersion: 1,
+    settings: [{ platform: 'Analogue Pocket', accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' }],
+  });
+  const legacyIdentity = legacyIdentityState.settings.find((setting) => setting.platform === 'Analogue Pocket');
+  if (legacyIdentity?.artworkUrl !== persistentArtwork || legacyIdentity.maxActiveGames < 1) {
+    throw new Error('Expected legacy identity-only platform settings to hydrate without losing custom artwork.');
+  }
+
+  const temporaryArtworkState = normalizePlatformQueueState({
+    activePlatforms: ['Analogue Pocket'],
+    entries: [],
+    schemaVersion: 1,
+    settings: [{ platform: 'Analogue Pocket', maxActiveGames: 3, artworkUrl: 'blob:http://localhost/not-persistent' }],
+  });
+  if (temporaryArtworkState.settings.find((setting) => setting.platform === 'Analogue Pocket')?.artworkUrl) {
+    throw new Error('Expected temporary blob/object artwork URLs to be rejected during hydration.');
+  }
+
 }
