@@ -737,7 +737,6 @@ function FocusedReviewCard({
   const activeCoverSource = coverSources[coverSourceIndex];
   const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
   const metacriticScore = formatReviewMetacriticScore(game.metacriticScore);
-  const rawgPlaytime = formatReviewRawgPlaytime(game.rawgPlaytimeHours);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -994,10 +993,9 @@ function FocusedReviewCard({
                   </div>
                 </div>
               )}
-              {metacriticScore || rawgPlaytime ? (
+              {metacriticScore ? (
                 <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-1.5">
                   {metacriticScore ? <span className="rounded-full border border-mint/35 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-mint shadow-glow backdrop-blur-md">Metacritic {metacriticScore}</span> : null}
-                  {rawgPlaytime ? <span className="rounded-full border border-skyglass/30 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-white shadow-panel backdrop-blur-md">~{rawgPlaytime}</span> : null}
                 </div>
               ) : null}
             </div>
@@ -1677,12 +1675,6 @@ function formatReviewMetacriticScore(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
 }
 
-function formatReviewRawgPlaytime(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
-  const hours = Math.round(value);
-  if (hours <= 0) return null;
-  return `${hours}h`;
-}
 
 function compareReviewGames(firstGame: Game, secondGame: Game) {
   return getGameTime(secondGame.importedAt ?? secondGame.updatedAt) - getGameTime(firstGame.importedAt ?? firstGame.updatedAt);

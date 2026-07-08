@@ -10,7 +10,7 @@ import { FullscreenGameShell } from '../game-detail/FullscreenGameShell';
 import { GameHero, HeroStat } from '../game-detail/GameHero';
 import { DetailSection } from '../game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from '../game-detail/GameDetailActions';
-import { GameInformationSection, formatMetacriticScore, formatRawgPlaytime } from '../game-detail/GameInformationSection';
+import { GameInformationSection, formatMetacriticScore } from '../game-detail/GameInformationSection';
 import { DiscoveryScreenshotStrip } from '../ScreenshotStrip';
 import { ContextualRecommendationsSection } from './ContextualRecommendationsSection';
 
@@ -87,7 +87,6 @@ export function DiscoveryPreviewPanel({
     backgroundImage: details?.background_image ?? game.coverUrl ?? null,
     developers: details?.developers?.map((d) => d.name),
     publishers: details?.publishers?.map((p) => p.name),
-    averagePlaytime: details?.playtime,
     source: 'rawg',
   }), [candidate, game.coverUrl, details]);
 
@@ -102,12 +101,10 @@ export function DiscoveryPreviewPanel({
     backgroundImage: previewArtwork.background ?? null,
     developers: previewModel.metadata.developers,
     publishers: previewModel.metadata.publishers,
-    averagePlaytime: previewModel.metadata.averagePlaytime,
     rawgTags: previewModel.metadata.tags,
   }), [candidate, userGames, previewArtwork, previewModel]);
 
   const metacriticScore = formatMetacriticScore(previewMetadata.metacritic);
-  const rawgPlaytime = formatRawgPlaytime(details?.playtime);
   const releaseYear = previewMetadata.releaseYear;
   const description = details?.description_raw?.trim();
 
@@ -190,7 +187,6 @@ export function DiscoveryPreviewPanel({
           <HeroStat label={t('detail.currentStatus')} value={collectionStatus} accent={isInLibrary || isInWishlist} />
           {releaseYear ? <HeroStat label={t('preview.released')} value={releaseYear} /> : null}
           {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-          {rawgPlaytime ? <HeroStat label={t('preview.rawgSteamAveragePlaytime')} value={rawgPlaytime} /> : null}
         </>}
       />
 
@@ -233,7 +229,6 @@ export function DiscoveryPreviewPanel({
       <GameInformationSection
         game={previewGame}
         metacriticScore={metacriticScore}
-        rawgPlaytime={rawgPlaytime}
         t={t}
       />
 

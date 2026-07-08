@@ -34,7 +34,6 @@ export type RawgMetadataSnapshot = {
   publishers: string[];
   metacritic?: number | null;
   backgroundImage?: string | null;
-  averagePlaytime?: number | null;
   source?: Game['metadataSource'] | 'rawg';
   updatedAt?: string;
   skippedAt?: string;
@@ -191,7 +190,6 @@ export function getRawgMetadataSnapshot(source: MetadataSourceModel): RawgMetada
       publishers: source.metadata.publishers ?? [],
       metacritic: source.metadata.metacritic,
       backgroundImage: source.artwork.backgroundImage ?? source.artwork.coverUrl ?? null,
-      averagePlaytime: source.metadata.averagePlaytime,
       source: 'rawg',
     };
   }
@@ -227,7 +225,6 @@ export function getRawgMetadataSnapshot(source: MetadataSourceModel): RawgMetada
     publishers: source.publishers ?? [],
     metacritic: source.metacritic ?? source.metacriticScore,
     backgroundImage: source.backgroundImage,
-    averagePlaytime: source.averagePlaytime ?? source.rawgPlaytimeHours,
     source: source.metadataSource,
     updatedAt: source.metadataUpdatedAt,
     skippedAt: source.metadataSkippedAt,
@@ -243,7 +240,7 @@ export function getHltbMetadataSnapshot(source: MetadataSourceModel): HltbMetada
   return {
     hltbId: source.hltbId,
     title: source.hltbTitle,
-    averagePlaytime: source.hltbMainHours ?? source.averagePlaytime ?? null,
+    averagePlaytime: source.hltbMainHours ?? null,
     mainStory: source.hltbMainHours,
     mainExtra: source.hltbMainExtraHours,
     completionist: source.hltbCompletionistHours,
@@ -270,7 +267,7 @@ export function getMetadataSummary(source: MetadataSourceModel): MetadataSummary
     developers: rawg.developers,
     publishers: rawg.publishers,
     metacritic: rawg.metacritic,
-    averagePlaytime: hltb.averagePlaytime ?? rawg.averagePlaytime ?? null,
+    averagePlaytime: hltb.averagePlaytime ?? null,
   };
 }
 

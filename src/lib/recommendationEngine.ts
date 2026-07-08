@@ -250,7 +250,7 @@ function scoreAchievementProgress(game: Game) {
 }
 
 function scoreTimeFit(game: Game, availableTime: AvailableTime, keywordText: string) {
-  const averagePlaytime = getPrimaryHltbHours(game) ?? game.averagePlaytime ?? null;
+  const averagePlaytime = getPrimaryHltbHours(game) ?? null;
   const hasShortSessionHint = shortSessionKeywords.some((keyword) => keywordText.includes(keyword));
   const hasLongSessionHint = longSessionKeywords.some((keyword) => keywordText.includes(keyword));
 
