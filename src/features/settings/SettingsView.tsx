@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { DataManagementPanel } from '../../components/DataManagementPanel';
 import { HltbSettingsPanel } from '../../components/HltbSettingsPanel';
 import { IsThereAnyDealSettingsPanel } from '../../components/IsThereAnyDealSettingsPanel';
@@ -95,7 +95,7 @@ export type SettingsViewProps = {
   onOnboardingSkip: (itemId: OnboardingItemId) => void;
   onOpenOnboarding: () => void;
   onRestartOnboarding: () => void;
-  onPlatformQueueStateChange: (state: PlatformQueueState) => void;
+  onPlatformQueueStateChange: Dispatch<SetStateAction<PlatformQueueState>>;
   onRawgApiKeyConfigured: () => void;
   onRefreshSteamPlaytime: () => Promise<SteamPlaytimeRefreshSummary | null>;
   onReviewRetroImportedGames: () => void;

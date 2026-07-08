@@ -274,3 +274,17 @@ test('older backups without explicit secret metadata remain importable as no-sec
     assert.equal(result.backup.metadata.includesSecrets, false);
   }
 });
+
+test('export includes custom empty platform plans', () => {
+  const { store } = installMemoryStorage();
+  const platformQueueState = {
+    activePlatforms: ['Analogue Pocket'],
+    entries: [],
+    schemaVersion: 1,
+    settings: [],
+  };
+  store.set('questshelf.platformQueues.v1', JSON.stringify(platformQueueState));
+
+  const exported = createQuestShelfBackup(false);
+  assert.deepEqual(exported.data['questshelf.platformQueues.v1'], platformQueueState);
+});
