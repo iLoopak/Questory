@@ -213,6 +213,8 @@ export type AppSectionRouterProps = {
   handleSelectDiscoveryGame: (game: DiscoveryGame) => void;
   openDiscoveryPreview: (candidate: DiscoveryCandidate) => void;
   addToDiscoveryInbox: (game: DiscoveryGame, reason: string) => void;
+  promoteDiscoveryToWishlist: (game: DiscoveryGame) => void;
+  promoteDiscoveryToPlans: (game: DiscoveryGame) => void;
   promoteInboxDiscoveryToLibrary: (item: DiscoveryInboxItem) => void;
   promoteInboxDiscoveryToWishlist: (item: DiscoveryInboxItem) => void;
   promoteInboxDiscoveryToPlans: (item: DiscoveryInboxItem) => void;
@@ -385,6 +387,8 @@ export function AppSectionRouter({
   handleSelectDiscoveryGame,
   openDiscoveryPreview,
   addToDiscoveryInbox,
+  promoteDiscoveryToWishlist,
+  promoteDiscoveryToPlans,
   promoteInboxDiscoveryToLibrary,
   promoteInboxDiscoveryToWishlist,
   promoteInboxDiscoveryToPlans,
@@ -709,6 +713,12 @@ export function AppSectionRouter({
           discoveryInboxRawgIds={discoveryInboxRawgIds}
           onAddToInbox={addToDiscoveryInbox}
           onOpenGame={openDiscoveryPreview}
+          onAddToWishlist={promoteDiscoveryToWishlist}
+          onAddToPlans={promoteDiscoveryToPlans}
+          onOpenSettings={() => {
+            setActiveNavItem('Settings');
+            setActiveSettingsCategory('Integrations');
+          }}
         />
       ) : activeNavItem === 'Stats' ? (
         <Suspense fallback={<PanelLoadingFallback />}>

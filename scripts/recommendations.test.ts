@@ -3,6 +3,7 @@ import test from 'node:test';
 import { buildUserProfile } from '../src/lib/userProfile';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
 import { scorePersonalRecommendationCandidate } from '../src/services/personalRecommendationsService';
+import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds } from '../src/services/releaseCalendarService';
 import type { Game } from '../src/types/game';
 import type { DiscoveryGame } from '../src/lib/discovery';
 import type { RawgSearchResult } from '../src/types/rawg';
@@ -88,4 +89,24 @@ test('home profile changes when ratings change', () => {
   assert.equal(fiveStar.topGenres[0]?.name, 'RPG');
   assert.equal(oneStar.topGenres.length, 0);
   assert.equal(oneStar.negativeGenres[0]?.name, 'RPG');
+});
+
+
+test('release calendar builds an upcoming date range from today through the selected window', () => {
+  assert.equal(getUpcomingDateRange(30, new Date('2026-07-08T12:00:00Z')), '2026-07-08,2026-08-07');
+  assert.equal(getUpcomingDateRange(90, new Date('2026-07-08T12:00:00Z')), '2026-07-08,2026-10-06');
+});
+
+test('release calendar ignored games are persisted as RAWG ids', () => {
+  const store = new Map<string, string>();
+  (globalThis as typeof globalThis & { localStorage: Storage }).localStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value); },
+    removeItem: (key: string) => { store.delete(key); },
+    clear: () => { store.clear(); },
+    key: (index: number) => [...store.keys()][index] ?? null,
+    get length() { return store.size; },
+  } as Storage;
+  ignoreReleaseCalendarGame(1234);
+  assert.deepEqual([...getIgnoredReleaseRawgIds()], [1234]);
 });
