@@ -162,9 +162,7 @@ export type Game = {
   publishers?: string[];
   released?: string | null;
   metacritic?: number | null;
-  averagePlaytime?: number | null;
   metacriticScore?: number;
-  rawgPlaytimeHours?: number;
   backgroundImage?: string | null;
   metadataSource?: 'rawg';
   metadataUpdatedAt?: string;

@@ -285,7 +285,7 @@ export function addGameToPlatformQueue(
   const targetEntries = nextEntries.filter((entry) => entry.targetPlatform === targetPlatform);
   const entry: PlatformQueueEntry = {
     expectedCompletionDate: existingEntry?.expectedCompletionDate,
-    estimatedPlaytime: game.averagePlaytime ?? game.expectedPlaytime ?? existingEntry?.estimatedPlaytime ?? null,
+    estimatedPlaytime: game.expectedPlaytime ?? existingEntry?.estimatedPlaytime ?? null,
     gameId: game.id,
     queueNotes: options.queueNotes ?? existingEntry?.queueNotes ?? '',
     queuePosition: targetEntries.length + 1,
@@ -311,7 +311,7 @@ export function addGameToPlatformQueueTop(
   const nextEntries = state.entries.filter((entry) => !isSamePlatformPlanEntry(entry, game.id, targetPlatform));
   const entry: PlatformQueueEntry = {
     expectedCompletionDate: existingEntry?.expectedCompletionDate,
-    estimatedPlaytime: game.averagePlaytime ?? game.expectedPlaytime ?? existingEntry?.estimatedPlaytime ?? null,
+    estimatedPlaytime: game.expectedPlaytime ?? existingEntry?.estimatedPlaytime ?? null,
     gameId: game.id,
     queueNotes: options.queueNotes ?? existingEntry?.queueNotes ?? '',
     queuePosition: 0,
@@ -480,7 +480,7 @@ export function getQueueSummary(state: PlatformQueueState, games: Game[]): Platf
     averageQueueAgeDays: ageDays.length > 0 ? Math.round(ageDays.reduce((sum, age) => sum + age, 0) / ageDays.length) : 0,
     estimatedBacklogHours: visibleEntries.reduce((sum, entry) => {
       const game = gamesById.get(entry.gameId);
-      return sum + (entry.estimatedPlaytime ?? game?.averagePlaytime ?? game?.expectedPlaytime ?? 0);
+      return sum + (entry.estimatedPlaytime ?? game?.expectedPlaytime ?? 0);
     }, 0),
     platformSizes: Array.from(platformCounts.entries())
       .map(([platform, count]) => ({ count, platform }))

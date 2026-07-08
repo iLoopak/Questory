@@ -48,7 +48,6 @@ export type GamePreviewModel = {
     metacritic: number | null;
     developers?: string[];
     publishers?: string[];
-    averagePlaytime?: number | null;
   };
   recommendation?: { reason?: string; source?: string };
   collectionStatus: DiscoveryCollectionStatus;
@@ -141,7 +140,6 @@ export function discoveryCandidateToPreviewModel(
     backgroundImage?: string | null;
     developers?: string[];
     publishers?: string[];
-    averagePlaytime?: number | null;
     source?: string;
   } = {},
 ): GamePreviewModel {
@@ -159,7 +157,6 @@ export function discoveryCandidateToPreviewModel(
       metacritic: candidate.game.metacritic,
       developers: options.developers,
       publishers: options.publishers,
-      averagePlaytime: options.averagePlaytime,
     },
     recommendation: { reason: candidate.reason, source: options.source },
     collectionStatus,

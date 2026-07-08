@@ -35,7 +35,7 @@ function hasPositiveNumber(value: unknown): value is number {
 }
 
 function needsMetadata(game: Game): boolean {
-  return !(hasPositiveNumber(game.metacriticScore) && hasPositiveNumber(game.rawgPlaytimeHours));
+  return !hasPositiveNumber(game.metacriticScore);
 }
 
 function needsScreenshots(game: Game): boolean {

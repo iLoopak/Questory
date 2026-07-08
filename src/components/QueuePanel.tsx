@@ -1466,7 +1466,6 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
   const isPlayingSize = size === 'playing';
   const shouldShowMetadataBadges = isPlayingSize;
   const metacriticScore = shouldShowMetadataBadges ? formatQueueMetacriticScore(game.metacriticScore) : null;
-  const rawgPlaytime = shouldShowMetadataBadges ? formatQueueRawgPlaytime(game.rawgPlaytimeHours) : null;
 
   useEffect(() => {
     setIsCoverLoaded(false);
@@ -1492,10 +1491,9 @@ function QueueCoverThumbnail({ game, size }: { game: Game; size: 'playing' | 'ti
         usage="portrait"
         width={isPlayingSize ? 60 : 33}
       />
-      {metacriticScore || rawgPlaytime ? (
+      {metacriticScore ? (
         <span className="pointer-events-none absolute bottom-0 left-0 z-[2] flex max-w-full flex-wrap items-end gap-0.5 bg-gradient-to-tr from-ink-950/85 via-ink-950/45 to-transparent p-0.5 pr-2 pt-2">
           {metacriticScore ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">MC {metacriticScore}</span> : null}
-          {rawgPlaytime ? <span className="rounded bg-ink-950/80 px-1 py-0.5 text-[0.55rem] font-extrabold leading-none text-slate-100 ring-1 ring-white/15 backdrop-blur-sm">~{rawgPlaytime}</span> : null}
         </span>
       ) : null}
     </span>
@@ -1512,12 +1510,6 @@ function formatQueueMetacriticScore(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value).toString() : null;
 }
 
-function formatQueueRawgPlaytime(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
-  const hours = Math.round(value);
-  if (hours <= 0) return null;
-  return `${hours}h`;
-}
 
 function pickQueueGhostMessage(messages: readonly string[]) {
   return messages[Math.floor(Math.random() * messages.length)];

@@ -47,7 +47,7 @@ export function useMetadataArtworkActions({
   const automaticRawgRefreshIdsRef = useRef<Set<string>>(new Set());
 
   const ensureRawgMetadataForGame = useCallback(async (game: Game) => {
-    if (hasPositiveNumber(game.metacriticScore) && hasPositiveNumber(game.rawgPlaytimeHours)) {
+    if (hasPositiveNumber(game.metacriticScore)) {
       return;
     }
 

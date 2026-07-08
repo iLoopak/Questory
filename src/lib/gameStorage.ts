@@ -120,7 +120,6 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     rawgId: getOptionalNonNegativeNumber(game.rawgId),
     rawgSlug: typeof game.rawgSlug === 'string' ? game.rawgSlug : undefined,
     rawgTitle: typeof game.rawgTitle === 'string' ? game.rawgTitle : undefined,
-    rawgPlaytimeHours: getOptionalPositiveNumber(game.rawgPlaytimeHours ?? game.averagePlaytime),
     steamPlaytimeMinutes: getOptionalNonNegativeNumber(game.steamPlaytimeMinutes),
     priority: normalizeWishlistPriority(game.priority),
     romFiles: normalizeRomFiles(game.romFiles),

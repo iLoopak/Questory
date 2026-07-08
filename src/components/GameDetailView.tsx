@@ -9,7 +9,7 @@ import { GameHero, HeroStat, getDisplayTitle } from './game-detail/GameHero';
 import { EditTitleModal } from './game-detail/EditTitleModal';
 import { DetailSection } from './game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from './game-detail/GameDetailActions';
-import { GameInformationSection, formatMetacriticScore, formatRawgPlaytime } from './game-detail/GameInformationSection';
+import { GameInformationSection, formatMetacriticScore } from './game-detail/GameInformationSection';
 import { gameCollectionTypes, gamePlatforms, gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { formatSteamAchievementSummary } from '../lib/steamAchievementSummary';
 import { translateOption, useI18n, type TFunction } from '../i18n';
@@ -115,7 +115,6 @@ export function GameDetailView({
     : undefined;
   const hltbBadge = formatHltbBadge(game, { includeLabel: true });
   const metacriticScore = formatMetacriticScore(game.metacriticScore ?? game.metacritic);
-  const rawgPlaytime = formatRawgPlaytime(game.rawgPlaytimeHours ?? game.averagePlaytime);
   const canEditGame = isGameEditable(game);
   const recentSteamActivity = useMemo(() => getRecentSteamActivityForGame(activity, game.id), [activity, game.id]);
   const lastSteamActivityAt = recentSteamActivity?.detectedAt ?? game.lastSteamActivityAt;
@@ -281,7 +280,6 @@ export function GameDetailView({
             />
           ) : null}
           {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-          {rawgPlaytime ? <HeroStat label={t('detail.rawgSteamAveragePlaytime')} value={rawgPlaytime} /> : null}
           {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
         </>}
       />
@@ -426,7 +424,6 @@ export function GameDetailView({
       <GameInformationSection
         game={game}
         metacriticScore={metacriticScore}
-        rawgPlaytime={rawgPlaytime}
         t={t}
       />
       <DeveloperToolsSection

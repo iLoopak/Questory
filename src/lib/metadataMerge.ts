@@ -40,8 +40,8 @@ function preservePositiveExternalNumber(
   metadataRecord: Record<string, unknown>,
   existingRecord: Record<string, unknown>,
   mergedRecord: Record<string, unknown>,
-  targetField: 'metacriticScore' | 'rawgPlaytimeHours',
-  legacyField: 'metacritic' | 'averagePlaytime',
+  targetField: 'metacriticScore',
+  legacyField: 'metacritic',
 ) {
   const nextValue = getPositiveNumber(metadataRecord[targetField] ?? metadataRecord[legacyField]);
 
@@ -97,7 +97,6 @@ export function mergeRawgMetadataIntoGame(game: Game, metadata: RawgMetadata, op
   const mergedRecord = mergedGame as Record<string, unknown>;
   const existingRecord = game as Record<string, unknown>;
   preservePositiveExternalNumber(metadataRecord, existingRecord, mergedRecord, 'metacriticScore', 'metacritic');
-  preservePositiveExternalNumber(metadataRecord, existingRecord, mergedRecord, 'rawgPlaytimeHours', 'averagePlaytime');
   const protectsCoverImage = hasProtectedArtwork(game);
 
   if (options.preserveArtwork) {
