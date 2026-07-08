@@ -1859,3 +1859,41 @@ export function AppController() {
   );
 }
 
+function createGameFromDiscovery(
+  dg: import('../../lib/discovery').DiscoveryGame,
+  existingIds: Set<string>,
+): import('../../types/game').Game {
+  const base =
+    dg.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game';
+  let id = `rawg-${base}`;
+  let n = 2;
+  while (existingIds.has(id)) { id = `rawg-${base}-${n++}`; }
+  const now = new Date().toISOString();
+  return {
+    id,
+    title: dg.title,
+    platform: dg.hasSteamVersion ? 'Steam' : 'PC',
+    status: 'Want to play',
+    coverImage: dg.coverUrl ?? '',
+    artworkSource: dg.coverUrl ? 'rawg' : undefined,
+    artworkUpdatedAt: dg.coverUrl ? now : undefined,
+    backgroundImage: dg.coverUrl,
+    playtimeHours: 0,
+    tags: [],
+    lastPlayedAt: null,
+    notes: '',
+    collectionType: 'library',
+    externalSource: 'manual',
+    importedAt: now,
+    rawgId: dg.rawgId,
+    rawgSlug: dg.slug ?? undefined,
+    rawgTitle: dg.title,
+    metacritic: dg.metacritic,
+    metacriticScore: dg.metacritic ?? undefined,
+    released: dg.released,
+    genres: dg.genres.length > 0 ? dg.genres : undefined,
+    metadataSource: 'rawg',
+    metadataUpdatedAt: now,
+  };
+}
+
