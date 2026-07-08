@@ -63,6 +63,7 @@ import type { SetupTask } from '../../lib/setupTasks';
 import type { ConfirmCancelConvention, ControllerProfileId } from '../../lib/controllerProfiles';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import type { HltbSyncSummary } from '../../lib/hltb';
+import type { MultiGameImportParseResult, MultiGameImportSummary } from '../../lib/multiGameImport';
 import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import type { MetadataRefreshMode, MetadataRefreshResult, MetadataSelectionRequest } from '../../hooks/useMetadataArtworkActions';
@@ -228,6 +229,7 @@ export type AppSectionRouterProps = {
   refreshSteamPlaytime: (gameIds?: string[], options?: { completionToastMessage?: (summary: SteamPlaytimeRefreshSummary) => string; emptyToastMessage?: string; showToast?: boolean }) => Promise<SteamPlaytimeRefreshSummary | null>;
   syncWishlistDeals: (gameIds: string[]) => Promise<{ updatedCount: number; noMatchCount: number; failedCount: number } | null>;
   syncSteamWishlist: () => Promise<unknown>;
+  importMultiGameItemsWithAnalytics: (parsed: MultiGameImportParseResult) => MultiGameImportSummary;
   importSteamWishlistHtmlItemsWithAnalytics: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
   syncHltb: (gameIds: string[]) => Promise<HltbSyncSummary | null>;
   importNewSteamGames: () => Promise<void>;
@@ -395,6 +397,7 @@ export function AppSectionRouter({
   refreshSteamPlaytime,
   syncWishlistDeals,
   syncSteamWishlist,
+  importMultiGameItemsWithAnalytics,
   importSteamWishlistHtmlItemsWithAnalytics,
   syncHltb,
   importNewSteamGames,
@@ -565,6 +568,9 @@ export function AppSectionRouter({
             drop: dropGameFromCompactRow,
           }}
           reviewActions={{ startReview: startReviewMode }}
+          syncActions={{
+            importMultiGames: importMultiGameItemsWithAnalytics,
+          }}
           filterActions={{
             clearFilters: handleClearLibraryFilters,
             filtersChange: handleLibraryFiltersChange,

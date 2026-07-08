@@ -384,7 +384,7 @@ export function WishlistSettingsPanel({
   const hasConfiguredSteamWishlistUrl =
     steamWishlistUrl !== genericSteamWishlistUrl;
 
-  async function copyBookmarklet() {
+  async function copySteamBookmarklet() {
     try {
       await navigator.clipboard.writeText(steamWishlistBookmarklet);
       setClipboardMessage(t("wishlist.bookmarkletCopied"));
@@ -394,6 +394,9 @@ export function WishlistSettingsPanel({
       setClipboardError(t("wishlist.bookmarkletCopyFailed"));
     }
   }
+
+
+
 
   return (
     <section className="qs-glass space-y-5 rounded-lg border p-4">
@@ -406,7 +409,7 @@ export function WishlistSettingsPanel({
         </p>
       </div>
 
-      <div className="rounded-lg border border-mint/25 bg-mint/10 p-4">
+      <div className="rounded-lg border border-skyglass/15 bg-ink-950/50 p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
             <h3 className="text-lg font-semibold text-white">
@@ -432,7 +435,7 @@ export function WishlistSettingsPanel({
             </a>
             <button
               className="h-10 rounded-md border border-skyglass/20 px-3 text-sm font-semibold text-slate-100 transition hover:border-mint/40 hover:bg-mint/10"
-              onClick={() => void copyBookmarklet()}
+              onClick={() => void copySteamBookmarklet()}
               type="button"
             >
               {t("wishlist.copyBookmarklet")}

@@ -699,6 +699,14 @@ export function AppController() {
     }
   }
 
+  function importMultiGameItemsWithAnalytics(...args: Parameters<typeof importMultiGameItems>) {
+    const summary = importMultiGameItems(...args);
+    if (summary.importedCount > 0 || summary.updatedExisting > 0) {
+      trackMinimalAnalyticsEvent('import_completed', summary.source === 'playstation-library' ? 'unknown' : 'manual');
+    }
+    return summary;
+  }
+
   function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
     const summary = importSteamWishlistHtmlItems(...args);
     if (summary.addedCount > 0) {
@@ -753,6 +761,7 @@ export function AppController() {
   }
 
   const {
+    importMultiGameItems,
     importSteamWishlistHtmlItems,
     importSteamWishlistItems,
     refreshSteamPlaytime,
@@ -1253,6 +1262,7 @@ export function AppController() {
           refreshSteamPlaytime={refreshSteamPlaytime}
           syncWishlistDeals={syncWishlistDeals}
           syncSteamWishlist={syncSteamWishlist}
+          importMultiGameItemsWithAnalytics={importMultiGameItemsWithAnalytics}
           importSteamWishlistHtmlItemsWithAnalytics={importSteamWishlistHtmlItemsWithAnalytics}
           syncHltb={syncHltb}
           importNewSteamGames={importNewSteamGames}

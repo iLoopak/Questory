@@ -12,6 +12,7 @@ import { syncHltbForGames, type HltbSyncSummary } from '../../lib/hltb';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from '../../lib/steamAchievementsSync';
 import { isRefreshableSteamGame, refreshSteamPlaytimeForGames } from '../../lib/steamPlaytimeRefresh';
 import type { ParsedSteamWishlistImportItem } from '../../lib/steamWishlistHtmlImport';
+import { mergeMultiGameImport, type MultiGameImportParseResult, type MultiGameImportSummary } from '../../lib/multiGameImport';
 import {
   didSteamAchievementSyncSucceed,
   didSteamPlaytimeSyncSucceed,
@@ -570,6 +571,32 @@ export function useAppSyncActions({
     }
   }
 
+
+  function importMultiGameItems(parsed: MultiGameImportParseResult): MultiGameImportSummary {
+    const importedAt = new Date().toISOString();
+    let summary: MultiGameImportSummary = {
+      importedCount: 0,
+      skippedDuplicates: parsed.duplicateCount,
+      updatedExisting: 0,
+      invalidRows: parsed.skippedCount,
+      source: parsed.source,
+    };
+
+    setGames((currentGames) => {
+      const result = mergeMultiGameImport(currentGames, parsed, importedAt);
+      summary = result.summary;
+      return result.games;
+    });
+
+    addToastNotification({
+      category: summary.importedCount > 0 || summary.updatedExisting > 0 ? 'success' : 'info',
+      dedupeKey: 'multi-game-import',
+      message: `Multi Game Import: ${summary.importedCount} imported · ${summary.updatedExisting} updated · ${summary.skippedDuplicates} duplicates · ${summary.invalidRows} skipped`,
+    });
+
+    return summary;
+  }
+
   function importSteamWishlistItems(wishlistItems: SteamWishlistItem[]): SteamWishlistSyncSummary {
     const syncedAt = new Date().toISOString();
     const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
@@ -617,6 +644,7 @@ export function useAppSyncActions({
   }
 
   return {
+    importMultiGameItems,
     importSteamWishlistHtmlItems,
     importSteamWishlistItems,
     refreshSteamPlaytime,
