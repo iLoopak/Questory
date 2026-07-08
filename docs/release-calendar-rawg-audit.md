@@ -33,4 +33,4 @@ Questory fetches one base page for the full upcoming window, plus at most one ge
 
 ## Personalization strategy
 
-The ranking layer scores upcoming results with positive signals from highly rated finished games, currently playing games, wishlist/planned games, preferred genres/tags/developers/platforms, and platform affinity. It subtracts confidence for dropped or low-rated genre/tag matches and excludes owned, wishlisted, dropped, finished, and ignored RAWG ids from the rendered section.
+The ranking layer uses a deliberately forgiving multi-pass strategy for the smaller upcoming-release pool. It boosts favorite genres, platforms, developers/publishers, similar tags, highly rated library neighbors, and games similar to wishlist/planned titles; applies only light low-rated/dropped-signal penalties; targets roughly 8–20 items by relaxing thresholds when the high-confidence pool is small; diversifies across genre/franchise buckets; and excludes owned, wishlisted, dropped, finished, and ignored RAWG ids from the rendered section. If personalization is sparse, broad high-quality upcoming picks for preferred platforms are kept as general recommendations.
