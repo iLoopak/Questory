@@ -46,7 +46,6 @@ import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import { addGameToPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
-import { formatLocalDate, loadPlayActivity, upsertPlayedTodayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
 import {
@@ -64,7 +63,7 @@ import { loadReviewModeState, type ReviewModeState, type ReviewSource } from '..
 import { getAppTemplateClassName, type AccentColorPreference, type AppTemplatePreference, type ResolvedTheme, type ThemePreference } from '../../lib/themePreferences';
 import { type UndoActionHistoryEntry } from '../../lib/undoHistoryStorage';
 import { addIgnoredSteamGame, loadIgnoredSteamGames, removeIgnoredSteamGame, type IgnoredSteamGame } from '../../lib/steamIgnoredGamesStorage';
-import type { Game, GamePlatform, GameStatus } from '../../types/game';
+import type { Game, GamePlatform } from '../../types/game';
 import type { RawgSearchResult } from '../../types/rawg';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState, SteamWishlistSyncState } from '../../types/steam';
 import { useAppPersistence } from './useAppPersistence';
@@ -92,7 +91,6 @@ const SettingsView = lazy(() =>
   import('../settings/SettingsView').then((m) => ({ default: m.SettingsView })),
 );
 import { buildSetupTasks } from '../../lib/setupTasks';
-import { trackAnalyticsEvent, type AnalyticsCounts, type AnalyticsImportSource } from '../../lib/analytics';
 import { CompletionRatingSheet } from '../../components/CompletionRatingSheet';
 import { QueueGhost, type QueueGhostAchievement } from '../../components/QueueGhost';
 import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
@@ -104,6 +102,10 @@ import { AddGameDialog } from './components/AddGameDialog';
 import { AppStartupScreen } from './components/AppStartupScreen';
 import { PlaceholderPanel } from './components/PlaceholderPanel';
 import { touchGameRecord, getRetroDuplicateKey } from '../../lib/gameUtils';
+import { useMainScrollBehavior } from './useMainScrollBehavior';
+import { usePlayActivity } from './usePlayActivity';
+import { useCompletionRating } from './useCompletionRating';
+import { useAnalytics } from './useAnalytics';
 
 function normalizeImportMatchTitle(title: string) {
   return title.trim().toLocaleLowerCase().replace(/[â„˘Â®Â©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -130,10 +132,10 @@ function getSafeWishlistTitleMatches(games: Game[]) {
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>(() => loadIgnoredSteamGames());
-  const [playActivity, setPlayActivity] = useState<PlayActivityRecord[]>(() => loadPlayActivity());
   const [isAppReady, setIsAppReady] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isImportingNewSteamGames, setIsImportingNewSteamGames] = useState(false);
+  const { logPlayedToday, playActivity, setPlayActivity } = usePlayActivity({ setGames });
+  const { isScrolled, mainContentRef } = useMainScrollBehavior();
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
   const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
   const [isRawgApiKeySet, setIsRawgApiKeySet] = useState(() => Boolean(loadRawgSettings().apiKey.trim()));
@@ -204,27 +206,6 @@ export function AppController() {
     shelfProfileRef,
   } = useShelfProfileController(games, platformQueueState, steamProfileName);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
-
-  const analyticsCounts = useMemo<AnalyticsCounts>(() => ({
-    librarySize: games.filter((game) => game.collectionType === 'library').length,
-    wishlistSize: games.filter((game) => game.collectionType === 'wishlist').length,
-    platformCount: activeQueuePlatforms.length,
-    playingCount: games.filter((game) => game.collectionType === 'library' && game.status === 'Playing').length,
-    queueCount: queueSummary.queuedCount,
-  }), [activeQueuePlatforms.length, games, queueSummary.queuedCount]);
-  const trackedSessionEventsRef = useRef(new Set<string>());
-
-  function trackMinimalAnalyticsEvent(eventName: Parameters<typeof trackAnalyticsEvent>[0], importSource?: AnalyticsImportSource) {
-    trackAnalyticsEvent(eventName, analyticsCounts, importSource ? { importSource } : undefined);
-  }
-
-  function trackSessionAnalyticsEvent(eventName: Parameters<typeof trackAnalyticsEvent>[0], importSource?: AnalyticsImportSource) {
-    const eventKey = importSource ? `${eventName}:${importSource}` : eventName;
-    if (trackedSessionEventsRef.current.has(eventKey)) return;
-    trackedSessionEventsRef.current.add(eventKey);
-    trackMinimalAnalyticsEvent(eventName, importSource);
-  }
-  const mainContentRef = useRef<HTMLElement | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const isMoreNavActive = moreNavItems.includes(activeNavItem as MoreNavItem);
   const steamAvatarUrl = steamSettingsSnapshot.profile?.avatarUrl ?? '';
@@ -266,6 +247,15 @@ export function AppController() {
     skipOnboardingItem,
     skippedOnboardingItemIds,
   } = useOnboardingController({ setActiveNavItem, setActiveSettingsCategory, setIsAddGameOpen, setSelectedGameId });
+  const { trackMinimalAnalyticsEvent } = useAnalytics({
+    activeNavItem,
+    activeQueuePlatforms,
+    activeSettingsCategory,
+    games,
+    isAppReady,
+    isOnboardingComplete,
+    queuedCount: queueSummary.queuedCount,
+  });
   const {
     isHltbSyncing,
     itadDealSyncState,
@@ -285,7 +275,6 @@ export function AppController() {
   }
 
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);
-  const [completionRatingGame, setCompletionRatingGame] = useState<Game | null>(null);
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => loadReviewModeState());
   const [activeReviewSource, setActiveReviewSource] = useState<ReviewSource>(() => loadReviewModeState().lastSource);
   const [rawgRecoveryRequest, setRawgRecoveryRequest] = useState<{ gameId: string; retryMode: 'metadata' | 'artwork' } | null>(null);
@@ -478,20 +467,11 @@ export function AppController() {
     t,
   });
 
-  function triggerCompletionSheet(gameId: string) {
-    const game = games.find((g) => g.id === gameId);
-    if (game) setCompletionRatingGame(game);
-  }
-
-  function updateGameStatusWithCompletion(gameId: string, status: GameStatus) {
-    updateGameStatus(gameId, status);
-    if (status === 'Finished') triggerCompletionSheet(gameId);
-  }
-
-  function updateGameReviewFieldsWithCompletion(gameId: string, changes: Partial<Game>) {
-    updateGameReviewFields(gameId, changes);
-    if (changes.status === 'Finished') triggerCompletionSheet(gameId);
-  }
+  const { completionRatingGame, setCompletionRatingGame, updateGameReviewFieldsWithCompletion, updateGameStatusWithCompletion } = useCompletionRating({
+    games,
+    updateGameReviewFields,
+    updateGameStatus,
+  });
 
   const {
     metadataSelectionRequest,
@@ -565,41 +545,6 @@ export function AppController() {
     const readyFrame = window.requestAnimationFrame(() => setIsAppReady(true));
 
     return () => window.cancelAnimationFrame(readyFrame);
-  }, []);
-
-  useEffect(() => {
-    if (isAppReady) {
-      trackSessionAnalyticsEvent('app_open');
-    }
-  }, [isAppReady, analyticsCounts]);
-
-  useEffect(() => {
-    if (isOnboardingComplete) {
-      trackSessionAnalyticsEvent('first_run_completed');
-    }
-  }, [isOnboardingComplete, analyticsCounts]);
-
-  useEffect(() => {
-    if (activeNavItem === 'Queue') {
-      trackSessionAnalyticsEvent('quest_queue_opened');
-    }
-  }, [activeNavItem, analyticsCounts]);
-
-  useEffect(() => {
-    if (activeNavItem === 'Settings' && activeSettingsCategory === 'Platforms') {
-      trackSessionAnalyticsEvent('platform_plans_opened');
-    }
-  }, [activeNavItem, activeSettingsCategory, analyticsCounts]);
-
-  useEffect(() => {
-    const el = mainContentRef.current;
-    if (!el) return;
-    function handleScroll() {
-      const nextIsScrolled = el!.scrollTop > 15;
-      setIsScrolled((currentIsScrolled) => (currentIsScrolled === nextIsScrolled ? currentIsScrolled : nextIsScrolled));
-    }
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
@@ -1138,21 +1083,6 @@ export function AppController() {
     setTargetQueuePlatform(platform);
     setSelectedGameId(null);
     setActiveNavItem('Queue');
-  }
-
-  function logPlayedToday(game: Game) {
-    const now = new Date();
-    setPlayActivity((currentActivity) => upsertPlayedTodayActivity(currentActivity, game.id, now));
-    setGames((currentGames) =>
-      currentGames.map((currentGame) =>
-        currentGame.id === game.id
-          ? touchGameRecord({
-              ...currentGame,
-              lastPlayedAt: formatLocalDate(now),
-            })
-          : currentGame,
-      ),
-    );
   }
 
   function openSettingsFromShelfProfile() {
