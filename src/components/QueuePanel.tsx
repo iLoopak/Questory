@@ -960,8 +960,8 @@ function PlatformQueueColumn({
     <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 overflow-hidden rounded-t-lg border-b border-white/10">
-          <img alt="" className="h-full w-full object-cover object-center opacity-65" src={displayArtworkUrl} />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/85" />
+          <img alt="" className="h-full w-full object-cover object-center opacity-85" src={displayArtworkUrl} />
+          <div className="qs-platform-artwork-overlay absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
             <h3
               className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
