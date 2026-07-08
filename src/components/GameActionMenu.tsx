@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n, type TFunction } from '../i18n';
 import { formatDealPrice } from './DealCoverBadges';
@@ -246,6 +246,19 @@ function GameActionMenuOverlay({
     enabledItems[nextIndex]?.focus({ preventScroll: true });
   }
 
+  function handleClosePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    // The close button sits inside the draggable sheet header. Keep its pointer
+    // sequence out of the drag handler so pointer capture cannot swallow the
+    // subsequent click that calls the shared close path.
+    event.stopPropagation();
+  }
+
+  function handleCloseKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      closedViaKeyboardRef.current = true;
+    }
+  }
+
   if (typeof document === 'undefined') {
     return null;
   }
@@ -292,6 +305,8 @@ function GameActionMenuOverlay({
             aria-label={t('action.close')}
             className="qs-game-action-close"
             onClick={onClose}
+            onKeyDown={handleCloseKeyDown}
+            onPointerDown={handleClosePointerDown}
             type="button"
           >
             <span aria-hidden="true">×</span>
