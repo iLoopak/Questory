@@ -18,6 +18,10 @@ import {
 import { setStorageAdapter, type StorageAdapter } from '../src/lib/storageAdapter';
 
 const ACHIEVEMENT_COUNTERS_KEY = 'questshelf.achievementCounters.v1';
+const RAWG_SETTINGS_KEY = 'questshelf.rawgSettings.v1';
+const STEAM_GRID_DB_SETTINGS_KEY = 'questshelf.steamGridDbSettings.v1';
+const ITAD_SETTINGS_KEY = 'questshelf.isThereAnyDealSettings.v1';
+const STEAM_SETTINGS_KEY = 'questshelf.steamSettings.v1';
 
 // Install a fresh in-memory browser storage (window.localStorage) + StorageAdapter
 // backed by the same map, so createQuestShelfBackup's raw reads, restore/merge writes,
@@ -74,6 +78,7 @@ function makeFreshBackup(dataOverrides: Record<string, unknown> = {}): QuestShel
       appVersion: questShelfAppVersion,
       exportedAt: new Date().toISOString(),
       includesIntegrationSettings: false,
+      includesSecrets: false,
       schemaVersion: questShelfBackupVersion,
     },
     data: {
@@ -117,6 +122,69 @@ test('export -> restore roundtrip preserves achievement counters', () => {
   const restored = loadAchievementCounters();
   assert.equal(restored.questRunnerRuns, 9);
   assert.equal(restored.justBrowsingOpens, 4);
+});
+
+test('export without integration secrets excludes locally stored API keys', () => {
+  const { store } = installMemoryStorage();
+  store.set(RAWG_SETTINGS_KEY, JSON.stringify({ apiKey: 'rawg-secret' }));
+  store.set(STEAM_GRID_DB_SETTINGS_KEY, JSON.stringify({ apiKey: 'sgdb-secret' }));
+  store.set(ITAD_SETTINGS_KEY, JSON.stringify({ apiKey: 'itad-secret' }));
+  store.set(STEAM_SETTINGS_KEY, JSON.stringify({ apiKey: 'steam-secret', steamId64: '76561198000000000' }));
+
+  const exported = createQuestShelfBackup(false);
+
+  assert.equal(exported.metadata.includesIntegrationSettings, false);
+  assert.equal(exported.metadata.includesSecrets, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(exported.data, RAWG_SETTINGS_KEY), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(exported.data, STEAM_GRID_DB_SETTINGS_KEY), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(exported.data, ITAD_SETTINGS_KEY), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(exported.data, STEAM_SETTINGS_KEY), false);
+  assert.doesNotMatch(JSON.stringify(exported), /rawg-secret|sgdb-secret|itad-secret|steam-secret/);
+});
+
+test('export with integration secrets includes locally stored API keys explicitly', () => {
+  const { store } = installMemoryStorage();
+  store.set(RAWG_SETTINGS_KEY, JSON.stringify({ apiKey: 'rawg-secret' }));
+  store.set(STEAM_GRID_DB_SETTINGS_KEY, JSON.stringify({ apiKey: 'sgdb-secret' }));
+  store.set(ITAD_SETTINGS_KEY, JSON.stringify({ apiKey: 'itad-secret' }));
+  store.set(STEAM_SETTINGS_KEY, JSON.stringify({ apiKey: 'steam-secret', steamId64: '76561198000000000' }));
+
+  const exported = createQuestShelfBackup(true);
+
+  assert.equal(exported.metadata.includesIntegrationSettings, true);
+  assert.equal(exported.metadata.includesSecrets, true);
+  assert.deepEqual(exported.data[RAWG_SETTINGS_KEY], { apiKey: 'rawg-secret' });
+  assert.deepEqual(exported.data[STEAM_GRID_DB_SETTINGS_KEY], { apiKey: 'sgdb-secret' });
+  assert.deepEqual(exported.data[ITAD_SETTINGS_KEY], { apiKey: 'itad-secret' });
+  assert.deepEqual(exported.data[STEAM_SETTINGS_KEY], { apiKey: 'steam-secret', steamId64: '76561198000000000' });
+});
+
+test('restore with integration secrets restores locally stored API keys', () => {
+  const { store } = installMemoryStorage();
+  const backup = parseOrThrow(makeFreshBackup({
+    [RAWG_SETTINGS_KEY]: { apiKey: 'rawg-secret' },
+    [STEAM_GRID_DB_SETTINGS_KEY]: { apiKey: 'sgdb-secret' },
+    [ITAD_SETTINGS_KEY]: { apiKey: 'itad-secret' },
+    [STEAM_SETTINGS_KEY]: { apiKey: 'steam-secret', steamId64: '76561198000000000' },
+  }));
+
+  restoreQuestShelfBackup(backup);
+
+  assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'rawg-secret' });
+  assert.deepEqual(JSON.parse(store.get(STEAM_GRID_DB_SETTINGS_KEY)!), { apiKey: 'sgdb-secret' });
+  assert.deepEqual(JSON.parse(store.get(ITAD_SETTINGS_KEY)!), { apiKey: 'itad-secret' });
+  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'steam-secret', steamId64: '76561198000000000', wishlistUrl: '' });
+});
+
+test('replace restore from backup without integration secrets preserves existing API keys', () => {
+  const { store } = installMemoryStorage();
+  store.set(RAWG_SETTINGS_KEY, JSON.stringify({ apiKey: 'existing-rawg' }));
+  store.set(STEAM_SETTINGS_KEY, JSON.stringify({ apiKey: 'existing-steam', steamId64: '76561198000000000' }));
+
+  restoreQuestShelfBackup(parseOrThrow(makeFreshBackup()));
+
+  assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'existing-rawg' });
+  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'existing-steam', steamId64: '76561198000000000' });
 });
 
 test('export -> merge roundtrip applies the backup achievement counters', () => {
@@ -190,4 +258,19 @@ test('older QuestShelf-branded backups without counters remain importable', () =
 
   const result = parseQuestShelfBackupText(JSON.stringify(backup));
   assert.equal(result.ok, true, result.ok ? '' : result.error);
+});
+
+test('older backups without explicit secret metadata remain importable as no-secret backups', () => {
+  installMemoryStorage();
+  const backup = makeFreshBackup();
+  delete (backup.metadata as Partial<QuestShelfBackup['metadata']>).includesIntegrationSettings;
+  delete (backup.metadata as Partial<QuestShelfBackup['metadata']>).includesSecrets;
+
+  const result = parseQuestShelfBackupText(JSON.stringify(backup));
+
+  assert.equal(result.ok, true, result.ok ? '' : result.error);
+  if (result.ok) {
+    assert.equal(result.backup.metadata.includesIntegrationSettings, false);
+    assert.equal(result.backup.metadata.includesSecrets, false);
+  }
 });

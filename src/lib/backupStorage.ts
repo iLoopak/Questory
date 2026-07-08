@@ -35,6 +35,7 @@ export type QuestShelfBackup = {
     appVersion: string;
     exportedAt: string;
     includesIntegrationSettings: boolean;
+    includesSecrets: boolean;
     schemaVersion: typeof questShelfBackupVersion;
   };
   schemaVersion: typeof questShelfBackupVersion;
@@ -76,6 +77,7 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
       appVersion: questShelfAppVersion,
       exportedAt: new Date().toISOString(),
       includesIntegrationSettings: includeIntegrationSettings,
+      includesSecrets: includeIntegrationSettings,
       schemaVersion: questShelfBackupVersion,
     },
     data: keys.reduce<QuestShelfBackup['data']>((backupData, key) => {
@@ -289,12 +291,12 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
     };
   }
 
-  if (typeof metadata.includesIntegrationSettings !== 'boolean') {
-    return {
-      ok: false,
-      error: 'Backup metadata is missing the integration settings flag.',
-    };
-  }
+  const includesIntegrationSettings = typeof metadata.includesIntegrationSettings === 'boolean'
+    ? metadata.includesIntegrationSettings
+    : false;
+  const includesSecrets = typeof metadata.includesSecrets === 'boolean'
+    ? metadata.includesSecrets
+    : includesIntegrationSettings;
 
   if (!backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) {
     return {
@@ -326,7 +328,8 @@ function validateQuestShelfBackup(value: unknown): BackupParseResult {
       metadata: {
         appVersion: metadata.appVersion,
         exportedAt: metadata.exportedAt,
-        includesIntegrationSettings: metadata.includesIntegrationSettings,
+        includesIntegrationSettings,
+        includesSecrets,
         schemaVersion: questShelfBackupVersion,
       },
     },
