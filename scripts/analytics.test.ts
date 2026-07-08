@@ -138,6 +138,16 @@ test('send failures are swallowed', async () => {
   }));
 });
 
+test('a non-2xx response never throws or blocks', async () => {
+  enableLocalAnalytics();
+  let calls = 0;
+  await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
+    calls += 1;
+    return new Response('nope', { status: 500 });
+  }));
+  assert.equal(calls, 1);
+});
+
 test('platform queue regression assertions', () => {
   runPlatformQueueUniquenessRegressionAssertions();
 });

@@ -55,14 +55,34 @@ export function getAnalyticsConfig(): AnalyticsConfig {
   };
 }
 
+/**
+ * Returns a human-readable reason the build-time analytics config is unusable, or
+ * null when it is fully configured. Single source of truth for isAnalyticsConfigured
+ * and the dev-only diagnostics below, so the boolean and the explanation never drift.
+ */
+export function describeAnalyticsConfigProblem(config: AnalyticsConfig): string | null {
+  if (config.enabled !== true) return 'VITE_QS_ANALYTICS_ENABLED is not "true" in this build';
+  if (!config.webhookUrl) return 'VITE_QS_ANALYTICS_WEBHOOK_URL is empty in this build';
+  if (config.webhookUrl.includes('example.invalid')) return 'VITE_QS_ANALYTICS_WEBHOOK_URL is still the example.invalid placeholder';
+  if (!config.analyticsKey) return 'VITE_QS_ANALYTICS_KEY is empty in this build';
+  if (config.analyticsKey === 'replace-with-alpha-analytics-key') return 'VITE_QS_ANALYTICS_KEY is still the placeholder value';
+  return null;
+}
+
 export function isAnalyticsConfigured(config: AnalyticsConfig) {
-  return (
-    config.enabled === true &&
-    Boolean(config.webhookUrl) &&
-    !config.webhookUrl.includes('example.invalid') &&
-    Boolean(config.analyticsKey) &&
-    config.analyticsKey !== 'replace-with-alpha-analytics-key'
-  );
+  return describeAnalyticsConfigProblem(config) === null;
+}
+
+// Dev-only diagnostics. Analytics failures are silent by design in production, which
+// also makes a misconfigured/disabled build indistinguishable from a working one.
+// These logs (gated on Vite dev mode) surface *why* nothing was sent, without any
+// production logging.
+function analyticsDebug(message: string, ...details: unknown[]) {
+  if (import.meta.env.DEV) console.debug('[Questory analytics]', message, ...details);
+}
+
+function analyticsWarn(message: string) {
+  if (import.meta.env.DEV) console.warn('[Questory analytics]', message);
 }
 
 export function getAnalyticsRuntime(): AnalyticsRuntime {
@@ -126,10 +146,25 @@ export function validateAnalyticsEvent(value: unknown): value is MinimalAnalytic
 }
 
 export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = getAnalyticsConfig(), fetcher: typeof fetch = fetch) {
-  if (!isAnalyticsConfigured(config) || !loadAnalyticsSettings().isAnalyticsEnabled || !validateAnalyticsEvent(event)) return;
+  // Gate 1: user opt-in. Disabled by default; the common, correct no-send case.
+  if (!loadAnalyticsSettings().isAnalyticsEnabled) return;
+
+  // Gate 2: build-time config. When the user opted in but the build has no valid
+  // config, nothing is sent — the exact silent gap that makes telemetry "not fire".
+  const configProblem = describeAnalyticsConfigProblem(config);
+  if (configProblem) {
+    analyticsWarn(`Enabled by the user but no event can be sent: ${configProblem}. Set the VITE_QS_ANALYTICS_* env vars (see .env.example).`);
+    return;
+  }
+
+  // Gate 3: payload allowlist. Guards against ever sending unexpected fields.
+  if (!validateAnalyticsEvent(event)) {
+    analyticsDebug('Event failed validation; not sent', event);
+    return;
+  }
 
   try {
-    await fetcher(config.webhookUrl, {
+    const response = await fetcher(config.webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,8 +173,14 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
       body: JSON.stringify(event),
       keepalive: true,
     });
-  } catch {
-    // Analytics must fail silently and never break app behavior.
+    if (!response.ok) {
+      analyticsWarn(`Endpoint returned HTTP ${response.status} for "${event.eventName}". Check the webhook URL/API key and that it allows CORS + a custom header from this origin.`);
+    } else {
+      analyticsDebug(`Sent "${event.eventName}"`);
+    }
+  } catch (error) {
+    // Network error or (most often on web) a blocked CORS preflight. Silent in prod.
+    analyticsDebug('Send failed (network or CORS preflight) — failing silently', error);
   }
 }
 
