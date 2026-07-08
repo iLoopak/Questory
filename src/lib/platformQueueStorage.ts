@@ -627,14 +627,33 @@ function isQueueEntry(value: unknown): value is PlatformQueueEntry {
   return typeof entry.gameId === 'string' && typeof entry.targetPlatform === 'string' && typeof entry.queuedAt === 'string';
 }
 
-function normalizeQueueSetting(setting: PlatformQueueSettings): PlatformQueueSettings {
+function normalizeQueueSetting(setting: Partial<PlatformQueueSettings> & Pick<PlatformQueueSettings, 'platform'>): PlatformQueueSettings {
+  const platform = normalizePlatformName(setting.platform);
+
   return {
     accentColor: isValidAccentColor(setting.accentColor) ? setting.accentColor : undefined,
-    artworkUrl: typeof setting.artworkUrl === 'string' && setting.artworkUrl.trim() ? setting.artworkUrl.trim() : undefined,
-    maxActiveGames: Math.max(1, Math.min(25, Math.round(setting.maxActiveGames || defaultActiveLimits.get(setting.platform) || defaultActiveGameLimit))),
-    platform: normalizePlatformName(setting.platform),
+    artworkUrl: normalizePlatformArtworkUrl(setting.artworkUrl),
+    maxActiveGames: Math.max(1, Math.min(25, Math.round(setting.maxActiveGames || defaultActiveLimits.get(platform) || defaultActiveGameLimit))),
+    platform,
     platformTag: typeof setting.platformTag === 'string' && setting.platformTag.trim() ? setting.platformTag.trim() : undefined,
   };
+}
+
+function normalizePlatformArtworkUrl(artworkUrl: unknown) {
+  if (typeof artworkUrl !== 'string') {
+    return undefined;
+  }
+
+  const trimmedArtworkUrl = artworkUrl.trim();
+  if (!trimmedArtworkUrl || isTemporaryBrowserArtworkUrl(trimmedArtworkUrl)) {
+    return undefined;
+  }
+
+  return trimmedArtworkUrl;
+}
+
+function isTemporaryBrowserArtworkUrl(artworkUrl: string) {
+  return artworkUrl.startsWith('blob:') || artworkUrl.startsWith('filesystem:');
 }
 
 function isValidAccentColor(color: unknown): color is string {
@@ -645,11 +664,11 @@ function hashPlatformName(platform: GamePlatform) {
   return Array.from(platform).reduce((hash, character) => hash + character.charCodeAt(0), 0);
 }
 
-function isQueueSetting(value: unknown): value is PlatformQueueSettings {
+function isQueueSetting(value: unknown): value is Partial<PlatformQueueSettings> & Pick<PlatformQueueSettings, 'platform'> {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
   const setting = value as Partial<PlatformQueueSettings>;
-  return typeof setting.platform === 'string' && typeof setting.maxActiveGames === 'number';
+  return typeof setting.platform === 'string';
 }

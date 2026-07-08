@@ -2,6 +2,11 @@ import type { ChangeEvent } from 'react';
 import { platformAccentPalette, platformArtworkPresetOptions, type PlatformArtworkPreset } from '../lib/platformQueueStorage';
 import { useI18n } from '../i18n';
 
+const maxUploadedArtworkWidth = 1440;
+const maxUploadedArtworkHeight = 480;
+const uploadedArtworkMimeType = 'image/jpeg';
+const uploadedArtworkQuality = 0.86;
+
 type PlatformIdentityFieldsProps = {
   accentColor: string;
   artworkUrl: string;
@@ -29,13 +34,7 @@ export function PlatformIdentityFields({
       return;
     }
 
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        onArtworkUrlChange(reader.result);
-      }
-    });
-    reader.readAsDataURL(file);
+    void readPlatformArtworkFile(file).then(onArtworkUrlChange);
     event.target.value = '';
   }
 
@@ -52,12 +51,12 @@ export function PlatformIdentityFields({
       </label>
       <label className="grid gap-1">
         <span className="text-xs font-semibold text-slate-400">{t('settings.platformArtworkUrl')}</span>
-        <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="https://..." value={artworkUrl} onChange={(event) => onArtworkUrlChange(event.target.value)} />
+        <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="https://... or data:image/..." value={artworkUrl} onChange={(event) => onArtworkUrlChange(event.target.value)} />
       </label>
       <label className="grid gap-1">
         <span className="text-xs font-semibold text-slate-400">{t('settings.uploadImage')}</span>
         <input className="text-xs text-slate-300 file:mr-2 file:h-8 file:rounded file:border-0 file:bg-mint file:px-2 file:text-xs file:font-semibold file:text-ink-950" accept="image/*" type="file" onChange={uploadArtwork} />
-        <span className="text-xs text-slate-500">Recommended size: 1080 × 340 px</span>
+        <span className="text-xs text-slate-500">Recommended size: 1080 × 340 px. Uploaded files are saved as a persistent Data URL for reloads and backups.</span>
       </label>
       <div>
         <span className="text-xs font-semibold text-slate-400">{t('settings.presetImage')}</span>
@@ -75,4 +74,55 @@ export function PlatformIdentityFields({
       </label>
     </div>
   );
+}
+
+async function readPlatformArtworkFile(file: File): Promise<string> {
+  const sourceDataUrl = await readFileAsDataUrl(file);
+
+  if (typeof document === 'undefined' || typeof Image === 'undefined') {
+    return sourceDataUrl;
+  }
+
+  const image = await loadImage(sourceDataUrl);
+  const scale = Math.min(1, maxUploadedArtworkWidth / image.naturalWidth, maxUploadedArtworkHeight / image.naturalHeight);
+
+  if (scale >= 1 && sourceDataUrl.length <= 750_000) {
+    return sourceDataUrl;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    return sourceDataUrl;
+  }
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL(uploadedArtworkMimeType, uploadedArtworkQuality);
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error('Uploaded artwork could not be read as a Data URL.'));
+    });
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('Uploaded artwork could not be read.')));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', () => reject(new Error('Uploaded artwork could not be decoded.')));
+    image.src = src;
+  });
 }
