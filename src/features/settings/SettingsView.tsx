@@ -16,6 +16,7 @@ import { QueuePlatformsSettingsPanel } from '../../components/settings/Platforms
 import { SetupCenterPanel } from '../../components/settings/SetupCenterPanel';
 import { SettingsSection } from '../../components/settings/SettingsSection';
 import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from '../../components/settings/WishlistSettingsPanel';
+import type { MultiGameImportParseResult, MultiGameImportSummary } from '../../lib/multiGameImport';
 import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } from '../../config/settings';
 import { createTranslator, translateSettingsCategory, useI18n, type AppLanguage } from '../../i18n';
 import { getSetupProgress, type SetupTask } from '../../lib/setupTasks';
@@ -110,6 +111,7 @@ export type SettingsViewProps = {
   onSteamApiKeyConfigured: () => void;
   onSteamIdConfigured: () => void;
   onSteamLibraryImported: () => void;
+  onImportMultiGames: (parsed: MultiGameImportParseResult) => MultiGameImportSummary;
   onImportSteamWishlistHtml: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
   onSyncSteamWishlist: () => void;
   onSteamProfileNameChange: (profileName: string) => void;
@@ -194,6 +196,7 @@ export function SettingsView({
   onSteamApiKeyConfigured,
   onSteamIdConfigured,
   onSteamLibraryImported,
+  onImportMultiGames,
   onImportSteamWishlistHtml,
   onSyncSteamWishlist,
   onSteamProfileNameChange,
@@ -307,6 +310,7 @@ export function SettingsView({
                 .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId === 'number')
                 .map((game) => game.steamAppId as number)}
               steamWishlistSyncState={steamWishlistSyncState}
+              onImportMultiGames={onImportMultiGames}
               onImportSteamWishlistHtml={onImportSteamWishlistHtml}
               onSyncSteamWishlist={onSyncSteamWishlist}
             />

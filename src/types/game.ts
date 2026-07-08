@@ -100,7 +100,7 @@ export type Game = {
   steamAchievements?: SteamAchievement[];
   lastSteamActivityAt?: string;
   lastSteamActivityDeltaMinutes?: number;
-  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom';
+  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom' | 'playstation-library';
   externalUrl?: string;
   importedAt?: string;
   updatedAt?: string;
