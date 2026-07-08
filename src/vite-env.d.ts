@@ -11,3 +11,7 @@ declare module 'virtual:pwa-register' {
 
   export function registerSW(options?: RegisterSWOptions): (reloadPage?: boolean) => void;
 }
+
+interface Window {
+  questShelfTelemetrySelfTest?: () => Promise<unknown>;
+}
