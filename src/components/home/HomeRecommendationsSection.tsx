@@ -22,11 +22,13 @@ export function HomeRecommendationsSection({
   }
 
   return (
-    <PersonalRecommendationsSection
-      userGames={games}
-      inboxRawgIds={inboxRawgIds}
-      onSelectGame={onSelectGame}
-      onOpenPreview={onOpenPreview}
-    />
+    <section className="qs-home-section min-w-0 overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+      <PersonalRecommendationsSection
+        userGames={games}
+        inboxRawgIds={inboxRawgIds}
+        onSelectGame={onSelectGame}
+        onOpenPreview={onOpenPreview}
+      />
+    </section>
   );
 }

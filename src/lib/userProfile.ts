@@ -176,9 +176,38 @@ export function buildUserProfile(games: Game[]): UserProfile {
   };
 }
 
-/** Stable fingerprint used to invalidate the recommendations cache. */
+/**
+ * Stable fingerprint used to invalidate the recommendations cache.
+ *
+ * Keep this aligned with the inputs used by buildUserProfile/applyLibraryStatus:
+ * imports, collection changes, status changes, metadata enrichment, playtime/rating
+ * edits, and queue-tag decisions should all move this fingerprint without tying
+ * recommendation refreshes to React render identity.
+ */
 export function profileFingerprint(games: Game[]): string {
-  const finished = games.filter((g) => g.status === 'Finished').length;
-  const withGenres = games.filter((g) => (g.genres?.length ?? 0) > 0).length;
-  return `f${finished}:g${withGenres}`;
+  return games
+    .map((game) => {
+      const genres = [...(game.genres ?? [])].sort().join(',');
+      const rawgTags = [...(game.rawgTags ?? [])].sort().join(',');
+      const developers = [...(game.developers ?? [])].sort().join(',');
+      const tags = [...(game.tags ?? [])].sort().join(',');
+      const metacritic = game.metacritic ?? game.metacriticScore ?? '';
+      const playtime = Math.round(game.playtimeHours || 0);
+      const rating = game.rating ?? '';
+      return [
+        game.id,
+        game.rawgId ?? '',
+        game.collectionType,
+        game.status,
+        playtime,
+        rating,
+        metacritic,
+        genres,
+        rawgTags,
+        developers,
+        tags,
+      ].join('|');
+    })
+    .sort()
+    .join('||');
 }
