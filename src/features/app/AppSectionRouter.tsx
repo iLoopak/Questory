@@ -797,6 +797,7 @@ export function AppSectionRouter({
           onSteamIdConfigured={() => markOnboardingItemComplete('steam-id64')}
           onSteamProfileNameChange={handleSteamProfileNameChange}
           onSteamLibraryImported={() => markOnboardingItemsComplete(['steam-import', 'steam-connect'])}
+          onImportMultiGames={importMultiGameItemsWithAnalytics}
           onImportSteamWishlistHtml={importSteamWishlistHtmlItemsWithAnalytics}
           onSyncSteamWishlist={syncSteamWishlist}
           onReviewRetroImportedGames={() => startReviewMode('recent-imports')}
