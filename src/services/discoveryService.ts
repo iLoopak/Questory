@@ -61,7 +61,7 @@ export function buildDiscoveryCandidates(
   userGames: Game[],
   options: CandidateFilterOptions = {},
 ): DiscoveryCandidate[] {
-  const { excludeDropped = false } = options;
+  void options;
 
   const allGames = games;
 
@@ -75,13 +75,8 @@ export function buildDiscoveryCandidates(
       let exclusionReason: DiscoveryExclusionReason | null = null;
 
       if (match) {
-        if (match.status === 'Finished') {
-          excluded = true;
-          exclusionReason = 'finished';
-        } else if (excludeDropped && match.status === 'Dropped') {
-          excluded = true;
-          exclusionReason = 'dropped';
-        }
+        excluded = true;
+        exclusionReason = match.status === 'Dropped' ? 'dropped' : match.status === 'Finished' ? 'finished' : match.collectionType === 'wishlist' ? 'wishlist' : 'owned';
       }
 
       // Non-owned games rank first; owned/wishlisted rank lower.
