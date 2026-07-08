@@ -904,15 +904,22 @@ function PlatformQueueColumn({
 }) {
   const { t } = useI18n();
   const playingNowLabel = t('action.playingNow');
+  const [isPlannedQueueExpanded, setIsPlannedQueueExpanded] = useState(false);
+  const plannedQueuePreviewLimit = 5;
+  const shouldCollapsePlannedQueue = queueEntries.length > plannedQueuePreviewLimit;
+  const displayedQueueEntries = shouldCollapsePlannedQueue && !isPlannedQueueExpanded
+    ? queueEntries.slice(0, plannedQueuePreviewLimit)
+    : queueEntries;
+  const hiddenPlannedQueueCount = Math.max(0, queueEntries.length - plannedQueuePreviewLimit);
   const queueEntriesVirtualizerRef = useRef<HTMLDivElement | null>(null);
   const virtualQueueEntries = useVirtualWindow({
-    itemCount: queueEntries.length,
+    itemCount: displayedQueueEntries.length,
     estimateItemSize: 148,
     overscan: 5,
     scrollElementRef: queueScrollRef,
     virtualizerRef: queueEntriesVirtualizerRef,
   });
-  const renderedQueueEntries = queueEntries.slice(virtualQueueEntries.startIndex, virtualQueueEntries.endIndex + 1);
+  const renderedQueueEntries = displayedQueueEntries.slice(virtualQueueEntries.startIndex, virtualQueueEntries.endIndex + 1);
   const showPlayingSection = statusFilter !== 'Planned';
   const showPlannedSection = statusFilter !== 'Playing';
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
@@ -935,13 +942,15 @@ function PlatformQueueColumn({
       label: `${platform} queue`,
       totalItems: queueEntries.length,
       renderedItemCount: renderedQueueEntries.length,
+      displayedItemCount: displayedQueueEntries.length,
+      collapsed: shouldCollapsePlannedQueue && !isPlannedQueueExpanded,
       virtualRangeStart: virtualQueueEntries.startIndex,
       virtualRangeEnd: virtualQueueEntries.endIndex,
       columns: 1,
       viewportHeight: virtualQueueEntries.viewportSize,
       containerHeight: queueScrollRef.current?.clientHeight ?? null,
     });
-  }, [platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
+  }, [displayedQueueEntries.length, isPlannedQueueExpanded, platform, queueEntries.length, queueScrollRef, renderedQueueEntries.length, shouldCollapsePlannedQueue, virtualQueueEntries.endIndex, virtualQueueEntries.startIndex, virtualQueueEntries.viewportSize]);
 
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
@@ -1034,7 +1043,8 @@ function PlatformQueueColumn({
         </div>
       ) : null}
 
-      {showPlannedSection ? <div ref={queueEntriesVirtualizerRef} className="qs-queue-virtual-window relative min-w-0" style={{ minHeight: queueEntries.length > 0 ? virtualQueueEntries.totalSize : undefined }}>
+      {showPlannedSection ? <div>
+        <div ref={queueEntriesVirtualizerRef} className="qs-queue-virtual-window relative min-w-0" style={{ minHeight: displayedQueueEntries.length > 0 ? virtualQueueEntries.totalSize : undefined }}>
         {queueEntries.length > 0 ? (
           <div className="qs-queue-virtual-items absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
             {renderedQueueEntries.map((entry) => {
@@ -1078,6 +1088,27 @@ function PlatformQueueColumn({
             <p>{t('queue.noQueuePlatform').replace('{platform}', platform)}</p>
           </div>
         )}
+        </div>
+        {shouldCollapsePlannedQueue ? (
+          <button
+            aria-expanded={isPlannedQueueExpanded}
+            className="qs-planned-queue-toggle mt-2 flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition"
+            onClick={() => setIsPlannedQueueExpanded((currentIsExpanded) => !currentIsExpanded)}
+            style={{
+              borderColor: `color-mix(in srgb, ${platformAccentColor} 24%, rgb(255 255 255 / 0.08))`,
+              color: `color-mix(in srgb, ${platformAccentColor} 72%, rgb(203 213 225))`,
+              backgroundColor: `color-mix(in srgb, ${platformAccentColor} 8%, rgb(2 6 23 / 0.72))`,
+            }}
+            type="button"
+          >
+            <Icon name={isPlannedQueueExpanded ? 'chevron-up' : 'chevron-down'} size={14} />
+            <span>
+              {isPlannedQueueExpanded
+                ? t('queue.showLess')
+                : t('queue.showMore').replace('{count}', String(hiddenPlannedQueueCount))}
+            </span>
+          </button>
+        ) : null}
       </div> : null}
     </section>
 
