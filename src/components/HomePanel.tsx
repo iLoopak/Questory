@@ -46,6 +46,7 @@ type HomePanelProps = {
   onOpenQueue: (platform?: GamePlatform) => void;
   onOpenReviewMode: (source: ReviewSource) => void;
   onOpenSettings?: () => void;
+  onOpenIntegrationsSettings?: () => void;
   onOpenWishlist: () => void;
   onPlayToday: (game: Game) => void;
   onQuickNote: (gameId: string, note: string) => void;
@@ -85,6 +86,7 @@ export function HomePanel({
   onOpenQueue,
   onOpenReviewMode,
   onOpenSettings,
+  onOpenIntegrationsSettings,
   onOpenWishlist,
   onPlayToday,
   onQuickNote,
@@ -581,6 +583,7 @@ export function HomePanel({
             inboxRawgIds={discoveryInboxRawgIds}
             onSelectGame={onSelectDiscoveryGame}
             onOpenPreview={onOpenDiscoveryPreview}
+            onOpenRawgSettings={onOpenIntegrationsSettings ?? onOpenSettings}
           />
         );
 

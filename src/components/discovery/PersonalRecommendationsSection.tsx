@@ -3,6 +3,7 @@ import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { getUserProfileReadiness, profileFingerprint } from '../../lib/userProfile';
 import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
+import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from './DiscoveryGameCard';
 import { useI18n, type TFunction } from '../../i18n';
 
@@ -43,6 +44,7 @@ function ColdStart({ progress, t }: { progress: number; t: TFunction }) {
 
 type LoadedProps = {
   userGames: Game[];
+  onOpenRawgSettings?: () => void;
   inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
   onOpenPreview?: (candidate: DiscoveryCandidate) => void;
@@ -51,11 +53,13 @@ type LoadedProps = {
 
 function PersonalRecommendationsLoaded({
   userGames,
+  onOpenRawgSettings,
   inboxRawgIds,
   onSelectGame,
   onOpenPreview,
   t,
 }: LoadedProps) {
+  const isRawgConfigured = loadRawgSettings().apiKey.trim().length > 0;
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
 
   const lastFingerprintRef = useRef<string | null>(null);
@@ -63,6 +67,11 @@ function PersonalRecommendationsLoaded({
   const fingerprint = useMemo(() => profileFingerprint(userGames), [userGames]);
 
   useEffect(() => {
+    if (!isRawgConfigured) {
+      setCandidates([]);
+      lastFingerprintRef.current = null;
+      return;
+    }
     if (fingerprint === lastFingerprintRef.current && candidates !== null) return;
 
     let cancelled = false;
@@ -77,30 +86,50 @@ function PersonalRecommendationsLoaded({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerprint]);
+  }, [fingerprint, isRawgConfigured]);
 
   // Re-apply library/inbox status when userGames or inboxRawgIds changes without a
   // fingerprint change (e.g., adding a game to wishlist or inbox).
   useEffect(() => {
-    if (candidates === null) return;
+    if (!isRawgConfigured || candidates === null) return;
     let cancelled = false;
     fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
       if (!cancelled) setCandidates(result.filter((c) => c.libraryStatus === null));
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userGames, inboxRawgIds]);
+  }, [userGames, inboxRawgIds, isRawgConfigured]);
+
+  if (!isRawgConfigured) {
+    return (
+      <section aria-label={t('recommendations.forYouTitle')} className="qs-home-section min-w-0 rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-white">{t('recommendations.forYouTitle')}</h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">{t('recommendations.rawgRequiredText')}</p>
+          </div>
+          <p className="text-xs leading-relaxed text-slate-500">{t('recommendations.rawgRequiredHelp')}</p>
+          {onOpenRawgSettings ? (
+            <button className="min-h-10 rounded-xl bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90" onClick={onOpenRawgSettings} type="button">
+              {t('recommendations.openIntegrationsCta')}
+            </button>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
 
   if (candidates !== null && candidates.length === 0) return null;
 
   return (
-    <section aria-label={t('recommendations.forYouTitle')} className="min-w-0 space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold text-white">{t('recommendations.forYouTitle')}</h3>
-        <p className="mt-0.5 text-xs text-slate-500">{t('recommendations.tapHint')}</p>
-      </div>
-      <div className="min-w-0 touch-pan-x scroll-px-1 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
-        <div className="flex w-max gap-3 px-0.5">
+    <section aria-label={t('recommendations.forYouTitle')} className="qs-home-section min-w-0 overflow-hidden rounded-2xl border border-skyglass/15 bg-ink-900/74 p-4 shadow-panel">
+      <div className="min-w-0 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-white">{t('recommendations.forYouTitle')}</h3>
+          <p className="mt-0.5 text-xs text-slate-500">{t('recommendations.tapHint')}</p>
+        </div>
+        <div className="min-w-0 touch-pan-x scroll-px-1 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
+          <div className="flex w-max gap-3 px-0.5">
           {candidates === null ? (
             Array.from({ length: SKELETON_COUNT }, (_, i) => <DiscoveryCompactCardSkeleton key={i} />)
           ) : (
@@ -121,6 +150,7 @@ function PersonalRecommendationsLoaded({
               />
             ))
           )}
+          </div>
         </div>
       </div>
     </section>
@@ -133,6 +163,7 @@ function PersonalRecommendationsLoaded({
 
 type Props = {
   userGames: Game[];
+  onOpenRawgSettings?: () => void;
   inboxRawgIds: Set<number>;
   onSelectGame: (game: DiscoveryGame) => void;
   onOpenPreview?: (candidate: DiscoveryCandidate) => void;
@@ -140,6 +171,7 @@ type Props = {
 
 export function PersonalRecommendationsSection({
   userGames,
+  onOpenRawgSettings,
   inboxRawgIds,
   onSelectGame,
   onOpenPreview,
@@ -154,6 +186,7 @@ export function PersonalRecommendationsSection({
   return (
     <PersonalRecommendationsLoaded
       userGames={userGames}
+      onOpenRawgSettings={onOpenRawgSettings}
       inboxRawgIds={inboxRawgIds}
       onSelectGame={onSelectGame}
       onOpenPreview={onOpenPreview}
