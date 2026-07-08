@@ -3,6 +3,7 @@ import type { ReviewModeAction, ReviewModeActionContext } from '../components/Re
 import { createTranslator } from '../i18n';
 import { formatGameToastMessage } from '../lib/notifications';
 import { removeGameFromPlatformQueue, type PlatformQueueState } from '../lib/platformQueueStorage';
+import { reorderSkippedGameToPendingQueueEnd } from '../lib/reviewQueueOrder';
 import {
   saveReviewModeState,
   type ReviewDecision,
@@ -80,14 +81,11 @@ export function useReviewModeActions({
 
   function moveQuestQueueGameToEnd(gameId: string, context?: ReviewModeActionContext) {
     setReviewModeState((currentState) => {
-      const currentQueueOrder = context?.queueGameIds?.length ? context.queueGameIds : currentState.queueOrder;
-      const reorderedCurrentQueue = [...currentQueueOrder.filter((queuedGameId) => queuedGameId !== gameId), gameId];
-      const reorderedGameIds = new Set(reorderedCurrentQueue);
-      const outsideCurrentQueue = currentState.queueOrder.filter((queuedGameId) => !reorderedGameIds.has(queuedGameId));
+      const pendingQueueOrder = context?.pendingGameIds?.length ? context.pendingGameIds : currentState.queueOrder;
 
       return {
         ...currentState,
-        queueOrder: [...reorderedCurrentQueue, ...outsideCurrentQueue],
+        queueOrder: reorderSkippedGameToPendingQueueEnd(gameId, pendingQueueOrder, currentState.queueOrder),
       };
     });
   }
@@ -129,7 +127,7 @@ export function useReviewModeActions({
         description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
       });
       recordReviewDecision('skipped');
-      moveQuestQueueGameToEnd(game.id);
+      moveQuestQueueGameToEnd(game.id, context);
       return;
     }
 

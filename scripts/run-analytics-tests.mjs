@@ -26,6 +26,7 @@ const testFiles = [
   { entry: 'scripts/retroTitleResolver.test.ts', out: 'retroTitleResolver.test.mjs' },
   { entry: 'scripts/settingsEntrypoints.test.ts', out: 'settingsEntrypoints.test.mjs' },
   { entry: 'scripts/backupStorage.test.ts', out: 'backupStorage.test.mjs' },
+  { entry: 'scripts/reviewQueueOrder.test.ts', out: 'reviewQueueOrder.test.mjs' },
 ];
 
 await Promise.all(
