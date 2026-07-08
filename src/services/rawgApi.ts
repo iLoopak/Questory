@@ -156,6 +156,8 @@ function getPositiveNumber(value: unknown) {
 
 export function mapRawgDetailsToMetadata(details: RawgGameDetails): RawgMetadata {
   const metacriticScore = getPositiveNumber(details.metacritic);
+  // RAWG documents `playtime` as Steam average playtime, in hours.
+  // It is not a completion-time / time-to-beat estimate.
   const rawgPlaytimeHours = getPositiveNumber(details.playtime);
   return {
     rawgId: details.id,

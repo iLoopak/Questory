@@ -31,6 +31,7 @@ export type RawgGameDetails = RawgSearchResult & {
   tags?: RawgListItem[];
   developers?: RawgListItem[];
   publishers?: RawgListItem[];
+  /** RAWG `playtime`: Steam average playtime, in hours; not time-to-beat. */
   playtime?: number;
   description_raw?: string;
 };

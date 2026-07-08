@@ -281,7 +281,7 @@ export function GameDetailView({
             />
           ) : null}
           {metacriticScore ? <HeroStat label="Metacritic" value={metacriticScore} /> : null}
-          {rawgPlaytime ? <HeroStat label="Average playtime" value={rawgPlaytime} /> : null}
+          {rawgPlaytime ? <HeroStat label={t('detail.rawgSteamAveragePlaytime')} value={rawgPlaytime} /> : null}
           {hltbBadge ? <HeroStat label={t('hltb.estimatedTime')} value={hltbBadge} /> : null}
         </>}
       />
