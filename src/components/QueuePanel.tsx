@@ -253,10 +253,10 @@ export function QueuePanel({
       <div ref={queueListRef} className="qs-queue-list min-w-0 pr-1">
         <div className={
           displayedQueuePlatforms.length === 1
-            ? 'qs-platform-grid grid min-w-0 gap-5'
+            ? 'qs-platform-grid grid min-w-0 items-start gap-5'
             : displayedQueuePlatforms.length === 2
-            ? 'qs-platform-grid grid min-w-0 grid-cols-2 gap-5'
-            : 'qs-platform-grid grid min-w-0 gap-5 xl:grid-cols-2'
+            ? 'qs-platform-grid grid min-w-0 grid-cols-2 items-start gap-5'
+            : 'qs-platform-grid grid min-w-0 items-start gap-5 xl:grid-cols-2'
         }>
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
@@ -709,7 +709,7 @@ function PlatformQueueColumn({
   const queueEntriesVirtualizerRef = useRef<HTMLDivElement | null>(null);
   const virtualQueueEntries = useVirtualWindow({
     itemCount: displayedQueueEntries.length,
-    estimateItemSize: 148,
+    estimateItemSize: 92,
     overscan: 5,
     scrollElementRef: queueScrollRef,
     virtualizerRef: queueEntriesVirtualizerRef,
@@ -718,6 +718,7 @@ function PlatformQueueColumn({
   const showPlayingSection = statusFilter !== 'Planned';
   const showPlannedSection = statusFilter !== 'Playing';
   const hasGames = currentlyPlaying.length > 0 || queueEntries.length > 0;
+  const platformPersonalityLine = getPlatformPersonalityLine(platform, platformTag, currentlyPlaying, queueEntries.length);
   const platformAccentColor = accentColor || 'var(--accent)';
   const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
   const accentStyle = {
@@ -785,7 +786,7 @@ function PlatformQueueColumn({
           <div className="qs-platform-artwork-overlay absolute inset-0" />
           {platformTag ? (
             <span
-              className="absolute left-4 top-4 inline-flex max-w-[calc(100%-2rem)] items-center rounded-full px-2.5 py-1 text-xs font-semibold shadow-panel backdrop-blur-sm"
+              className={`absolute left-4 ${platformPersonalityLine ? 'top-12' : 'top-4'} inline-flex max-w-[calc(100%-2rem)] items-center rounded-full px-2.5 py-1 text-xs font-semibold shadow-panel backdrop-blur-sm`}
               style={{
                 color: `color-mix(in srgb, ${platformAccentColor} 82%, rgb(226 232 240))`,
                 backgroundColor: `color-mix(in srgb, ${platformAccentColor} 16%, rgb(2 6 23 / 0.76))`,
@@ -793,6 +794,11 @@ function PlatformQueueColumn({
             >
               <span className="min-w-0 truncate">{platformTag}</span>
             </span>
+          ) : null}
+          {platformPersonalityLine ? (
+            <p className="qs-platform-personality absolute left-4 top-4 max-w-[calc(100%-2rem)] truncate rounded-full px-2.5 py-1 text-xs font-semibold shadow-panel backdrop-blur-sm">
+              {platformPersonalityLine}
+            </p>
           ) : null}
           <div className="qs-platform-artwork-controls absolute inset-x-0 bottom-0 flex min-w-0 items-end justify-between gap-3">
             <h3
@@ -813,6 +819,7 @@ function PlatformQueueColumn({
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
               <span className="min-w-0 truncate" style={{ color: platformAccentColor }}>{platform}</span>
             </h3>
+            {platformPersonalityLine ? <p className="qs-platform-personality mt-1.5 truncate text-xs font-semibold">{platformPersonalityLine}</p> : null}
             {platformTag ? (
               <div className="mt-1.5">
                 <span
@@ -834,9 +841,6 @@ function PlatformQueueColumn({
 
       {showPlayingSection && currentlyPlaying.length > 0 ? (
         <div className="qs-platform-playing-section mb-4 grid w-full min-w-0 gap-2">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <p className="qs-platform-playing-meta text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} in progress</p>
-          </div>
           <div className="grid w-full min-w-0 gap-2">
             {currentlyPlaying.map((game) => (
               <QueueGameRow
@@ -1112,6 +1116,32 @@ function removePlatformArtworkWatermark(artworkUrl: string) {
   }
 }
 
+function getPlatformPersonalityLine(platform: GamePlatform, platformTag: string, currentlyPlaying: Game[], queuedCount: number) {
+  if (currentlyPlaying[0]?.title) {
+    return `Current adventure · ${currentlyPlaying[0].title}`;
+  }
+
+  if (platformTag.trim()) {
+    return `${platformTag.trim()} sessions`;
+  }
+
+  const normalizedPlatform = platform.toLowerCase();
+
+  if (/deck|retroid|switch|handheld|portable|vita|3ds|ds/.test(normalizedPlatform)) {
+    return 'Handheld sessions';
+  }
+
+  if (/switch|xbox|playstation|ps5|ps4|wii|couch/.test(normalizedPlatform)) {
+    return 'Ready for couch co-op';
+  }
+
+  if (queuedCount >= 8) {
+    return 'Dream queue';
+  }
+
+  return null;
+}
+
 function QueueEntryRow({
   entry,
   game,
@@ -1166,7 +1196,7 @@ function QueueEntryRow({
   return (
     <article
       aria-label={`${game.title} ${t('queue.entryA11y')}`}
-      className="qs-queue-entry qs-queue-entry--playlist rounded-xl bg-ink-950/60 p-3"
+      className="qs-queue-entry qs-queue-entry--playlist rounded-lg px-1.5 py-2"
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button, select, input, label')) return;
         onOpenDetails(game.id);
@@ -1235,7 +1265,7 @@ function QueueGameRow({
   const { t } = useI18n();
 
   return (
-    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 rounded-lg p-2 text-sm transition">
+    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 rounded-xl p-2.5 text-sm transition">
       <div className="relative self-start">
         <button className="block text-left" onClick={() => onOpenDetails(game.id)} type="button">
           <QueueCoverThumbnail game={game} size="playing" />
