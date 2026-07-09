@@ -1,7 +1,7 @@
 import { Icon } from './Icon';
 import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, Dispatch, FormEvent, KeyboardEvent, ReactNode, RefObject, SetStateAction } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { ButtonHTMLAttributes, CSSProperties, Dispatch, FormEvent, KeyboardEvent, ReactNode, RefObject, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import {
   addActiveQueuePlatform,
@@ -494,14 +494,33 @@ type PlatformOptionsMenuPosition = {
 type PlatformOptionsMenuProps = {
   ariaLabel?: string;
   children: (options: { closeMenu: () => void }) => ReactNode;
-  label: string;
 };
+
+
+const PlatformOverflowButton = forwardRef<HTMLButtonElement, Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'type'>>(
+  function PlatformOverflowButton({ className = '', ...props }, ref) {
+    return (
+      <button
+        ref={ref}
+        className={`qs-platform-secondary-button qs-platform-options-button ${className}`.trim()}
+        type="button"
+        {...props}
+      >
+        <span className="qs-platform-overflow-icon" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      </button>
+    );
+  },
+);
 
 const platformOptionsMenuWidth = 192;
 const platformOptionsMenuViewportMargin = 8;
 const platformOptionsMenuOffset = 8;
 
-function PlatformOptionsMenu({ ariaLabel, children, label }: PlatformOptionsMenuProps) {
+function PlatformOptionsMenu({ ariaLabel, children }: PlatformOptionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<PlatformOptionsMenuPosition>({ left: 0, top: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -597,18 +616,14 @@ function PlatformOptionsMenu({ ariaLabel, children, label }: PlatformOptionsMenu
 
   return (
     <>
-      <button
+      <PlatformOverflowButton
         ref={buttonRef}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={ariaLabel}
-        className="qs-platform-secondary-button qs-platform-options-button"
         title={ariaLabel}
         onClick={toggleMenu}
-        type="button"
-      >
-        {label}
-      </button>
+      />
       {isOpen && typeof document !== 'undefined'
         ? createPortal(
             <div
@@ -736,7 +751,7 @@ function PlatformQueueColumn({
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
 
   const platformOptionsMenu = (
-    <PlatformOptionsMenu ariaLabel={`${platform} ${t('queue.options')}`} label="…">
+    <PlatformOptionsMenu ariaLabel={`${platform} ${t('queue.options')}`}>
       {({ closeMenu }) => (
         <>
           <label className="block">
@@ -1178,7 +1193,7 @@ function QueueEntryRow({
             <Icon name="gamepad-2" />
             <span>{t('queue.playNow')}</span>
           </button>
-          <PlatformOptionsMenu label="•••">
+          <PlatformOptionsMenu ariaLabel={`${game.title} ${t('queue.options')}`}>
             {({ closeMenu }) => (
               <>
                 <button className="qs-platform-menu-item" onClick={() => { onPlayNow(); closeMenu(); }} type="button">{t('queue.playNow')}</button>
@@ -1239,7 +1254,7 @@ function QueueGameRow({
       </div>
       <div className="flex shrink-0 items-center gap-2 self-center" aria-label={`${game.title} ${t('queue.currentlyPlayingActions')}`}>
         <button className="qs-platform-secondary-button qs-platform-action-button" onClick={() => onOpenDetails(game.id)} type="button">{t('queue.openAdventure')}</button>
-        <PlatformOptionsMenu label="•••">
+        <PlatformOptionsMenu ariaLabel={`${game.title} ${t('queue.options')}`}>
           {({ closeMenu }) => (
             <>
               <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(game.id, platform, 'move-to-backlog'); closeMenu(); }} type="button">{t('queue.moveToQueue')}</button>
