@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Game } from '../../types/game';
 import { getGameCoverSources, isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
 import { getArtworkSet } from '../../lib/gameSelectors';
+import { useCoverImageLoaded } from '../../hooks/useCoverImageLoaded';
 import { useI18n } from '../../i18n';
 import { Icon } from '../Icon';
 
@@ -42,7 +43,6 @@ type GameHeroProps = {
 export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
   const { t } = useI18n();
   const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const [heroBgSourceIndex, setHeroBgSourceIndex] = useState(0);
 
   const artworkSet = useMemo(() => getArtworkSet(game), [game]);
@@ -60,11 +60,11 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
 
   useEffect(() => {
     setCoverSourceIndex(0);
-    setIsCoverLoaded(false);
     setHeroBgSourceIndex(0);
   }, [coverSources, heroBgSources, game.id]);
 
-  const activeCoverSource = coverSources[coverSourceIndex];
+  const activeCoverSource = coverSources[coverSourceIndex] ?? null;
+  const { imgRef: coverImgRef, isLoaded: isCoverLoaded, markBroken: markCoverBroken, markLoaded: markCoverLoaded } = useCoverImageLoaded(activeCoverSource);
   const activeHeroBgSource = heroBgSources[heroBgSourceIndex] ?? null;
   const logoUrl = artworkSet.logo?.trim() || null;
 
@@ -101,10 +101,11 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
                   decoding="async"
                   loading="lazy"
                   onError={() => {
-                    setIsCoverLoaded(false);
-                    setCoverSourceIndex((currentIndex) => currentIndex + 1);
+                    markCoverBroken();
+                    setCoverSourceIndex((currentIndex) => Math.min(currentIndex + 1, coverSources.length - 1));
                   }}
-                  onLoad={() => setIsCoverLoaded(true)}
+                  onLoad={markCoverLoaded}
+                  ref={coverImgRef}
                   src={activeCoverSource}
                 />
               </div>
