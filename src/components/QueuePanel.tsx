@@ -600,7 +600,7 @@ function PlatformOptionsMenu({ children, label }: PlatformOptionsMenuProps) {
         ref={buttonRef}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="qs-platform-options-button rounded-md border px-3 py-2 text-xs font-semibold"
+        className="qs-platform-secondary-button qs-platform-options-button"
         onClick={toggleMenu}
         type="button"
       >
@@ -681,7 +681,6 @@ function PlatformQueueColumn({
   onRemoveEntry: (gameId: string, platform: GamePlatform) => void;
 }) {
   const { t } = useI18n();
-  const playingNowLabel = t('action.playingNow');
   const [isPlannedQueueExpanded, setIsPlannedQueueExpanded] = useState(false);
   const plannedQueuePreviewLimit = 5;
   const shouldCollapsePlannedQueue = queueEntries.length > plannedQueuePreviewLimit;
@@ -737,24 +736,47 @@ function PlatformQueueColumn({
     <>
     <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
-        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-5 overflow-hidden rounded-t-2xl border-b border-white/10">
-          <img alt="" className="h-full w-full object-cover object-center opacity-85" src={displayArtworkUrl} />
+        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-4 overflow-hidden rounded-t-2xl">
+          <img alt="" className="h-full w-full object-cover object-center opacity-88" src={displayArtworkUrl} />
           <div className="qs-platform-artwork-overlay absolute inset-0" />
-          <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-4">
-            <h3
-              className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+          {platformTag ? (
+            <span
+              className="absolute left-4 top-4 inline-flex max-w-[calc(100%-2rem)] items-center rounded-full px-2.5 py-1 text-xs font-semibold shadow-panel backdrop-blur-sm"
               style={{
-                borderColor: `color-mix(in srgb, ${platformAccentColor} 40%, rgb(255 255 255 / 0.1))`,
-                backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.85))`,
+                color: `color-mix(in srgb, ${platformAccentColor} 82%, rgb(226 232 240))`,
+                backgroundColor: `color-mix(in srgb, ${platformAccentColor} 16%, rgb(2 6 23 / 0.76))`,
               }}
+            >
+              <span className="min-w-0 truncate">{platformTag}</span>
+            </span>
+          ) : null}
+          <div className="absolute inset-x-0 bottom-0 flex min-w-0 items-end justify-between gap-3 p-4">
+            <h3
+              className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              style={{ backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.76))` }}
             >
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
               <span className="min-w-0 truncate">{platform}</span>
             </h3>
+            {currentlyPlaying[0] ? (
+              <div className="flex shrink-0 items-center gap-2" aria-label={`${currentlyPlaying[0].title} ${t('queue.currentlyPlayingActions')}`}>
+                <button className="qs-platform-secondary-button qs-platform-action-button" onClick={() => onOpenDetails(currentlyPlaying[0].id)} type="button">{t('queue.openAdventure')}</button>
+                <PlatformOptionsMenu label="•••">
+                  {({ closeMenu }) => (
+                    <>
+                      <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'move-to-backlog'); closeMenu(); }} type="button">{t('queue.moveToQueue')}</button>
+                      <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'finished'); closeMenu(); }} type="button">{t('action.finished')}</button>
+                      <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'drop'); closeMenu(); }} type="button">{t('queue.drop')}</button>
+                      <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'remove-from-playing'); closeMenu(); }} type="button">{t('queue.removeFromPlaying')}</button>
+                    </>
+                  )}
+                </PlatformOptionsMenu>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           {!displayArtworkUrl ? (
             <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight">
@@ -762,7 +784,7 @@ function PlatformQueueColumn({
               <span className="min-w-0 truncate" style={{ color: platformAccentColor }}>{platform}</span>
             </h3>
           ) : null}
-          {platformTag ? (
+          {platformTag && !displayArtworkUrl ? (
             <div className="mt-1.5">
               <span
                 className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
@@ -777,6 +799,10 @@ function PlatformQueueColumn({
             </div>
           ) : null}
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {!displayArtworkUrl && currentlyPlaying[0] ? (
+            <button className="qs-platform-secondary-button qs-platform-action-button" onClick={() => onOpenDetails(currentlyPlaying[0].id)} type="button">{t('queue.openAdventure')}</button>
+          ) : null}
         <PlatformOptionsMenu label={t('queue.options')}>
           {({ closeMenu }) => (
             <>
@@ -791,32 +817,27 @@ function PlatformQueueColumn({
                   onChange={(event) => onLimitChange(platform, Number(event.target.value))}
                 />
               </label>
-              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
-              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
-              <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
-              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
-              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
-              <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
+              <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
             </>
           )}
         </PlatformOptionsMenu>
+        </div>
       </div>
 
       {showPlayingSection && currentlyPlaying.length > 0 ? (
-        <div className="qs-platform-playing-section mb-3 grid w-full min-w-0 gap-2 border-b border-skyglass/15 pb-3">
-          <div className="qs-platform-playing-panel w-full min-w-0 rounded-xl border p-3 shadow-panel">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h4 className="qs-platform-playing-title text-sm font-semibold uppercase tracking-spread">{playingNowLabel}</h4>
-                <p className="qs-platform-playing-meta mt-1 text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} · {platform}</p>
-              </div>
-              <span className="qs-platform-playing-chip rounded-full border px-2 py-1 text-xs font-semibold">{t('queue.activeList')}</span>
-            </div>
-            <div className="grid w-full min-w-0 gap-2">
+        <div className="qs-platform-playing-section mb-4 grid w-full min-w-0 gap-2">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="qs-platform-playing-meta text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} in progress</p>
+          </div>
+          <div className="grid w-full min-w-0 gap-2">
               {currentlyPlaying.map((game) => (
-                <QueueGameRow key={game.id} game={game} platform={platform} playingNowLabel={playingNowLabel} onAction={onPlayingAction} onFindArtwork={onFindArtwork} onOpenDetails={onOpenDetails} />
+                <QueueGameRow key={game.id} game={game} onFindArtwork={onFindArtwork} onOpenDetails={onOpenDetails} />
               ))}
-            </div>
           </div>
         </div>
       ) : null}
@@ -877,7 +898,7 @@ function PlatformQueueColumn({
         {shouldCollapsePlannedQueue ? (
           <button
             aria-expanded={isPlannedQueueExpanded}
-            className="qs-planned-queue-toggle mt-2 flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition"
+            className="qs-planned-queue-toggle mt-2 flex w-full items-center justify-center gap-2 px-3 py-2 text-xs font-semibold transition"
             onClick={() => setIsPlannedQueueExpanded((currentIsExpanded) => !currentIsExpanded)}
             style={{
               borderColor: `color-mix(in srgb, ${platformAccentColor} 24%, rgb(255 255 255 / 0.08))`,
@@ -1135,7 +1156,7 @@ function QueueEntryRow({
   return (
     <article
       aria-label={`${game.title} ${t('queue.entryA11y')}`}
-      className="qs-queue-entry qs-queue-entry--playlist rounded-xl border bg-ink-950/88 p-3"
+      className="qs-queue-entry qs-queue-entry--playlist rounded-xl bg-ink-950/60 p-3"
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button, select, input, label')) return;
         onOpenDetails(game.id);
@@ -1158,17 +1179,17 @@ function QueueEntryRow({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="qs-queue-entry-primary-action hidden h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold text-slate-100 hover:bg-white/10 sm:inline-flex" style={{ borderColor: 'var(--platform-accent)', backgroundColor: 'color-mix(in srgb, var(--platform-accent) 14%, transparent)' }} onClick={onPlayNow} type="button">
+          <button className="qs-platform-secondary-button qs-queue-entry-primary-action hidden items-center gap-1.5 text-slate-100 hover:bg-white/10 sm:inline-flex" style={{ borderColor: 'var(--platform-accent)', backgroundColor: 'color-mix(in srgb, var(--platform-accent) 14%, transparent)' }} onClick={onPlayNow} type="button">
             <Icon name="gamepad-2" />
             <span>{t('queue.playNow')}</span>
           </button>
           <PlatformOptionsMenu label="•••">
             {({ closeMenu }) => (
               <>
-                <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10" onClick={() => { onPlayNow(); closeMenu(); }} type="button">{t('queue.playNow')}</button>
-                <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10 disabled:opacity-45" disabled={isFirstEntry} onClick={() => { onMoveEntry(game.id, entry.targetPlatform, 'top'); closeMenu(); }} type="button">{t('queue.top')}</button>
-                <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10 disabled:opacity-45" disabled={isFirstEntry} onClick={() => { onMoveEntry(game.id, entry.targetPlatform, 'up'); closeMenu(); }} type="button">{t('settings.up')}</button>
-                <button className="h-8 rounded-md border border-white/10 px-2 text-left text-xs text-slate-200 hover:bg-white/10 disabled:opacity-45" disabled={isLastEntry} onClick={() => { onMoveEntry(game.id, entry.targetPlatform, 'down'); closeMenu(); }} type="button">{t('settings.down')}</button>
+                <button className="qs-platform-menu-item" onClick={() => { onPlayNow(); closeMenu(); }} type="button">{t('queue.playNow')}</button>
+                <button className="qs-platform-menu-item disabled:opacity-45" disabled={isFirstEntry} onClick={() => { onMoveEntry(game.id, entry.targetPlatform, 'top'); closeMenu(); }} type="button">{t('queue.top')}</button>
+                <button className="qs-platform-menu-item disabled:opacity-45" disabled={isFirstEntry} onClick={() => { onMoveEntry(game.id, entry.targetPlatform, 'up'); closeMenu(); }} type="button">{t('settings.up')}</button>
+                <button className="qs-platform-menu-item disabled:opacity-45" disabled={isLastEntry} onClick={() => { onMoveEntry(game.id, entry.targetPlatform, 'down'); closeMenu(); }} type="button">{t('settings.down')}</button>
                 <label className="block">
                   <span className="qs-label-caps text-muted">{t('queue.movePlatform')}</span>
                   {platformOptions.length > 0 ? (
@@ -1178,7 +1199,7 @@ function QueueEntryRow({
                     </select>
                   ) : <span className="text-xs text-slate-500">{t('queue.noActivePlatformsConfigured')}</span>}
                 </label>
-                <button className="h-8 rounded-md border border-red-400/30 px-2 text-left text-xs text-red-100 hover:bg-red-500/10" onClick={() => { onRemoveEntry(game.id, entry.targetPlatform); closeMenu(); }} type="button">{t('action.remove')}</button>
+                <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onRemoveEntry(game.id, entry.targetPlatform); closeMenu(); }} type="button">{t('action.remove')}</button>
               </>
             )}
           </PlatformOptionsMenu>
@@ -1190,23 +1211,15 @@ function QueueEntryRow({
 
 function QueueGameRow({
   game,
-  platform,
-  playingNowLabel,
-  onAction,
   onFindArtwork,
   onOpenDetails,
 }: {
   game: Game;
-  platform: GamePlatform;
-  playingNowLabel: string;
-  onAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
   onFindArtwork?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
 }) {
-  const { t } = useI18n();
-
   return (
-    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border p-2 text-sm transition">
+    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg p-2 text-sm transition">
       <div className="relative self-start">
         <button className="block text-left" onClick={() => onOpenDetails(game.id)} type="button">
           <QueueCoverThumbnail game={game} size="playing" />
@@ -1217,25 +1230,12 @@ function QueueGameRow({
         <button className="qs-platform-playing-link block max-w-full truncate text-left text-base font-semibold" onClick={() => onOpenDetails(game.id)} type="button">
           {game.title}
         </button>
-        <span className="qs-platform-playing-label mt-1 block qs-label-caps">{playingNowLabel}</span>
         <span className="qs-platform-playing-meta mt-1 block truncate text-xs">{game.platform}</span>
         <div className="mt-2 flex flex-wrap gap-2">
           <AchievementProgressBadge game={game} />
           <HltbBadge game={game} includeLabel />
         </div>
-        <div className="mt-3 flex items-center gap-2" aria-label={`${game.title} ${t('queue.currentlyPlayingActions')}`}>
-          <button className="qs-platform-playing-action h-9 rounded-full border px-3 text-xs font-semibold" onClick={() => onOpenDetails(game.id)} type="button">{t('queue.openAdventure')}</button>
-          <PlatformOptionsMenu label="•••">
-            {({ closeMenu }) => (
-              <>
-                <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-left text-xs" onClick={() => { onAction(game.id, platform, 'move-to-backlog'); closeMenu(); }} type="button">{t('queue.moveToQueue')}</button>
-                <button className="qs-platform-playing-action h-8 rounded-md border px-2 text-left text-xs" onClick={() => { onAction(game.id, platform, 'finished'); closeMenu(); }} type="button">{t('action.finished')}</button>
-                <button className="qs-platform-playing-drop-action h-8 rounded-md border px-2 text-left text-xs" onClick={() => { onAction(game.id, platform, 'drop'); closeMenu(); }} type="button">{t('queue.drop')}</button>
-                <button className="qs-platform-playing-secondary-action h-8 rounded-md border px-2 text-left text-xs" onClick={() => { onAction(game.id, platform, 'remove-from-playing'); closeMenu(); }} type="button">{t('queue.removeFromPlaying')}</button>
-              </>
-            )}
-          </PlatformOptionsMenu>
-        </div>
+
       </div>
     </article>
   );

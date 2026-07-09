@@ -681,23 +681,58 @@ img {
 }
 
 .qs-queue-entry {
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 20%, rgb(255 255 255 / 0.06));
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  border: 1px solid transparent;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 .qs-queue-entry:hover,
 .qs-queue-entry:focus-within {
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 42%, rgb(255 255 255 / 0.1));
-  box-shadow: 0 0 14px color-mix(in srgb, var(--platform-accent, var(--accent)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 26%, rgb(255 255 255 / 0.08));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--platform-accent, var(--accent)) 10%, transparent);
+}
+.qs-platform-secondary-button {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, rgb(255 255 255 / 0.08));
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 72%, rgb(226 232 240));
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 9%, rgb(2 6 23 / 0.58));
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
 .qs-platform-options-button {
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 30%, rgb(255 255 255 / 0.08));
-  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 60%, rgb(148 163 184));
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  min-width: 2.25rem;
 }
-.qs-platform-options-button:hover {
-  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 10%, transparent);
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 50%, rgb(255 255 255 / 0.1));
+.qs-platform-secondary-button:hover,
+.qs-platform-secondary-button:focus-visible {
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 15%, rgb(2 6 23 / 0.74));
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 45%, rgb(255 255 255 / 0.1));
   color: color-mix(in srgb, var(--platform-accent, var(--accent)) 85%, rgb(255 255 255));
+  transform: translateY(-1px);
+}
+.qs-platform-menu-item {
+  min-height: 2rem;
+  border-radius: 0.625rem;
+  padding: 0.45rem 0.625rem;
+  text-align: left;
+  font-size: 0.75rem;
+  color: rgb(226 232 240);
+}
+.qs-platform-menu-item:hover,
+.qs-platform-menu-item:focus-visible {
+  background: rgb(255 255 255 / 0.08);
+}
+.qs-platform-menu-item--danger {
+  color: rgb(254 202 202);
+}
+.qs-platform-menu-item--danger:hover,
+.qs-platform-menu-item--danger:focus-visible {
+  background: rgb(var(--warning-rgb) / 0.12);
 }
 
 .qs-platform-playing-panel {
@@ -718,8 +753,7 @@ img {
 }
 
 .qs-platform-playing-row {
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 32%, var(--border));
-  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 7%, var(--surface-secondary));
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 5%, transparent);
   color: var(--text-secondary);
 }
 
@@ -754,8 +788,7 @@ img {
 
 .qs-platform-playing-row:hover,
 .qs-platform-playing-row:focus-within {
-  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 52%, var(--border));
-  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 12%, var(--surface-secondary));
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 10%, var(--surface-secondary));
 }
 
 .qs-platform-playing-link:hover,
@@ -798,15 +831,8 @@ img {
 .qs-queue-entry--playlist {
   cursor: pointer;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--platform-accent, var(--accent)) 9%, transparent), transparent 42%),
-    color-mix(in srgb, var(--surface-secondary) 92%, black);
-}
-
-.qs-queue-entry--playlist .qs-platform-options-button {
-  min-width: 2.25rem;
-  padding-inline: 0.55rem;
-  border-radius: 999px;
-  letter-spacing: 0.08em;
+    linear-gradient(90deg, color-mix(in srgb, var(--platform-accent, var(--accent)) 7%, transparent), transparent 42%),
+    color-mix(in srgb, var(--surface-secondary) 70%, transparent);
 }
 
 .qs-queue-entry-primary-action,
@@ -2784,13 +2810,16 @@ textarea,
 }
 
 .qs-planned-queue-toggle {
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--platform-accent) 18%, rgb(255 255 255 / 0.08));
+  border-radius: 0;
+  background: transparent !important;
 }
 
 .qs-planned-queue-toggle:hover,
 .qs-planned-queue-toggle:focus-visible {
-  border-color: color-mix(in srgb, var(--platform-accent) 42%, rgb(255 255 255 / 0.14)) !important;
-  background-color: color-mix(in srgb, var(--platform-accent) 13%, rgb(2 6 23 / 0.84)) !important;
+  border-color: color-mix(in srgb, var(--platform-accent) 34%, rgb(255 255 255 / 0.14)) !important;
+  background-color: color-mix(in srgb, var(--platform-accent) 7%, transparent) !important;
   color: color-mix(in srgb, var(--platform-accent) 86%, white) !important;
 }
 
