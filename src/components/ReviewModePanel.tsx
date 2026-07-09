@@ -25,6 +25,7 @@ import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ScreenshotStrip } from './ScreenshotStrip';
+import { RatingBadgeStack } from './RatingBadgeStack';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 import { useQuestQueuePrefetch } from '../hooks/useQuestQueuePrefetch';
 
@@ -736,7 +737,7 @@ function FocusedReviewCard({
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const activeCoverSource = coverSources[coverSourceIndex];
   const isGeneratedFallbackActive = activeCoverSource === fallbackCoverSource;
-  const metacriticScore = formatReviewMetacriticScore(game.metacriticScore);
+  const metacriticScore = formatReviewMetacriticScore(game.metacriticScore ?? game.metacritic);
 
   useEffect(() => {
     setCoverSourceIndex(0);
@@ -993,11 +994,12 @@ function FocusedReviewCard({
                   </div>
                 </div>
               )}
-              {metacriticScore ? (
-                <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-1.5">
-                  {metacriticScore ? <span className="rounded-full border border-mint/35 bg-ink-950/90 px-3 py-1 text-xs font-black leading-none text-mint shadow-glow backdrop-blur-md">Metacritic {metacriticScore}</span> : null}
-                </div>
-              ) : null}
+              <RatingBadgeStack
+                className="pointer-events-none absolute left-4 top-4 z-10 max-w-[calc(100%-5rem)]"
+                game={game}
+                metacriticScore={metacriticScore}
+                variant="detail"
+              />
             </div>
           </div>
 
