@@ -114,7 +114,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
   );
 
   return (
-    <div className="px-3 pb-24 pt-4">
+    <div className="space-y-8 px-3 pb-24 pt-4">
       <ReleaseCalendarSection
         candidates={upcoming}
         isRawgConfigured={loadRawgSettings().apiKey.trim().length > 0}
@@ -126,57 +126,75 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
         onRefresh={() => setReleaseRefreshToken((value) => value + 1)}
       />
 
-      {candidates === null ? (
-        <DiscoverGridSkeleton />
-      ) : candidates.length === 0 ? (
-        <div className="mx-auto max-w-md py-16">
-          <EmptyState
-            icon="compass"
-            title={t('discover.empty.title')}
-            text={t('discover.empty.text')}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2">
-          {candidates.map((candidate, i) => {
-            const game = adaptedGames[i];
-            if (!game) return null;
+      <section className="rounded-2xl border border-skyglass/15 bg-ink-950/35 p-3 shadow-glow/20 sm:p-4">
+        <DiscoverSectionHeader
+          kicker="Personalized recommendations"
+          title="Recommended for You"
+          subtitle="Personalized picks from your library history."
+        />
+        {candidates === null ? (
+          <DiscoverGridSkeleton />
+        ) : candidates.length === 0 ? (
+          <div className="mx-auto max-w-md py-16">
+            <EmptyState
+              icon="compass"
+              title={t('discover.empty.title')}
+              text={t('discover.empty.text')}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2.5 sm:gap-3">
+            {candidates.map((candidate, i) => {
+              const game = adaptedGames[i];
+              if (!game) return null;
 
-            const canAddToInbox =
-              !candidate.libraryStatus && !candidate.inboxStatus && onAddToInbox != null;
-            const metacritic = candidate.game.metacritic;
-            const context = getDiscoveryContext(candidate, t);
+              const canAddToInbox =
+                !candidate.libraryStatus && !candidate.inboxStatus && onAddToInbox != null;
+              const metacritic = candidate.game.metacritic;
+              const context = getDiscoveryContext(candidate, t);
 
-            return (
-              <GameCard
-                key={game.id}
-                game={game}
-                suppressWantToPlayStatus={candidate.libraryStatus === null}
-                detailsLabel={t('action.preview')}
-                hideActionMenu
-                onOpenDetails={() => onOpenGame(candidate)}
-                primaryAction={
-                  canAddToInbox
-                    ? {
-                        label: t('action.reviewLater'),
-                        onClick: () => onAddToInbox(candidate.game, candidate.reason ?? ''),
-                      }
-                    : undefined
-                }
-                coverBadgeTopRight={
-                  <RatingBadgeStack
-                    className="absolute right-3 top-3 z-10 items-end"
-                    game={game}
-                    metacriticScore={metacritic}
-                  />
-                }
-                suppressRawgRatingBadge
-                discoveryContext={context}
-              />
-            );
-          })}
-        </div>
-      )}
+              return (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  suppressWantToPlayStatus={candidate.libraryStatus === null}
+                  detailsLabel={t('action.preview')}
+                  hideActionMenu
+                  onOpenDetails={() => onOpenGame(candidate)}
+                  primaryAction={
+                    canAddToInbox
+                      ? {
+                          label: t('action.reviewLater'),
+                          onClick: () => onAddToInbox(candidate.game, candidate.reason ?? ''),
+                        }
+                      : undefined
+                  }
+                  coverBadgeTopRight={
+                    <RatingBadgeStack
+                      className="absolute right-3 top-3 z-10 items-end"
+                      game={game}
+                      metacriticScore={metacritic}
+                    />
+                  }
+                  suppressRawgRatingBadge
+                  discoveryContext={context}
+                  discoveryContextTone="muted"
+                />
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function DiscoverSectionHeader({ kicker, title, subtitle }: { kicker: string; title: string; subtitle: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="qs-label-caps text-muted">{kicker}</p>
+      <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{title}</h2>
+      <p className="mt-1 max-w-2xl text-sm text-slate-400">{subtitle}</p>
     </div>
   );
 }
@@ -202,13 +220,13 @@ function ReleaseCalendarSection({
 }) {
   if (!isRawgConfigured) {
     return (
-      <section className="mb-4 rounded-xl border border-skyglass/15 bg-ink-900/70 p-3 sm:p-4">
+      <section className="rounded-2xl border border-skyglass/15 bg-gradient-to-b from-mint/10 via-ink-950/50 to-ink-950/30 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="qs-label-caps text-muted">Release Calendar</p>
-            <h2 className="text-lg font-semibold text-white">Upcoming for You</h2>
-            <p className="mt-1 text-sm text-slate-400">Connect RAWG to see personalized upcoming releases from the next 90 days.</p>
-          </div>
+          <DiscoverSectionHeader
+            kicker="Release Calendar"
+            title="Upcoming for You"
+            subtitle="Connect RAWG to see personalized upcoming releases from the next 90 days."
+          />
           {onOpenSettings ? <button className="rounded-lg border border-mint/40 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint" onClick={onOpenSettings} type="button">Settings → Integrations</button> : null}
         </div>
       </section>
@@ -216,45 +234,51 @@ function ReleaseCalendarSection({
   }
 
   if (candidates === null) {
-    return <div className="mb-4 h-36 animate-pulse rounded-xl border border-skyglass/10 bg-ink-900/70" />;
+    return <div className="h-44 animate-pulse rounded-2xl border border-skyglass/10 bg-ink-900/70" />;
   }
 
   if (candidates.length === 0) return null;
 
   return (
-    <section className="mb-5">
-      <div className="mb-2 flex items-end justify-between gap-3">
-        <div>
-          <p className="qs-label-caps text-muted">Release Calendar</p>
-          <h2 className="text-xl font-semibold text-white">Upcoming for You</h2>
-          <p className="text-sm text-slate-400">Ordered by release date, filtered by your library taste.</p>
-        </div>
-        <button className="rounded-lg border border-skyglass/20 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-mint/40 hover:text-mint" onClick={onRefresh} type="button">Refresh</button>
+    <section className="rounded-2xl border border-mint/15 bg-gradient-to-b from-mint/10 via-ink-950/55 to-ink-950/35 p-3 sm:p-4">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <DiscoverSectionHeader
+          kicker="Release Calendar"
+          title="Upcoming for You"
+          subtitle="Upcoming releases matched to your library taste."
+        />
+        <button className="rounded-lg border border-skyglass/20 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-mint/40 hover:text-mint focus-visible:border-mint/50 focus-visible:outline-none" onClick={onRefresh} type="button">Refresh</button>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] sm:overflow-visible">
-        {candidates.slice(0, 6).map((candidate) => (
-          <article key={candidate.game.rawgId} className="qs-glass w-56 shrink-0 overflow-hidden rounded-xl border sm:w-auto">
-            <button className="block w-full text-left" onClick={() => onOpenGame(candidate)} type="button">
-              <div className="aspect-[16/9] bg-ink-800">
-                {candidate.game.coverUrl ? <img alt="" className="h-full w-full object-cover" src={candidate.game.coverUrl} /> : null}
-              </div>
-              <div className="space-y-2 p-3">
-                <div>
-                  <h3 className="line-clamp-2 font-semibold text-white">{candidate.game.title}</h3>
-                  <p className="text-xs text-mint">{formatReleaseDate(candidate.game.released)}</p>
-                </div>
-                <p className="line-clamp-1 text-xs text-slate-400">{candidate.game.platforms.join(' · ') || 'Platforms TBA'}</p>
-                <p className="line-clamp-2 text-xs text-slate-300">{candidate.reason}</p>
-                <p className="text-xs text-slate-500">{candidate.game.metacritic ? `MC ${candidate.game.metacritic}` : candidate.game.rawgRating ? `RAWG ★ ${candidate.game.rawgRating.toFixed(1)}` : 'Rating TBA'}</p>
-              </div>
-            </button>
-            <div className="grid grid-cols-3 gap-1 px-3 pb-3 text-[11px] font-semibold">
-              <button className="rounded bg-mint/10 px-2 py-1 text-mint" onClick={() => onAddToWishlist?.(candidate.game)} type="button">Wishlist</button>
-              <button className="rounded bg-skyglass/10 px-2 py-1 text-slate-200" onClick={() => onAddToPlans?.(candidate.game)} type="button">Plan</button>
-              <button className="rounded bg-ink-800 px-2 py-1 text-slate-400" onClick={() => onIgnore(candidate)} type="button">Ignore</button>
-            </div>
-          </article>
-        ))}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2.5 sm:gap-3">
+        {candidates.slice(0, 6).map((candidate) => {
+          const game = discoveryCandidateToGame(candidate, [], 'discover');
+          return (
+            <GameCard
+              key={candidate.game.rawgId}
+              game={game}
+              suppressWantToPlayStatus
+              detailsLabel="Preview"
+              hideActionMenu
+              onOpenDetails={() => onOpenGame(candidate)}
+              primaryAction={onAddToWishlist ? { label: 'Wishlist', onClick: () => onAddToWishlist(candidate.game) } : undefined}
+              secondaryActions={[
+                ...(onAddToPlans ? [{ label: 'Plan', onClick: () => onAddToPlans(candidate.game) }] : []),
+                { label: 'Ignore', onClick: () => onIgnore(candidate), tone: 'danger' as const },
+              ]}
+              coverBadgeTopRight={
+                <RatingBadgeStack
+                  className="absolute right-3 top-3 z-10 items-end"
+                  game={game}
+                  metacriticScore={candidate.game.metacritic}
+                />
+              }
+              suppressRawgRatingBadge
+              metaEyebrow={<span className="inline-flex rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-xs font-bold text-mint">{formatReleaseDate(candidate.game.released)}</span>}
+              discoveryContext={candidate.reason ?? 'Matched to your library taste'}
+              discoveryContextTone="accent"
+            />
+          );
+        })}
       </div>
     </section>
   );

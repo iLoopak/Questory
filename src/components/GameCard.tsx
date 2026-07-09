@@ -37,6 +37,8 @@ type GameCardProps = {
    * the card footer. Designed for Discover-mode cards ("Review Later").
    */
   primaryAction?: { label: string; onClick: () => void };
+  secondaryActions?: Array<{ label: string; onClick: () => void; tone?: 'neutral' | 'danger' }>;
+  metaEyebrow?: ReactNode;
   /**
    * Element rendered inside the cover area — caller must include `absolute`
    * positioning classes. Designed for Discover-mode metacritic badges.
@@ -49,6 +51,7 @@ type GameCardProps = {
    * Designed for Discover-mode reason text ("Trending", "Hidden Gem", …).
    */
   discoveryContext?: string;
+  discoveryContextTone?: 'muted' | 'accent';
   /** Override the label of the "Details" button. Pass "Preview" for Discover cards. */
   detailsLabel?: string;
   /**
@@ -78,9 +81,12 @@ function GameCardComponent({
   platformLabel,
   suppressWantToPlayStatus = false,
   primaryAction,
+  secondaryActions,
+  metaEyebrow,
   coverBadgeTopRight,
   suppressRawgRatingBadge = false,
   discoveryContext,
+  discoveryContextTone = 'muted',
   detailsLabel,
   hideActionMenu = false,
 }: GameCardProps) {
@@ -268,12 +274,34 @@ function GameCardComponent({
               {'★'.repeat(game.rating)}{'☆'.repeat(5 - game.rating)}
             </div>
           ) : null}
+          {metaEyebrow ? <div className="mb-1.5">{metaEyebrow}</div> : null}
           {discoveryContext ? (
-            <p className="mt-1 line-clamp-2 text-xs italic leading-snug text-slate-500">{discoveryContext}</p>
+            <p className={`mt-1 line-clamp-2 text-xs leading-snug ${discoveryContextTone === 'accent' ? 'font-medium text-mint' : 'italic text-slate-500'}`}>{discoveryContext}</p>
           ) : null}
         </div>
 
         <div className="mt-auto border-t border-skyglass/15 pt-2.5 sm:pt-3">
+          {secondaryActions?.length ? (
+            <div className="mb-2 grid grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-1.5 text-[11px] font-semibold sm:text-xs">
+              {secondaryActions.map((action) => (
+                <button
+                  className={`h-9 rounded-md border px-2 transition focus-visible:outline-none ${
+                    action.tone === 'danger'
+                      ? 'border-skyglass/15 bg-ink-800/80 text-slate-400 hover:border-red-400/40 hover:text-red-300 focus-visible:border-red-400/60'
+                      : 'border-skyglass/20 bg-skyglass/10 text-slate-200 hover:border-mint/35 hover:text-mint focus-visible:border-mint/50'
+                  }`}
+                  key={action.label}
+                  onClick={(event) => {
+                    stopCardAction(event);
+                    action.onClick();
+                  }}
+                  type="button"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
             {primaryAction ? (
               <button
