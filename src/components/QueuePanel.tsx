@@ -758,21 +758,6 @@ function PlatformQueueColumn({
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
               <span className="min-w-0 truncate">{platform}</span>
             </h3>
-            {currentlyPlaying[0] ? (
-              <div className="flex shrink-0 items-center gap-2" aria-label={`${currentlyPlaying[0].title} ${t('queue.currentlyPlayingActions')}`}>
-                <button className="qs-platform-secondary-button qs-platform-action-button" onClick={() => onOpenDetails(currentlyPlaying[0].id)} type="button">{t('queue.openAdventure')}</button>
-                <PlatformOptionsMenu label="•••">
-                  {({ closeMenu }) => (
-                    <>
-                      <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'move-to-backlog'); closeMenu(); }} type="button">{t('queue.moveToQueue')}</button>
-                      <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'finished'); closeMenu(); }} type="button">{t('action.finished')}</button>
-                      <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'drop'); closeMenu(); }} type="button">{t('queue.drop')}</button>
-                      <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(currentlyPlaying[0].id, platform, 'remove-from-playing'); closeMenu(); }} type="button">{t('queue.removeFromPlaying')}</button>
-                    </>
-                  )}
-                </PlatformOptionsMenu>
-              </div>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -800,32 +785,29 @@ function PlatformQueueColumn({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {!displayArtworkUrl && currentlyPlaying[0] ? (
-            <button className="qs-platform-secondary-button qs-platform-action-button" onClick={() => onOpenDetails(currentlyPlaying[0].id)} type="button">{t('queue.openAdventure')}</button>
-          ) : null}
-        <PlatformOptionsMenu label={t('queue.options')}>
-          {({ closeMenu }) => (
-            <>
-              <label className="block">
-                <span className="qs-label-caps text-muted">{t('queue.futureActiveLimit')}</span>
-                <input
-                  className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-                  min={1}
-                  max={25}
-                  type="number"
-                  value={maxActiveGames}
-                  onChange={(event) => onLimitChange(platform, Number(event.target.value))}
-                />
-              </label>
-              <button className="qs-platform-menu-item" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
-              <button className="qs-platform-menu-item" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
-              <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
-              <button className="qs-platform-menu-item" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
-              <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
-              <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
-            </>
-          )}
-        </PlatformOptionsMenu>
+          <PlatformOptionsMenu label={t('queue.options')}>
+            {({ closeMenu }) => (
+              <>
+                <label className="block">
+                  <span className="qs-label-caps text-muted">{t('queue.futureActiveLimit')}</span>
+                  <input
+                    className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+                    min={1}
+                    max={25}
+                    type="number"
+                    value={maxActiveGames}
+                    onChange={(event) => onLimitChange(platform, Number(event.target.value))}
+                  />
+                </label>
+                <button className="qs-platform-menu-item" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
+                <button className="qs-platform-menu-item" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
+                <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
+                <button className="qs-platform-menu-item" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
+                <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
+                <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
+              </>
+            )}
+          </PlatformOptionsMenu>
         </div>
       </div>
 
@@ -835,9 +817,16 @@ function PlatformQueueColumn({
             <p className="qs-platform-playing-meta text-xs">{currentlyPlaying.length} {currentlyPlaying.length === 1 ? t('queue.activeGame') : t('queue.activeGames')} in progress</p>
           </div>
           <div className="grid w-full min-w-0 gap-2">
-              {currentlyPlaying.map((game) => (
-                <QueueGameRow key={game.id} game={game} onFindArtwork={onFindArtwork} onOpenDetails={onOpenDetails} />
-              ))}
+            {currentlyPlaying.map((game) => (
+              <QueueGameRow
+                key={game.id}
+                game={game}
+                platform={platform}
+                onFindArtwork={onFindArtwork}
+                onOpenDetails={onOpenDetails}
+                onPlayingAction={onPlayingAction}
+              />
+            ))}
           </div>
         </div>
       ) : null}
@@ -1211,15 +1200,21 @@ function QueueEntryRow({
 
 function QueueGameRow({
   game,
+  platform,
   onFindArtwork,
   onOpenDetails,
+  onPlayingAction,
 }: {
   game: Game;
+  platform: GamePlatform;
   onFindArtwork?: (game: Game) => void;
   onOpenDetails: (gameId: string) => void;
+  onPlayingAction: (gameId: string, platform: GamePlatform, action: PlayingGameAction) => void;
 }) {
+  const { t } = useI18n();
+
   return (
-    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg p-2 text-sm transition">
+    <article className="qs-platform-playing-row group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 rounded-lg p-2 text-sm transition">
       <div className="relative self-start">
         <button className="block text-left" onClick={() => onOpenDetails(game.id)} type="button">
           <QueueCoverThumbnail game={game} size="playing" />
@@ -1235,7 +1230,19 @@ function QueueGameRow({
           <AchievementProgressBadge game={game} />
           <HltbBadge game={game} includeLabel />
         </div>
-
+      </div>
+      <div className="flex shrink-0 items-center gap-2 self-center" aria-label={`${game.title} ${t('queue.currentlyPlayingActions')}`}>
+        <button className="qs-platform-secondary-button qs-platform-action-button" onClick={() => onOpenDetails(game.id)} type="button">{t('queue.openAdventure')}</button>
+        <PlatformOptionsMenu label="•••">
+          {({ closeMenu }) => (
+            <>
+              <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(game.id, platform, 'move-to-backlog'); closeMenu(); }} type="button">{t('queue.moveToQueue')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(game.id, platform, 'finished'); closeMenu(); }} type="button">{t('action.finished')}</button>
+              <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onPlayingAction(game.id, platform, 'drop'); closeMenu(); }} type="button">{t('queue.drop')}</button>
+              <button className="qs-platform-menu-item" onClick={() => { onPlayingAction(game.id, platform, 'remove-from-playing'); closeMenu(); }} type="button">{t('queue.removeFromPlaying')}</button>
+            </>
+          )}
+        </PlatformOptionsMenu>
       </div>
     </article>
   );
