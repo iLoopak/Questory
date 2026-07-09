@@ -1,7 +1,20 @@
 import { ArtworkBrowserView } from '../../artwork/ArtworkBrowserView';
-import type { AppSectionRouteModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel } from '../AppSectionRouter';
 
-type ArtworkRouteProps = Pick<AppSectionRouteModel, 'games' | 'updateGameArtwork' | 'startMetadataWorkflow' | 'refreshGameMetadataFromActions' | 'setSelectedGameId'>;
-export function ArtworkRoute({ games, updateGameArtwork, startMetadataWorkflow, refreshGameMetadataFromActions, setSelectedGameId }: ArtworkRouteProps) {
-  return <ArtworkBrowserView games={games} onApplyArtworkUpdate={updateGameArtwork} onEnrichGames={startMetadataWorkflow} onFindArtwork={(game, mode = 'artwork') => refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')} onOpenDetails={setSelectedGameId} />;
+type ArtworkRouteProps = {
+  core: Pick<AppRouterCoreModel, 'setSelectedGameId'>;
+  games: Pick<AppRouterGameModel, 'games'>;
+  metadata: Pick<AppRouterMetadataModel, 'updateGameArtwork' | 'startMetadataWorkflow' | 'refreshGameMetadataFromActions'>;
+};
+
+export function ArtworkRoute({ core, games, metadata }: ArtworkRouteProps) {
+  return (
+    <ArtworkBrowserView
+      games={games.games}
+      onApplyArtworkUpdate={metadata.updateGameArtwork}
+      onEnrichGames={metadata.startMetadataWorkflow}
+      onFindArtwork={(game, mode = 'artwork') => metadata.refreshGameMetadataFromActions(game, mode as 'metadata' | 'artwork')}
+      onOpenDetails={core.setSelectedGameId}
+    />
+  );
 }

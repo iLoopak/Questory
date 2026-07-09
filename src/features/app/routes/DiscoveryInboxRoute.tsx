@@ -1,7 +1,18 @@
 import { DiscoveryInboxPanel } from '../../../components/DiscoveryInboxPanel';
-import type { AppSectionRouteModel } from '../AppSectionRouter';
+import type { AppRouterDiscoveryModel } from '../AppSectionRouter';
 
-type DiscoveryInboxRouteProps = Pick<AppSectionRouteModel, 'discoveryInboxItems' | 'promoteInboxDiscoveryToLibrary' | 'promoteInboxDiscoveryToWishlist' | 'promoteInboxDiscoveryToPlans' | 'handleInboxIgnore'>;
-export function DiscoveryInboxRoute({ discoveryInboxItems, promoteInboxDiscoveryToLibrary, promoteInboxDiscoveryToWishlist, promoteInboxDiscoveryToPlans, handleInboxIgnore }: DiscoveryInboxRouteProps) {
-  return <DiscoveryInboxPanel items={discoveryInboxItems} onAddToLibrary={promoteInboxDiscoveryToLibrary} onAddToWishlist={promoteInboxDiscoveryToWishlist} onAddToPlans={promoteInboxDiscoveryToPlans} onIgnore={handleInboxIgnore} />;
+type DiscoveryInboxRouteProps = {
+  discovery: Pick<AppRouterDiscoveryModel, 'discoveryInboxItems' | 'promoteInboxDiscoveryToLibrary' | 'promoteInboxDiscoveryToWishlist' | 'promoteInboxDiscoveryToPlans' | 'handleInboxIgnore'>;
+};
+
+export function DiscoveryInboxRoute({ discovery }: DiscoveryInboxRouteProps) {
+  return (
+    <DiscoveryInboxPanel
+      items={discovery.discoveryInboxItems}
+      onAddToLibrary={discovery.promoteInboxDiscoveryToLibrary}
+      onAddToWishlist={discovery.promoteInboxDiscoveryToWishlist}
+      onAddToPlans={discovery.promoteInboxDiscoveryToPlans}
+      onIgnore={discovery.handleInboxIgnore}
+    />
+  );
 }

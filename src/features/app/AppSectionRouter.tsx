@@ -294,39 +294,88 @@ export type AppRouterSettingsModel = Pick<AppSectionRouteModel, AppRouterSetting
 export type AppRouterMetadataModel = Pick<AppSectionRouteModel, AppRouterMetadataKeys>;
 export type AppRouterImportModel = Pick<AppSectionRouteModel, AppRouterImportKeys>;
 
-export type AppSectionRouterProps = { core: AppRouterCoreModel; games: AppRouterGameModel; collections: AppRouterCollectionModel; queue: AppRouterQueueModel; review: AppRouterReviewModel; sync: AppRouterSyncModel; shelf: AppRouterShelfModel; discovery: AppRouterDiscoveryModel; onboarding: AppRouterOnboardingModel; settings: AppRouterSettingsModel; metadata: AppRouterMetadataModel; imports: AppRouterImportModel; };
+export type AppSectionRouterProps = {
+  core: AppRouterCoreModel;
+  games: AppRouterGameModel;
+  collections: AppRouterCollectionModel;
+  queue: AppRouterQueueModel;
+  review: AppRouterReviewModel;
+  sync: AppRouterSyncModel;
+  shelf: AppRouterShelfModel;
+  discovery: AppRouterDiscoveryModel;
+  onboarding: AppRouterOnboardingModel;
+  settings: AppRouterSettingsModel;
+  metadata: AppRouterMetadataModel;
+  imports: AppRouterImportModel;
+};
 
 export function AppSectionRouter(props: AppSectionRouterProps) {
   const { core, games, collections, queue, review, sync, shelf, discovery, onboarding, settings, metadata, imports } = props;
   const { activeNavItem, mainContentRef } = core;
-  const routeProps: AppSectionRouteModel = { ...core, ...games, ...collections, ...queue, ...review, ...sync, ...shelf, ...discovery, ...onboarding, ...settings, ...metadata, ...imports };
 
   return (
     <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
       {activeNavItem === 'Home' ? (
-        <HomeRoute {...routeProps} />
+        <HomeRoute
+          core={core}
+          games={games}
+          queue={queue}
+          review={review}
+          sync={sync}
+          shelf={shelf}
+          discovery={discovery}
+        />
       ) : activeNavItem === 'Library' ? (
-        <LibraryRoute {...routeProps} />
+        <LibraryRoute
+          core={core}
+          games={games}
+          collections={collections}
+          queue={queue}
+          review={review}
+          sync={sync}
+          metadata={metadata}
+          imports={imports}
+        />
       ) : activeNavItem === 'Wishlist' ? (
-        <WishlistRoute {...routeProps} />
+        <WishlistRoute
+          core={core}
+          games={games}
+          collections={collections}
+          queue={queue}
+          review={review}
+          sync={sync}
+          metadata={metadata}
+          imports={imports}
+        />
       ) : activeNavItem === 'Queue' ? (
-        <QuestQueueRoute {...routeProps} />
+        <QuestQueueRoute core={core} games={games} queue={queue} review={review} metadata={metadata} />
       ) : activeNavItem === 'Review Mode' ? (
-        <ReviewModeRoute {...routeProps} />
+        <ReviewModeRoute core={core} games={games} queue={queue} review={review} metadata={metadata} />
       ) : activeNavItem === 'Discovery Inbox' ? (
-        <DiscoveryInboxRoute {...routeProps} />
+        <DiscoveryInboxRoute discovery={discovery} />
       ) : activeNavItem === 'Metadata' ? (
-        <MetadataRoute {...routeProps} />
+        <MetadataRoute games={games} metadata={metadata} onboarding={onboarding} />
       ) : activeNavItem === 'Artwork' ? (
-        <ArtworkRoute {...routeProps} />
+        <ArtworkRoute core={core} games={games} metadata={metadata} />
       ) : activeNavItem === 'Discover' ? (
-        <DiscoveryRoute {...routeProps} />
+        <DiscoveryRoute core={core} games={games} discovery={discovery} />
       ) : activeNavItem === 'Stats' ? (
-        <StatsRoute {...routeProps} />
+        <StatsRoute core={core} games={games} queue={queue} />
       ) : activeNavItem === 'Quest Runner' ? (
-        <QuestRunnerRoute {...routeProps} />
+        <QuestRunnerRoute games={games} />
       ) : activeNavItem === 'Settings' ? (
-        <SettingsRoute {...routeProps} />
+        <SettingsRoute
+          core={core}
+          games={games}
+          collections={collections}
+          queue={queue}
+          review={review}
+          sync={sync}
+          shelf={shelf}
+          onboarding={onboarding}
+          settings={settings}
+          imports={imports}
+        />
       ) : (
         <PlaceholderPanel title={activeNavItem} />
       )}

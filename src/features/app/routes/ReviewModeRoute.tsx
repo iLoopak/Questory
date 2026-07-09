@@ -1,7 +1,32 @@
 import { ReviewModePanel } from '../../../components/ReviewModePanel';
-import type { AppSectionRouteModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel } from '../AppSectionRouter';
 
-type ReviewModeRouteProps = Pick<AppSectionRouteModel, 'games' | 'reviewIgnoredGameIds' | 'activeQueuePlatforms' | 'platformQueueState' | 'refreshingMetadataGameIds' | 'reviewModeState' | 'confirmCancelConvention' | 'activeReviewSource' | 'handleReviewAction' | 'ensureRawgMetadataForGame' | 'addQueuePlatform' | 'setActiveNavItem' | 'restoreReviewIgnoredGames' | 'setReviewSource'>;
-export function ReviewModeRoute({ games, reviewIgnoredGameIds, activeQueuePlatforms, platformQueueState, refreshingMetadataGameIds, reviewModeState, confirmCancelConvention, activeReviewSource, handleReviewAction, ensureRawgMetadataForGame, addQueuePlatform, setActiveNavItem, restoreReviewIgnoredGames, setReviewSource }: ReviewModeRouteProps) {
-  return <ReviewModePanel games={games} ignoredGameIds={reviewIgnoredGameIds} queuePlatforms={activeQueuePlatforms} queueState={platformQueueState} refreshingMetadataGameIds={refreshingMetadataGameIds} reviewModeState={reviewModeState} confirmCancelConvention={confirmCancelConvention} source={activeReviewSource} onAction={handleReviewAction} onEnsureRawgMetadata={ensureRawgMetadataForGame} onAddPlatform={addQueuePlatform} onOpenQueue={() => setActiveNavItem('Queue')} onRestoreIgnored={restoreReviewIgnoredGames} onReturnToLibrary={() => setActiveNavItem('Library')} onSourceChange={setReviewSource} />;
+type ReviewModeRouteProps = {
+  core: Pick<AppRouterCoreModel, 'setActiveNavItem'>;
+  games: Pick<AppRouterGameModel, 'games' | 'reviewIgnoredGameIds'>;
+  queue: Pick<AppRouterQueueModel, 'activeQueuePlatforms' | 'platformQueueState' | 'addQueuePlatform'>;
+  review: AppRouterReviewModel;
+  metadata: Pick<AppRouterMetadataModel, 'refreshingMetadataGameIds' | 'ensureRawgMetadataForGame'>;
+};
+
+export function ReviewModeRoute({ core, games, queue, review, metadata }: ReviewModeRouteProps) {
+  return (
+    <ReviewModePanel
+      games={games.games}
+      ignoredGameIds={games.reviewIgnoredGameIds}
+      queuePlatforms={queue.activeQueuePlatforms}
+      queueState={queue.platformQueueState}
+      refreshingMetadataGameIds={metadata.refreshingMetadataGameIds}
+      reviewModeState={review.reviewModeState}
+      confirmCancelConvention={review.confirmCancelConvention}
+      source={review.activeReviewSource}
+      onAction={review.handleReviewAction}
+      onEnsureRawgMetadata={metadata.ensureRawgMetadataForGame}
+      onAddPlatform={queue.addQueuePlatform}
+      onOpenQueue={() => core.setActiveNavItem('Queue')}
+      onRestoreIgnored={review.restoreReviewIgnoredGames}
+      onReturnToLibrary={() => core.setActiveNavItem('Library')}
+      onSourceChange={review.setReviewSource}
+    />
+  );
 }
