@@ -7,6 +7,7 @@ import {
   createPlatformArtworkPreset,
   getActiveQueuePlatforms,
   getPlatformAccentColor,
+  getPlatformArtworkUrl,
   getPlatformTag,
   getQueuePlatforms,
   getQueueSummary,
@@ -113,6 +114,7 @@ export function QueuePlatformsSettingsPanel({
                   key={platform}
                   isActive
                   accentColor={getPlatformAccentColor(queueState, platform)}
+                  displayArtworkUrl={getPlatformArtworkUrl(queueState, platform)}
                   artworkUrl={
                     queueState.settings.find(
                       (setting) => setting.platform === platform
@@ -197,6 +199,7 @@ export function QueuePlatformsSettingsPanel({
                 key={platform}
                 isActive={false}
                 accentColor={getPlatformAccentColor(queueState, platform)}
+                displayArtworkUrl={getPlatformArtworkUrl(queueState, platform)}
                 artworkUrl={
                   queueState.settings.find(
                     (setting) => setting.platform === platform
@@ -306,6 +309,7 @@ export function QueuePlatformsSettingsPanel({
 function QueuePlatformManagementRow({
   accentColor,
   artworkUrl,
+  displayArtworkUrl,
   isActive,
   platform,
   platformTag,
@@ -322,6 +326,7 @@ function QueuePlatformManagementRow({
 }: {
   accentColor: string;
   artworkUrl: string;
+  displayArtworkUrl: string;
   isActive: boolean;
   platform: GamePlatform;
   platformTag: string;
@@ -373,12 +378,12 @@ function QueuePlatformManagementRow({
             ? "Shown in Platform Plans"
             : "Hidden from Platform Plans but available for imports/metadata"}
         </div>
-        {artworkUrl ? (
+        {displayArtworkUrl ? (
           <div className="qs-platform-artwork-banner mt-2 overflow-hidden rounded border border-white/10">
             <img
               alt=""
               className="h-full w-full object-cover object-center"
-              src={artworkUrl}
+              src={displayArtworkUrl}
             />
           </div>
         ) : null}

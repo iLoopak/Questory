@@ -1,5 +1,6 @@
 import type { Game, GamePlatform } from '../types/game';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { resolveDefaultPlatformArtwork } from './platformArtwork';
 
 const STORAGE_KEY = 'questshelf.platformQueues.v1';
 const platformQueueSchemaVersion = 1;
@@ -267,7 +268,7 @@ export function getDefaultPlatformAccentColor(platform: GamePlatform) {
 }
 
 export function getPlatformArtworkUrl(state: PlatformQueueState, platform: GamePlatform) {
-  return getPlatformQueueSetting(state, platform)?.artworkUrl ?? '';
+  return getPlatformQueueSetting(state, platform)?.artworkUrl ?? resolveDefaultPlatformArtwork(platform) ?? '';
 }
 
 export function getPlatformTag(state: PlatformQueueState, platform: GamePlatform) {
