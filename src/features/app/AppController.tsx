@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
@@ -79,28 +79,7 @@ import { usePlayActivity } from './usePlayActivity';
 import { useCompletionRating } from './useCompletionRating';
 import { useAnalytics } from './useAnalytics';
 import { useAchievementSystem } from './useAchievementSystem';
-
-function normalizeImportMatchTitle(title: string) {
-  return title.trim().toLocaleLowerCase().replace(/[â„˘Â®Â©]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function getSafeWishlistTitleMatches(games: Game[]) {
-  const titleCounts = new Map<string, number>();
-  const titleIds = new Map<string, string>();
-
-  games
-    .filter((game) => game.collectionType === 'wishlist' && typeof game.steamAppId !== 'number')
-    .forEach((game) => {
-      const title = normalizeImportMatchTitle(game.title);
-      if (!title) return;
-      titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
-      titleIds.set(title, game.id);
-    });
-
-  return new Map(
-    Array.from(titleIds.entries()).filter(([title]) => titleCounts.get(title) === 1),
-  );
-}
+import { getSafeWishlistTitleMatches, normalizeImportMatchTitle } from '../../domain/imports/titleMatching';
 
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
