@@ -780,7 +780,7 @@ function PlatformQueueColumn({
     <>
     <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
-        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-4 overflow-hidden rounded-t-2xl">
+        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-3 overflow-hidden">
           <img alt="" className="h-full w-full object-cover object-center opacity-88" src={displayArtworkUrl} />
           <div className="qs-platform-artwork-overlay absolute inset-0" />
           {platformTag ? (
@@ -794,9 +794,9 @@ function PlatformQueueColumn({
               <span className="min-w-0 truncate">{platformTag}</span>
             </span>
           ) : null}
-          <div className="absolute inset-x-0 bottom-0 flex min-w-0 items-end justify-between gap-3 p-4">
+          <div className="qs-platform-artwork-controls absolute inset-x-0 bottom-0 flex min-w-0 items-end justify-between gap-3">
             <h3
-              className="qs-platform-artwork-title flex min-w-0 max-w-[calc(100%-3.5rem)] items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              className="qs-platform-artwork-title flex min-w-0 items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
               style={{ backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.76))` }}
             >
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
