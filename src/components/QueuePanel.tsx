@@ -252,10 +252,10 @@ export function QueuePanel({
       <div ref={queueListRef} className="qs-queue-list min-w-0 pr-1">
         <div className={
           displayedQueuePlatforms.length === 1
-            ? 'qs-platform-grid grid min-w-0 gap-2'
+            ? 'qs-platform-grid grid min-w-0 gap-5'
             : displayedQueuePlatforms.length === 2
-            ? 'qs-platform-grid grid min-w-0 grid-cols-2 gap-2'
-            : 'qs-platform-grid grid min-w-0 gap-2 xl:grid-cols-2'
+            ? 'qs-platform-grid grid min-w-0 grid-cols-2 gap-5'
+            : 'qs-platform-grid grid min-w-0 gap-5 xl:grid-cols-2'
         }>
           {displayedQueuePlatforms.map((platform) => (
             <PlatformQueueColumn
@@ -731,12 +731,12 @@ function PlatformQueueColumn({
 
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-lg border bg-ink-950/80 p-3 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
-        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-3 -mt-3 mb-3 overflow-hidden rounded-t-lg border-b border-white/10">
+        <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-5 overflow-hidden rounded-t-2xl border-b border-white/10">
           <img alt="" className="h-full w-full object-cover object-center opacity-85" src={displayArtworkUrl} />
           <div className="qs-platform-artwork-overlay absolute inset-0" />
-          <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-3">
+          <div className="absolute inset-x-0 bottom-0 flex min-w-0 p-4">
             <h3
               className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
               style={{
