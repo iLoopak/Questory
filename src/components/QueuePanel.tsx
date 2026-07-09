@@ -29,7 +29,6 @@ import type { Game, GamePlatform } from '../types/game';
 export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
 import { GameCoverImage } from './GameCoverImage';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
-import { CollectionToolbar } from './CollectionToolbar';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { PlatformIdentityFields } from './PlatformIdentityFields';
 import { HltbBadge } from './HltbBadge';
@@ -76,25 +75,17 @@ export function QueuePanel({
   onStartReview,
 }: QueuePanelProps) {
   const { t } = useI18n();
-  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | ''>(initialPlatform ?? queueState.activePlatforms[0] ?? '');
-  const [customPlatformName, setCustomPlatformName] = useState('');
   const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
   const platformRefs = useRef(new Map<GamePlatform, HTMLElement>());
   const queueListRef = useRef<HTMLDivElement | null>(null);
-  const [selectedGameId, setSelectedGameId] = useState('');
-  const [queueSearchTerm, setQueueSearchTerm] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<GamePlatform | 'All Platforms'>('All Platforms');
-  const [statusFilter, setStatusFilter] = useState<'All Statuses' | 'Planned' | 'Playing'>('All Statuses');
   const [showQueueHint, setShowQueueHint] = useState(() => localStorage.getItem('qs-queue-hint-v1') !== 'dismissed');
   const [platformGhostSlot] = useState(() => pickQueueGhostSlot('platformPlans'));
   const [platformGhostVariant] = useState(() => pickSimpleVariant());
   const [showPlatformGhost, setShowPlatformGhost] = useState(() => Boolean(platformGhostSlot) && shouldShowQueueGhostInHabitat('platformPlans'));
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
-  const queuePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
   const activeQueuePlatforms = useMemo(() => getActiveQueuePlatforms(queueState), [queueState]);
   const movePlatformOptions = activeQueuePlatforms;
-  const queueGameIds = useMemo(() => new Set(visibleQueueEntries.map((entry) => `${entry.gameId}::${entry.targetPlatform}`)), [visibleQueueEntries]);
   const suggestedPlatform = useMemo<GamePlatform | null>(() => {
     const libraryGames = games.filter((game) => game.collectionType === 'library');
     if (libraryGames.length === 0) return null;
@@ -121,72 +112,22 @@ export function QueuePanel({
   useEffect(() => () => releaseQueueGhostHabitat('platformPlans'), []);
 
   const displayedQueuePlatforms = useMemo(() => {
-    let visiblePlatforms = platformFilter === 'All Platforms'
-      ? activeQueuePlatforms
-      : activeQueuePlatforms.filter((platform) => platform === platformFilter);
-
-    if (statusFilter === 'Playing') {
-      visiblePlatforms = visiblePlatforms.filter((platform) => (playingGamesByPlatform.get(platform)?.length ?? 0) > 0);
-    } else if (statusFilter === 'Planned') {
-      visiblePlatforms = visiblePlatforms.filter((platform) => visibleQueueEntries.some((e) => e.targetPlatform === platform));
+    if (!initialPlatform || !activeQueuePlatforms.includes(initialPlatform)) {
+      return activeQueuePlatforms;
     }
 
-    if (!initialPlatform || !visiblePlatforms.includes(initialPlatform)) {
-      return visiblePlatforms;
-    }
-
-    return [initialPlatform, ...visiblePlatforms.filter((platform) => platform !== initialPlatform)];
-  }, [activeQueuePlatforms, initialPlatform, platformFilter, playingGamesByPlatform, statusFilter, visibleQueueEntries]);
-
-  const hasActiveFilters = platformFilter !== 'All Platforms' || statusFilter !== 'All Statuses';
-
-  const selectedPlatformSummary = useMemo(() => {
-    if (platformFilter === 'All Platforms') return null;
-    const playing = playingGamesByPlatform.get(platformFilter)?.length ?? 0;
-    const planned = visibleQueueEntries.filter((e) => e.targetPlatform === platformFilter).length;
-    const wishlist = games.filter((g) => g.platform === platformFilter && g.collectionType === 'wishlist').length;
-    return { playing, planned, wishlist };
-  }, [platformFilter, playingGamesByPlatform, visibleQueueEntries, games]);
-
-  const normalizedQueueSearch = queueSearchTerm.trim().toLowerCase();
-  const addableGames = useMemo(() => {
-    return games
-      .filter((game) => game.collectionType === 'library' && (!selectedPlatform || !queueGameIds.has(`${game.id}::${selectedPlatform}`)))
-      .filter((game) =>
-        normalizedQueueSearch
-          ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch)
-          : true,
-      )
-      .sort((first, second) => first.title.localeCompare(second.title));
-  }, [games, normalizedQueueSearch, queueGameIds, selectedPlatform]);
+    return [initialPlatform, ...activeQueuePlatforms.filter((platform) => platform !== initialPlatform)];
+  }, [activeQueuePlatforms, initialPlatform]);
 
   useEffect(() => {
     if (!initialPlatform) {
       return;
     }
 
-    setSelectedPlatform(initialPlatform);
     window.requestAnimationFrame(() => {
       platformRefs.current.get(initialPlatform)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   }, [initialPlatform]);
-
-  useEffect(() => {
-    if (activeQueuePlatforms.length === 0) {
-      setSelectedPlatform('');
-      return;
-    }
-
-    if (!selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)) {
-      setSelectedPlatform(activeQueuePlatforms[0]);
-    }
-  }, [activeQueuePlatforms, selectedPlatform]);
-
-  function addQueuePlatform(platform: GamePlatform) {
-    onQueueStateChange((currentState) => addActiveQueuePlatform(currentState, platform));
-    setSelectedPlatform(platform);
-    setCustomPlatformName('');
-  }
 
   function addSuggestedPlatform(platform: GamePlatform) {
     const nextAccentColor = getDefaultPlatformAccentColor(platform);
@@ -196,26 +137,6 @@ export function QueuePanel({
       platform,
       { accentColor: nextAccentColor, artworkUrl, platformTag: '' },
     ));
-    setSelectedPlatform(platform);
-  }
-
-  function addCustomQueuePlatform() {
-    const platform = customPlatformName.trim() as GamePlatform;
-    if (!platform) {
-      return;
-    }
-
-    addQueuePlatform(platform);
-  }
-
-  function addSelectedGame() {
-    const game = gamesById.get(selectedGameId);
-    if (!game || !selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)) {
-      return;
-    }
-
-    onAddGameToQueue(game, selectedPlatform);
-    setSelectedGameId('');
   }
 
   function dismissQueueHint() {
@@ -223,196 +144,55 @@ export function QueuePanel({
     setShowQueueHint(false);
   }
 
-  const summaryAccentColor = selectedPlatformSummary
-    ? getPlatformAccentColor(queueState, platformFilter as GamePlatform)
-    : '';
-
   return (
     <section className="qs-queue-shell flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
-      <CollectionToolbar
-        title={t('queue.platforms')}
-        searchValue={queueSearchTerm}
-        searchPlaceholder={t('queue.findGame')}
-        onSearchChange={setQueueSearchTerm}
-        selects={[
-          {
-            label: t('toolbar.status'),
-            value: statusFilter,
-            options: ['All Statuses', 'Planned', 'Playing'],
-            onChange: (value) => setStatusFilter(value as 'All Statuses' | 'Planned' | 'Playing'),
-          },
-          {
-            label: t('toolbar.platform'),
-            value: platformFilter,
-            options: ['All Platforms', ...activeQueuePlatforms],
-            onChange: (value) => setPlatformFilter(value as GamePlatform | 'All Platforms'),
-          },
-        ]}
-        primaryAction={
-          <button
-            aria-label={t('queue.addPlatform')}
-            className="grid h-9 w-9 place-items-center rounded-md bg-mint text-ink-950 transition hover:bg-mint/90"
-            onClick={() => setIsPlatformModalOpen(true)}
-            title={t('queue.addPlatform')}
-            type="button"
-          >
-            <Icon name="plus" size={18} strokeWidth={2.5} />
-          </button>
-        }
-        actionMenu={
-          <>
-            <label className="block">
-              <span className="qs-label-caps text-muted">{t('queue.addGame')}</span>
-              <select
-                className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
-                value={selectedGameId}
-                onChange={(event) => setSelectedGameId(event.target.value)}
-              >
-                <option value="">{t('queue.chooseLibraryGame')}</option>
-                {addableGames.map((game) => (
-                  <option key={game.id} value={game.id}>
-                    {game.title} - {game.platform}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="qs-label-caps text-muted">{t('queue.targetPlatform')}</span>
-              <select
-                className="mt-1 h-9 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
-                value={selectedPlatform}
-                onChange={(event) => setSelectedPlatform(event.target.value as GamePlatform)}
-              >
-                {activeQueuePlatforms.map((platform) => (
-                  <option key={platform} value={platform}>
-                    {platform}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="h-9 rounded-md bg-mint px-3 text-left text-sm font-semibold text-ink-950 transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-              disabled={!selectedGameId || !selectedPlatform || !activeQueuePlatforms.includes(selectedPlatform)}
-              onClick={addSelectedGame}
-              type="button"
-            >
-              {t('queue.addGame')}
-            </button>
-            <button
-              className="h-9 rounded-md border border-mint/30 bg-mint/10 px-3 text-left text-sm font-semibold text-mint transition hover:bg-mint/20"
-              onClick={onStartReview}
-              type="button"
-            >
-              {t('queue.buildReview')}
-            </button>
-            <details className="rounded-md border border-white/10 bg-ink-900 p-2">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-300">{t('queue.managePlatforms')}</summary>
-              <div className="mt-2 grid gap-2">
-                {queuePlatforms
-                  .filter((platform) => !activeQueuePlatforms.includes(platform))
-                  .slice(0, 12)
-                  .map((platform) => (
-                    <button
-                      key={platform}
-                      className="h-8 rounded-md border border-white/10 px-2 text-left text-xs font-semibold text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint"
-                      onClick={() => addQueuePlatform(platform)}
-                      type="button"
-                    >
-                      {platform}
-                    </button>
-                  ))}
-                <label className="grid gap-2">
-                  <span className="sr-only">{t('queue.customPlatform')}</span>
-                  <input
-                    className="h-8 min-w-0 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-                    placeholder={t('queue.customPlatform')}
-                    value={customPlatformName}
-                    onChange={(event) => setCustomPlatformName(event.target.value)}
-                  />
+      <header className="mb-3 space-y-3 px-1">
+        <h2 className="text-lg font-semibold text-white">{t('queue.platforms')}</h2>
+        {activeQueuePlatforms.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <div className="qs-platform-progress flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1" aria-label="Platform Plans navigation">
+              {activeQueuePlatforms.map((platform) => {
+                const planned = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
+                const playing = playingGamesByPlatform.get(platform)?.length ?? 0;
+                const cardAccent = getPlatformAccentColor(queueState, platform);
+                return (
                   <button
-                    className="h-8 rounded-md bg-mint px-3 text-xs font-semibold text-ink-950 hover:bg-mint/90 disabled:bg-slate-600 disabled:text-slate-300"
-                    disabled={!customPlatformName.trim()}
-                    onClick={addCustomQueuePlatform}
+                    key={platform}
+                    className="min-w-[8rem] max-w-[11rem] shrink-0 rounded-xl border px-3 py-2 text-left transition"
+                    style={{
+                      borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
+                      backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
+                    }}
+                    onClick={() => platformRefs.current.get(platform)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
                     type="button"
                   >
-                    {t('queue.addPlatform')}
+                    <div className="truncate text-sm font-semibold text-white">{platform}</div>
+                    <div className="mt-1.5 flex gap-3 text-xs">
+                      <span>
+                        <span className="font-bold" style={{ color: cardAccent }}>{playing}</span>
+                        <span className="ml-1 text-slate-500">Playing</span>
+                      </span>
+                      <span>
+                        <span className="font-bold" style={{ color: cardAccent }}>{planned}</span>
+                        <span className="ml-1 text-slate-500">{t('queue.planned')}</span>
+                      </span>
+                    </div>
                   </button>
-                </label>
-              </div>
-            </details>
-          </>
-        }
-      />
-      <div className="-mt-1 mb-2 flex items-center justify-between gap-2 px-1">
-        <p className="text-sm text-slate-400">{t('queue.platformBacklogHelp')}</p>
-        {hasActiveFilters ? (
-          <button
-            className="shrink-0 rounded-md border border-skyglass/15 px-2.5 py-1 text-xs font-medium text-slate-400 transition hover:border-mint/30 hover:bg-mint/10 hover:text-mint"
-            onClick={() => { setPlatformFilter('All Platforms'); setStatusFilter('All Statuses'); }}
-            type="button"
-          >
-            {t('toolbar.clearFilters')}
-          </button>
-        ) : null}
-      </div>
-
-      {selectedPlatformSummary ? (
-        <div
-          className="qs-platform-summary mb-3 rounded-xl border px-4 py-3"
-          style={{
-            borderColor: `color-mix(in srgb, ${summaryAccentColor} 32%, rgb(255 255 255 / 0.06))`,
-            backgroundColor: `color-mix(in srgb, ${summaryAccentColor} 7%, rgb(2 6 23 / 0.6))`,
-          }}
-        >
-          <div className="text-sm font-semibold text-white">{platformFilter} {t('queue.platformSummary')}</div>
-          <div className="mt-2 flex flex-wrap gap-6">
-            <div>
-              <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.playing}</div>
-              <div className="mt-0.5 text-xs text-slate-400">{t('action.playingNow')}</div>
+                );
+              })}
             </div>
-            <div>
-              <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.planned}</div>
-              <div className="mt-0.5 text-xs text-slate-400">{t('queue.planned')}</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold" style={{ color: summaryAccentColor }}>{selectedPlatformSummary.wishlist}</div>
-              <div className="mt-0.5 text-xs text-slate-400">{t('nav.wishlist')}</div>
-            </div>
+            <button
+              aria-label={t('queue.addPlatform')}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-mint text-ink-950 transition hover:bg-mint/90"
+              onClick={() => setIsPlatformModalOpen(true)}
+              title={t('queue.addPlatform')}
+              type="button"
+            >
+              <Icon name="plus" size={18} strokeWidth={2.5} />
+            </button>
           </div>
-        </div>
-      ) : activeQueuePlatforms.length > 0 ? (
-        <div className="qs-platform-progress mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Platform Plans progress">
-          {activeQueuePlatforms.map((platform) => {
-            const planned = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
-            const playing = playingGamesByPlatform.get(platform)?.length ?? 0;
-            const cardAccent = getPlatformAccentColor(queueState, platform);
-            return (
-              <button
-                key={platform}
-                className="min-w-[8rem] max-w-[11rem] shrink-0 rounded-xl border px-3 py-2 text-left transition"
-                style={{
-                  borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
-                  backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
-                }}
-                onClick={() => setPlatformFilter(platform)}
-                type="button"
-              >
-                <div className="truncate text-sm font-semibold text-white">{platform}</div>
-                <div className="mt-1.5 flex gap-3 text-xs">
-                  <span>
-                    <span className="font-bold" style={{ color: cardAccent }}>{playing}</span>
-                    <span className="ml-1 text-slate-500">Playing</span>
-                  </span>
-                  <span>
-                    <span className="font-bold" style={{ color: cardAccent }}>{planned}</span>
-                    <span className="ml-1 text-slate-500">{t('queue.planned')}</span>
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+        ) : null}
+      </header>
 
       {showQueueHint && (
         <div className="relative mb-3 rounded-xl border border-mint/20 bg-mint/5 p-3 text-xs">
@@ -487,7 +267,7 @@ export function QueuePanel({
               artworkUrl={getPlatformArtworkUrl(queueState, platform)}
               isHighlighted={platform === initialPlatform}
               platform={platform}
-              statusFilter={statusFilter}
+              statusFilter="All Statuses"
               platformTag={getPlatformTag(queueState, platform)}
               platformOptions={movePlatformOptions}
               setPlatformRef={(element) => {
@@ -500,10 +280,6 @@ export function QueuePanel({
               queueScrollRef={contentScrollRef}
               queueEntries={visibleQueueEntries
                 .filter((entry) => entry.targetPlatform === platform)
-                .filter((entry) => {
-                  const game = gamesById.get(entry.gameId);
-                  return !normalizedQueueSearch || (game ? `${game.title} ${game.platform} ${game.status}`.toLowerCase().includes(normalizedQueueSearch) : false);
-                })
                 .sort(compareQueueEntries)}
               onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
               onIdentityChange={(changes) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, changes))}
@@ -530,8 +306,6 @@ export function QueuePanel({
           onClose={() => setIsPlatformModalOpen(false)}
           onCreate={(nextState, platform) => {
             onQueueStateChange(nextState);
-            setPlatformFilter('All Platforms');
-            setSelectedPlatform(platform);
             setIsPlatformModalOpen(false);
             window.requestAnimationFrame(() => {
               platformRefs.current.get(platform)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
