@@ -12,6 +12,7 @@ import {
   getPlatformAccentColor,
   getPlatformArtworkUrl,
   getPlatformMaxActiveGames,
+  getPlatformQueueSetting,
   getPlatformTag,
   getQueuePlatforms,
   getVisiblePlatformQueueEntries,
@@ -39,6 +40,7 @@ import { ViewportModal } from './ViewportModal';
 import { useI18n } from '../i18n';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
 import { QueueGhost, pickQueueGhostSlot, pickSimpleVariant, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
+import { resolveDefaultPlatformArtwork } from '../lib/platformArtwork';
 
 type QueuePanelProps = {
   games: Game[];
@@ -190,11 +192,10 @@ export function QueuePanel({
 
   function addSuggestedPlatform(platform: GamePlatform) {
     const nextAccentColor = getDefaultPlatformAccentColor(platform);
-    const artworkUrl = createPlatformArtworkPreset(platform, nextAccentColor, 'Aurora');
     onQueueStateChange((currentState) => updatePlatformQueueVisualSettings(
       addActiveQueuePlatform(currentState, platform),
       platform,
-      { accentColor: nextAccentColor, artworkUrl, platformTag: '' },
+      { accentColor: nextAccentColor, platformTag: '' },
     ));
     setSelectedPlatform(platform);
   }
@@ -485,6 +486,7 @@ export function QueuePanel({
               maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
               accentColor={getPlatformAccentColor(queueState, platform)}
               artworkUrl={getPlatformArtworkUrl(queueState, platform)}
+              customArtworkUrl={getPlatformQueueSetting(queueState, platform)?.artworkUrl ?? ''}
               isHighlighted={platform === initialPlatform}
               platform={platform}
               statusFilter={statusFilter}
@@ -590,13 +592,13 @@ function AddPlatformModal({
     [availablePlatforms],
   );
   const previewName = (platformName.trim() || 'New Platform') as GamePlatform;
-  const previewArtworkUrl = artworkUrl || createPlatformArtworkPreset(previewName, accentColor, 'Aurora');
+  const previewArtworkUrl = artworkUrl || resolveDefaultPlatformArtwork(previewName) || createPlatformArtworkPreset(previewName, accentColor, 'Aurora');
 
   function applyPresetPlatform(platform: GamePlatform) {
     const nextAccentColor = getDefaultPlatformAccentColor(platform);
     setPlatformName(platform);
     setAccentColor(nextAccentColor);
-    setArtworkUrl(createPlatformArtworkPreset(platform, nextAccentColor, 'Aurora'));
+    setArtworkUrl('');
     setValidationMessage('');
   }
 
@@ -852,6 +854,7 @@ function PlatformQueueColumn({
   currentlyPlaying,
   accentColor,
   artworkUrl,
+  customArtworkUrl,
   maxActiveGames,
   isHighlighted,
   platform,
@@ -877,6 +880,7 @@ function PlatformQueueColumn({
 }: {
   accentColor: string;
   artworkUrl: string;
+  customArtworkUrl: string;
   currentlyPlaying: Game[];
   gamesById: Map<string, Game>;
   maxActiveGames: number;
@@ -1123,7 +1127,7 @@ function PlatformQueueColumn({
       <PlatformIdentityModal
         platform={platform}
         accentColor={accentColor}
-        artworkUrl={artworkUrl}
+        artworkUrl={customArtworkUrl}
         platformTag={platformTag}
         onSave={onIdentityChange}
         onClose={() => setIsIdentityModalOpen(false)}
@@ -1208,7 +1212,7 @@ function PlatformIdentityModal({
   const [accentColor, setAccentColor] = useState(initialAccentColor);
   const [artworkUrl, setArtworkUrl] = useState(initialArtworkUrl);
   const [platformTag, setPlatformTag] = useState(initialPlatformTag);
-  const previewArtworkUrl = artworkUrl || createPlatformArtworkPreset(platform, accentColor, 'Aurora');
+  const previewArtworkUrl = artworkUrl || resolveDefaultPlatformArtwork(platform) || createPlatformArtworkPreset(platform, accentColor, 'Aurora');
 
   function handleSave() {
     onSave({ accentColor, artworkUrl, platformTag: platformTag.trim() });
