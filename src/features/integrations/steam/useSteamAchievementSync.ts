@@ -20,10 +20,17 @@ export type SteamAchievementSyncOptions = {
   t: TFunction;
 };
 
+export type SyncSteamAchievementsOptions = {
+  completionToastMessage?: (summary: SteamAchievementSyncSummary) => string;
+  emptyToastMessage?: string;
+  force?: boolean;
+  showToast?: boolean;
+};
+
 export function useSteamAchievementSync({ games, isAppMountedRef, setGames, setSteamAchievementSyncState, addToastNotification, t }: SteamAchievementSyncOptions) {
   return async function syncSteamAchievements(
     gameIds?: string[],
-    options: { completionToastMessage?: (summary: SteamAchievementSyncSummary) => string; emptyToastMessage?: string; force?: boolean; showToast?: boolean } = {},
+    options: SyncSteamAchievementsOptions = {},
   ) {
     const targetGames = (gameIds ? games.filter((game) => gameIds.includes(game.id)) : games).filter((game) => game.collectionType === 'library');
     const syncableGames = targetGames.filter(isSteamAchievementSyncableGame);
