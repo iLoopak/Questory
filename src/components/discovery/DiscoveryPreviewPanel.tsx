@@ -49,6 +49,7 @@ export function DiscoveryPreviewPanel({
 }: Props) {
   const { t } = useI18n();
   const { game, reason } = candidate;
+  const initialCoverUrl = getValidImageUrl(game.coverUrl);
   const [details, setDetails] = useState<RawgGameDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -84,12 +85,30 @@ export function DiscoveryPreviewPanel({
     return () => { cancelled = true; };
   }, [game.rawgId]);
 
-  const previewModel = useMemo(() => discoveryCandidateToPreviewModel(candidate, {
-    backgroundImage: details?.background_image ?? game.coverUrl ?? null,
-    developers: details?.developers?.map((d) => d.name),
-    publishers: details?.publishers?.map((p) => p.name),
-    source: 'rawg',
-  }), [candidate, game.coverUrl, details]);
+  const enrichedCandidate = useMemo(() => {
+    const enrichedBackgroundImage = getValidImageUrl(details?.background_image);
+    const bestCoverUrl = initialCoverUrl ?? enrichedBackgroundImage ?? null;
+
+    if (bestCoverUrl === game.coverUrl) return candidate;
+
+    return {
+      ...candidate,
+      game: {
+        ...game,
+        coverUrl: bestCoverUrl,
+      },
+    };
+  }, [candidate, details?.background_image, game, initialCoverUrl]);
+
+  const previewModel = useMemo(() => {
+    const enrichedBackgroundImage = getValidImageUrl(details?.background_image);
+    return discoveryCandidateToPreviewModel(enrichedCandidate, {
+      backgroundImage: enrichedBackgroundImage ?? initialCoverUrl ?? null,
+      developers: details?.developers?.map((d) => d.name),
+      publishers: details?.publishers?.map((p) => p.name),
+      source: 'rawg',
+    });
+  }, [enrichedCandidate, initialCoverUrl, details]);
 
   const previewArtwork = useMemo(() => getArtworkSet(previewModel), [previewModel]);
   const previewMetadata = useMemo(() => getMetadataSummary(previewModel), [previewModel]);
@@ -98,14 +117,14 @@ export function DiscoveryPreviewPanel({
   // Preview-specific code should prefer previewModel so catalog previews do not
   // conceptually require collectionType/status/notes/playtime.
   const previewGame: Game = useMemo(() => ({
-    ...discoveryCandidateToGame(candidate, userGames, 'preview'),
+    ...discoveryCandidateToGame(enrichedCandidate, userGames, 'preview'),
     backgroundImage: previewArtwork.background ?? null,
     developers: previewModel.metadata.developers,
     publishers: previewModel.metadata.publishers,
     rawgTags: previewModel.metadata.tags,
     rawgRating: typeof details?.rating === 'number' ? details.rating : previewModel.metadata.rawgRating,
     rawgRatingsCount: typeof details?.ratings_count === 'number' ? details.ratings_count : previewModel.metadata.rawgRatingsCount,
-  }), [candidate, userGames, previewArtwork, previewModel]);
+  }), [enrichedCandidate, userGames, previewArtwork, previewModel, details?.rating, details?.ratings_count]);
 
   const metacriticScore = formatMetacriticScore(previewMetadata.metacritic);
   const rawgRating = getRawgRatingDisplay(previewGame);
@@ -125,7 +144,7 @@ export function DiscoveryPreviewPanel({
         {
           icon: 'gamepad-2',
           label: t('preview.openGameHub'),
-          onClick: () => onOpenLibraryGame?.(game),
+          onClick: () => onOpenLibraryGame?.(enrichedCandidate.game),
           tone: 'accent',
           disabled: !onOpenLibraryGame,
         },
@@ -135,7 +154,7 @@ export function DiscoveryPreviewPanel({
           {
             icon: 'library',
             label: t('preview.moveToLibrary'),
-            onClick: () => onAddToLibrary(game),
+            onClick: () => onAddToLibrary(enrichedCandidate.game),
             tone: 'accent',
           },
           {
@@ -158,19 +177,19 @@ export function DiscoveryPreviewPanel({
             : {
                 icon: 'list-plus' as const,
                 label: t('action.reviewLater'),
-                onClick: () => onAddToInbox(game, reason ?? ''),
+                onClick: () => onAddToInbox(enrichedCandidate.game, reason ?? ''),
                 tone: 'accent' as const,
               },
           {
             icon: 'heart',
             label: t('preview.addToWishlist'),
-            onClick: () => onAddToWishlist(game),
+            onClick: () => onAddToWishlist(enrichedCandidate.game),
             tone: 'neutral',
           },
           {
             icon: 'library',
             label: t('preview.addToLibrary'),
-            onClick: () => onAddToLibrary(game),
+            onClick: () => onAddToLibrary(enrichedCandidate.game),
             tone: 'accent',
           },
         ];
@@ -249,4 +268,9 @@ export function DiscoveryPreviewPanel({
       />
     </FullscreenGameShell>
   );
+}
+
+function getValidImageUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }

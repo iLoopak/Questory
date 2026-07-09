@@ -84,6 +84,7 @@ export function discoveryGameToGame(game: DiscoveryGame, idPrefix: string): Game
     platform: game.hasSteamVersion ? 'Steam' : (game.platforms[0] ?? 'PC'),
     status: 'Want to play',
     coverImage: game.coverUrl ?? '',
+    artworkSource: game.coverUrl ? 'rawg' : undefined,
     backgroundImage: game.coverUrl ?? null,
     playtimeHours: 0,
     tags: game.tags.slice(0, 5),

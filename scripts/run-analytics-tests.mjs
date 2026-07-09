@@ -31,6 +31,7 @@ const testFiles = [
   { entry: 'scripts/reviewQueueOrder.test.ts', out: 'reviewQueueOrder.test.mjs' },
   { entry: 'scripts/multiGameImport.test.ts', out: 'multiGameImport.test.mjs' },
   { entry: 'scripts/recommendations.test.ts', out: 'recommendations.test.mjs' },
+  { entry: 'scripts/discoveryPreviewArtwork.test.ts', out: 'discoveryPreviewArtwork.test.mjs' },
 ];
 
 await Promise.all(

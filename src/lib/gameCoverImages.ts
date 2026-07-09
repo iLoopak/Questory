@@ -98,12 +98,12 @@ export function getArtworkCandidates(game: Game, options: { includeGeneratedFall
     candidates.push({ source: 'steam', url: currentCover });
   }
 
-  if (game.backgroundImage) {
-    candidates.push({ source: 'rawg', url: game.backgroundImage });
+  if (currentCover && currentSource === 'rawg') {
+    candidates.push({ source: 'rawg', url: currentCover });
   }
 
-  if (currentCover && currentSource === 'rawg' && currentCover !== game.backgroundImage) {
-    candidates.push({ source: 'rawg', url: currentCover });
+  if (game.backgroundImage && game.backgroundImage !== currentCover) {
+    candidates.push({ source: 'rawg', url: game.backgroundImage });
   }
 
   if (currentCover && currentSource === 'imported') {
