@@ -1,7 +1,7 @@
 import { ReviewModePanel } from '../../../components/ReviewModePanel';
-import type { AppSectionRouterProps } from '../AppSectionRouter';
+import type { AppSectionRouteModel } from '../AppSectionRouter';
 
-type ReviewModeRouteProps = Pick<AppSectionRouterProps, 'games' | 'reviewIgnoredGameIds' | 'activeQueuePlatforms' | 'platformQueueState' | 'refreshingMetadataGameIds' | 'reviewModeState' | 'confirmCancelConvention' | 'activeReviewSource' | 'handleReviewAction' | 'ensureRawgMetadataForGame' | 'addQueuePlatform' | 'setActiveNavItem' | 'restoreReviewIgnoredGames' | 'setReviewSource'>;
+type ReviewModeRouteProps = Pick<AppSectionRouteModel, 'games' | 'reviewIgnoredGameIds' | 'activeQueuePlatforms' | 'platformQueueState' | 'refreshingMetadataGameIds' | 'reviewModeState' | 'confirmCancelConvention' | 'activeReviewSource' | 'handleReviewAction' | 'ensureRawgMetadataForGame' | 'addQueuePlatform' | 'setActiveNavItem' | 'restoreReviewIgnoredGames' | 'setReviewSource'>;
 export function ReviewModeRoute({ games, reviewIgnoredGameIds, activeQueuePlatforms, platformQueueState, refreshingMetadataGameIds, reviewModeState, confirmCancelConvention, activeReviewSource, handleReviewAction, ensureRawgMetadataForGame, addQueuePlatform, setActiveNavItem, restoreReviewIgnoredGames, setReviewSource }: ReviewModeRouteProps) {
   return <ReviewModePanel games={games} ignoredGameIds={reviewIgnoredGameIds} queuePlatforms={activeQueuePlatforms} queueState={platformQueueState} refreshingMetadataGameIds={refreshingMetadataGameIds} reviewModeState={reviewModeState} confirmCancelConvention={confirmCancelConvention} source={activeReviewSource} onAction={handleReviewAction} onEnsureRawgMetadata={ensureRawgMetadataForGame} onAddPlatform={addQueuePlatform} onOpenQueue={() => setActiveNavItem('Queue')} onRestoreIgnored={restoreReviewIgnoredGames} onReturnToLibrary={() => setActiveNavItem('Library')} onSourceChange={setReviewSource} />;
 }

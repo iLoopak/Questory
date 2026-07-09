@@ -1,7 +1,7 @@
 import { QueuePanel } from '../../../components/QueuePanel';
-import type { AppSectionRouterProps } from '../AppSectionRouter';
+import type { AppSectionRouteModel } from '../AppSectionRouter';
 
-type QuestQueueRouteProps = Pick<AppSectionRouterProps, 'games' | 'mainContentRef' | 'targetQueuePlatform' | 'platformQueueState' | 'addGameToQueue' | 'refreshGameMetadataFromActions' | 'updateQueueLimit' | 'setPlatformQueueState' | 'moveQueueGame' | 'moveQueueGameToPlatform' | 'playQueueGameNow' | 'updateCurrentlyPlayingGame' | 'setSelectedGameId' | 'removeQueueGame' | 'startReviewMode'>;
+type QuestQueueRouteProps = Pick<AppSectionRouteModel, 'games' | 'mainContentRef' | 'targetQueuePlatform' | 'platformQueueState' | 'addGameToQueue' | 'refreshGameMetadataFromActions' | 'updateQueueLimit' | 'setPlatformQueueState' | 'moveQueueGame' | 'moveQueueGameToPlatform' | 'playQueueGameNow' | 'updateCurrentlyPlayingGame' | 'setSelectedGameId' | 'removeQueueGame' | 'startReviewMode'>;
 export function QuestQueueRoute({ games, mainContentRef, targetQueuePlatform, platformQueueState, addGameToQueue, refreshGameMetadataFromActions, updateQueueLimit, setPlatformQueueState, moveQueueGame, moveQueueGameToPlatform, playQueueGameNow, updateCurrentlyPlayingGame, setSelectedGameId, removeQueueGame, startReviewMode }: QuestQueueRouteProps) {
   return <QueuePanel games={games} contentScrollRef={mainContentRef} initialPlatform={targetQueuePlatform} queueState={platformQueueState} onAddGameToQueue={addGameToQueue} onFindArtwork={(game) => refreshGameMetadataFromActions(game, 'artwork')} onLimitChange={updateQueueLimit} onQueueStateChange={setPlatformQueueState} onMoveEntry={moveQueueGame} onMoveEntryToPlatform={moveQueueGameToPlatform} onPlayNow={playQueueGameNow} onPlayingAction={updateCurrentlyPlayingGame} onOpenDetails={setSelectedGameId} onRemoveEntry={removeQueueGame} onStartReview={() => startReviewMode('backlog')} />;
 }

@@ -59,7 +59,7 @@ import type { PlayingGameAction } from '../../components/QueuePanel';
 import type { ReviewModeAction, ReviewModeActionContext } from '../../components/ReviewModePanel';
 import type { SteamWishlistHtmlImportSummary } from '../../utils/summaryFormatters';
 
-export type AppSectionRouterProps = {
+export type AppSectionRouteModel = {
   // ── Core ──────────────────────────────────────────────────────────────────
   activeNavItem: NavItem;
   mainContentRef: RefObject<HTMLElement | null>;
@@ -268,35 +268,65 @@ export type AppSectionRouterProps = {
   unignoreSteamGame: (steamAppId: number) => void;
 };
 
+type AppRouterCoreKeys = 'activeNavItem' | 'mainContentRef' | 't' | 'addToastNotification' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 'setSelectedGameId' | 'setIsAddGameOpen' | 'openOnboarding' | 'setIsAchievementTimelineOpen' | 'openGameFromHome';
+type AppRouterGameKeys = 'games' | 'filteredLibraryGames' | 'filteredWishlistGames' | 'playActivity' | 'reviewIgnoredGameIds' | 'ignoredSteamGames' | 'addToWishlist' | 'addManyToWishlist' | 'moveToLibrary' | 'removeGame' | 'removeAndIgnoreSteamGame' | 'removeManyGames' | 'removeAndIgnoreManyGames' | 'updateGameStatusWithCompletion' | 'updateManyGameStatuses' | 'updateGameTracking' | 'updateGameReviewFieldsWithCompletion' | 'logPlayedToday' | 'handleOpenDetailsFromCollection';
+type AppRouterCollectionKeys = 'libraryFilters' | 'wishlistFilters' | 'platformOptions' | 'tags' | 'areLastRetroImportsHiddenByFilters' | 'handleClearLibraryFilters' | 'handleClearWishlistFilters' | 'handleLibraryFiltersChange' | 'handleWishlistFiltersChange' | 'setLibraryFilters';
+type AppRouterQueueKeys = 'platformQueueState' | 'queueSummary' | 'activeQueuePlatforms' | 'targetQueuePlatform' | 'homeSteamSyncGameIds' | 'openQueue' | 'openBacklogPicker' | 'addGameToQueue' | 'addQueuePlatform' | 'updateQueueLimit' | 'setPlatformQueueState' | 'moveQueueGame' | 'moveQueueGameToPlatform' | 'playQueueGameNow' | 'updateCurrentlyPlayingGame' | 'removeQueueGame' | 'playGameFromCompactRow' | 'finishGameFromCompactRow' | 'dropGameFromCompactRow';
+type AppRouterReviewKeys = 'reviewModeState' | 'activeReviewSource' | 'confirmCancelConvention' | 'handleReviewAction' | 'startReviewMode' | 'setReviewSource' | 'restoreReviewIgnoredGames';
+type AppRouterSyncKeys = 'itadDealSyncState' | 'steamAchievementSyncState' | 'steamPlaytimeRefreshState' | 'steamWishlistSyncState' | 'isImportingNewSteamGames' | 'isHltbSyncing' | 'syncSteamAchievements' | 'refreshSteamPlaytime' | 'syncWishlistDeals' | 'syncSteamWishlist' | 'syncHltb' | 'importNewSteamGames';
+type AppRouterShelfKeys = 'personalizedQuestShelfTitle' | 'computedShelfTitle' | 'resolvedFeaturedGame' | 'shelfIdentity' | 'steamAvatarUrl' | 'libraryOwnerNickname' | 'questShelfAchievements' | 'setLibraryOwnerNickname' | 'setShelfIdentity';
+type AppRouterDiscoveryKeys = 'discoveryInboxItems' | 'discoveryInboxRawgIds' | 'handleSelectDiscoveryGame' | 'openDiscoveryPreview' | 'addToDiscoveryInbox' | 'promoteDiscoveryToWishlist' | 'promoteDiscoveryToPlans' | 'promoteInboxDiscoveryToLibrary' | 'promoteInboxDiscoveryToWishlist' | 'promoteInboxDiscoveryToPlans' | 'handleInboxIgnore';
+type AppRouterOnboardingKeys = 'completedOnboardingItemIds' | 'skippedOnboardingItemIds' | 'isOnboardingOpen' | 'isOnboardingComplete' | 'markOnboardingItemComplete' | 'markOnboardingItemsComplete' | 'hideOnboarding' | 'skipOnboardingItem' | 'handleOnboardingAction' | 'restartOnboarding';
+type AppRouterSettingsKeys = 'activeSettingsCategory' | 'autoBackupSignal' | 'setupTasks' | 'runtimeEnvironment' | 'resolvedTheme' | 'themePreference' | 'appTemplatePreference' | 'accentColorPreference' | 'secondaryAccentColorPreference' | 'gradientOrientationPreference' | 'neonButtonGradientBalancePreference' | 'neonButtonGradientMidpointPreference' | 'neonButtonStylePreference' | 'language' | 'navigationVisibility' | 'controllerProfileId' | 'detectedProfileId' | 'isControllerDebugEnabled' | 'isLandscapeLockEnabled' | 'steamPersonaName' | 'setIsRawgApiKeySet' | 'handleSteamProfileNameChange' | 'setNavigationVisibility' | 'setThemePreference' | 'setAppTemplatePreference' | 'setAccentColorPreference' | 'setSecondaryAccentColorPreference' | 'setGradientOrientationPreference' | 'setNeonButtonGradientBalancePreference' | 'setNeonButtonGradientMidpointPreference' | 'setNeonButtonStylePreference' | 'setLanguage' | 'setControllerProfileId' | 'setIsControllerDebugEnabled' | 'setIsLandscapeLockEnabled' | 'handleBackupExported' | 'handleBackupImported' | 'unignoreSteamGame';
+type AppRouterMetadataKeys = 'metadataSelectionRequest' | 'refreshingMetadataGameIds' | 'updateGameArtwork' | 'updateGameMetadata' | 'updateGameMetadataManagement' | 'refreshGameMetadataFromActions' | 'startMetadataWorkflow' | 'ensureRawgMetadataForGame';
+type AppRouterImportKeys = 'importMultiGameItemsWithAnalytics' | 'importSteamWishlistHtmlItemsWithAnalytics' | 'importSteamGames' | 'handleRetroImportGames' | 'addRetroImportedGamesToQueue' | 'enrichRetroImportedGames' | 'viewRetroImportedGames';
+
+export type AppRouterCoreModel = Pick<AppSectionRouteModel, AppRouterCoreKeys>;
+export type AppRouterGameModel = Pick<AppSectionRouteModel, AppRouterGameKeys>;
+export type AppRouterCollectionModel = Pick<AppSectionRouteModel, AppRouterCollectionKeys>;
+export type AppRouterQueueModel = Pick<AppSectionRouteModel, AppRouterQueueKeys>;
+export type AppRouterReviewModel = Pick<AppSectionRouteModel, AppRouterReviewKeys>;
+export type AppRouterSyncModel = Pick<AppSectionRouteModel, AppRouterSyncKeys>;
+export type AppRouterShelfModel = Pick<AppSectionRouteModel, AppRouterShelfKeys>;
+export type AppRouterDiscoveryModel = Pick<AppSectionRouteModel, AppRouterDiscoveryKeys>;
+export type AppRouterOnboardingModel = Pick<AppSectionRouteModel, AppRouterOnboardingKeys>;
+export type AppRouterSettingsModel = Pick<AppSectionRouteModel, AppRouterSettingsKeys>;
+export type AppRouterMetadataModel = Pick<AppSectionRouteModel, AppRouterMetadataKeys>;
+export type AppRouterImportModel = Pick<AppSectionRouteModel, AppRouterImportKeys>;
+
+export type AppSectionRouterProps = { core: AppRouterCoreModel; games: AppRouterGameModel; collections: AppRouterCollectionModel; queue: AppRouterQueueModel; review: AppRouterReviewModel; sync: AppRouterSyncModel; shelf: AppRouterShelfModel; discovery: AppRouterDiscoveryModel; onboarding: AppRouterOnboardingModel; settings: AppRouterSettingsModel; metadata: AppRouterMetadataModel; imports: AppRouterImportModel; };
+
 export function AppSectionRouter(props: AppSectionRouterProps) {
-  const { activeNavItem, mainContentRef } = props;
+  const { core, games, collections, queue, review, sync, shelf, discovery, onboarding, settings, metadata, imports } = props;
+  const { activeNavItem, mainContentRef } = core;
+  const routeProps: AppSectionRouteModel = { ...core, ...games, ...collections, ...queue, ...review, ...sync, ...shelf, ...discovery, ...onboarding, ...settings, ...metadata, ...imports };
 
   return (
     <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
       {activeNavItem === 'Home' ? (
-        <HomeRoute {...props} />
+        <HomeRoute {...routeProps} />
       ) : activeNavItem === 'Library' ? (
-        <LibraryRoute {...props} />
+        <LibraryRoute {...routeProps} />
       ) : activeNavItem === 'Wishlist' ? (
-        <WishlistRoute {...props} />
+        <WishlistRoute {...routeProps} />
       ) : activeNavItem === 'Queue' ? (
-        <QuestQueueRoute {...props} />
+        <QuestQueueRoute {...routeProps} />
       ) : activeNavItem === 'Review Mode' ? (
-        <ReviewModeRoute {...props} />
+        <ReviewModeRoute {...routeProps} />
       ) : activeNavItem === 'Discovery Inbox' ? (
-        <DiscoveryInboxRoute {...props} />
+        <DiscoveryInboxRoute {...routeProps} />
       ) : activeNavItem === 'Metadata' ? (
-        <MetadataRoute {...props} />
+        <MetadataRoute {...routeProps} />
       ) : activeNavItem === 'Artwork' ? (
-        <ArtworkRoute {...props} />
+        <ArtworkRoute {...routeProps} />
       ) : activeNavItem === 'Discover' ? (
-        <DiscoveryRoute {...props} />
+        <DiscoveryRoute {...routeProps} />
       ) : activeNavItem === 'Stats' ? (
-        <StatsRoute {...props} />
+        <StatsRoute {...routeProps} />
       ) : activeNavItem === 'Quest Runner' ? (
-        <QuestRunnerRoute {...props} />
+        <QuestRunnerRoute {...routeProps} />
       ) : activeNavItem === 'Settings' ? (
-        <SettingsRoute {...props} />
+        <SettingsRoute {...routeProps} />
       ) : (
         <PlaceholderPanel title={activeNavItem} />
       )}
