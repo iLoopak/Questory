@@ -719,6 +719,10 @@ img {
   border-radius: 999px;
   line-height: 0;
 }
+
+.qs-platform-artwork-controls .qs-platform-options-button {
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 15%, rgb(2 6 23 / 0.76));
+}
 .qs-platform-overflow-icon {
   display: grid;
   grid-auto-flow: column;
@@ -2757,6 +2761,17 @@ textarea,
   max-width: 100%;
 }
 
+.qs-platform-artwork-header {
+  --platform-hero-card-padding: 1rem;
+  --platform-hero-radius: calc(1rem - 1px);
+  --platform-hero-overlay-inset: 0.875rem;
+  width: calc(100% + (var(--platform-hero-card-padding) * 2));
+  max-width: none;
+  border-radius: var(--platform-hero-radius) var(--platform-hero-radius) 0 0;
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 18%, rgb(2 6 23));
+  transform: translateZ(0);
+}
+
 .qs-platform-artwork-banner > img {
   display: block;
   height: 100%;
@@ -2764,6 +2779,22 @@ textarea,
   max-width: none;
   object-fit: cover;
   object-position: center center;
+}
+
+.qs-platform-artwork-header > img,
+.qs-platform-artwork-overlay {
+  border-radius: inherit;
+}
+
+.qs-platform-artwork-controls {
+  padding: var(--platform-hero-overlay-inset);
+}
+
+.qs-platform-artwork-title {
+  min-height: 2.25rem;
+  max-width: calc(100% - 3.125rem);
+  border: 1px solid color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, rgb(255 255 255 / 0.08));
+  line-height: 1;
 }
 
 /* ─── Platform Plans — Neon Deck visual identity ─── */
