@@ -492,6 +492,7 @@ type PlatformOptionsMenuPosition = {
 };
 
 type PlatformOptionsMenuProps = {
+  ariaLabel?: string;
   children: (options: { closeMenu: () => void }) => ReactNode;
   label: string;
 };
@@ -500,7 +501,7 @@ const platformOptionsMenuWidth = 192;
 const platformOptionsMenuViewportMargin = 8;
 const platformOptionsMenuOffset = 8;
 
-function PlatformOptionsMenu({ children, label }: PlatformOptionsMenuProps) {
+function PlatformOptionsMenu({ ariaLabel, children, label }: PlatformOptionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<PlatformOptionsMenuPosition>({ left: 0, top: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -600,7 +601,9 @@ function PlatformOptionsMenu({ children, label }: PlatformOptionsMenuProps) {
         ref={buttonRef}
         aria-expanded={isOpen}
         aria-haspopup="menu"
+        aria-label={ariaLabel}
         className="qs-platform-secondary-button qs-platform-options-button"
+        title={ariaLabel}
         onClick={toggleMenu}
         type="button"
       >
@@ -732,9 +735,35 @@ function PlatformQueueColumn({
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
 
+  const platformOptionsMenu = (
+    <PlatformOptionsMenu ariaLabel={`${platform} ${t('queue.options')}`} label="…">
+      {({ closeMenu }) => (
+        <>
+          <label className="block">
+            <span className="qs-label-caps text-muted">{t('queue.futureActiveLimit')}</span>
+            <input
+              className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
+              min={1}
+              max={25}
+              type="number"
+              value={maxActiveGames}
+              onChange={(event) => onLimitChange(platform, Number(event.target.value))}
+            />
+          </label>
+          <button className="qs-platform-menu-item" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
+          <button className="qs-platform-menu-item" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
+          <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
+          <button className="qs-platform-menu-item" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
+          <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
+          <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
+        </>
+      )}
+    </PlatformOptionsMenu>
+  );
+
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-4 overflow-hidden rounded-t-2xl">
           <img alt="" className="h-full w-full object-cover object-center opacity-88" src={displayArtworkUrl} />
@@ -752,64 +781,41 @@ function PlatformQueueColumn({
           ) : null}
           <div className="absolute inset-x-0 bottom-0 flex min-w-0 items-end justify-between gap-3 p-4">
             <h3
-              className="qs-platform-artwork-title flex max-w-full min-w-0 items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              className="qs-platform-artwork-title flex min-w-0 max-w-[calc(100%-3.5rem)] items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
               style={{ backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.76))` }}
             >
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
               <span className="min-w-0 truncate">{platform}</span>
             </h3>
+            <div className="shrink-0">{platformOptionsMenu}</div>
           </div>
         </div>
       ) : null}
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          {!displayArtworkUrl ? (
+      {!displayArtworkUrl ? (
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight">
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
               <span className="min-w-0 truncate" style={{ color: platformAccentColor }}>{platform}</span>
             </h3>
-          ) : null}
-          {platformTag && !displayArtworkUrl ? (
-            <div className="mt-1.5">
-              <span
-                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
-                style={{
-                  borderColor: `color-mix(in srgb, ${platformAccentColor} 30%, transparent)`,
-                  color: `color-mix(in srgb, ${platformAccentColor} 75%, rgb(148 163 184))`,
-                  backgroundColor: `color-mix(in srgb, ${platformAccentColor} 10%, transparent)`,
-                }}
-              >
-                {platformTag}
-              </span>
-            </div>
-          ) : null}
+            {platformTag ? (
+              <div className="mt-1.5">
+                <span
+                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${platformAccentColor} 30%, transparent)`,
+                    color: `color-mix(in srgb, ${platformAccentColor} 75%, rgb(148 163 184))`,
+                    backgroundColor: `color-mix(in srgb, ${platformAccentColor} 10%, transparent)`,
+                  }}
+                >
+                  {platformTag}
+                </span>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">{platformOptionsMenu}</div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <PlatformOptionsMenu label={t('queue.options')}>
-            {({ closeMenu }) => (
-              <>
-                <label className="block">
-                  <span className="qs-label-caps text-muted">{t('queue.futureActiveLimit')}</span>
-                  <input
-                    className="mt-1 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint"
-                    min={1}
-                    max={25}
-                    type="number"
-                    value={maxActiveGames}
-                    onChange={(event) => onLimitChange(platform, Number(event.target.value))}
-                  />
-                </label>
-                <button className="qs-platform-menu-item" onClick={() => { setIsIdentityModalOpen(true); closeMenu(); }} type="button">{t('queue.editIdentity')}</button>
-                <button className="qs-platform-menu-item" onClick={() => { onHidePlatform(platform); closeMenu(); }} type="button">{t('queue.hidePlatform')}</button>
-                <button className="qs-platform-menu-item qs-platform-menu-item--danger" onClick={() => { onRemovePlatform(platform); closeMenu(); }} type="button">{t('queue.removePlatform')}</button>
-                <button className="qs-platform-menu-item" onClick={() => { setIsRenameModalOpen(true); closeMenu(); }} type="button">{t('queue.renamePlatform')}</button>
-                <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'up'); closeMenu(); }} type="button">{t('queue.moveUp')}</button>
-                <button className="qs-platform-menu-item" onClick={() => { onMovePlatform(platform, 'down'); closeMenu(); }} type="button">{t('queue.moveDown')}</button>
-              </>
-            )}
-          </PlatformOptionsMenu>
-        </div>
-      </div>
+      ) : null}
 
       {showPlayingSection && currentlyPlaying.length > 0 ? (
         <div className="qs-platform-playing-section mb-4 grid w-full min-w-0 gap-2">

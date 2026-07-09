@@ -707,6 +707,10 @@ img {
 }
 .qs-platform-options-button {
   min-width: 2.25rem;
+  width: 2.25rem;
+  padding-inline: 0;
+  font-size: 1.125rem;
+  letter-spacing: 0.08em;
 }
 .qs-platform-secondary-button:hover,
 .qs-platform-secondary-button:focus-visible {
@@ -2727,8 +2731,10 @@ textarea,
 }
 
 .qs-platform-artwork-banner > img {
+  display: block;
   height: 100%;
   width: 100%;
+  max-width: none;
   object-fit: cover;
   object-position: center center;
 }
