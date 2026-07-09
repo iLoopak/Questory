@@ -786,6 +786,34 @@ img {
   border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 36%, var(--border));
 }
 
+
+.qs-platform-nextup-section {
+  margin-top: 0.75rem;
+}
+
+.qs-platform-nextup-title {
+  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 82%, var(--text-primary));
+}
+
+.qs-queue-entry--playlist {
+  cursor: pointer;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--platform-accent, var(--accent)) 9%, transparent), transparent 42%),
+    color-mix(in srgb, var(--surface-secondary) 92%, black);
+}
+
+.qs-queue-entry--playlist .qs-platform-options-button {
+  min-width: 2.25rem;
+  padding-inline: 0.55rem;
+  border-radius: 999px;
+  letter-spacing: 0.08em;
+}
+
+.qs-queue-entry-primary-action,
+.qs-platform-playing-action {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--platform-accent, var(--accent)) 10%, transparent);
+}
+
 .qs-review-action:focus-visible {
   transform: translateY(-1px);
 }
