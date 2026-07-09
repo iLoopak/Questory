@@ -9,10 +9,23 @@ import type { SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary } from '../
 import type { TFunction } from '../../../i18n';
 import { formatMessageTemplate, formatSteamPlaytimeRefreshSummary } from '../../../utils/summaryFormatters';
 
-export type SteamPlaytimeSyncOptions = { games: Game[]; setGames: Dispatch<SetStateAction<Game[]>>; setPlayActivity: Dispatch<SetStateAction<PlayActivityRecord[]>>; setSteamPlaytimeRefreshState: Dispatch<SetStateAction<SteamPlaytimeRefreshState>>; addToastNotification: (notification: NotificationDraft) => void; t: TFunction };
+export type SteamPlaytimeSyncOptions = {
+  games: Game[];
+  setGames: Dispatch<SetStateAction<Game[]>>;
+  setPlayActivity: Dispatch<SetStateAction<PlayActivityRecord[]>>;
+  setSteamPlaytimeRefreshState: Dispatch<SetStateAction<SteamPlaytimeRefreshState>>;
+  addToastNotification: (notification: NotificationDraft) => void;
+  t: TFunction;
+};
+
+export type RefreshSteamPlaytimeOptions = {
+  completionToastMessage?: (summary: SteamPlaytimeRefreshSummary) => string;
+  emptyToastMessage?: string;
+  showToast?: boolean;
+};
 
 export function useSteamPlaytimeSync({ games, setGames, setPlayActivity, setSteamPlaytimeRefreshState, addToastNotification, t }: SteamPlaytimeSyncOptions) {
-  return async function refreshSteamPlaytime(gameIds?: string[], options: { completionToastMessage?: (summary: SteamPlaytimeRefreshSummary) => string; emptyToastMessage?: string; showToast?: boolean } = {}) {
+  return async function refreshSteamPlaytime(gameIds?: string[], options: RefreshSteamPlaytimeOptions = {}) {
     const targetGames = (gameIds ? games.filter((game) => gameIds.includes(game.id)) : games).filter((game) => game.collectionType === 'library');
     const refreshableGames = targetGames.filter(isRefreshableSteamGame);
     const total = refreshableGames.length;
