@@ -1,7 +1,25 @@
 import { DiscoverPanel } from '../../../components/DiscoverPanel';
-import type { AppSectionRouteModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel } from '../AppSectionRouter';
 
-type DiscoveryRouteProps = Pick<AppSectionRouteModel, 'games' | 'discoveryInboxRawgIds' | 'addToDiscoveryInbox' | 'openDiscoveryPreview' | 'promoteDiscoveryToWishlist' | 'promoteDiscoveryToPlans' | 'setActiveNavItem' | 'setActiveSettingsCategory'>;
-export function DiscoveryRoute({ games, discoveryInboxRawgIds, addToDiscoveryInbox, openDiscoveryPreview, promoteDiscoveryToWishlist, promoteDiscoveryToPlans, setActiveNavItem, setActiveSettingsCategory }: DiscoveryRouteProps) {
-  return <DiscoverPanel games={games} discoveryInboxRawgIds={discoveryInboxRawgIds} onAddToInbox={addToDiscoveryInbox} onOpenGame={openDiscoveryPreview} onAddToWishlist={promoteDiscoveryToWishlist} onAddToPlans={promoteDiscoveryToPlans} onOpenSettings={() => { setActiveNavItem('Settings'); setActiveSettingsCategory('Integrations'); }} />;
+type DiscoveryRouteProps = {
+  core: Pick<AppRouterCoreModel, 'setActiveNavItem' | 'setActiveSettingsCategory'>;
+  games: Pick<AppRouterGameModel, 'games'>;
+  discovery: Pick<AppRouterDiscoveryModel, 'discoveryInboxRawgIds' | 'addToDiscoveryInbox' | 'openDiscoveryPreview' | 'promoteDiscoveryToWishlist' | 'promoteDiscoveryToPlans'>;
+};
+
+export function DiscoveryRoute({ core, games, discovery }: DiscoveryRouteProps) {
+  return (
+    <DiscoverPanel
+      games={games.games}
+      discoveryInboxRawgIds={discovery.discoveryInboxRawgIds}
+      onAddToInbox={discovery.addToDiscoveryInbox}
+      onOpenGame={discovery.openDiscoveryPreview}
+      onAddToWishlist={discovery.promoteDiscoveryToWishlist}
+      onAddToPlans={discovery.promoteDiscoveryToPlans}
+      onOpenSettings={() => {
+        core.setActiveNavItem('Settings');
+        core.setActiveSettingsCategory('Integrations');
+      }}
+    />
+  );
 }

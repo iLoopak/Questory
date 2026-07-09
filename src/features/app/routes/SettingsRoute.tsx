@@ -1,12 +1,106 @@
 import { Suspense, lazy } from 'react';
 import { initialCollectionFilters } from '../../../config/collection';
 import { PanelLoadingFallback } from '../../../components/PanelLoadingFallback';
-import type { AppSectionRouteModel } from '../AppSectionRouter';
+import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterOnboardingModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSettingsModel, AppRouterShelfModel, AppRouterSyncModel } from '../AppSectionRouter';
 
 const SettingsView = lazy(() => import('../../settings/SettingsView').then((m) => ({ default: m.SettingsView })));
 
-type SettingsRouteProps = Pick<AppSectionRouteModel, 'activeSettingsCategory' | 'autoBackupSignal' | 'setupTasks' | 'setIsAddGameOpen' | 'games' | 'syncSteamAchievements' | 'completedOnboardingItemIds' | 'skippedOnboardingItemIds' | 'ignoredSteamGames' | 'libraryOwnerNickname' | 'personalizedQuestShelfTitle' | 'shelfIdentity' | 'questShelfAchievements' | 'computedShelfTitle' | 'steamAvatarUrl' | 'steamPersonaName' | 'controllerProfileId' | 'detectedProfileId' | 'isControllerDebugEnabled' | 'isLandscapeLockEnabled' | 'isOnboardingOpen' | 'isOnboardingComplete' | 'areLastRetroImportsHiddenByFilters' | 'resolvedTheme' | 'runtimeEnvironment' | 'themePreference' | 'appTemplatePreference' | 'accentColorPreference' | 'secondaryAccentColorPreference' | 'gradientOrientationPreference' | 'neonButtonGradientBalancePreference' | 'neonButtonGradientMidpointPreference' | 'neonButtonStylePreference' | 'language' | 'navigationVisibility' | 'platformQueueState' | 'steamPlaytimeRefreshState' | 'steamWishlistSyncState' | 'addRetroImportedGamesToQueue' | 'handleBackupExported' | 'handleBackupImported' | 'setActiveSettingsCategory' | 'setLibraryOwnerNickname' | 'setShelfIdentity' | 'handleSteamProfileNameChange' | 'markOnboardingItemComplete' | 'setLibraryFilters' | 'enrichRetroImportedGames' | 'importSteamGames' | 'handleRetroImportGames' | 'setIsControllerDebugEnabled' | 'setControllerProfileId' | 'setIsLandscapeLockEnabled' | 'setNavigationVisibility' | 'handleOnboardingAction' | 'hideOnboarding' | 'skipOnboardingItem' | 'openOnboarding' | 'restartOnboarding' | 'setPlatformQueueState' | 'setIsRawgApiKeySet' | 'refreshSteamPlaytime' | 'markOnboardingItemsComplete' | 'importMultiGameItemsWithAnalytics' | 'importSteamWishlistHtmlItemsWithAnalytics' | 'syncSteamWishlist' | 'startReviewMode' | 'setThemePreference' | 'setAppTemplatePreference' | 'setAccentColorPreference' | 'setSecondaryAccentColorPreference' | 'setGradientOrientationPreference' | 'setNeonButtonGradientBalancePreference' | 'setNeonButtonGradientMidpointPreference' | 'setNeonButtonStylePreference' | 'setLanguage' | 'unignoreSteamGame' | 'viewRetroImportedGames'>;
-export function SettingsRoute({ activeSettingsCategory, autoBackupSignal, setupTasks, setIsAddGameOpen, games, syncSteamAchievements, completedOnboardingItemIds, skippedOnboardingItemIds, ignoredSteamGames, libraryOwnerNickname, personalizedQuestShelfTitle, shelfIdentity, questShelfAchievements, computedShelfTitle, steamAvatarUrl, steamPersonaName, controllerProfileId, detectedProfileId, isControllerDebugEnabled, isLandscapeLockEnabled, isOnboardingOpen, isOnboardingComplete, areLastRetroImportsHiddenByFilters, resolvedTheme, runtimeEnvironment, themePreference, appTemplatePreference, accentColorPreference, secondaryAccentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, neonButtonStylePreference, language, navigationVisibility, platformQueueState, steamPlaytimeRefreshState, steamWishlistSyncState, addRetroImportedGamesToQueue, handleBackupExported, handleBackupImported, setActiveSettingsCategory, setLibraryOwnerNickname, setShelfIdentity, handleSteamProfileNameChange, markOnboardingItemComplete, setLibraryFilters, enrichRetroImportedGames, importSteamGames, handleRetroImportGames, setIsControllerDebugEnabled, setControllerProfileId, setIsLandscapeLockEnabled, setNavigationVisibility, handleOnboardingAction, hideOnboarding, skipOnboardingItem, openOnboarding, restartOnboarding, setPlatformQueueState, setIsRawgApiKeySet, refreshSteamPlaytime, markOnboardingItemsComplete, importMultiGameItemsWithAnalytics, importSteamWishlistHtmlItemsWithAnalytics, syncSteamWishlist, startReviewMode, setThemePreference, setAppTemplatePreference, setAccentColorPreference, setSecondaryAccentColorPreference, setGradientOrientationPreference, setNeonButtonGradientBalancePreference, setNeonButtonGradientMidpointPreference, setNeonButtonStylePreference, setLanguage, unignoreSteamGame, viewRetroImportedGames }: SettingsRouteProps) {
+type SettingsRouteProps = {
+  core: Pick<AppRouterCoreModel, 'setIsAddGameOpen' | 'setActiveSettingsCategory' | 'openOnboarding'>;
+  games: Pick<AppRouterGameModel, 'games' | 'ignoredSteamGames'>;
+  collections: Pick<AppRouterCollectionModel, 'areLastRetroImportsHiddenByFilters' | 'setLibraryFilters'>;
+  queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'setPlatformQueueState'>;
+  review: Pick<AppRouterReviewModel, 'startReviewMode'>;
+  sync: Pick<AppRouterSyncModel, 'steamPlaytimeRefreshState' | 'steamWishlistSyncState' | 'syncSteamAchievements' | 'refreshSteamPlaytime' | 'syncSteamWishlist'>;
+  shelf: AppRouterShelfModel;
+  onboarding: AppRouterOnboardingModel;
+  settings: AppRouterSettingsModel;
+  imports: AppRouterImportModel;
+};
+
+export function SettingsRoute({ core, games, collections, queue, review, sync, shelf, onboarding, settings, imports }: SettingsRouteProps) {
+  const model = { ...core, ...games, ...collections, ...queue, ...review, ...sync, ...shelf, ...onboarding, ...settings, ...imports };
+  const {
+    activeSettingsCategory,
+    autoBackupSignal,
+    setupTasks,
+    setIsAddGameOpen,
+    games: gameList,
+    syncSteamAchievements,
+    completedOnboardingItemIds,
+    skippedOnboardingItemIds,
+    ignoredSteamGames,
+    libraryOwnerNickname,
+    personalizedQuestShelfTitle,
+    shelfIdentity,
+    questShelfAchievements,
+    computedShelfTitle,
+    steamAvatarUrl,
+    steamPersonaName,
+    controllerProfileId,
+    detectedProfileId,
+    isControllerDebugEnabled,
+    isLandscapeLockEnabled,
+    isOnboardingOpen,
+    isOnboardingComplete,
+    areLastRetroImportsHiddenByFilters,
+    resolvedTheme,
+    runtimeEnvironment,
+    themePreference,
+    appTemplatePreference,
+    accentColorPreference,
+    secondaryAccentColorPreference,
+    gradientOrientationPreference,
+    neonButtonGradientBalancePreference,
+    neonButtonGradientMidpointPreference,
+    neonButtonStylePreference,
+    language,
+    navigationVisibility,
+    platformQueueState,
+    steamPlaytimeRefreshState,
+    steamWishlistSyncState,
+    addRetroImportedGamesToQueue,
+    handleBackupExported,
+    handleBackupImported,
+    setActiveSettingsCategory,
+    setLibraryOwnerNickname,
+    setShelfIdentity,
+    handleSteamProfileNameChange,
+    markOnboardingItemComplete,
+    setLibraryFilters,
+    enrichRetroImportedGames,
+    importSteamGames,
+    handleRetroImportGames,
+    setIsControllerDebugEnabled,
+    setControllerProfileId,
+    setIsLandscapeLockEnabled,
+    setNavigationVisibility,
+    handleOnboardingAction,
+    hideOnboarding,
+    skipOnboardingItem,
+    openOnboarding,
+    restartOnboarding,
+    setPlatformQueueState,
+    setIsRawgApiKeySet,
+    refreshSteamPlaytime,
+    markOnboardingItemsComplete,
+    importMultiGameItemsWithAnalytics,
+    importSteamWishlistHtmlItemsWithAnalytics,
+    syncSteamWishlist,
+    startReviewMode,
+    setThemePreference,
+    setAppTemplatePreference,
+    setAccentColorPreference,
+    setSecondaryAccentColorPreference,
+    setGradientOrientationPreference,
+    setNeonButtonGradientBalancePreference,
+    setNeonButtonGradientMidpointPreference,
+    setNeonButtonStylePreference,
+    setLanguage,
+    unignoreSteamGame,
+    viewRetroImportedGames,
+  } = model;
+
   return (
     <Suspense fallback={<PanelLoadingFallback />}>
       <SettingsView
@@ -15,14 +109,14 @@ export function SettingsRoute({ activeSettingsCategory, autoBackupSignal, setupT
           setupTasks={setupTasks}
           onAddGame={() => setIsAddGameOpen(true)}
           onSyncAchievements={() => {
-            const allSteamGameIds = games
+            const allSteamGameIds = gameList
               .filter((g) => g.collectionType === 'library' && typeof g.steamAppId === 'number')
               .map((g) => g.id);
             void syncSteamAchievements(allSteamGameIds, { showToast: true });
           }}
           completedOnboardingItemIds={completedOnboardingItemIds}
           skippedOnboardingItemIds={skippedOnboardingItemIds}
-          games={games}
+          games={gameList}
           ignoredSteamGames={ignoredSteamGames}
           libraryOwnerNickname={libraryOwnerNickname}
           personalizedQuestShelfTitle={personalizedQuestShelfTitle}
