@@ -11,6 +11,7 @@ import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 import type { DiscoveryInboxItem } from '../lib/discoveryInboxStorage';
 import { Icon } from './Icon';
+import { QueueCompletionScreen } from './QueueCompletionScreen';
 import { DiscoveryScreenshotStrip } from './ScreenshotStrip';
 import { useI18n } from '../i18n';
 import { formatMessageTemplate } from '../utils/summaryFormatters';
@@ -569,63 +570,30 @@ function FocusedDiscoveryCard({
 
 function InboxComplete({ stats, reviewedCount }: { stats: SessionStats; reviewedCount: number }) {
   const { t } = useI18n();
-  const hasStats = stats.library > 0 || stats.wishlist > 0 || stats.plans > 0 || stats.ignored > 0;
   const addedCount = stats.library + stats.wishlist + stats.plans;
+  const chipConfigs = [
+    stats.library > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeAddedLibrary'), { count: stats.library }), tone: 'accent' as const, value: stats.library } : null,
+    stats.wishlist > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeAddedWishlist'), { count: stats.wishlist }), tone: 'neutral' as const, value: stats.wishlist } : null,
+    stats.plans > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeAddedPlans'), { count: stats.plans }), tone: 'neutral' as const, value: stats.plans } : null,
+    stats.ignored > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeIgnored'), { count: stats.ignored }), tone: 'muted' as const, value: stats.ignored } : null,
+  ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
 
   return (
-    <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
-      <div className="max-w-sm">
-        <div className="text-xs font-semibold uppercase tracking-spread text-amber-400">
-          {t('discoveryInbox.completeKicker')}
-        </div>
-        <h3 className="mt-2 text-3xl font-semibold text-white">{t('discoveryInbox.completeTitle')}</h3>
-        <p className="mt-3 text-sm text-slate-400">
-          {formatMessageTemplate(
-            t(reviewedCount === 1 ? 'discoveryInbox.completeTriagedOne' : 'discoveryInbox.completeTriagedMany'),
-            { count: reviewedCount },
-          )}
-        </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
-            <div className="qs-label-caps text-amber-400">{t('discoveryInbox.completeTriagedLabel')}</div>
-            <div className="mt-1 text-2xl font-semibold text-white">{reviewedCount}</div>
-            <div className="text-xs text-slate-400">{t('discoveryInbox.completeThisSession')}</div>
-          </div>
-          <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
-            <div className="qs-label-caps text-accent">{t('discoveryInbox.completeAddedLabel')}</div>
-            <div className="mt-1 text-2xl font-semibold text-white">{addedCount}</div>
-            <div className="text-xs text-slate-400">{t('discoveryInbox.completeToCollection')}</div>
-          </div>
-        </div>
-        {hasStats && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
-            {stats.library > 0 && (
-              <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">
-                {formatMessageTemplate(t('discoveryInbox.completeAddedLibrary'), { count: stats.library })}
-              </span>
-            )}
-            {stats.wishlist > 0 && (
-              <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">
-                {formatMessageTemplate(t('discoveryInbox.completeAddedWishlist'), { count: stats.wishlist })}
-              </span>
-            )}
-            {stats.plans > 0 && (
-              <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">
-                {formatMessageTemplate(t('discoveryInbox.completeAddedPlans'), { count: stats.plans })}
-              </span>
-            )}
-            {stats.ignored > 0 && (
-              <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">
-                {formatMessageTemplate(t('discoveryInbox.completeIgnored'), { count: stats.ignored })}
-              </span>
-            )}
-          </div>
-        )}
-        <p className="mt-6 text-xs text-slate-500">
-          {t('discoveryInbox.completeBrowseMore')}
-        </p>
-      </div>
-    </div>
+    <QueueCompletionScreen
+      eyebrow={t('discoveryInbox.completeKicker')}
+      footer={t('discoveryInbox.completeBrowseMore')}
+      heading={t('discoveryInbox.completeTitle')}
+      state="queue-empty"
+      summary={formatMessageTemplate(
+        t(reviewedCount === 1 ? 'discoveryInbox.completeTriagedOne' : 'discoveryInbox.completeTriagedMany'),
+        { count: reviewedCount },
+      )}
+      stats={[
+        { label: t('discoveryInbox.completeTriagedLabel'), value: reviewedCount, helper: t('discoveryInbox.completeThisSession'), tone: 'warm' },
+        { label: t('discoveryInbox.completeAddedLabel'), value: addedCount, helper: t('discoveryInbox.completeToCollection'), tone: 'accent' },
+      ]}
+      chips={chipConfigs}
+    />
   );
 }
 
