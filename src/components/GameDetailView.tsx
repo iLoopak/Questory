@@ -26,6 +26,8 @@ import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { RawgRatingBadge, getRawgRatingDisplay } from './RawgRatingBadge';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ContextualRecommendationsSection } from './discovery/ContextualRecommendationsSection';
+import { GameScreenshotGallery } from './ScreenshotStrip';
+import { useGameScreenshots } from '../hooks/useGameScreenshots';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 
 type GameDetailViewProps = {
@@ -372,6 +374,8 @@ export function GameDetailView({
         <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
       ) : null}
 
+      <GameDetailScreenshotsSection game={game} />
+
       <DetailSection title={t('detail.myGameLog')} description={t('detail.myGameLogHelp')}>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
           <label className="block rounded-xl border border-mint/20 bg-ink-950/80 p-3 shadow-inner shadow-mint/5">
@@ -452,6 +456,26 @@ export function GameDetailView({
         onOpenPreview={onOpenDiscoveryPreview}
       />
     </FullscreenGameShell>
+  );
+}
+
+function GameDetailScreenshotsSection({ game }: { game: Game }) {
+  const { t } = useI18n();
+  const { screenshots, loading } = useGameScreenshots(game);
+
+  if (!loading && screenshots.length === 0) return null;
+
+  return (
+    <DetailSection title={t('preview.screenshots')}>
+      <GameScreenshotGallery
+        className="rounded-2xl border border-white/10 bg-ink-950/55 p-3"
+        loading={loading}
+        screenshots={screenshots}
+        skeletonCount={4}
+        thumbnailClassName="h-24 w-40 sm:h-28 sm:w-48"
+        title={getDisplayTitle(game)}
+      />
+    </DetailSection>
   );
 }
 
