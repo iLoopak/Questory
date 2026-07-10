@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { getUserProfileReadiness, profileFingerprint } from '../../lib/userProfile';
-import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
+import { fetchPersonalRecommendations, reportRecommendationSurfaceDiagnostics } from '../../services/personalRecommendationsService';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from './DiscoveryGameCard';
 import { useI18n, type TFunction } from '../../i18n';
@@ -79,7 +79,11 @@ function PersonalRecommendationsLoaded({
     lastFingerprintRef.current = fingerprint;
 
     fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
-      if (!cancelled) setCandidates(result.filter((c) => c.libraryStatus === null));
+      if (!cancelled) {
+        const visible = result.filter((c) => c.libraryStatus === null);
+        reportRecommendationSurfaceDiagnostics('home', visible.length, visible.length > 0 ? 'rendered' : 'empty-after-home-selector');
+        setCandidates(visible);
+      }
     });
 
     return () => {
@@ -94,7 +98,11 @@ function PersonalRecommendationsLoaded({
     if (!isRawgConfigured || candidates === null) return;
     let cancelled = false;
     fetchPersonalRecommendations(userGames, inboxRawgIds).then((result) => {
-      if (!cancelled) setCandidates(result.filter((c) => c.libraryStatus === null));
+      if (!cancelled) {
+        const visible = result.filter((c) => c.libraryStatus === null);
+        reportRecommendationSurfaceDiagnostics('home', visible.length, visible.length > 0 ? 'rendered' : 'empty-after-home-restamp');
+        setCandidates(visible);
+      }
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,6 +188,7 @@ export function PersonalRecommendationsSection({
   const readiness = useMemo(() => getUserProfileReadiness(userGames), [userGames]);
 
   if (!readiness.ready) {
+    reportRecommendationSurfaceDiagnostics('home', 0, 'cold-start-readiness');
     return <ColdStart progress={readiness.progress} t={t} />;
   }
 
