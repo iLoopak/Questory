@@ -83,6 +83,9 @@ export function QueuePanel({
   const [showQueueHint, setShowQueueHint] = useState(() => localStorage.getItem('qs-queue-hint-v1') !== 'dismissed');
   const [platformGhostSlot] = useState(() => pickQueueGhostSlot('platformPlans'));
   const [platformGhostVariant] = useState(() => pickSimpleVariant());
+  const [selectedPlatform, setSelectedPlatform] = useState<GamePlatform | null>(null);
+  const [bootingPlatform, setBootingPlatform] = useState<GamePlatform | null>(null);
+  const selectorScrollTopRef = useRef(0);
   const [showPlatformGhost, setShowPlatformGhost] = useState(() => Boolean(platformGhostSlot) && shouldShowQueueGhostInHabitat('platformPlans'));
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const visibleQueueEntries = useMemo(() => getVisiblePlatformQueueEntries(queueState, games), [games, queueState]);
@@ -122,14 +125,44 @@ export function QueuePanel({
   }, [activeQueuePlatforms, initialPlatform]);
 
   useEffect(() => {
-    if (!initialPlatform) {
+    if (selectedPlatform && !activeQueuePlatforms.includes(selectedPlatform)) {
+      setSelectedPlatform(null);
+    }
+  }, [activeQueuePlatforms, selectedPlatform]);
+
+  useEffect(() => {
+    if (!initialPlatform || selectedPlatform) {
       return;
     }
 
     window.requestAnimationFrame(() => {
-      platformRefs.current.get(initialPlatform)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const targetPlatformCard = platformRefs.current.get(initialPlatform);
+      targetPlatformCard?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
-  }, [initialPlatform]);
+  }, [initialPlatform, selectedPlatform]);
+
+  function openPlatformPlan(platform: GamePlatform) {
+    if (bootingPlatform || selectedPlatform) {
+      return;
+    }
+
+    selectorScrollTopRef.current = contentScrollRef.current?.scrollTop ?? 0;
+    setBootingPlatform(platform);
+    window.setTimeout(() => {
+      setSelectedPlatform(platform);
+      setBootingPlatform(null);
+      window.requestAnimationFrame(() => {
+        contentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      });
+    }, 180);
+  }
+
+  function returnToPlatformHub() {
+    setSelectedPlatform(null);
+    window.requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollTo({ top: selectorScrollTopRef.current, behavior: 'auto' });
+    });
+  }
 
   function addSuggestedPlatform(platform: GamePlatform) {
     const nextAccentColor = getDefaultPlatformAccentColor(platform);
@@ -149,7 +182,7 @@ export function QueuePanel({
     <section className="qs-queue-shell flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
       <header className="mb-3 space-y-3 px-1">
         <h2 className="text-lg font-semibold text-white">{t('queue.platforms')}</h2>
-        {activeQueuePlatforms.length > 0 ? (
+        {selectedPlatform && activeQueuePlatforms.length > 0 ? (
           <div className="flex items-center gap-2">
             <div className="qs-platform-progress flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1" aria-label="Platform Plans navigation">
               {activeQueuePlatforms.map((platform) => {
@@ -164,7 +197,7 @@ export function QueuePanel({
                       borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
                       backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
                     }}
-                    onClick={() => platformRefs.current.get(platform)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+                    onClick={() => setSelectedPlatform(platform)}
                     type="button"
                   >
                     <div className="truncate text-sm font-semibold text-white">{platform}</div>
@@ -248,58 +281,71 @@ export function QueuePanel({
             </>
           )}
         </div>
-      ) : null}
-
-      <div ref={queueListRef} className="qs-queue-list min-w-0 pr-1">
-        <div className={
-          displayedQueuePlatforms.length === 1
-            ? 'qs-platform-grid grid min-w-0 items-start gap-5'
-            : displayedQueuePlatforms.length === 2
-            ? 'qs-platform-grid grid min-w-0 grid-cols-2 items-start gap-5'
-            : 'qs-platform-grid grid min-w-0 items-start gap-5 xl:grid-cols-2'
-        }>
-          {displayedQueuePlatforms.map((platform) => (
-            <PlatformQueueColumn
-              key={platform}
-              gamesById={gamesById}
-              currentlyPlaying={playingGamesByPlatform.get(platform) ?? []}
-              maxActiveGames={getPlatformMaxActiveGames(queueState, platform)}
-              accentColor={getPlatformAccentColor(queueState, platform)}
-              artworkUrl={getPlatformArtworkUrl(queueState, platform)}
-              customArtworkUrl={getPlatformQueueSetting(queueState, platform)?.artworkUrl ?? ''}
-              isHighlighted={platform === initialPlatform}
-              platform={platform}
-              statusFilter="All Statuses"
-              platformTag={getPlatformTag(queueState, platform)}
-              platformOptions={movePlatformOptions}
-              setPlatformRef={(element) => {
-                if (element) {
-                  platformRefs.current.set(platform, element);
-                } else {
-                  platformRefs.current.delete(platform);
-                }
-              }}
-              queueScrollRef={contentScrollRef}
-              queueEntries={visibleQueueEntries
-                .filter((entry) => entry.targetPlatform === platform)
-                .sort(compareQueueEntries)}
-              onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
-              onIdentityChange={(changes) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, platform, changes))}
-              onLimitChange={onLimitChange}
-              onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
-              onRemovePlatform={(platform) => onQueueStateChange(removeQueuePlatform(queueState, platform))}
-              onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
-              onMoveEntry={onMoveEntry}
-              onMoveEntryToPlatform={onMoveEntryToPlatform}
-              onFindArtwork={onFindArtwork}
-              onPlayNow={onPlayNow}
-              onPlayingAction={onPlayingAction}
-              onOpenDetails={onOpenDetails}
-              onRemoveEntry={onRemoveEntry}
-            />
-          ))}
+      ) : selectedPlatform ? (
+        <div ref={queueListRef} className="qs-queue-list qs-queue-list--focused min-w-0 pr-1">
+          <PlatformQueueColumn
+            key={selectedPlatform}
+            gamesById={gamesById}
+            currentlyPlaying={playingGamesByPlatform.get(selectedPlatform) ?? []}
+            maxActiveGames={getPlatformMaxActiveGames(queueState, selectedPlatform)}
+            accentColor={getPlatformAccentColor(queueState, selectedPlatform)}
+            artworkUrl={getPlatformArtworkUrl(queueState, selectedPlatform)}
+            customArtworkUrl={getPlatformQueueSetting(queueState, selectedPlatform)?.artworkUrl ?? ''}
+            isHighlighted
+            isFocusedExperience
+            platform={selectedPlatform}
+            statusFilter="All Statuses"
+            platformTag={getPlatformTag(queueState, selectedPlatform)}
+            platformOptions={movePlatformOptions}
+            setPlatformRef={(element) => {
+              if (element) platformRefs.current.set(selectedPlatform, element);
+              else platformRefs.current.delete(selectedPlatform);
+            }}
+            queueScrollRef={contentScrollRef}
+            queueEntries={visibleQueueEntries.filter((entry) => entry.targetPlatform === selectedPlatform).sort(compareQueueEntries)}
+            onBackToHub={returnToPlatformHub}
+            onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
+            onIdentityChange={(changes) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, selectedPlatform, changes))}
+            onLimitChange={onLimitChange}
+            onMovePlatform={(platform, direction) => onQueueStateChange(moveQueuePlatform(queueState, platform, direction))}
+            onRemovePlatform={(platform) => onQueueStateChange(removeQueuePlatform(queueState, platform))}
+            onRenamePlatform={(platform, nextPlatform) => onQueueStateChange(renameQueuePlatform(queueState, platform, nextPlatform))}
+            onMoveEntry={onMoveEntry}
+            onMoveEntryToPlatform={onMoveEntryToPlatform}
+            onFindArtwork={onFindArtwork}
+            onPlayNow={onPlayNow}
+            onPlayingAction={onPlayingAction}
+            onOpenDetails={onOpenDetails}
+            onRemoveEntry={onRemoveEntry}
+          />
         </div>
-      </div>
+      ) : (
+        <div ref={queueListRef} className="qs-platform-hub-grid min-w-0 pr-1" aria-label="Platform Hub Selector">
+          {displayedQueuePlatforms.map((platform) => {
+            const queueEntries = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).sort(compareQueueEntries);
+            const currentlyPlaying = playingGamesByPlatform.get(platform) ?? [];
+            return (
+              <PlatformHubCard
+                key={platform}
+                accentColor={getPlatformAccentColor(queueState, platform)}
+                artworkUrl={getPlatformArtworkUrl(queueState, platform)}
+                isBooting={bootingPlatform === platform}
+                isFading={Boolean(bootingPlatform) && bootingPlatform !== platform}
+                platform={platform}
+                platformTag={getPlatformTag(queueState, platform)}
+                plannedCount={queueEntries.length}
+                playingCount={currentlyPlaying.length}
+                setPlatformRef={(element) => {
+                  if (element) platformRefs.current.set(platform, element);
+                  else platformRefs.current.delete(platform);
+                }}
+                statusLine={getPlatformPersonalityLine(platform, getPlatformTag(queueState, platform), currentlyPlaying, queueEntries.length)}
+                onOpen={() => openPlatformPlan(platform)}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {isPlatformModalOpen ? (
         <AddPlatformModal
@@ -641,6 +687,60 @@ function PlatformOptionsMenu({ ariaLabel, children }: PlatformOptionsMenuProps) 
   );
 }
 
+function PlatformHubCard({
+  accentColor,
+  artworkUrl,
+  isBooting,
+  isFading,
+  platform,
+  platformTag,
+  plannedCount,
+  playingCount,
+  setPlatformRef,
+  statusLine,
+  onOpen,
+}: {
+  accentColor: string;
+  artworkUrl: string;
+  isBooting: boolean;
+  isFading: boolean;
+  platform: GamePlatform;
+  platformTag: string;
+  plannedCount: number;
+  playingCount: number;
+  setPlatformRef: (element: HTMLElement | null) => void;
+  statusLine: string | null;
+  onOpen: () => void;
+}) {
+  const displayArtworkUrl = removePlatformArtworkWatermark(artworkUrl);
+  const platformAccentColor = accentColor || 'var(--accent)';
+
+  return (
+    <button
+      ref={setPlatformRef}
+      aria-label={`Open ${platform} Platform Plan`}
+      className={`qs-platform-hub-card ${isBooting ? 'qs-platform-hub-card--booting' : ''} ${isFading ? 'qs-platform-hub-card--fading' : ''}`}
+      onClick={onOpen}
+      style={{ '--platform-accent': platformAccentColor } as CSSProperties}
+      type="button"
+    >
+      <div className="qs-platform-hub-artwork" aria-hidden="true">
+        {displayArtworkUrl ? <img alt="" src={displayArtworkUrl} /> : <div className="qs-platform-hub-artwork-fallback" />}
+        <div className="qs-platform-hub-wake-light" />
+      </div>
+      <div className="qs-platform-hub-content">
+        {platformTag ? <span className="qs-platform-hub-kicker">{platformTag}</span> : null}
+        <h3>{platform}</h3>
+        {statusLine ? <p>{statusLine}</p> : null}
+        <div className="qs-platform-hub-counts" aria-label={`${playingCount} playing, ${plannedCount} planned`}>
+          <span><strong>{playingCount}</strong> Playing</span>
+          <span><strong>{plannedCount}</strong> Planned</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function PlatformQueueColumn({
   gamesById,
   currentlyPlaying,
@@ -649,6 +749,8 @@ function PlatformQueueColumn({
   customArtworkUrl,
   maxActiveGames,
   isHighlighted,
+  isFocusedExperience = false,
+  onBackToHub,
   platform,
   platformOptions,
   platformTag,
@@ -677,6 +779,8 @@ function PlatformQueueColumn({
   gamesById: Map<string, Game>;
   maxActiveGames: number;
   isHighlighted: boolean;
+  isFocusedExperience?: boolean;
+  onBackToHub?: () => void;
   platform: GamePlatform;
   platformOptions: GamePlatform[];
   platformTag: string;
@@ -779,7 +883,13 @@ function PlatformQueueColumn({
 
   return (
     <>
-    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+    <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${isFocusedExperience ? 'qs-platform-column--focused-experience' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
+      {onBackToHub ? (
+        <button className="qs-platform-back-button mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-mint/40 hover:text-mint" onClick={onBackToHub} type="button">
+          <Icon name="chevron-left" size={16} />
+          <span>Back to all platforms</span>
+        </button>
+      ) : null}
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-3 overflow-hidden">
           <img alt="" className="h-full w-full object-cover object-center opacity-88" src={displayArtworkUrl} />
@@ -802,7 +912,7 @@ function PlatformQueueColumn({
           ) : null}
           <div className="qs-platform-artwork-controls absolute inset-x-0 bottom-0 flex min-w-0 items-end justify-between gap-3">
             <h3
-              className="qs-platform-artwork-title flex min-w-0 items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm"
+              className={`qs-platform-artwork-title ${isFocusedExperience ? 'qs-platform-artwork-title--arrival' : ''} flex min-w-0 items-center gap-2 rounded-full px-3 py-1 text-base font-semibold leading-tight text-white shadow-panel backdrop-blur-sm`}
               style={{ backgroundColor: `color-mix(in srgb, ${platformAccentColor} 15%, rgb(2 6 23 / 0.76))` }}
             >
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: platformAccentColor }} />
@@ -840,7 +950,7 @@ function PlatformQueueColumn({
       ) : null}
 
       {showPlayingSection && currentlyPlaying.length > 0 ? (
-        <div className="qs-platform-playing-section mb-4 grid w-full min-w-0 gap-2">
+        <div className="qs-platform-playing-section qs-platform-plan-reveal qs-platform-plan-reveal--playing mb-4 grid w-full min-w-0 gap-2">
           <div className="grid w-full min-w-0 gap-2">
             {currentlyPlaying.map((game) => (
               <QueueGameRow
@@ -856,7 +966,7 @@ function PlatformQueueColumn({
         </div>
       ) : null}
 
-      {showPlannedSection ? <div className="qs-platform-nextup-section">
+      {showPlannedSection ? <div className="qs-platform-nextup-section qs-platform-plan-reveal qs-platform-plan-reveal--nextup">
         <div className="mb-2 flex items-end justify-between gap-3">
           <div>
             <h4 className="qs-platform-nextup-title text-sm font-semibold uppercase tracking-spread">{t('queue.nextUp')}</h4>
