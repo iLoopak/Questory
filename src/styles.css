@@ -4567,6 +4567,37 @@ body.qs-controller-active .qs-compact-card:focus-within {
   touch-action: pan-y pinch-zoom;
 }
 
+.qs-platform-plans-title-row {
+  min-block-size: 2.25rem;
+}
+
+.qs-platform-add-button {
+  position: static;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  min-inline-size: 2.25rem;
+  min-block-size: 2.25rem;
+  transform: none;
+  transition-property: background-color, border-color, color, box-shadow, opacity;
+}
+
+.qs-platform-add-button:hover,
+.qs-platform-add-button:active,
+.qs-platform-add-button:focus,
+.qs-platform-add-button:focus-visible {
+  transform: none;
+}
+
+.qs-platform-add-button:active {
+  opacity: 0.92;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .qs-platform-add-button:hover {
+    background-color: rgb(94 234 212 / 0.9);
+  }
+}
+
 .qs-queue-list {
   overflow-x: clip;
   touch-action: pan-y pinch-zoom;
