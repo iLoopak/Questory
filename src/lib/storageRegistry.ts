@@ -2,6 +2,9 @@ export type QuestShelfStorageKey =
   | 'questshelf.achievementCounters.v1'
   | 'questshelf.games.v1'
   | 'questshelf.rawgMetadataCache.v1'
+  | 'questshelf.screenshots.v1'
+  | 'questshelf.personalRecommendations.v1'
+  | 'questshelf.releaseCalendar.v2'
   | 'questshelf.rawgSettings.v1'
   | 'questshelf.steamGridDbSettings.v1'
   | 'questshelf.isThereAnyDealSettings.v1'
@@ -74,6 +77,31 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Local RAWG search/detail cache. Wave 4: stored per-record in the IndexedDB rawgMetadataCache store; this blob is a read-only import fallback kept inert (not mirrored to Preferences). Still the backup export/import shape.',
     scope: 'core',
     schema: 'Record<string, RawgMetadataCacheEntry>.',
+    store: 'collection',
+  },
+
+  {
+    backup: 'never',
+    key: 'questshelf.screenshots.v1',
+    purpose: 'RAWG screenshot URL cache. Stored in IndexedDB appCaches; legacy localStorage blobs are migrated and removed.',
+    scope: 'core',
+    schema: 'Record<string, { urls: string[]; provider: string; cachedAt: number }>.',
+    store: 'collection',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.personalRecommendations.v1',
+    purpose: 'Personal discovery recommendation cache. Stored in IndexedDB appCaches; legacy localStorage blobs are migrated and removed.',
+    scope: 'core',
+    schema: 'Recommendation cache entry keyed by profile fingerprint.',
+    store: 'collection',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.releaseCalendar.v2',
+    purpose: 'Personalized release calendar cache. Stored in IndexedDB appCaches; legacy localStorage blobs are migrated and removed.',
+    scope: 'core',
+    schema: 'Release calendar cache entry keyed by profile fingerprint/date range.',
     store: 'collection',
   },
   {

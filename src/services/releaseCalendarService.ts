@@ -4,6 +4,7 @@ import { buildUserProfile, profileFingerprint } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames, type RecommendedGamesParams } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
+import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 
 const CACHE_KEY = 'questshelf.releaseCalendar.v2';
 const IGNORE_KEY = 'questshelf.releaseCalendarIgnoredRawgIds.v1';
@@ -51,7 +52,7 @@ export async function fetchPersonalizedReleaseCalendar(
   const dateRange = getUpcomingDateRange(days);
   const fp = `${profileFingerprint(userGames)}::ignored=${[...getIgnoredReleaseRawgIds()].sort().join(',')}`;
   if (!options.forceRefresh) {
-    const fresh = readCache(fp, dateRange);
+    const fresh = await readCache(fp, dateRange);
     if (fresh) return restamp(fresh.candidates.map((c) => c.game), userGames, inboxRawgIds, fresh.candidates.map((c) => c.reason), fresh.candidates.map((c) => c.score));
   }
 
@@ -238,18 +239,14 @@ function compareReleaseDates(a: string | null, b: string | null): number {
   return (a ?? '9999-12-31').localeCompare(b ?? '9999-12-31');
 }
 
-function readCache(fingerprint: string, dateRange: string): CacheEntry | null {
-  if (typeof localStorage === 'undefined') return null;
-  try {
-    const entry = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as CacheEntry | null;
-    if (!entry || entry.fingerprint !== fingerprint || entry.dateRange !== dateRange || Date.now() - entry.fetchedAt >= CACHE_TTL_MS) return null;
-    return entry;
-  } catch { return null; }
+async function readCache(fingerprint: string, dateRange: string): Promise<CacheEntry | null> {
+  const entry = await readAppCacheValue<CacheEntry>(CACHE_KEY);
+  if (!entry || entry.fingerprint !== fingerprint || entry.dateRange !== dateRange || Date.now() - entry.fetchedAt >= CACHE_TTL_MS) return null;
+  return entry;
 }
 
 function writeCache(entry: CacheEntry): void {
-  if (typeof localStorage === 'undefined') return;
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(entry)); } catch { /* ignore cache failures */ }
+  void writeAppCacheValue(CACHE_KEY, entry);
 }
 
 function formatDate(date: Date): string {

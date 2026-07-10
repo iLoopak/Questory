@@ -822,6 +822,23 @@ function StorageHealthPanel({ diagnostics }: { diagnostics: StorageDiagnostics |
         ) : null}
       </div>
 
+
+      <div className="mt-3 rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
+        <div className="text-xs uppercase tracking-wide text-slate-500">Discovery and artwork caches</div>
+        <div className="mt-1 text-sm text-slate-200">
+          {diagnostics.appCacheStore.backend === 'indexeddb' ? 'IndexedDB' : 'Unavailable'}
+          <span className="text-slate-500">
+            {' · '}{diagnostics.appCacheStore.keyCount} cache entries
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Screenshots, recommendations, and release-calendar caches are kept out of localStorage. Legacy blobs migrate on first use and are removed after verification.
+        </div>
+        {diagnostics.appCacheStore.lastError ? (
+          <div className="mt-1 text-xs text-rose-300">Last error: {diagnostics.appCacheStore.lastError}</div>
+        ) : null}
+      </div>
+
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border border-skyglass/15 bg-ink-950/60 px-3 py-2">
           <div className="text-xs uppercase tracking-wide text-slate-500">Questory local data</div>

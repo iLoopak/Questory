@@ -1,5 +1,6 @@
 import type { Game } from '../types/game';
 import { normalizeTitle } from './rawgMatchScoring';
+import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from './indexedDbAppCache';
 
 const STORAGE_KEY = 'questshelf.screenshots.v1';
 const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -18,7 +19,10 @@ function entryKey(game: Game): string {
   return `title:${normalizeTitle(game.title)}:${game.platform}`;
 }
 
-function readStore(): ScreenshotStore {
+let storeSnapshot: ScreenshotStore = {};
+let hydrated = false;
+
+function readLegacyStore(): ScreenshotStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
@@ -29,12 +33,23 @@ function readStore(): ScreenshotStore {
   }
 }
 
+function hydrateStore(): void {
+  if (hydrated) return;
+  hydrated = true;
+  storeSnapshot = readLegacyStore();
+  void readAppCacheValue<ScreenshotStore>(STORAGE_KEY).then((stored) => {
+    if (stored && Object.keys(stored).length > 0) storeSnapshot = stored;
+  });
+}
+
+function readStore(): ScreenshotStore {
+  hydrateStore();
+  return storeSnapshot;
+}
+
 function writeStore(store: ScreenshotStore): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // Ignore quota/unavailability errors — screenshots are a best-effort enrichment.
-  }
+  storeSnapshot = store;
+  void writeAppCacheValue(STORAGE_KEY, store);
 }
 
 /** Returns cached screenshot URLs, or null if the entry is absent or expired. */
@@ -58,6 +73,7 @@ export function clearCachedScreenshots(game: Game): void {
   const store = readStore();
   delete store[entryKey(game)];
   writeStore(store);
+  if (Object.keys(store).length === 0) void removeAppCacheValue(STORAGE_KEY);
 }
 
 // ── rawgId-based helpers (for DiscoveryGame which has rawgId but not the full Game type) ──
