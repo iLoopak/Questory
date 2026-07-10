@@ -1496,15 +1496,48 @@ function ReviewComplete({
 }
 
 function getQuestQueueCompletionArtwork(sessionSummary: ReviewSessionSummary): QueueCompletionArtwork[] {
-  const seen = new Set<string>();
-  return sessionSummary.highlights
-    .flatMap((highlight) => highlight.games)
-    .flatMap((game) => getGameCoverSources(game, { includeGeneratedFallback: false }).map((url) => ({ alt: game.title, id: game.id, url })))
-    .filter((item) => {
-      if (!item.url || seen.has(item.url)) return false;
-      seen.add(item.url);
-      return true;
+  const seenGames = new Set<string>();
+  const seenArtwork = new Set<string>();
+  const artwork: QueueCompletionArtwork[] = [];
+
+  for (const game of sessionSummary.highlights.flatMap((highlight) => highlight.games)) {
+    const gameKey = getArtworkGameKey(game);
+    if (seenGames.has(gameKey)) continue;
+
+    const url = getGameCoverSources(game, { includeGeneratedFallback: false }).find((source) => {
+      const normalizedSource = source.trim();
+      return normalizedSource && !seenArtwork.has(normalizedSource);
     });
+
+    if (!url) continue;
+
+    seenGames.add(gameKey);
+    seenArtwork.add(url.trim());
+    artwork.push({ alt: game.title, gameKey, id: game.id, url });
+  }
+
+  return artwork;
+}
+
+function getArtworkGameKey(game: Game): string {
+  if (game.id) return `id:${game.id}`;
+  if (typeof game.rawgId === 'number') return `rawg:${game.rawgId}`;
+  if (typeof game.steamAppId === 'number') return `steam:${game.steamAppId}`;
+
+  const normalizedTitle = normalizeArtworkIdentity(game.rawgTitle ?? game.metadataSearchTitle ?? game.title);
+  const normalizedPlatform = normalizeArtworkIdentity(game.platform);
+  return normalizedPlatform ? `title-platform:${normalizedPlatform}:${normalizedTitle}` : `title:${normalizedTitle}`;
+}
+
+function normalizeArtworkIdentity(value: string | null | undefined): string {
+  return (value ?? '')
+    .trim()
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 const sessionReportActions: Array<{ action: ReviewModeAction; key: keyof ReviewActionStats; icon: IconName; label: string }> = [

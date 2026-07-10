@@ -579,8 +579,28 @@ function FocusedDiscoveryCard({
 
 function appendDiscoveryCompletionArtwork(current: QueueCompletionArtwork[], item: DiscoveryInboxItem): QueueCompletionArtwork[] {
   const url = item.game.coverUrl?.trim();
-  if (!url || current.some((artwork) => artwork.url === url)) return current;
-  return [...current, { alt: item.game.title, id: item.id, url }];
+  const gameKey = getDiscoveryArtworkGameKey(item);
+  if (!url || current.some((artwork) => artwork.url === url || artwork.gameKey === gameKey)) return current;
+  return [...current, { alt: item.game.title, gameKey, id: item.id, url }];
+}
+
+function getDiscoveryArtworkGameKey(item: DiscoveryInboxItem): string {
+  if (typeof item.rawgId === 'number') return `rawg:${item.rawgId}`;
+
+  const normalizedTitle = normalizeDiscoveryArtworkIdentity(item.game.title);
+  const normalizedPlatform = normalizeDiscoveryArtworkIdentity(item.game.platforms[0]);
+  return normalizedPlatform ? `title-platform:${normalizedPlatform}:${normalizedTitle}` : `title:${normalizedTitle}`;
+}
+
+function normalizeDiscoveryArtworkIdentity(value: string | null | undefined): string {
+  return (value ?? '')
+    .trim()
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 // ---------------------------------------------------------------------------
