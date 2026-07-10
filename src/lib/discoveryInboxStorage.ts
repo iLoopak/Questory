@@ -33,3 +33,7 @@ export function loadDiscoveryInbox(): DiscoveryInboxItem[] {
 export function saveDiscoveryInbox(items: DiscoveryInboxItem[]): void {
   savePersistedJson(STORAGE_KEY, items);
 }
+
+export function removeDiscoveryInboxItemForSession(items: DiscoveryInboxItem[], id: string): DiscoveryInboxItem[] {
+  return items.filter((item) => item.id !== id);
+}

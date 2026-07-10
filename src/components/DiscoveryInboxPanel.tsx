@@ -109,14 +109,15 @@ function getSwipeTarget(offsetX: number, offsetY: number) {
 // Session stats
 // ---------------------------------------------------------------------------
 
-type SessionStats = { library: number; wishlist: number; plans: number; ignored: number };
-const emptySessionStats: SessionStats = { library: 0, wishlist: 0, plans: 0, ignored: 0 };
+type SessionStats = { library: number; wishlist: number; plans: number; ignored: number; skipped: number };
+const emptySessionStats: SessionStats = { library: 0, wishlist: 0, plans: 0, ignored: 0, skipped: 0 };
 
 function getNextStats(stats: SessionStats, action: DiscoveryInboxAction): SessionStats {
   if (action === 'library') return { ...stats, library: stats.library + 1 };
   if (action === 'wishlist') return { ...stats, wishlist: stats.wishlist + 1 };
   if (action === 'plans') return { ...stats, plans: stats.plans + 1 };
   if (action === 'ignore') return { ...stats, ignored: stats.ignored + 1 };
+  if (action === 'skip') return { ...stats, skipped: stats.skipped + 1 };
   return stats;
 }
 
@@ -219,14 +220,14 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   function performAction(item: DiscoveryInboxItem, action: DiscoveryInboxAction) {
     setHighlightedActionIndex(firstPositiveActionIndex);
 
+    setSessionStats((s) => getNextStats(s, action));
+    setSessionReviewedCount((c) => c + 1);
+    setSessionArtwork((current) => appendDiscoveryCompletionArtwork(current, item));
+
     if (action === 'skip') {
       onSkip(item);
       return;
     }
-
-    setSessionStats((s) => getNextStats(s, action));
-    setSessionReviewedCount((c) => c + 1);
-    setSessionArtwork((current) => appendDiscoveryCompletionArtwork(current, item));
 
     if (action === 'library') onAddToLibrary(item);
     else if (action === 'wishlist') onAddToWishlist(item);
@@ -615,6 +616,7 @@ function InboxComplete({ artwork, stats, reviewedCount }: { artwork: QueueComple
     stats.wishlist > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeAddedWishlist'), { count: stats.wishlist }), tone: 'neutral' as const, value: stats.wishlist } : null,
     stats.plans > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeAddedPlans'), { count: stats.plans }), tone: 'neutral' as const, value: stats.plans } : null,
     stats.ignored > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeIgnored'), { count: stats.ignored }), tone: 'muted' as const, value: stats.ignored } : null,
+    stats.skipped > 0 ? { label: formatMessageTemplate(t('discoveryInbox.completeSkipped'), { count: stats.skipped }), tone: 'muted' as const, value: stats.skipped } : null,
   ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
 
   return (

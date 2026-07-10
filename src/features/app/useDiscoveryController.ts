@@ -2,7 +2,12 @@ import { useCallback, useMemo, useState } from 'react';
 import type { TFunction } from '../../i18n';
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
-import { loadDiscoveryInbox, saveDiscoveryInbox, type DiscoveryInboxItem } from '../../lib/discoveryInboxStorage';
+import {
+  loadDiscoveryInbox,
+  removeDiscoveryInboxItemForSession,
+  saveDiscoveryInbox,
+  type DiscoveryInboxItem,
+} from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
 
 type ToastNotification = {
@@ -19,6 +24,7 @@ type UseDiscoveryControllerOptions = {
 
 export function useDiscoveryController({ games, t, addToastNotification }: UseDiscoveryControllerOptions) {
   const [inboxItems, setInboxItems] = useState<DiscoveryInboxItem[]>(() => loadDiscoveryInbox());
+  const [, setSkippedInboxItems] = useState<DiscoveryInboxItem[]>([]);
   const [previewCandidate, setPreviewCandidate] = useState<DiscoveryCandidate | null>(null);
 
   const inboxRawgIds = useMemo(
@@ -81,15 +87,11 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
 
   const skipInboxItem = useCallback((id: string) => {
     setInboxItems((currentItems) => {
-      const itemIndex = currentItems.findIndex((item) => item.id === id);
-      if (itemIndex < 0 || currentItems.length <= 1) return currentItems;
+      const skippedItem = currentItems.find((item) => item.id === id);
+      const updated = removeDiscoveryInboxItemForSession(currentItems, id);
+      if (updated.length === currentItems.length || !skippedItem) return currentItems;
 
-      const skippedItem = currentItems[itemIndex];
-      const updated = [
-        ...currentItems.slice(0, itemIndex),
-        ...currentItems.slice(itemIndex + 1),
-        skippedItem,
-      ];
+      setSkippedInboxItems((currentSkippedItems) => [...currentSkippedItems, skippedItem]);
       saveDiscoveryInbox(updated);
       return updated;
     });
