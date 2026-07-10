@@ -16,12 +16,12 @@ export interface DiscoveryInboxItem {
 
 export interface DiscoveryInboxState {
   activeQueue: DiscoveryInboxItem[];
-  deferredQueue: DiscoveryInboxItem[];
+  nextQueue: DiscoveryInboxItem[];
 }
 
 const emptyDiscoveryInboxState: DiscoveryInboxState = {
   activeQueue: [],
-  deferredQueue: [],
+  nextQueue: [],
 };
 
 function normalizeDiscoveryInboxItems(value: unknown): DiscoveryInboxItem[] {
@@ -45,7 +45,7 @@ function normalizeDiscoveryInboxState(value: unknown): DiscoveryInboxState {
 
   return {
     activeQueue: normalizeDiscoveryInboxItems((value as DiscoveryInboxState).activeQueue),
-    deferredQueue: normalizeDiscoveryInboxItems((value as DiscoveryInboxState).deferredQueue),
+    nextQueue: normalizeDiscoveryInboxItems((value as DiscoveryInboxState).nextQueue ?? (value as { deferredQueue?: unknown }).deferredQueue),
   };
 }
 
@@ -70,23 +70,32 @@ export function removeDiscoveryInboxItemForSession(items: DiscoveryInboxItem[], 
   return items.filter((item) => item.id !== id);
 }
 
+export function startDiscoveryInboxRun(state: DiscoveryInboxState): DiscoveryInboxState {
+  if (state.activeQueue.length > 0 || state.nextQueue.length === 0) return state;
+
+  return {
+    activeQueue: state.nextQueue,
+    nextQueue: [],
+  };
+}
+
 export function deferDiscoveryInboxItemForFutureSession(state: DiscoveryInboxState, id: string): DiscoveryInboxState {
   const skippedItem = state.activeQueue.find((item) => item.id === id);
   if (!skippedItem) return state;
 
   return {
     activeQueue: removeDiscoveryInboxItemForSession(state.activeQueue, id),
-    deferredQueue: upsertDeferredDiscoveryInboxItem(state.deferredQueue, skippedItem),
+    nextQueue: upsertDeferredDiscoveryInboxItem(state.nextQueue, skippedItem),
   };
 }
 
 export function restoreDeferredDiscoveryInboxItem(state: DiscoveryInboxState, rawgId: number): DiscoveryInboxState {
-  const deferredItem = state.deferredQueue.find((item) => item.rawgId === rawgId);
+  const deferredItem = state.nextQueue.find((item) => item.rawgId === rawgId);
   if (!deferredItem || state.activeQueue.some((item) => item.rawgId === rawgId)) return state;
 
   return {
     activeQueue: [...state.activeQueue, deferredItem],
-    deferredQueue: state.deferredQueue.filter((item) => item.rawgId !== rawgId),
+    nextQueue: state.nextQueue.filter((item) => item.rawgId !== rawgId),
   };
 }
 
