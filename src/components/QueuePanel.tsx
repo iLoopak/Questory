@@ -1,7 +1,7 @@
 import { Icon } from './Icon';
 import { ArtworkRecoveryButton } from './ArtworkRecoveryButton';
 import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { ButtonHTMLAttributes, CSSProperties, Dispatch, FormEvent, KeyboardEvent, ReactNode, RefObject, SetStateAction } from 'react';
+import type { ButtonHTMLAttributes, CSSProperties, Dispatch, KeyboardEvent, ReactNode, RefObject, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import {
   addActiveQueuePlatform,
@@ -179,8 +179,19 @@ export function QueuePanel({
   }
 
   return (
-    <section className="qs-queue-shell flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
-      <header className="mb-3 space-y-3 px-1">
+    <section className="qs-queue-shell relative flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
+      {!selectedPlatform ? (
+        <button
+          aria-label="Create Platform Plan"
+          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-md bg-mint text-ink-950 shadow-glow transition hover:bg-mint/90"
+          onClick={() => setIsPlatformModalOpen(true)}
+          title="Create Platform Plan"
+          type="button"
+        >
+          <Icon name="plus" size={18} strokeWidth={2.5} />
+        </button>
+      ) : null}
+      <header className="mb-3 space-y-3 px-1 pr-12">
         <h2 className="text-lg font-semibold text-white">{t('queue.platforms')}</h2>
         {selectedPlatform ? (
           <div className="qs-platform-detail-header flex min-w-0 items-center justify-between gap-3">
@@ -335,25 +346,6 @@ export function QueuePanel({
   );
 }
 
-const platformPresetSuggestions: GamePlatform[] = [
-  'Steam',
-  'PlayStation',
-  'Xbox',
-  'Nintendo Switch',
-  'Switch 2',
-  'Wii',
-  'Wii U',
-  'GameCube',
-  'PS Vita',
-  'PSP',
-  'PS2',
-  'SNES',
-  'N64',
-  'Dreamcast',
-  'PC',
-  'Retro',
-];
-
 function AddPlatformModal({
   games,
   queueState,
@@ -366,6 +358,7 @@ function AddPlatformModal({
   onCreate: (state: PlatformQueueState, platform: GamePlatform) => void;
 }) {
   const { t } = useI18n();
+  const [stepIndex, setStepIndex] = useState(0);
   const [platformName, setPlatformName] = useState('');
   const [accentColor, setAccentColor] = useState('#2563eb');
   const [artworkUrl, setArtworkUrl] = useState('');
@@ -373,46 +366,62 @@ function AddPlatformModal({
   const [validationMessage, setValidationMessage] = useState('');
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const availablePlatforms = useMemo(() => getQueuePlatforms(games, queueState), [games, queueState]);
-  const activePlatformNames = useMemo(
-    () => new Map(queueState.activePlatforms.map((platform) => [platform.trim().toLowerCase(), platform])),
-    [queueState.activePlatforms],
-  );
-  const availablePlatformNames = useMemo(
-    () => new Map(availablePlatforms.map((platform) => [platform.trim().toLowerCase(), platform])),
-    [availablePlatforms],
-  );
+  const activePlatformNames = useMemo(() => new Map(queueState.activePlatforms.map((platform) => [platform.trim().toLowerCase(), platform])), [queueState.activePlatforms]);
+  const availablePlatformNames = useMemo(() => new Map(availablePlatforms.map((platform) => [platform.trim().toLowerCase(), platform])), [availablePlatforms]);
+  const platformTypes = [
+    { label: 'Gaming platform', name: suggestedPlatformName(availablePlatforms, 'Steam'), tag: 'My Steam backlog' },
+    { label: 'Handheld', name: suggestedPlatformName(availablePlatforms, 'Steam Deck'), tag: 'Handheld sessions' },
+    { label: 'Family / Couch co-op', name: suggestedPlatformName(availablePlatforms, 'Nintendo Switch'), tag: 'Ready for couch co-op' },
+    { label: 'Someday collection', name: 'Someday', tag: 'Dream queue' },
+    { label: 'Retro collection', name: suggestedPlatformName(availablePlatforms, 'Retro'), tag: 'Retro collection' },
+    { label: 'Custom', name: '', tag: '' },
+  ];
   const previewName = (platformName.trim() || 'New Platform') as GamePlatform;
   const previewArtworkUrl = artworkUrl || resolveDefaultPlatformArtwork(previewName) || createPlatformArtworkPreset(previewName, accentColor, 'Aurora');
+  const steps = ['Type', 'Name', 'Look', 'Personality', 'Review'];
 
-  function applyPresetPlatform(platform: GamePlatform) {
-    const nextAccentColor = getDefaultPlatformAccentColor(platform);
-    setPlatformName(platform);
-    setAccentColor(nextAccentColor);
+  function chooseType(option: { name: string; tag: string }) {
+    const nextName = option.name;
+    const nextAccent = getDefaultPlatformAccentColor(nextName || 'Custom');
+    setPlatformName(nextName);
+    setAccentColor(nextAccent);
     setArtworkUrl('');
+    setPlatformTag(option.tag);
     setValidationMessage('');
+    setStepIndex(1);
   }
 
   function applyPresetArtwork(preset: PlatformArtworkPreset) {
     setArtworkUrl(createPlatformArtworkPreset(previewName, accentColor, preset));
   }
 
-  function submitPlatform(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const platformDraft = platformName.trim() as GamePlatform;
-
+  function validateName() {
+    const platformDraft = platformName.trim();
     if (!platformDraft) {
       setValidationMessage(t('queue.platformNameRequired'));
       nameInputRef.current?.focus();
-      return;
+      return false;
     }
-
     const existingActivePlatform = activePlatformNames.get(platformDraft.toLowerCase());
     if (existingActivePlatform) {
       setValidationMessage(t('queue.platformAlreadyExists').replace('{platform}', existingActivePlatform));
       nameInputRef.current?.focus();
+      return false;
+    }
+    return true;
+  }
+
+  function goNext() {
+    if (stepIndex === 1 && !validateName()) return;
+    setStepIndex((current) => Math.min(steps.length - 1, current + 1));
+  }
+
+  function createPlan() {
+    if (!validateName()) {
+      setStepIndex(1);
       return;
     }
-
+    const platformDraft = platformName.trim() as GamePlatform;
     const platform = (availablePlatformNames.get(platformDraft.toLowerCase()) ?? platformDraft) as GamePlatform;
     const createdState = updatePlatformQueueVisualSettings(addActiveQueuePlatform(queueState, platform), platform, {
       accentColor,
@@ -423,84 +432,101 @@ function AddPlatformModal({
   }
 
   return (
-    <ViewportModal ariaLabel={t('queue.addPlatform')} initialFocusRef={nameInputRef} onClose={onClose} placement="center">
-      <form className="max-h-[85vh] overflow-y-auto p-4" onSubmit={submitPlatform}>
+    <ViewportModal ariaLabel="Create Platform Plan" initialFocusRef={nameInputRef} onClose={onClose} placement="center">
+      <div className="max-h-[85vh] overflow-y-auto p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="qs-label-caps text-accent">{t('queue.platforms')}</div>
-            <h2 className="mt-1 text-xl font-semibold text-white">{t('queue.addPlatform')}</h2>
-            <p className="mt-1 text-sm text-slate-400">{t('queue.addPlatformHelp')}</p>
+            <div className="qs-label-caps text-accent">Platform Plan Forge</div>
+            <h2 className="mt-1 text-xl font-semibold text-white">Create Platform Plan</h2>
+            <p className="mt-1 text-sm text-slate-400">Shape a small gaming world, one focused choice at a time.</p>
           </div>
-          <button className="rounded-md border border-white/10 px-2 py-1 text-sm text-slate-300 hover:bg-white/10" onClick={onClose} type="button">
-            <Icon name="x" />
-          </button>
+          <button className="rounded-md border border-white/10 px-2 py-1 text-sm text-slate-300 hover:bg-white/10" onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-ink-950/70">
-          <div className="qs-platform-artwork-banner relative">
-            {previewArtworkUrl ? <img alt="" className="h-full w-full object-cover object-center" src={previewArtworkUrl} /> : null}
-            <div className="absolute inset-0 bg-gradient-to-r from-ink-950/85 to-ink-950/15" />
-            <div className="absolute inset-x-0 bottom-0 p-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-ink-950/75 px-3 py-1 text-sm font-semibold text-white">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} />
-                {previewName}
+        <div className="mt-4 flex gap-1.5" aria-label="Creation progress">
+          {steps.map((step, index) => <span key={step} className={`h-1.5 flex-1 rounded-full transition ${index <= stepIndex ? 'bg-mint' : 'bg-white/10'}`} />)}
+        </div>
+
+        <div className="qs-platform-plan-step mt-4 grid gap-4 rounded-xl border border-white/10 bg-ink-950/60 p-3">
+          {stepIndex === 0 ? (
+            <div>
+              <h3 className="text-lg font-semibold text-white">Choose the platform type</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {platformTypes.map((option) => <button key={option.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left text-sm font-semibold text-slate-100 transition hover:border-mint/40 hover:bg-mint/10 hover:text-mint" onClick={() => chooseType(option)} type="button">{option.label}<span className="mt-1 block text-xs font-normal text-slate-500">{option.tag || 'Start from a blank world'}</span></button>)}
               </div>
             </div>
-          </div>
+          ) : null}
+
+          {stepIndex === 1 ? (
+            <div className="grid gap-4">
+              <h3 className="text-lg font-semibold text-white">Name your Platform Plan</h3>
+              <label className="grid gap-1">
+                <span className="text-xs font-semibold text-slate-400">{t('queue.platformName')} <span className="text-red-300">*</span></span>
+                <input ref={nameInputRef} aria-invalid={Boolean(validationMessage)} className="h-11 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" placeholder="Steam Deck, Dreamcast, Couch Co-op..." value={platformName} onChange={(event) => { setPlatformName(event.target.value); setValidationMessage(''); }} />
+                {validationMessage ? <span className="text-xs font-semibold text-red-200">{validationMessage}</span> : null}
+              </label>
+              <PlatformPlanPreview accentColor={accentColor} artworkUrl={previewArtworkUrl} platform={previewName} platformTag={platformTag} />
+            </div>
+          ) : null}
+
+          {stepIndex === 2 ? (
+            <div className="grid gap-4">
+              <h3 className="text-lg font-semibold text-white">Choose its visual identity</h3>
+              <PlatformPlanPreview accentColor={accentColor} artworkUrl={previewArtworkUrl} platform={previewName} platformTag={platformTag} />
+              <PlatformIdentityFields accentColor={accentColor} artworkUrl={artworkUrl} platformTag={platformTag} onAccentColorChange={setAccentColor} onArtworkUrlChange={setArtworkUrl} onPlatformTagChange={setPlatformTag} onPresetArtwork={applyPresetArtwork} showPlatformTag={false} />
+            </div>
+          ) : null}
+
+          {stepIndex === 3 ? (
+            <div className="grid gap-4">
+              <h3 className="text-lg font-semibold text-white">Add an optional personality</h3>
+              <label className="grid gap-1">
+                <span className="text-xs font-semibold text-slate-400">Subtitle / description</span>
+                <input className="h-11 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" maxLength={64} placeholder="Ready for couch co-op" value={platformTag} onChange={(event) => setPlatformTag(event.target.value)} />
+                <span className="text-xs text-slate-500">Examples: Dream queue, My Steam backlog, Ready for couch co-op.</span>
+              </label>
+              <PlatformPlanPreview accentColor={accentColor} artworkUrl={previewArtworkUrl} platform={previewName} platformTag={platformTag} />
+            </div>
+          ) : null}
+
+          {stepIndex === 4 ? (
+            <div className="grid gap-4">
+              <h3 className="text-lg font-semibold text-white">Review your new Platform Plan</h3>
+              <PlatformPlanPreview accentColor={accentColor} artworkUrl={previewArtworkUrl} platform={previewName} platformTag={platformTag} large />
+            </div>
+          ) : null}
         </div>
 
-        <label className="mt-4 grid gap-1">
-          <span className="text-xs font-semibold text-slate-400">{t('queue.platformName')} <span className="text-red-300">*</span></span>
-          <input
-            ref={nameInputRef}
-            aria-invalid={Boolean(validationMessage)}
-            className="h-10 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint"
-            placeholder="Steam, PlayStation, Dreamcast..."
-            value={platformName}
-            onChange={(event) => {
-              setPlatformName(event.target.value);
-              setValidationMessage('');
-            }}
-          />
-          {validationMessage ? <span className="text-xs font-semibold text-red-200">{validationMessage}</span> : null}
-        </label>
-
-        <div className="mt-4">
-          <div className="text-xs font-semibold text-slate-400">{t('queue.platformPresets')}</div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {platformPresetSuggestions.map((platform) => (
-              <button key={platform} className="min-h-9 rounded-md border border-white/10 px-3 py-1 text-xs text-slate-200 hover:border-mint/40 hover:bg-mint/10 hover:text-mint" onClick={() => applyPresetPlatform(platform)} type="button">
-                {platform}
-              </button>
-            ))}
-          </div>
+        <div className="mt-4 flex flex-wrap justify-between gap-2">
+          <button className="h-10 rounded-md border border-white/10 px-4 text-sm font-semibold text-slate-200 hover:bg-white/10" onClick={stepIndex === 0 ? onClose : () => setStepIndex((current) => Math.max(0, current - 1))} type="button">{stepIndex === 0 ? t('common.cancel') : 'Back'}</button>
+          {stepIndex < steps.length - 1 ? <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={goNext} type="button">Next</button> : <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90" onClick={createPlan} type="button">Create</button>}
         </div>
-
-        <div className="mt-4 rounded-lg border border-white/10 bg-ink-950/60 p-3">
-          <PlatformIdentityFields
-            accentColor={accentColor}
-            artworkUrl={artworkUrl}
-            platformTag={platformTag}
-            onAccentColorChange={setAccentColor}
-            onArtworkUrlChange={setArtworkUrl}
-            onPlatformTagChange={setPlatformTag}
-            onPresetArtwork={applyPresetArtwork}
-          />
-        </div>
-
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <button className="h-10 rounded-md border border-white/10 px-4 text-sm font-semibold text-slate-200 hover:bg-white/10" onClick={onClose} type="button">
-            {t('common.cancel')}
-          </button>
-          <button className="h-10 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 hover:bg-mint/90" type="submit">
-            {t('queue.addPlatform')}
-          </button>
-        </div>
-      </form>
+      </div>
     </ViewportModal>
   );
 }
 
+function suggestedPlatformName(platforms: GamePlatform[], fallback: string) {
+  return platforms.find((platform) => platform.toLowerCase().includes(fallback.toLowerCase())) ?? fallback;
+}
+
+function PlatformPlanPreview({ accentColor, artworkUrl, platform, platformTag, large = false }: { accentColor: string; artworkUrl: string; platform: GamePlatform; platformTag: string; large?: boolean }) {
+  return (
+    <div className={`overflow-hidden rounded-xl border border-white/10 bg-ink-950/70 ${large ? 'min-h-72' : ''}`} style={{ '--platform-accent': accentColor } as CSSProperties}>
+      <div className={`qs-platform-artwork-banner relative ${large ? 'min-h-72' : ''}`}>
+        {artworkUrl ? <img alt="" className="h-full w-full object-cover object-center" src={artworkUrl} /> : null}
+        <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/45 to-ink-950/10" />
+        <div className="absolute inset-x-0 bottom-0 p-3">
+          {platformTag.trim() ? <p className="mb-2 max-w-full truncate rounded-full bg-ink-950/70 px-3 py-1 text-xs font-semibold text-slate-200">{platformTag.trim()}</p> : null}
+          <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-ink-950/75 px-3 py-1 text-sm font-semibold text-white">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
+            <span className="truncate">{platform}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type PlatformOptionsMenuPosition = {
   left: number;
@@ -1194,7 +1220,7 @@ function getPlatformPersonalityLine(platform: GamePlatform, platformTag: string,
   }
 
   if (platformTag.trim()) {
-    return `${platformTag.trim()} sessions`;
+    return platformTag.trim();
   }
 
   const normalizedPlatform = platform.toLowerCase();
