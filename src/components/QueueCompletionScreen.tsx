@@ -23,6 +23,7 @@ type QueueCompletionAction = {
 
 export type QueueCompletionArtwork = {
   alt?: string;
+  gameKey?: string;
   id?: string;
   url: string | null | undefined;
 };
@@ -144,12 +145,15 @@ function useCompletionArtwork(artwork: QueueCompletionArtwork[]): VisibleArtwork
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
 
   return useMemo(() => {
-    const seen = new Set<string>();
+    const seenArtwork = new Set<string>();
+    const seenGames = new Set<string>();
     return artwork
       .filter((item) => {
         const url = item.url?.trim();
-        if (!url || failedUrls.has(url) || seen.has(url)) return false;
-        seen.add(url);
+        const gameKey = item.gameKey?.trim();
+        if (!url || failedUrls.has(url) || seenArtwork.has(url) || (gameKey && seenGames.has(gameKey))) return false;
+        seenArtwork.add(url);
+        if (gameKey) seenGames.add(gameKey);
         return true;
       })
       .slice(0, 7)
