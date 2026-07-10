@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { TFunction } from '../../i18n';
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import {
+  appendDiscoveryInboxRecommendations,
   deferDiscoveryInboxItemForFutureSession,
   loadDiscoveryInboxState,
   restoreDeferredDiscoveryInboxItem,
@@ -11,6 +12,8 @@ import {
   type DiscoveryInboxItem,
 } from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
+import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
+import { trackAnalyticsEvent } from '../../lib/analytics';
 
 type ToastNotification = {
   category: 'success' | 'info';
@@ -32,6 +35,8 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
   });
   const inboxItems = inboxState.activeQueue;
   const [previewCandidate, setPreviewCandidate] = useState<DiscoveryCandidate | null>(null);
+  const [isRequestingInboxRecommendations, setIsRequestingInboxRecommendations] = useState(false);
+  const isRequestingInboxRecommendationsRef = useRef(false);
 
   const inboxRawgIds = useMemo(
     () => new Set(inboxItems.map((item) => item.rawgId)),
@@ -104,6 +109,58 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     });
   }, []);
 
+  const requestInboxRecommendations = useCallback(async () => {
+    if (isRequestingInboxRecommendationsRef.current) return 0;
+    isRequestingInboxRecommendationsRef.current = true;
+    setIsRequestingInboxRecommendations(true);
+    try {
+      const latestState = loadDiscoveryInboxState();
+      const queuedRawgIds = new Set([
+        ...latestState.activeQueue.map((item) => item.rawgId),
+        ...latestState.nextQueue.map((item) => item.rawgId),
+      ]);
+      const candidates = await fetchPersonalRecommendations(games, queuedRawgIds);
+      const validCandidates = candidates
+        .filter((candidate) => !candidate.excluded && candidate.libraryStatus === null && !candidate.inboxStatus)
+        .slice(0, 10);
+      const { state: updatedState, addedItems } = appendDiscoveryInboxRecommendations(
+        latestState,
+        validCandidates.map((candidate) => ({ game: candidate.game, reason: candidate.reason })),
+      );
+
+      if (updatedState !== latestState) {
+        saveDiscoveryInboxState(updatedState);
+        setInboxState(updatedState);
+      }
+
+      trackAnalyticsEvent('discovery_recommendations_requested', {
+        requested_count: 10,
+        returned_count: addedItems.length,
+        source: 'discovery_inbox',
+      });
+
+      addToastNotification({
+        category: addedItems.length > 0 ? 'success' : 'info',
+        dedupeKey: `discovery-recommendations:${Date.now()}`,
+        message: addedItems.length === 1
+          ? t('toast.discoveryRecommendationsAddedOne')
+          : formatMessageTemplate(t('toast.discoveryRecommendationsAddedMany'), { count: addedItems.length }),
+      });
+
+      return addedItems.length;
+    } catch {
+      addToastNotification({
+        category: 'info',
+        dedupeKey: 'discovery-recommendations-failed',
+        message: t('toast.discoveryRecommendationsFailed'),
+      });
+      return 0;
+    } finally {
+      isRequestingInboxRecommendationsRef.current = false;
+      setIsRequestingInboxRecommendations(false);
+    }
+  }, [addToastNotification, games, t]);
+
   const skipInboxItem = useCallback((id: string) => {
     setInboxState((currentState) => {
       const updatedState = deferDiscoveryInboxItemForFutureSession(currentState, id);
@@ -122,6 +179,8 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     closePreview,
     openPreview,
     removeFromInbox,
+    requestInboxRecommendations,
+    isRequestingInboxRecommendations,
     skipInboxItem,
     startInboxRun,
   };

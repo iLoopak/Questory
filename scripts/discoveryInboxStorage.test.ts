@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { deferDiscoveryInboxItemForFutureSession, removeDiscoveryInboxItemForSession, restoreDeferredDiscoveryInboxItem, startDiscoveryInboxRun, type DiscoveryInboxItem } from '../src/lib/discoveryInboxStorage';
+import { appendDiscoveryInboxRecommendations, deferDiscoveryInboxItemForFutureSession, removeDiscoveryInboxItemForSession, restoreDeferredDiscoveryInboxItem, startDiscoveryInboxRun, type DiscoveryInboxItem } from '../src/lib/discoveryInboxStorage';
 
 function makeItem(id: string, rawgId: number): DiscoveryInboxItem {
   return {
@@ -86,4 +86,53 @@ test('starting a run does not merge skipped games into an unfinished active queu
   };
 
   assert.equal(startDiscoveryInboxRun(state), state);
+});
+
+
+test('appending recommendations creates an active queue when the inbox is empty', () => {
+  const recs = Array.from({ length: 12 }, (_, i) => ({ game: makeItem(`R${i + 1}`, i + 1).game }));
+
+  const updated = appendDiscoveryInboxRecommendations({ activeQueue: [], nextQueue: [] }, recs.slice(0, 10));
+
+  assert.equal(updated.addedItems.length, 10);
+  assert.deepEqual(updated.state.activeQueue.map((item) => item.rawgId), [1,2,3,4,5,6,7,8,9,10]);
+});
+
+test('appending recommendations preserves existing active queue order', () => {
+  const state = { activeQueue: [makeItem('A', 1), makeItem('B', 2)], nextQueue: [] };
+
+  const updated = appendDiscoveryInboxRecommendations(state, [3,4].map((id) => ({ game: makeItem(`R${id}`, id).game })));
+
+  assert.deepEqual(updated.state.activeQueue.map((item) => item.rawgId), [1,2,3,4]);
+});
+
+test('appending recommendations keeps pending skipped games first for the next run', () => {
+  const state = { activeQueue: [], nextQueue: [makeItem('skip', 9)] };
+
+  const updated = appendDiscoveryInboxRecommendations(state, [10,11].map((id) => ({ game: makeItem(`R${id}`, id).game })));
+
+  assert.deepEqual(updated.state.activeQueue, []);
+  assert.deepEqual(updated.state.nextQueue.map((item) => item.rawgId), [9,10,11]);
+});
+
+test('appending recommendations filters duplicate stable identities', () => {
+  const duplicateTitle = makeItem('duplicate-title', 0).game;
+  duplicateTitle.title = 'Same Game';
+  duplicateTitle.platforms = ['PC'];
+  const duplicateTitleAgain = { ...duplicateTitle, rawgId: 0, title: ' same   game ', platforms: ['PC'] };
+
+  const updated = appendDiscoveryInboxRecommendations(
+    { activeQueue: [makeItem('A', 1)], nextQueue: [makeItem('B', 2)] },
+    [{ game: makeItem('A duplicate', 1).game }, { game: makeItem('B duplicate', 2).game }, { game: duplicateTitle }, { game: duplicateTitleAgain }],
+  );
+
+  assert.deepEqual(updated.state.activeQueue.map((item) => item.game.title), ['A', 'Same Game']);
+  assert.equal(updated.addedItems.length, 1);
+});
+
+test('appending recommendations adds fewer than ten when only fewer valid games are supplied', () => {
+  const updated = appendDiscoveryInboxRecommendations({ activeQueue: [], nextQueue: [] }, [1,2,3,3].map((id) => ({ game: makeItem(`R${id}`, id).game })));
+
+  assert.equal(updated.addedItems.length, 3);
+  assert.deepEqual(updated.state.activeQueue.map((item) => item.rawgId), [1,2,3]);
 });

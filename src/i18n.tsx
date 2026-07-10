@@ -1092,6 +1092,10 @@ const en = {
   'recommendations.openIntegrationsCta': 'Open Settings → Integrations',
   'discoveryInbox.emptyTitle': 'Discovery Inbox is clear',
   'discoveryInbox.emptyHint': 'Browse the Home screen recommendations and tap "Review Later" to queue games here.',
+  'discoveryInbox.getRecommendations': 'Get 10 recommendations',
+  'discoveryInbox.getMoreRecommendations': 'Get 10 more recommendations',
+  'discoveryInbox.findingRecommendations': 'Finding recommendations…',
+  'discoveryInbox.recommendationsCopy': 'Add a fresh batch of recommended games to your Discovery Inbox.',
   'discoveryInbox.modeLibrary': 'Own it — add to your game collection',
   'discoveryInbox.modeWishlist': 'Interested, not ready to commit',
   'discoveryInbox.modePlans': 'Queue for a specific platform soon',
@@ -1121,6 +1125,9 @@ const en = {
   'toast.discoveryAddedToInbox': '{game} added to Discovery Inbox.',
   'toast.discoveryAddedToWishlist': '{game} added to Wishlist.',
   'toast.discoveryAddedToLibrary': '{game} added to Library.',
+  'toast.discoveryRecommendationsAddedOne': '1 recommendation added.',
+  'toast.discoveryRecommendationsAddedMany': '{count} recommendations added.',
+  'toast.discoveryRecommendationsFailed': 'Could not get recommendations. Please try again.',
   'home.reviewMoreHint': 'Reviewing more games improves recommendations in the Recommendations tab.',
 } as const;
 
@@ -2204,6 +2211,10 @@ const cs: Dictionary = {
   'recommendations.openIntegrationsCta': 'Otevřít Nastavení → Integrace',
   'discoveryInbox.emptyTitle': 'Discovery Inbox je prázdný',
   'discoveryInbox.emptyHint': 'Projděte si doporučení na domovské obrazovce a klepněte na „Posoudit později", abyste sem zařadili hry.',
+  'discoveryInbox.getRecommendations': 'Získat 10 doporučení',
+  'discoveryInbox.getMoreRecommendations': 'Získat dalších 10 doporučení',
+  'discoveryInbox.findingRecommendations': 'Hledám doporučení…',
+  'discoveryInbox.recommendationsCopy': 'Přidejte do Discovery Inboxu novou dávku doporučených her.',
   'discoveryInbox.modeLibrary': 'Vlastním ji — přidat do herní sbírky',
   'discoveryInbox.modeWishlist': 'Zaujala mě, ale ještě nejsem rozhodnutý',
   'discoveryInbox.modePlans': 'Zařadit brzy do plánu konkrétní platformy',
@@ -2233,6 +2244,9 @@ const cs: Dictionary = {
   'toast.discoveryAddedToInbox': '{game} přidáno do Discovery Inboxu.',
   'toast.discoveryAddedToWishlist': '{game} přidáno na seznam přání.',
   'toast.discoveryAddedToLibrary': '{game} přidáno do knihovny.',
+  'toast.discoveryRecommendationsAddedOne': 'Přidáno 1 doporučení.',
+  'toast.discoveryRecommendationsAddedMany': 'Přidáno {count} doporučení.',
+  'toast.discoveryRecommendationsFailed': 'Doporučení se nepodařilo získat. Zkuste to znovu.',
   'home.reviewMoreHint': 'Posouzení více her zlepšuje doporučení na kartě Doporučení.',
 };
 

@@ -138,10 +138,12 @@ type Props = {
   onAddToWishlist: (item: DiscoveryInboxItem) => void;
   onAddToPlans: (item: DiscoveryInboxItem) => void;
   onIgnore: (item: DiscoveryInboxItem) => void;
+  onRequestRecommendations: () => void;
+  isRequestingRecommendations: boolean;
   onSkip: (item: DiscoveryInboxItem) => void;
 };
 
-export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, onAddToPlans, onIgnore, onSkip }: Props) {
+export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, onAddToPlans, onIgnore, onRequestRecommendations, isRequestingRecommendations, onSkip }: Props) {
   const hasGamepad = useGamepadDetection();
   const [sessionStats, setSessionStats] = useState<SessionStats>(emptySessionStats);
   const [sessionReviewedCount, setSessionReviewedCount] = useState(0);
@@ -266,9 +268,9 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
               onHighlight={setHighlightedActionIndex}
             />
           ) : totalCount === 0 ? (
-            <InboxEmpty />
+            <InboxEmpty isRequestingRecommendations={isRequestingRecommendations} onRequestRecommendations={onRequestRecommendations} />
           ) : (
-            <InboxComplete artwork={sessionArtwork} reviewedCount={sessionReviewedCount} stats={sessionStats} />
+            <InboxComplete artwork={sessionArtwork} isRequestingRecommendations={isRequestingRecommendations} onRequestRecommendations={onRequestRecommendations} reviewedCount={sessionReviewedCount} stats={sessionStats} />
           )}
         </div>
       </div>
@@ -608,7 +610,7 @@ function normalizeDiscoveryArtworkIdentity(value: string | null | undefined): st
 // Completion screen
 // ---------------------------------------------------------------------------
 
-function InboxComplete({ artwork, stats, reviewedCount }: { artwork: QueueCompletionArtwork[]; stats: SessionStats; reviewedCount: number }) {
+function InboxComplete({ artwork, stats, reviewedCount, isRequestingRecommendations, onRequestRecommendations }: { artwork: QueueCompletionArtwork[]; stats: SessionStats; reviewedCount: number; isRequestingRecommendations: boolean; onRequestRecommendations: () => void }) {
   const { t } = useI18n();
   const addedCount = stats.library + stats.wishlist + stats.plans;
   const chipConfigs = [
@@ -635,6 +637,11 @@ function InboxComplete({ artwork, stats, reviewedCount }: { artwork: QueueComple
         { label: t('discoveryInbox.completeAddedLabel'), value: addedCount, helper: t('discoveryInbox.completeToCollection'), tone: 'accent' },
       ]}
       chips={chipConfigs}
+      actions={[{
+        label: isRequestingRecommendations ? t('discoveryInbox.findingRecommendations') : t('discoveryInbox.getMoreRecommendations'),
+        onClick: onRequestRecommendations,
+        variant: 'secondary',
+      }]}
     />
   );
 }
@@ -643,7 +650,7 @@ function InboxComplete({ artwork, stats, reviewedCount }: { artwork: QueueComple
 // Empty state
 // ---------------------------------------------------------------------------
 
-function InboxEmpty() {
+function InboxEmpty({ isRequestingRecommendations, onRequestRecommendations }: { isRequestingRecommendations: boolean; onRequestRecommendations: () => void }) {
   const { t } = useI18n();
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
@@ -653,7 +660,30 @@ function InboxEmpty() {
         <p className="mt-2 text-sm text-slate-400">
           {t('discoveryInbox.emptyHint')}
         </p>
+        <p className="mt-4 text-xs leading-relaxed text-slate-500">{t('discoveryInbox.recommendationsCopy')}</p>
+        <div className="mt-4">
+          <RecommendationCta
+            isLoading={isRequestingRecommendations}
+            label={t('discoveryInbox.getRecommendations')}
+            onClick={onRequestRecommendations}
+          />
+        </div>
       </div>
     </div>
+  );
+}
+
+function RecommendationCta({ isLoading, label, onClick }: { isLoading: boolean; label: string; onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <button
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-300/35 bg-amber-300/10 px-4 text-sm font-bold text-amber-100 shadow-panel transition hover:border-amber-300/55 hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-70"
+      disabled={isLoading}
+      onClick={onClick}
+      type="button"
+    >
+      <Icon className={isLoading ? 'animate-spin' : ''} name={isLoading ? 'refresh-cw' : 'sparkles'} size={16} />
+      <span>{isLoading ? t('discoveryInbox.findingRecommendations') : label}</span>
+    </button>
   );
 }
