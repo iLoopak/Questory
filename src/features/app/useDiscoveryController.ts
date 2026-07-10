@@ -3,9 +3,10 @@ import type { TFunction } from '../../i18n';
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import {
-  loadDiscoveryInbox,
-  removeDiscoveryInboxItemForSession,
-  saveDiscoveryInbox,
+  deferDiscoveryInboxItemForFutureSession,
+  loadDiscoveryInboxState,
+  restoreDeferredDiscoveryInboxItem,
+  saveDiscoveryInboxState,
   type DiscoveryInboxItem,
 } from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
@@ -23,8 +24,8 @@ type UseDiscoveryControllerOptions = {
 };
 
 export function useDiscoveryController({ games, t, addToastNotification }: UseDiscoveryControllerOptions) {
-  const [inboxItems, setInboxItems] = useState<DiscoveryInboxItem[]>(() => loadDiscoveryInbox());
-  const [, setSkippedInboxItems] = useState<DiscoveryInboxItem[]>([]);
+  const [inboxState, setInboxState] = useState(() => loadDiscoveryInboxState());
+  const inboxItems = inboxState.activeQueue;
   const [previewCandidate, setPreviewCandidate] = useState<DiscoveryCandidate | null>(null);
 
   const inboxRawgIds = useMemo(
@@ -41,7 +42,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
   }, []);
 
   const addToInbox = useCallback((discoveryGame: DiscoveryGame, reason: string) => {
-    if (inboxItems.some((item) => item.rawgId === discoveryGame.rawgId)) {
+    if (inboxState.activeQueue.some((item) => item.rawgId === discoveryGame.rawgId)) {
       addToastNotification({
         category: 'info',
         dedupeKey: `inbox-dup:${discoveryGame.rawgId}`,
@@ -67,33 +68,34 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
       reason,
       createdAt: Date.now(),
     };
-    const updated = [...inboxItems, newItem];
-    saveDiscoveryInbox(updated);
-    setInboxItems(updated);
+    const deferredState = restoreDeferredDiscoveryInboxItem(inboxState, discoveryGame.rawgId);
+    const updatedState = deferredState === inboxState
+      ? { ...inboxState, activeQueue: [...inboxState.activeQueue, newItem] }
+      : deferredState;
+    saveDiscoveryInboxState(updatedState);
+    setInboxState(updatedState);
     addToastNotification({
       category: 'success',
       dedupeKey: `inbox-add:${discoveryGame.rawgId}`,
       message: formatMessageTemplate(t('toast.discoveryAddedToInbox'), { game: discoveryGame.title }),
     });
-  }, [addToastNotification, games, inboxItems, t]);
+  }, [addToastNotification, games, inboxState, t]);
 
   const removeFromInbox = useCallback((id: string) => {
-    setInboxItems((currentItems) => {
-      const updated = currentItems.filter((item) => item.id !== id);
-      saveDiscoveryInbox(updated);
-      return updated;
+    setInboxState((currentState) => {
+      const updatedState = { ...currentState, activeQueue: currentState.activeQueue.filter((item) => item.id !== id) };
+      saveDiscoveryInboxState(updatedState);
+      return updatedState;
     });
   }, []);
 
   const skipInboxItem = useCallback((id: string) => {
-    setInboxItems((currentItems) => {
-      const skippedItem = currentItems.find((item) => item.id === id);
-      const updated = removeDiscoveryInboxItemForSession(currentItems, id);
-      if (updated.length === currentItems.length || !skippedItem) return currentItems;
+    setInboxState((currentState) => {
+      const updatedState = deferDiscoveryInboxItemForFutureSession(currentState, id);
+      if (updatedState === currentState) return currentState;
 
-      setSkippedInboxItems((currentSkippedItems) => [...currentSkippedItems, skippedItem]);
-      saveDiscoveryInbox(updated);
-      return updated;
+      saveDiscoveryInboxState(updatedState);
+      return updatedState;
     });
   }, []);
 
