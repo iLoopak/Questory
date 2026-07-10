@@ -132,19 +132,35 @@ const futureSwipeZones: Record<SwipeHorizontalDirection, Array<{ action: ReviewM
   ],
 };
 
+type ReviewSessionDecision = {
+  action: ReviewModeAction;
+  gameId: string;
+  targetPlatform?: GamePlatform;
+};
+
 type ReviewActionStats = {
   dropped: number;
+  finished: number;
   ignored: number;
   playing: number;
   queued: number;
+  skipped: number;
   wishlisted: number;
+};
+
+type ReviewSessionSummary = {
+  actionStats: ReviewActionStats;
+  highlights: Array<{ action: ReviewModeAction; games: Game[]; icon: IconName; label: string }>;
+  platformBreakdown: Array<{ platform: GamePlatform; count: number }>;
 };
 
 const emptyReviewActionStats: ReviewActionStats = {
   dropped: 0,
+  finished: 0,
   ignored: 0,
   playing: 0,
   queued: 0,
+  skipped: 0,
   wishlisted: 0,
 };
 
@@ -170,8 +186,8 @@ export function ReviewModePanel({
   const buttonLabels = getControllerButtonLabels(confirmCancelConvention);
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(() => new Set());
   const [sessionGameIds, setSessionGameIds] = useState<string[]>([]);
-  const [reviewHistory, setReviewHistory] = useState<Array<{ action: ReviewModeAction; gameId: string }>>([]);
-  const [actionStats, setActionStats] = useState<ReviewActionStats>(emptyReviewActionStats);
+  const [reviewHistory, setReviewHistory] = useState<ReviewSessionDecision[]>([]);
+  const initialReviewedCountRef = useRef(0);
   const [queueGhostSlot] = useState(() => pickQueueGhostSlot('questQueue'));
   const [showQueueGhost, setShowQueueGhost] = useState(() => {
     if (!queueGhostSlot || source !== 'backlog') return false;
@@ -281,15 +297,17 @@ export function ReviewModePanel({
   const sourceLabel = getReviewSourceLabel(source);
   const completedCount = sessionGameIds.filter((gameId) => processedGameIds.has(gameId)).length;
   const totalCount = sessionGameIds.length;
-  const lifetimeReviewedCount = Object.keys(reviewModeState.reviewedGames).length + completedCount;
+  const lifetimeReviewedCount = initialReviewedCountRef.current + completedCount;
   const fullRemainingCount = Math.max(0, baseSourceGames.length - completedCount);
+  const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
   const processedGames = useMemo(() =>
     sessionGameIds
       .filter((id) => processedGameIds.has(id))
-      .map((id) => games.find((g) => g.id === id))
+      .map((id) => gamesById.get(id))
       .filter((g): g is Game => g !== undefined),
-    [sessionGameIds, processedGameIds, games],
+    [sessionGameIds, processedGameIds, gamesById],
   );
+  const sessionSummary = useMemo(() => buildReviewSessionSummary(reviewHistory, gamesById), [gamesById, reviewHistory]);
 
   useEffect(() => {
     if (activeGame && hasGamepad) {
@@ -302,7 +320,7 @@ export function ReviewModePanel({
     setProcessedGameIds(new Set());
     setSessionGameIds(baseSourceGames.slice(0, reviewSessionBatchSize).map((game) => game.id));
     setReviewHistory([]);
-    setActionStats(emptyReviewActionStats);
+    initialReviewedCountRef.current = reviewedGameIds.size;
     setHighlightedActionIndex(firstPositiveActionIndex);
     setIsQueuePickerOpen(false);
     setIsReviewOptionsOpen(false);
@@ -442,8 +460,7 @@ export function ReviewModePanel({
       pendingGameIds: baseSourceGames.map((pendingGame) => pendingGame.id),
     });
     setProcessedGameIds((currentIds) => new Set(currentIds).add(game.id));
-    setReviewHistory((currentHistory) => [...currentHistory, { action, gameId: game.id }]);
-    setActionStats((currentStats) => getNextActionStats(currentStats, action));
+    setReviewHistory((currentHistory) => [...currentHistory, { action, gameId: game.id, targetPlatform }]);
     setHighlightedActionIndex(firstPositiveActionIndex);
     setIsQueuePickerOpen(false);
     setIsReviewOptionsOpen(false);
@@ -464,8 +481,6 @@ export function ReviewModePanel({
         nextIds.delete(previousReview.gameId);
         return nextIds;
       });
-      setActionStats((currentStats) => getPreviousActionStats(currentStats, previousReview.action));
-
       return currentHistory.slice(0, -1);
     });
   }
@@ -659,7 +674,7 @@ export function ReviewModePanel({
             <ReviewSourceEmpty source={source} onSourceChange={onSourceChange} />
           ) : (
             <ReviewComplete
-              actionStats={actionStats}
+              sessionSummary={sessionSummary}
               processedGames={processedGames}
               queuePlatforms={queuePlatforms}
               reviewedCount={completedCount}
@@ -669,9 +684,9 @@ export function ReviewModePanel({
               onOpenQueue={onOpenQueue}
               onReturnToLibrary={onReturnToLibrary}
               onReviewAnother={() => {
+                initialReviewedCountRef.current = lifetimeReviewedCount;
                 setProcessedGameIds(new Set());
                 setReviewHistory([]);
-                setActionStats(emptyReviewActionStats);
                 setSessionGameIds(sourceGames.filter((game) => !processedGameIds.has(game.id)).slice(0, reviewSessionBatchSize).map((game) => game.id));
               }}
             />
@@ -1431,7 +1446,7 @@ function ReviewSourceEmpty({
 }
 
 function ReviewComplete({
-  actionStats,
+  sessionSummary,
   processedGames,
   queuePlatforms,
   reviewedCount,
@@ -1442,7 +1457,7 @@ function ReviewComplete({
   onReturnToLibrary,
   onReviewAnother,
 }: {
-  actionStats: ReviewActionStats;
+  sessionSummary: ReviewSessionSummary;
   processedGames: Game[];
   queuePlatforms: GamePlatform[];
   reviewedCount: number;
@@ -1453,9 +1468,13 @@ function ReviewComplete({
   onReturnToLibrary: () => void;
   onReviewAnother: () => void;
 }) {
-  const { t } = useI18n();
-  const hasStats = actionStats.queued > 0 || actionStats.playing > 0 || actionStats.wishlisted > 0 || actionStats.dropped > 0 || actionStats.ignored > 0;
+  const { actionStats, highlights, platformBreakdown } = sessionSummary;
+  const hasStats = Object.values(actionStats).some((count) => count > 0);
   const noPlatformsWarning = actionStats.queued > 0 && queuePlatforms.length === 0;
+  const reviewedTotal = lifetimeReviewedCount + remainingCount;
+  const progressPercent = reviewedTotal > 0 ? Math.round((lifetimeReviewedCount / reviewedTotal) * 100) : 100;
+  const estimatedSessionsRemaining = remainingCount > 0 && reviewedCount > 0 ? Math.ceil(remainingCount / reviewedCount) : 0;
+  const motivation = getSessionMotivation(actionStats, reviewedCount, remainingCount, estimatedSessionsRemaining);
 
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
@@ -1471,32 +1490,66 @@ function ReviewComplete({
           </p>
         )}
         <BatchCelebrationCovers games={processedGames} />
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
-            <div className="qs-label-caps text-accent">This Session</div>
-            <div className="mt-1 text-2xl font-semibold text-white">{reviewedCount}</div>
-            <div className="text-xs text-slate-400">reviewed</div>
+        <div className="mt-5 rounded-2xl border border-skyglass/15 bg-ink-950/60 p-4 text-left">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="qs-label-caps text-accent">{sourceLabel} progress</div>
+              <div className="mt-1 text-sm font-semibold text-white">{progressPercent}% completed</div>
+            </div>
+            <div className="text-right text-xs text-slate-400">
+              <div><span className="font-semibold text-white">{lifetimeReviewedCount}</span> reviewed</div>
+              <div><span className="font-semibold text-white">{remainingCount}</span> remaining</div>
+            </div>
           </div>
-          <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
-            <div className="qs-label-caps text-muted">Lifetime</div>
-            <div className="mt-1 text-2xl font-semibold text-white">{lifetimeReviewedCount}</div>
-            <div className="text-xs text-slate-400">reviewed</div>
-          </div>
-          <div className="rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
-            <div className="qs-label-caps text-muted">Remaining</div>
-            <div className="mt-1 text-2xl font-semibold text-white">{remainingCount}</div>
-            <div className="text-xs text-slate-400">still waiting</div>
+          <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10" aria-label={`${progressPercent}% completed`}>
+            <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
         {hasStats && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
-            {actionStats.queued > 0 && <span className="rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-mint">{actionStats.queued} added to Platform Plans</span>}
-            {actionStats.playing > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.playing} marked Playing Now</span>}
-            {actionStats.wishlisted > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-200">{actionStats.wishlisted} added to Wishlist</span>}
-            {actionStats.dropped > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.dropped} dropped</span>}
-            {actionStats.ignored > 0 && <span className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-1 text-slate-400">{actionStats.ignored} ignored</span>}
+          <div className="mt-4 grid gap-2 text-left sm:grid-cols-2 lg:grid-cols-3">
+            {getSessionStatItems(actionStats).map((item) => item.count > 0 ? (
+              <div key={item.label} className="flex items-center gap-3 rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
+                <span className="grid h-9 w-9 place-items-center rounded-full border border-mint/20 bg-mint/10 text-mint"><Icon name={item.icon} /></span>
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold text-white">{item.count} <span className="text-mint/70">→</span></div>
+                  <div className="truncate text-xs text-slate-400">{item.label}</div>
+                </div>
+              </div>
+            ) : null)}
           </div>
         )}
+        {platformBreakdown.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-mint/20 bg-mint/5 p-4 text-left">
+            <div className="text-sm font-semibold text-mint">Platform Plans</div>
+            <div className="mt-3 grid gap-1.5 text-sm">
+              {platformBreakdown.map((item) => (
+                <div key={item.platform} className="flex items-baseline gap-2 text-slate-300">
+                  <span className="truncate">{item.platform}</span>
+                  <span className="min-w-6 flex-1 border-b border-dotted border-skyglass/20" />
+                  <span className="font-semibold text-white">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {highlights.length > 0 && (
+          <div className="mt-4 space-y-3 rounded-2xl border border-skyglass/15 bg-ink-950/60 p-4 text-left">
+            <div className="qs-label-caps text-muted">Session highlights</div>
+            {highlights.map((group) => (
+              <div key={group.label}>
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200"><Icon name={group.icon} size={14} /> {group.label}</div>
+                <div className="flex gap-1.5 overflow-hidden">
+                  {group.games.slice(0, 8).map((game) => (
+                    <span key={game.id} className="block h-16 w-11 shrink-0 overflow-hidden rounded-md border border-white/10 bg-ink-800" title={game.title}>
+                      <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 rounded-xl border border-skyglass/15 bg-white/[0.03] p-3 text-sm text-slate-300">{motivation}</div>
         {actionStats.queued > 0 && !noPlatformsWarning && (
           <div className="mt-4 rounded-xl border border-mint/20 bg-mint/5 p-3 text-center">
             <p className="text-sm text-slate-300">
@@ -1522,18 +1575,20 @@ function ReviewComplete({
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-            onClick={onOpenQueue}
-            type="button"
-          >
-            Open Platform Plans
-          </button>
-          <button
-            className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"
             onClick={onReviewAnother}
             type="button"
           >
             Continue Reviewing
           </button>
+          {actionStats.queued > 0 ? (
+            <button
+              className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"
+              onClick={onOpenQueue}
+              type="button"
+            >
+              Open Platform Plans
+            </button>
+          ) : null}
           <button
             className="min-h-12 rounded-xl border border-skyglass/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
             onClick={onReturnToLibrary}
@@ -1593,52 +1648,70 @@ function BatchCelebrationCovers({ games }: { games: Game[] }) {
   );
 }
 
-function getNextActionStats(currentStats: ReviewActionStats, action: ReviewModeAction): ReviewActionStats {
-  if (action === 'queue') {
-    return { ...currentStats, queued: currentStats.queued + 1 };
+const sessionReportActions: Array<{ action: ReviewModeAction; key: keyof ReviewActionStats; icon: IconName; label: string }> = [
+  { action: 'queue', key: 'queued', icon: 'list-plus', label: 'Added to Platform Plans' },
+  { action: 'playing', key: 'playing', icon: 'gamepad-2', label: 'Playing Now' },
+  { action: 'wishlist', key: 'wishlisted', icon: 'heart', label: 'Wishlist' },
+  { action: 'finished', key: 'finished', icon: 'trophy', label: 'Finished' },
+  { action: 'skip', key: 'skipped', icon: 'chevrons-right', label: 'Skipped' },
+  { action: 'ignore', key: 'ignored', icon: 'eye-off', label: 'Ignored' },
+  { action: 'dropped', key: 'dropped', icon: 'archive', label: 'Dropped' },
+];
+
+function buildReviewSessionSummary(decisions: ReviewSessionDecision[], gamesById: Map<string, Game>): ReviewSessionSummary {
+  const actionStats = { ...emptyReviewActionStats };
+  const gamesByAction = new Map<ReviewModeAction, Game[]>();
+  const platformCounts = new Map<GamePlatform, number>();
+
+  for (const decision of decisions) {
+    const config = sessionReportActions.find((item) => item.action === decision.action);
+    if (!config) continue;
+
+    actionStats[config.key] += 1;
+
+    const game = gamesById.get(decision.gameId);
+    if (game) {
+      gamesByAction.set(decision.action, [...(gamesByAction.get(decision.action) ?? []), game]);
+    }
+
+    if (decision.action === 'queue' && decision.targetPlatform) {
+      platformCounts.set(decision.targetPlatform, (platformCounts.get(decision.targetPlatform) ?? 0) + 1);
+    }
   }
 
-  if (action === 'playing') {
-    return { ...currentStats, playing: currentStats.playing + 1 };
-  }
-
-  if (action === 'wishlist') {
-    return { ...currentStats, wishlisted: currentStats.wishlisted + 1 };
-  }
-
-  if (action === 'dropped') {
-    return { ...currentStats, dropped: currentStats.dropped + 1 };
-  }
-
-  if (action === 'ignore') {
-    return { ...currentStats, ignored: currentStats.ignored + 1 };
-  }
-
-  return currentStats;
+  return {
+    actionStats,
+    highlights: sessionReportActions
+      .map((item) => ({ action: item.action, games: gamesByAction.get(item.action) ?? [], icon: item.icon, label: item.label }))
+      .filter((group) => group.games.length > 0),
+    platformBreakdown: Array.from(platformCounts, ([platform, count]) => ({ platform, count }))
+      .sort((first, second) => second.count - first.count || first.platform.localeCompare(second.platform)),
+  };
 }
 
-function getPreviousActionStats(currentStats: ReviewActionStats, action: ReviewModeAction): ReviewActionStats {
-  if (action === 'queue') {
-    return { ...currentStats, queued: Math.max(0, currentStats.queued - 1) };
+function getSessionStatItems(actionStats: ReviewActionStats) {
+  return sessionReportActions.map((item) => ({ ...item, count: actionStats[item.key] }));
+}
+
+function getSessionMotivation(actionStats: ReviewActionStats, reviewedCount: number, remainingCount: number, sessionsRemaining: number) {
+  if (actionStats.queued > 0) {
+    return `You moved ${actionStats.queued} ${actionStats.queued === 1 ? 'game' : 'games'} closer to actually being played.`;
   }
 
-  if (action === 'playing') {
-    return { ...currentStats, playing: Math.max(0, currentStats.playing - 1) };
+  if (actionStats.dropped > 0 || actionStats.ignored > 0) {
+    const shrunkBy = actionStats.dropped + actionStats.ignored;
+    return `Nice! Your backlog shrank by ${shrunkBy} ${shrunkBy === 1 ? 'game' : 'games'} today.`;
   }
 
-  if (action === 'wishlist') {
-    return { ...currentStats, wishlisted: Math.max(0, currentStats.wishlisted - 1) };
+  if (sessionsRemaining > 0) {
+    return `Only ${sessionsRemaining} focused ${sessionsRemaining === 1 ? 'session remains' : 'sessions remain'} to finish this backlog at today's pace.`;
   }
 
-  if (action === 'dropped') {
-    return { ...currentStats, dropped: Math.max(0, currentStats.dropped - 1) };
+  if (remainingCount === 0 && reviewedCount > 0) {
+    return 'Quest Queue is clear for this group — your library is more focused now.';
   }
 
-  if (action === 'ignore') {
-    return { ...currentStats, ignored: Math.max(0, currentStats.ignored - 1) };
-  }
-
-  return currentStats;
+  return 'Great progress — every decision makes your library easier to act on.';
 }
 
 function matchesReviewSource(game: Game, source: ReviewSource) {
