@@ -20,10 +20,11 @@ import { formatMessageTemplate } from '../utils/summaryFormatters';
 // Action definitions
 // ---------------------------------------------------------------------------
 
-type DiscoveryInboxAction = 'library' | 'wishlist' | 'plans' | 'ignore';
+type DiscoveryInboxAction = 'library' | 'wishlist' | 'plans' | 'ignore' | 'skip';
 
 // Labels/descriptions are i18n keys, translated at render time.
 const negativeActions = [
+  { action: 'skip', icon: 'chevrons-right', labelKey: 'action.skip', tone: 'neutral' },
   { action: 'ignore', icon: 'eye-off', labelKey: 'action.ignore', tone: 'danger' },
 ] as const;
 
@@ -38,6 +39,7 @@ const actionDescriptionKeys = {
   wishlist: 'discoveryInbox.modeWishlist',
   plans: 'discoveryInbox.modePlans',
   ignore: 'discoveryInbox.modeIgnore',
+  skip: 'discoveryInbox.modeSkip',
 } as const;
 
 const decisionActions = [...negativeActions, ...positiveActions];
@@ -65,7 +67,7 @@ const minDragScale = 0.74;
 const discoverySwipeZones: Record<SwipeHorizontalDirection, ReadonlyArray<{ action: DiscoveryInboxAction; quadrant: SwipeQuadrant }>> = {
   left: [
     { action: 'ignore', quadrant: 'left-up' },
-    { action: 'ignore', quadrant: 'left-down' },
+    { action: 'skip', quadrant: 'left-down' },
   ],
   right: [
     { action: 'library', quadrant: 'right-up' },
@@ -114,7 +116,8 @@ function getNextStats(stats: SessionStats, action: DiscoveryInboxAction): Sessio
   if (action === 'library') return { ...stats, library: stats.library + 1 };
   if (action === 'wishlist') return { ...stats, wishlist: stats.wishlist + 1 };
   if (action === 'plans') return { ...stats, plans: stats.plans + 1 };
-  return { ...stats, ignored: stats.ignored + 1 };
+  if (action === 'ignore') return { ...stats, ignored: stats.ignored + 1 };
+  return stats;
 }
 
 function getActionClassName(tone: 'accent' | 'neutral' | 'danger', isHighlighted: boolean): string {
@@ -134,9 +137,10 @@ type Props = {
   onAddToWishlist: (item: DiscoveryInboxItem) => void;
   onAddToPlans: (item: DiscoveryInboxItem) => void;
   onIgnore: (item: DiscoveryInboxItem) => void;
+  onSkip: (item: DiscoveryInboxItem) => void;
 };
 
-export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, onAddToPlans, onIgnore }: Props) {
+export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, onAddToPlans, onIgnore, onSkip }: Props) {
   const hasGamepad = useGamepadDetection();
   const [sessionStats, setSessionStats] = useState<SessionStats>(emptySessionStats);
   const [sessionReviewedCount, setSessionReviewedCount] = useState(0);
@@ -190,6 +194,7 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
       if (event.key.toLowerCase() === 'l') { event.preventDefault(); performAction(activeItem, 'library'); return; }
       if (event.key.toLowerCase() === 'w') { event.preventDefault(); performAction(activeItem, 'wishlist'); return; }
       if (event.key.toLowerCase() === 'p') { event.preventDefault(); performAction(activeItem, 'plans'); return; }
+      if (event.key.toLowerCase() === 's') { event.preventDefault(); performAction(activeItem, 'skip'); return; }
       if (event.key === 'Escape' || event.key.toLowerCase() === 'i') { event.preventDefault(); performAction(activeItem, 'ignore'); return; }
     }
 
@@ -212,10 +217,16 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   }, { enabled: canReceiveControllerActions });
 
   function performAction(item: DiscoveryInboxItem, action: DiscoveryInboxAction) {
+    setHighlightedActionIndex(firstPositiveActionIndex);
+
+    if (action === 'skip') {
+      onSkip(item);
+      return;
+    }
+
     setSessionStats((s) => getNextStats(s, action));
     setSessionReviewedCount((c) => c + 1);
     setSessionArtwork((current) => appendDiscoveryCompletionArtwork(current, item));
-    setHighlightedActionIndex(firstPositiveActionIndex);
 
     if (action === 'library') onAddToLibrary(item);
     else if (action === 'wishlist') onAddToWishlist(item);
@@ -370,9 +381,9 @@ function FocusedDiscoveryCard({
       data-swipe-left="negative"
       data-swipe-right="positive"
     >
-      {/* Left zone — Ignore */}
+      {/* Left zone — Skip / Ignore */}
       <section
-        aria-label={t('action.ignore')}
+        aria-label={`${t('action.skip')} / ${t('action.ignore')}`}
         className={`qs-review-zone qs-review-zone-negative ${isSwipeEngaged && swipeDirection === 'left' ? 'qs-review-zone-active' : ''}`}
       >
         <div className="qs-review-zone-label">{t('action.ignore')}</div>
