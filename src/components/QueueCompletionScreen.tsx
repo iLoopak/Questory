@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 export type QueueCompletionState = 'batch-complete' | 'queue-empty';
 
@@ -21,8 +21,15 @@ type QueueCompletionAction = {
   variant?: 'primary' | 'secondary' | 'ghost';
 };
 
+export type QueueCompletionArtwork = {
+  alt?: string;
+  id?: string;
+  url: string | null | undefined;
+};
+
 type Props = {
   actions?: QueueCompletionAction[];
+  artwork?: QueueCompletionArtwork[];
   chips?: QueueCompletionChip[];
   eyebrow: string;
   footer: ReactNode;
@@ -52,10 +59,26 @@ const actionClasses = {
   ghost: 'border-skyglass/15 text-slate-200 hover:bg-mint/10 hover:text-white',
 } as const;
 
-export function QueueCompletionScreen({ actions = [], chips = [], eyebrow, footer, heading, state, stats, summary }: Props) {
+const artworkSlots = [
+  { className: 'left-[4%] top-[10%] hidden md:block', rotate: '-8deg', duration: '5.8s', delay: '-0.6s' },
+  { className: 'left-[10%] top-[48%] hidden lg:block', rotate: '6deg', duration: '6.6s', delay: '-2.1s' },
+  { className: 'left-[22%] bottom-[7%] hidden xl:block', rotate: '-3deg', duration: '5.1s', delay: '-1.4s' },
+  { className: 'right-[5%] top-[12%] hidden md:block', rotate: '7deg', duration: '6.2s', delay: '-1.1s' },
+  { className: 'right-[11%] top-[52%] hidden lg:block', rotate: '-6deg', duration: '5.5s', delay: '-2.8s' },
+  { className: 'right-[23%] bottom-[6%] hidden xl:block', rotate: '4deg', duration: '7s', delay: '-3.6s' },
+  { className: 'left-[8%] top-[5%] md:hidden', rotate: '-7deg', duration: '6s', delay: '-1.5s' },
+  { className: 'right-[7%] top-[7%] md:hidden', rotate: '6deg', duration: '5.4s', delay: '-0.4s' },
+  { className: 'left-[10%] bottom-[5%] md:hidden', rotate: '4deg', duration: '6.8s', delay: '-2.4s' },
+  { className: 'right-[10%] bottom-[6%] md:hidden', rotate: '-5deg', duration: '5.7s', delay: '-3.2s' },
+] as const;
+
+type VisibleArtwork = QueueCompletionArtwork & { index: number; markFailed: () => void };
+
+export function QueueCompletionScreen({ actions = [], artwork = [], chips = [], eyebrow, footer, heading, state, stats, summary }: Props) {
   const primaryActionRef = useRef<HTMLButtonElement | null>(null);
   const visibleChips = chips.filter((chip) => chip.value === undefined || chip.value > 0);
   const visibleStats = stats.slice(0, 2);
+  const visibleArtwork = useCompletionArtwork(artwork);
 
   useEffect(() => {
     primaryActionRef.current?.focus({ preventScroll: true });
@@ -64,10 +87,11 @@ export function QueueCompletionScreen({ actions = [], chips = [], eyebrow, foote
   return (
     <section
       aria-labelledby="queue-completion-title"
-      className="grid min-h-full content-start justify-items-center overflow-y-auto rounded-[1.5rem] border border-white/10 bg-ink-900/70 px-4 py-5 text-center sm:px-5 md:place-items-center"
+      className="relative isolate grid min-h-full content-start justify-items-center overflow-hidden overflow-y-auto rounded-[1.5rem] border border-white/10 bg-ink-900/70 px-4 py-5 text-center sm:px-5 md:place-items-center"
       data-completion-state={state}
     >
-      <div className="w-full max-w-sm">
+      <CompletionArtworkLayer artwork={visibleArtwork} />
+      <div className="relative z-10 w-full max-w-sm">
         <p className="text-xs font-semibold uppercase tracking-spread text-mint">{eyebrow}</p>
         <h2 id="queue-completion-title" className="mt-2 text-3xl font-semibold leading-tight text-white">
           {heading}
@@ -113,5 +137,53 @@ export function QueueCompletionScreen({ actions = [], chips = [], eyebrow, foote
         ) : null}
       </div>
     </section>
+  );
+}
+
+function useCompletionArtwork(artwork: QueueCompletionArtwork[]): VisibleArtwork[] {
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+
+  return useMemo(() => {
+    const seen = new Set<string>();
+    return artwork
+      .filter((item) => {
+        const url = item.url?.trim();
+        if (!url || failedUrls.has(url) || seen.has(url)) return false;
+        seen.add(url);
+        return true;
+      })
+      .slice(0, 7)
+      .map((item, index) => ({ ...item, index, markFailed: () => setFailedUrls((current) => new Set(current).add(item.url!.trim())) }));
+  }, [artwork, failedUrls]);
+}
+
+function CompletionArtworkLayer({ artwork }: { artwork: VisibleArtwork[] }) {
+  if (artwork.length === 0) return null;
+
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-ink-900/75 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-ink-900/70 to-transparent" />
+      {artwork.map((item) => {
+        const slot = artworkSlots[item.index % artworkSlots.length];
+        return (
+          <img
+            key={`${item.id ?? item.url}-${item.index}`}
+            alt=""
+            className={`qs-batch-cover-tile absolute aspect-[3/4] w-16 rounded-xl border border-white/10 object-cover opacity-45 shadow-panel sm:w-20 md:w-24 lg:w-28 ${slot.className}`}
+            decoding="async"
+            draggable={false}
+            loading={item.index < 4 ? 'eager' : 'lazy'}
+            onError={item.markFailed}
+            src={item.url?.trim()}
+            style={{
+              '--tile-rotate': slot.rotate,
+              animationDelay: slot.delay,
+              animationDuration: slot.duration,
+            } as CSSProperties}
+          />
+        );
+      })}
+    </div>
   );
 }

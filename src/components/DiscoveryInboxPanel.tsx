@@ -11,7 +11,7 @@ import { useGamepadDetection } from '../hooks/useGamepadDetection';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 import type { DiscoveryInboxItem } from '../lib/discoveryInboxStorage';
 import { Icon } from './Icon';
-import { QueueCompletionScreen } from './QueueCompletionScreen';
+import { QueueCompletionScreen, type QueueCompletionArtwork } from './QueueCompletionScreen';
 import { DiscoveryScreenshotStrip } from './ScreenshotStrip';
 import { useI18n } from '../i18n';
 import { formatMessageTemplate } from '../utils/summaryFormatters';
@@ -140,6 +140,7 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   const hasGamepad = useGamepadDetection();
   const [sessionStats, setSessionStats] = useState<SessionStats>(emptySessionStats);
   const [sessionReviewedCount, setSessionReviewedCount] = useState(0);
+  const [sessionArtwork, setSessionArtwork] = useState<QueueCompletionArtwork[]>([]);
   const [highlightedActionIndex, setHighlightedActionIndex] = useState(firstPositiveActionIndex);
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -213,6 +214,7 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   function performAction(item: DiscoveryInboxItem, action: DiscoveryInboxAction) {
     setSessionStats((s) => getNextStats(s, action));
     setSessionReviewedCount((c) => c + 1);
+    setSessionArtwork((current) => appendDiscoveryCompletionArtwork(current, item));
     setHighlightedActionIndex(firstPositiveActionIndex);
 
     if (action === 'library') onAddToLibrary(item);
@@ -254,7 +256,7 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
           ) : totalCount === 0 ? (
             <InboxEmpty />
           ) : (
-            <InboxComplete reviewedCount={sessionReviewedCount} stats={sessionStats} />
+            <InboxComplete artwork={sessionArtwork} reviewedCount={sessionReviewedCount} stats={sessionStats} />
           )}
         </div>
       </div>
@@ -564,11 +566,17 @@ function FocusedDiscoveryCard({
   );
 }
 
+function appendDiscoveryCompletionArtwork(current: QueueCompletionArtwork[], item: DiscoveryInboxItem): QueueCompletionArtwork[] {
+  const url = item.game.coverUrl?.trim();
+  if (!url || current.some((artwork) => artwork.url === url)) return current;
+  return [...current, { alt: item.game.title, id: item.id, url }];
+}
+
 // ---------------------------------------------------------------------------
 // Completion screen
 // ---------------------------------------------------------------------------
 
-function InboxComplete({ stats, reviewedCount }: { stats: SessionStats; reviewedCount: number }) {
+function InboxComplete({ artwork, stats, reviewedCount }: { artwork: QueueCompletionArtwork[]; stats: SessionStats; reviewedCount: number }) {
   const { t } = useI18n();
   const addedCount = stats.library + stats.wishlist + stats.plans;
   const chipConfigs = [
@@ -580,6 +588,7 @@ function InboxComplete({ stats, reviewedCount }: { stats: SessionStats; reviewed
 
   return (
     <QueueCompletionScreen
+      artwork={artwork}
       eyebrow={t('discoveryInbox.completeKicker')}
       footer={t('discoveryInbox.completeBrowseMore')}
       heading={t('discoveryInbox.completeTitle')}
