@@ -964,34 +964,59 @@ function PlatformQueueColumn({
           </div>
           {queueEntries.length > 0 ? <span className="text-xs font-semibold text-slate-500">{t('queue.playlistOrder')}</span> : null}
         </div>
-        <div ref={queueEntriesVirtualizerRef} className="qs-queue-virtual-window relative min-w-0" style={{ minHeight: displayedQueueEntries.length > 0 ? virtualQueueEntries.totalSize : undefined }}>
         {queueEntries.length > 0 ? (
-          <div className="qs-queue-virtual-items absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
-            {renderedQueueEntries.map((entry) => {
-              const game = gamesById.get(entry.gameId);
-              const isFirstEntry = entry.queuePosition <= 1;
-              const isLastEntry = entry.queuePosition >= queueEntries.length;
-              if (!game) {
-                return null;
-              }
+          <div className="qs-planned-queue-frame">
+            <div className="qs-planned-queue-list">
+              <div ref={queueEntriesVirtualizerRef} className="qs-queue-virtual-window relative min-w-0" style={{ minHeight: virtualQueueEntries.totalSize }}>
+                <div className="qs-queue-virtual-items absolute left-0 top-0 grid w-full gap-2" style={{ transform: `translateY(${virtualQueueEntries.offsetBefore}px)` }}>
+                  {renderedQueueEntries.map((entry) => {
+                    const game = gamesById.get(entry.gameId);
+                    const isFirstEntry = entry.queuePosition <= 1;
+                    const isLastEntry = entry.queuePosition >= queueEntries.length;
+                    if (!game) {
+                      return null;
+                    }
 
-              return (
-                <QueueEntryRow
-                  key={`${entry.gameId}-${entry.targetPlatform}`}
-                  entry={entry}
-                  game={game}
-                  platformAccentColor={accentColor}
-                  platformOptions={platformOptions}
-                  isFirstEntry={isFirstEntry}
-                  isLastEntry={isLastEntry}
-                  onMoveEntry={onMoveEntry}
-                  onMoveEntryToPlatform={onMoveEntryToPlatform}
-                  onOpenDetails={onOpenDetails}
-                  onPlayNow={() => onPlayNow(game.id, platform)}
-                  onRemoveEntry={onRemoveEntry}
-                />
-              );
-            })}
+                    return (
+                      <QueueEntryRow
+                        key={`${entry.gameId}-${entry.targetPlatform}`}
+                        entry={entry}
+                        game={game}
+                        platformAccentColor={accentColor}
+                        platformOptions={platformOptions}
+                        isFirstEntry={isFirstEntry}
+                        isLastEntry={isLastEntry}
+                        onMoveEntry={onMoveEntry}
+                        onMoveEntryToPlatform={onMoveEntryToPlatform}
+                        onOpenDetails={onOpenDetails}
+                        onPlayNow={() => onPlayNow(game.id, platform)}
+                        onRemoveEntry={onRemoveEntry}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            {shouldCollapsePlannedQueue ? (
+              <button
+                aria-expanded={isPlannedQueueExpanded}
+                className="qs-planned-queue-toggle flex w-full items-center justify-center gap-2 px-3 py-2 text-xs font-semibold transition"
+                onClick={() => setIsPlannedQueueExpanded((currentIsExpanded) => !currentIsExpanded)}
+                style={{
+                  borderColor: `color-mix(in srgb, ${platformAccentColor} 24%, rgb(255 255 255 / 0.08))`,
+                  color: `color-mix(in srgb, ${platformAccentColor} 72%, rgb(203 213 225))`,
+                  backgroundColor: `color-mix(in srgb, ${platformAccentColor} 8%, rgb(2 6 23 / 0.72))`,
+                }}
+                type="button"
+              >
+                <Icon name={isPlannedQueueExpanded ? 'chevron-up' : 'chevron-down'} size={14} />
+                <span>
+                  {isPlannedQueueExpanded
+                    ? t('queue.showLess')
+                    : t('queue.showMore').replace('{count}', String(hiddenPlannedQueueCount))}
+                </span>
+              </button>
+            ) : null}
           </div>
         ) : (
           <div
@@ -1008,27 +1033,6 @@ function PlatformQueueColumn({
             <p>{t('queue.noQueuePlatform').replace('{platform}', platform)}</p>
           </div>
         )}
-        </div>
-        {shouldCollapsePlannedQueue ? (
-          <button
-            aria-expanded={isPlannedQueueExpanded}
-            className="qs-planned-queue-toggle mt-2 flex w-full items-center justify-center gap-2 px-3 py-2 text-xs font-semibold transition"
-            onClick={() => setIsPlannedQueueExpanded((currentIsExpanded) => !currentIsExpanded)}
-            style={{
-              borderColor: `color-mix(in srgb, ${platformAccentColor} 24%, rgb(255 255 255 / 0.08))`,
-              color: `color-mix(in srgb, ${platformAccentColor} 72%, rgb(203 213 225))`,
-              backgroundColor: `color-mix(in srgb, ${platformAccentColor} 8%, rgb(2 6 23 / 0.72))`,
-            }}
-            type="button"
-          >
-            <Icon name={isPlannedQueueExpanded ? 'chevron-up' : 'chevron-down'} size={14} />
-            <span>
-              {isPlannedQueueExpanded
-                ? t('queue.showLess')
-                : t('queue.showMore').replace('{count}', String(hiddenPlannedQueueCount))}
-            </span>
-          </button>
-        ) : null}
       </div> : null}
     </section>
 
