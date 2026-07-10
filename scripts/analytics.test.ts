@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bucketCount } from '../src/lib/analytics/buckets';
 import { defaultAnalyticsSettings, analyticsSettingsStorageKey } from '../src/lib/analytics/settings';
 import { isAnalyticsConfigured, runTelemetrySelfTest, sendAnalyticsEvent, validateAnalyticsEvent } from '../src/lib/analytics/client';
+import telemetryHandler from '../api/telemetry.js';
 import type { MinimalAnalyticsEvent } from '../src/lib/analytics/types';
 import { runPlatformQueueUniquenessRegressionAssertions } from '../src/lib/platformQueueStorage.regression';
 
@@ -37,8 +39,7 @@ function enableLocalAnalytics() {
 
 const configuredAnalytics = {
   enabled: true,
-  webhookUrl: 'https://analytics.example.test/hook',
-  analyticsKey: 'real-test-key',
+  endpointUrl: '/api/telemetry',
 };
 
 test('bucketCount boundaries', () => {
@@ -72,11 +73,9 @@ test('analytics disabled by default', () => {
 test('placeholder config prevents sending', async () => {
   enableLocalAnalytics();
   const placeholderConfigs = [
-    { enabled: false, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: 'real-test-key' },
-    { enabled: true, webhookUrl: '', analyticsKey: 'real-test-key' },
-    { enabled: true, webhookUrl: 'https://example.invalid/questshelf-analytics', analyticsKey: 'real-test-key' },
-    { enabled: true, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: '' },
-    { enabled: true, webhookUrl: 'https://analytics.example.test/hook', analyticsKey: 'replace-with-alpha-analytics-key' },
+    { enabled: false, endpointUrl: '/api/telemetry' },
+    { enabled: true, endpointUrl: '' },
+    { enabled: true, endpointUrl: 'https://example.invalid/questshelf-analytics' },
   ];
 
   for (const config of placeholderConfigs) {
@@ -137,11 +136,11 @@ test('telemetry self-test sends one privacy-safe POST with no-store cache', asyn
   let calls = 0;
   const result = await runTelemetrySelfTest(async (url, init) => {
     calls += 1;
-    assert.equal(url, configuredAnalytics.webhookUrl);
+    assert.equal(url, configuredAnalytics.endpointUrl);
     assert.equal(init?.method, 'POST');
     const headers = init?.headers as Record<string, string>;
     assert.equal(headers['Content-Type'], 'application/json');
-    assert.equal(headers['x-make-apikey'], 'real-test-key');
+    assert.equal(headers['x-make-apikey'], undefined);
     assert.equal(init?.cache, 'no-store');
     assert.equal(init?.credentials, 'omit');
     const body = JSON.parse(String(init?.body));
@@ -153,15 +152,15 @@ test('telemetry self-test sends one privacy-safe POST with no-store cache', asyn
   assert.equal(calls, 1);
   assert.equal(result.sent, true);
   assert.equal(result.status, 202);
-  assert.equal(result.requestHost, 'analytics.example.test');
+  assert.equal(result.requestHost, '/api/telemetry');
   assert.equal(result.responseText, 'ok');
 });
 
-test('x-make-apikey header is used for Make.com API key auth', async () => {
+test('browser telemetry uses first-party endpoint without Make.com secret header', async () => {
   enableLocalAnalytics();
   await sendAnalyticsEvent(baseEvent, configuredAnalytics, async (_url, init) => {
     const headers = init?.headers as Record<string, string>;
-    assert.equal(headers['x-make-apikey'], 'real-test-key');
+    assert.equal(headers['x-make-apikey'], undefined);
     assert.equal(headers['X-QS-Analytics-Key'], undefined);
     assert.equal(headers['Content-Type'], 'application/json');
     return new Response(null, { status: 200 });
@@ -187,4 +186,80 @@ test('a non-2xx response never throws or blocks', async () => {
 
 test('platform queue regression assertions', () => {
   runPlatformQueueUniquenessRegressionAssertions();
+});
+
+function createApiResponse() {
+  return {
+    statusCode: 200,
+    headers: {} as Record<string, string>,
+    body: undefined as unknown,
+    setHeader(key: string, value: string) { this.headers[key] = value; },
+    status(code: number) { this.statusCode = code; return this; },
+    json(value: unknown) { this.body = value; return this; },
+  };
+}
+
+async function callTelemetryApi({ method = 'POST', body = baseEvent, envUrl = 'https://make.example.test/hook', fetchImpl }: { method?: string; body?: unknown; envUrl?: string; fetchImpl?: typeof fetch } = {}) {
+  const originalWebhook = process.env.QS_ANALYTICS_WEBHOOK_URL;
+  const originalFetch = globalThis.fetch;
+  if (envUrl === '') delete process.env.QS_ANALYTICS_WEBHOOK_URL;
+  else process.env.QS_ANALYTICS_WEBHOOK_URL = envUrl;
+  if (fetchImpl) globalThis.fetch = fetchImpl;
+  const res = createApiResponse();
+  try {
+    await telemetryHandler({ method, body, headers: { 'content-length': String(JSON.stringify(body).length) } }, res);
+    return res;
+  } finally {
+    if (originalWebhook === undefined) delete process.env.QS_ANALYTICS_WEBHOOK_URL;
+    else process.env.QS_ANALYTICS_WEBHOOK_URL = originalWebhook;
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test('telemetry API rejects non-POST requests', async () => {
+  const res = await callTelemetryApi({ method: 'GET' });
+  assert.equal(res.statusCode, 405);
+  assert.equal((res.body as { code: string }).code, 'METHOD_NOT_ALLOWED');
+});
+
+test('telemetry API reports missing server webhook configuration without exposing URL', async () => {
+  const res = await callTelemetryApi({ envUrl: '' });
+  assert.equal(res.statusCode, 503);
+  assert.equal((res.body as { code: string }).code, 'TELEMETRY_NOT_CONFIGURED');
+  assert.doesNotMatch(JSON.stringify(res.body), /make\.example|hook/);
+});
+
+test('telemetry API validates payload and rejects private fields', async () => {
+  const res = await callTelemetryApi({ body: { ...baseEvent, gameTitle: 'Private Game' } });
+  assert.equal(res.statusCode, 400);
+  assert.equal((res.body as { code: string }).code, 'UNSUPPORTED_FIELD');
+});
+
+test('telemetry API forwards valid event to Make webhook server-side', async () => {
+  let calls = 0;
+  const res = await callTelemetryApi({ fetchImpl: async (url, init) => {
+    calls += 1;
+    assert.equal(url, 'https://make.example.test/hook');
+    assert.equal(init?.method, 'POST');
+    assert.deepEqual(init?.headers, { 'Content-Type': 'application/json' });
+    assert.equal(JSON.parse(String(init?.body)).eventName, 'app_open');
+    return new Response('accepted', { status: 200 });
+  }});
+  assert.equal(calls, 1);
+  assert.equal(res.statusCode, 202);
+  assert.equal((res.body as { success: boolean; accepted: boolean }).accepted, true);
+});
+
+test('telemetry API returns safe status for Make non-2xx response', async () => {
+  const res = await callTelemetryApi({ fetchImpl: async () => new Response('secret upstream text', { status: 500 }) });
+  assert.equal(res.statusCode, 502);
+  assert.equal((res.body as { code: string; status: number }).code, 'UPSTREAM_REJECTED');
+  assert.equal((res.body as { status: number }).status, 500);
+  assert.doesNotMatch(JSON.stringify(res.body), /secret upstream text/);
+});
+
+test('service worker bypasses telemetry and all non-GET API requests', () => {
+  const sw = readFileSync('public/sw.js', 'utf8');
+  assert.match(sw, /if \(request\.method !== 'GET'\) \{\s*return;\s*\}/);
+  assert.match(sw, /requestUrl\.pathname\.startsWith\('\/api\/'\)/);
 });

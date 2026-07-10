@@ -16,10 +16,9 @@ const sharedConfig = {
     'import.meta.env.PROD': JSON.stringify(false),
     'import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL': JSON.stringify(''),
     'import.meta.env.VITE_QS_ANALYTICS_ENABLED': JSON.stringify('false'),
-    'import.meta.env.VITE_QS_ANALYTICS_WEBHOOK_URL': JSON.stringify('https://example.invalid/questshelf-analytics'),
-    'import.meta.env.VITE_QS_ANALYTICS_KEY': JSON.stringify('replace-with-alpha-analytics-key'),
+    'import.meta.env.VITE_QS_ANALYTICS_ENDPOINT_URL': JSON.stringify('/api/telemetry'),
   },
-  external: ['node:assert/strict', 'node:test'],
+  external: ['node:assert/strict', 'node:test', 'node:fs'],
   logLevel: 'silent',
 };
 

@@ -1,75 +1,88 @@
-# Optional Telemetry Audit
+# Questory anonymous telemetry audit
 
-_Scope: optional anonymous analytics only. No new events added; no app behavior changed. Diagnostics are dev-only._
+_Scope: optional anonymous analytics only. Telemetry remains disabled by default and only sends after the local in-app opt-in is enabled._
 
-## Architecture (current)
+## Current architecture and event flow
 
-| Concern | Where | Notes |
+| Stage | Implementation | Behavior |
 | --- | --- | --- |
-| User opt-in state | `src/lib/analytics/settings.ts` (`questshelf.analyticsSettings.v1` in localStorage) | Default **off**; persisted; `backup:'never'` in `storageRegistry` (device-scoped consent, not synced). |
-| Toggle UI | `src/components/settings/AboutSettingsPanel.tsx` | "Anonymous usage analytics" switch → `updateAnalyticsEnabled`. |
-| Build config | `getAnalyticsConfig()` reads `import.meta.env.VITE_QS_ANALYTICS_ENABLED / _WEBHOOK_URL / _KEY` | **Build-time**, inlined by Vite at `npm run build`. |
-| Event creation | `buildAnalyticsEvent()` | Random `eventId` per event, bucketed counts. |
-| Send | `sendAnalyticsEvent()` → `POST` webhook, header `x-make-apikey`, `Content-Type: application/json`, `keepalive:true` | Fire-and-forget, no retry, try/catch swallows errors. |
-| Call sites | `AppController.tsx` (`app_open`, `first_run_completed`, `quest_queue_opened`, `platform_plans_opened`, `import_completed`, `backup_exported/imported`) | Session events de-duped per session. |
+| Consent storage | `src/lib/analytics/settings.ts` | `questshelf.analyticsSettings.v1` in `localStorage`; defaults off; string values are normalized with `=== true`, so string `"false"` is not truthy. |
+| Toggle UI | `src/components/settings/AboutSettingsPanel.tsx` | Settings → About → Anonymous usage analytics calls `updateAnalyticsEnabled`; the next event reads storage immediately, so no reload is required. |
+| Event creation | `src/lib/analytics/client.ts` | `buildAnalyticsEvent()` emits only event name, random per-event ID, timestamp, app version, runtime, and coarse count buckets; `import_completed` may include an enum import source. |
+| Client transport | `src/lib/analytics/client.ts` | If opted in and build-enabled, posts JSON to same-origin `/api/telemetry` (or `VITE_QS_ANALYTICS_ENDPOINT_URL` override), with `cache:'no-store'`, `credentials:'omit'`, and `keepalive:true`. No Make.com URL or key is exposed to the browser. |
+| Server transport | `api/telemetry.js` | Vercel function accepts POST only, validates a strict payload schema/size, forwards to Make.com using server-only `QS_ANALYTICS_WEBHOOK_URL`, times out after 5s, and returns safe status JSON. |
+| PWA/service worker | `public/sw.js` | Service worker ignores every non-GET request and every `/api/` path, so telemetry POSTs are not cached or intercepted. |
 
-Send requires **all three** gates: build config valid **AND** user opted in **AND** payload passes the allowlist validator.
+## Events currently emitted
 
-## Root cause — why telemetry may not be firing
+Session-de-duped events: `app_open`, `first_run_completed`, `quest_queue_opened`, `platform_plans_opened`.
+Action events: `import_completed` with source (`steam`, `wishlist_html`, `retro`, `backup`, `manual`, `unknown`), `backup_exported`, `backup_imported`.
+Diagnostics event: `telemetry_test` from the debug/test helper.
 
-**Primary (configuration gap, silent):** the `VITE_QS_ANALYTICS_*` vars are **not set in any committed build config**. `.env.production` only defines the integrations proxy URL; `.env.example` holds disabled placeholders (`false`, `example.invalid`, `replace-with-alpha-analytics-key`) and **Vite does not load `.env.example`**. Unless the three vars are injected via the **Vercel build environment** (and the Android build shell), `getAnalyticsConfig()` yields `{enabled:false, webhookUrl:'', analyticsKey:''}` → `isAnalyticsConfigured()` is `false` → `sendAnalyticsEvent` returns before any request — **even when the user has opted in.** There was previously **no diagnostic**, so this is invisible.
+Events emitted before telemetry is enabled are intentionally dropped; optional telemetry does not backfill pre-consent activity. Disabling telemetry stops new sends immediately because every send reads the saved setting at send time.
 
-**Secondary (would fail even if configured — web/PWA):** the browser send is a cross-origin `POST` with `Content-Type: application/json` **and** a custom `x-make-apikey` header. Both force a **CORS preflight (OPTIONS)**. A Make.com custom webhook does not return CORS headers by default, so the browser blocks the request; `fetch` rejects and the error is swallowed. `response.ok` was also never checked, so a `401/403` (bad key) or disabled scenario was equally invisible.
+## Confirmed bugs / likely failure points found
 
-**Retry/blocking:** none needed — fire-and-forget with `keepalive` is appropriate. Failures never block the UI and never throw (confirmed: `void send(...)` + try/catch; `buildAnalyticsEvent` runs before the network call).
+1. **Browser-to-Make.com CORS/preflight risk.** The previous direct browser request used `Content-Type: application/json` plus `x-make-apikey`, forcing a CORS preflight that Make.com custom webhooks commonly do not satisfy. Browser/PWA sends could fail before the POST reached Make.com.
+2. **Webhook secret exposed by design.** Any `VITE_QS_ANALYTICS_WEBHOOK_URL` and `VITE_QS_ANALYTICS_KEY` value is embedded into the client bundle and discoverable.
+3. **Production configuration was easy to silently miss.** `.env.production` did not configure telemetry, `.env.example` used disabled placeholders, and Vite variables are build-time only. An opted-in user on a build without the required vars produced no request.
+4. **Response status visibility was limited.** Direct sends were fire-and-forget and safe, but downstream failures were hard to distinguish from opt-out, blocked requests, or missing config without enabling debug mode.
 
-## Reproduction
+## Fix implemented
 
-1. Deploy/build without the three `VITE_QS_ANALYTICS_*` vars (current state) → enable analytics in Settings → perform tracked actions → **no network request** (DevTools Network shows nothing to the webhook).
-2. Even with the vars set to a raw Make webhook, on web/PWA the `OPTIONS` preflight fails (no `Access-Control-Allow-Origin`/`-Headers`) → the `POST` never leaves the browser.
+Questory now uses the preferred same-origin Vercel proxy architecture. The browser sends only to `/api/telemetry`; the Vercel function forwards to the Make.com webhook server-side. This avoids exposing the Make webhook URL, avoids browser-to-Make CORS, allows strict validation, provides safer statuses, and keeps the service worker out of the path.
 
-## Affected environments
+## Privacy review
 
-- **Local dev:** off unless a developer adds `.env` / `.env.development` with the vars (`.env.example` is not auto-loaded).
-- **Vercel web/PWA:** off unless the vars are set in Vercel env; if set, still blocked by CORS unless the endpoint allows it.
-- **Android/Capacitor:** off unless the vars are set in the Android build. A WebView `fetch` is still CORS-governed, but the app origin differs and behavior varies; not verifiable without a configured endpoint. `runtime` correctly reports `android` via `getRuntimeEnvironment()`.
+The payload allowlist rejects unexpected fields such as titles, notes, tags, account IDs, Steam IDs, URLs, paths, search queries, user input, and persistent user IDs. The current `eventId` is a random per-event UUID, not a stable installation/person identifier, which favors privacy over user-level aggregation.
 
-## Privacy review — no personal data (goal 10) ✅
+## Required environment variables
 
-Payload is a strict allowlist (`validateAnalyticsEvent` rejects any extra key): `schemaVersion, eventName, eventId (random UUID, not a stable user id), timestamp, appVersion, runtime, five *count buckets* (coarse ranges, not exact), optional importSource enum`. **No** notes, titles, email/user IDs, library contents, ROM paths, or backup contents. Counts are bucketed; `eventId` is per-event, so there is no cross-event user tracking.
+### Vercel Preview/Production build environment
 
-## Fix implemented (low-risk, in this PR)
+- `VITE_QS_ANALYTICS_ENABLED=true`
+- Optional: `VITE_QS_ANALYTICS_ENDPOINT_URL=/api/telemetry` only if the endpoint is not mounted at the default path.
 
-Original production send behavior was unchanged in that audit; current deployed-PWA troubleshooting adds explicit debug visibility (`src/lib/analytics/client.ts`), gated on `import.meta.env.DEV` or the per-device `?qsTelemetryDebug=1` flag:
+### Vercel Preview/Production runtime/function environment
 
-- `describeAnalyticsConfigProblem(config)` — single source of truth for `isAnalyticsConfigured`; names the exact missing/placeholder env var.
-- `sendAnalyticsEvent` now logs, in dev/debug mode only, the precise skip reason (opted-out is silent; **enabled-but-misconfigured warns**; invalid event debug-logs) and checks `response.ok` to warn on non-2xx / CORS. No production logging.
-- `.env.example` documents that these are build-time vars (Vercel env / Android build shell), not runtime, and that the endpoint must allow the cross-origin POST (CORS for `content-type` + `x-make-apikey`).
+- `QS_ANALYTICS_WEBHOOK_URL=<your Make.com custom webhook URL>`
 
-## Still requires external configuration (no secrets in repo)
+Do not use the old `VITE_QS_ANALYTICS_WEBHOOK_URL` or `VITE_QS_ANALYTICS_KEY`; they expose secrets in the browser bundle and are no longer used by the client.
 
-1. Set in the **Vercel** project (and Android build environment), **not committed**:
-   - `VITE_QS_ANALYTICS_ENABLED=true`
-   - `VITE_QS_ANALYTICS_WEBHOOK_URL=<your Make webhook URL>`
-   - `VITE_QS_ANALYTICS_KEY=<your Make API key>`
-2. Make the endpoint reachable from the browser — **recommended:** route telemetry through a first-party same-origin proxy (mirroring the existing `/api/integrations` proxy) that forwards to Make server-side. This avoids CORS entirely and keeps the Make key off the client. Otherwise, configure the webhook to return CORS headers allowing the app origin and the `x-make-apikey`/`content-type` headers.
+## Manual verification
 
-## Acceptance criteria
+### Local development
 
-- Disabled → no request. ✅ (unchanged; test: _no send when local setting is disabled_)
-- Enabled + valid config → event reaches endpoint. ✅ (unchanged; test: _x-make-apikey header_)
-- Enabled + invalid/missing config → dev-only diagnostic, app continues. ✅ (new)
-- Failures never affect app usage. ✅ (tests: _send failures swallowed_, _non-2xx never throws or blocks_)
-- Android/Capacitor explicitly documented. ✅ (above)
-- Report states status + what's fixed vs. needs external config. ✅ (this doc)
+1. Run with a Vercel-compatible local server if testing the serverless function (for example `vercel dev`) and set `QS_ANALYTICS_WEBHOOK_URL` in the local environment.
+2. Set `VITE_QS_ANALYTICS_ENABLED=true` before starting the dev server.
+3. Open Settings → About, enable Anonymous usage analytics, then add `?qsTelemetryDebug=1` to the URL.
+4. Click **Send telemetry test**. DevTools Network should show `POST /api/telemetry` with a small JSON payload and no Make.com URL or secret header.
+5. Console/debug output should show enabled/configured/sent/status details without a full webhook URL.
 
-## Vercel/PWA telemetry self-test
+### Vercel Preview and Production
 
-A debug-only self-test is available for deployed browser/PWA diagnosis without adding ongoing tracking. To enable it on a Vercel deployment, open the app once with `?qsTelemetryDebug=1`; this stores a local debug flag on that device. Then either:
+1. Add `VITE_QS_ANALYTICS_ENABLED=true` for the target environment and redeploy (Vite reads it at build time).
+2. Add `QS_ANALYTICS_WEBHOOK_URL` for the same target environment; redeploy/restart functions as needed.
+3. Visit the deployment with `?qsTelemetryDebug=1`, opt in, and click **Send telemetry test**.
+4. Browser Network should show `POST /api/telemetry` returning `202` for accepted forwarding, `503` if the function env var is missing, `502` for upstream rejection, or `504` for timeout.
+5. Vercel Function logs should show invocation of `/api/telemetry` but must not print the webhook URL.
+6. Make.com webhook history should show the `telemetry_test` payload after an HTTP-accepted request. A `202` confirms transport acceptance by the proxy/upstream HTTP response, not guaranteed downstream scenario processing.
 
-- Open Settings → About → Anonymous usage analytics and click **Send telemetry test**; or
-- Run `window.questShelfTelemetrySelfTest()` in DevTools Console.
+### Installed PWA
 
-The self-test sends exactly one `telemetry_test` event only if the in-app anonymous analytics opt-in is enabled and the Vite build contains valid `VITE_QS_ANALYTICS_*` values. It logs the opt-in state, whether an endpoint is configured, the webhook host (never the full secret URL), HTTP status, safe text responses, and caught network/CORS/offline errors. Telemetry fetches use `POST`, `Content-Type: application/json`, `cache: 'no-store'`, and no credentials so service-worker/app-shell caches should not serve or store them.
+1. Install the deployed PWA after the new deployment is live.
+2. Open it once online to receive the latest service worker/app bundle.
+3. Enable telemetry and run the test. Network should still show `POST /api/telemetry`; `public/sw.js` bypasses non-GET and `/api/` requests.
+4. Toggle telemetry off and repeat tracked actions; no new telemetry POST should appear.
 
-For Vercel production builds, confirm these variables are set in Vercel Project → Settings → Environment Variables before deploying: `VITE_QS_ANALYTICS_ENABLED=true`, `VITE_QS_ANALYTICS_WEBHOOK_URL`, and `VITE_QS_ANALYTICS_KEY`. Vite inlines these at build time; changing them after a deploy requires a redeploy. `.env.production` must not contain the Make webhook or key.
+### Offline / blocked request
+
+1. Enable telemetry, turn DevTools Network offline, then click the telemetry test.
+2. The test should report a failed/blocked request; normal app UI should continue working.
+3. With an ad blocker or CSP issue, expect a failed request in Network/console diagnostics, not app breakage.
+
+## Remaining limitations
+
+- Telemetry remains best-effort and does not retry; events may be dropped during offline/background/browser suspension. This is intentional for optional telemetry.
+- `VITE_QS_ANALYTICS_ENABLED` is still build-time; changing it in Vercel requires a redeploy.
+- The proxy performs validation and timeout handling but not durable rate limiting. Vercel/platform-level protections should be used if abuse appears.
