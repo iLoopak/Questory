@@ -4627,3 +4627,201 @@ body.qs-controller-active .qs-compact-card:focus-within {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* Platform Plans — two-level hub selector and signature boot transition */
+.qs-platform-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+.qs-platform-hub-card {
+  position: relative;
+  min-height: clamp(18rem, 32vw, 28rem);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, rgb(255 255 255 / 0.08));
+  border-radius: 1.35rem;
+  background: rgb(2 6 23 / 0.88);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.42), 0 0 28px color-mix(in srgb, var(--platform-accent, var(--accent)) 8%, transparent);
+  color: white;
+  isolation: isolate;
+  text-align: left;
+  transform: translateZ(0) scale(1);
+  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 360ms ease, border-color 240ms ease, box-shadow 520ms ease, filter 520ms ease;
+  will-change: transform, opacity, filter;
+}
+
+.qs-platform-hub-card:hover,
+.qs-platform-hub-card:focus-visible {
+  border-color: color-mix(in srgb, var(--platform-accent, var(--accent)) 52%, rgb(255 255 255 / 0.12));
+  box-shadow: 0 28px 80px rgb(0 0 0 / 0.48), 0 0 34px color-mix(in srgb, var(--platform-accent, var(--accent)) 15%, transparent);
+  transform: translateY(-2px) translateZ(0);
+}
+
+.qs-platform-hub-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--platform-accent, var(--accent)) 72%, white);
+  outline-offset: 3px;
+}
+
+.qs-platform-hub-artwork,
+.qs-platform-hub-artwork img,
+.qs-platform-hub-artwork-fallback {
+  position: absolute;
+  inset: 0;
+}
+
+.qs-platform-hub-artwork img,
+.qs-platform-hub-artwork-fallback {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transform: scale(1.001);
+  transition: transform 620ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 520ms ease, opacity 520ms ease;
+}
+
+.qs-platform-hub-artwork-fallback {
+  background: radial-gradient(circle at 30% 22%, color-mix(in srgb, var(--platform-accent, var(--accent)) 35%, transparent), transparent 34%), linear-gradient(135deg, rgb(15 23 42), rgb(2 6 23));
+}
+
+.qs-platform-hub-artwork::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(2 6 23 / 0.08), rgb(2 6 23 / 0.34) 48%, rgb(2 6 23 / 0.86));
+  transition: background 520ms ease;
+}
+
+.qs-platform-hub-wake-light {
+  position: absolute;
+  inset: -18%;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, transparent), transparent 42%);
+  filter: blur(18px);
+  transform: scale(0.96);
+  transition: opacity 520ms ease, transform 520ms ease;
+}
+
+.qs-platform-hub-content {
+  position: absolute;
+  inset-inline: 1rem;
+  bottom: 1rem;
+  z-index: 1;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgb(2 6 23 / 0.36), rgb(2 6 23 / 0.68));
+  padding: 1rem;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 18px 45px rgb(0 0 0 / 0.32);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.qs-platform-hub-content h3 {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.qs-platform-hub-content p,
+.qs-platform-hub-kicker {
+  color: rgb(203 213 225 / 0.82);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.qs-platform-hub-counts {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.qs-platform-hub-counts span {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--platform-accent, var(--accent)) 13%, rgb(15 23 42 / 0.78));
+  padding: 0.4rem 0.65rem;
+  color: rgb(226 232 240 / 0.86);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.qs-platform-hub-counts strong {
+  color: color-mix(in srgb, var(--platform-accent, var(--accent)) 82%, white);
+  margin-right: 0.25rem;
+}
+
+.qs-platform-hub-card--booting {
+  box-shadow: 0 34px 96px rgb(0 0 0 / 0.56), 0 0 46px color-mix(in srgb, var(--platform-accent, var(--accent)) 28%, transparent);
+  filter: saturate(1.08) brightness(0.98);
+  transform: translateZ(0) scale(1.03);
+}
+
+.qs-platform-hub-card--booting .qs-platform-hub-artwork img,
+.qs-platform-hub-card--booting .qs-platform-hub-artwork-fallback {
+  filter: brightness(0.93) saturate(1.14);
+  transform: scale(1.03);
+}
+
+.qs-platform-hub-card--booting .qs-platform-hub-wake-light {
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+.qs-platform-hub-card--fading {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.975) translateZ(0);
+}
+
+.qs-queue-list--focused .qs-platform-column--focused-experience {
+  animation: qs-platform-plan-arrive 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.qs-platform-plan-reveal {
+  animation: qs-platform-plan-content-reveal 360ms ease both;
+}
+
+.qs-platform-plan-reveal--playing { animation-delay: 120ms; }
+.qs-platform-plan-reveal--nextup { animation-delay: 190ms; }
+
+.qs-platform-artwork-title--arrival span[aria-hidden='true'] {
+  animation: qs-platform-badge-pulse 540ms ease 420ms both;
+}
+
+@keyframes qs-platform-plan-arrive {
+  from { opacity: 0; transform: scale(0.985) translateY(10px); filter: brightness(1.04); }
+  to { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+}
+
+@keyframes qs-platform-plan-content-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes qs-platform-badge-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--platform-accent, var(--accent)) 0%, transparent); transform: scale(1); }
+  42% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--platform-accent, var(--accent)) 24%, transparent); transform: scale(1.18); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--platform-accent, var(--accent)) 0%, transparent); transform: scale(1); }
+}
+
+@media (max-width: 640px) {
+  .qs-platform-hub-grid { gap: 0.85rem; }
+  .qs-platform-hub-card { min-height: 20rem; border-radius: 1.1rem; }
+  .qs-platform-hub-content { inset-inline: 0.75rem; bottom: 0.75rem; padding: 0.85rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qs-platform-hub-card,
+  .qs-platform-hub-artwork img,
+  .qs-platform-hub-artwork-fallback,
+  .qs-platform-hub-wake-light,
+  .qs-platform-plan-reveal,
+  .qs-queue-list--focused .qs-platform-column--focused-experience,
+  .qs-platform-artwork-title--arrival span[aria-hidden='true'] {
+    animation: none !important;
+    transition: opacity 180ms ease, filter 180ms ease !important;
+    transform: none !important;
+  }
+
+  .qs-platform-hub-card--fading { opacity: 0; }
+  .qs-platform-hub-card--booting { filter: brightness(0.98); }
+}
