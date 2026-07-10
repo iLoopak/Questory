@@ -29,11 +29,98 @@ export interface ContextualScore {
 }
 
 // ---------------------------------------------------------------------------
-// Tags that are too common to meaningfully distinguish similar games.
-// Matches on these tags are excluded from the scoring calculation.
+// Tag taxonomy + scoring
+// RAWG tags mix gameplay, genre-ish descriptors, themes, camera/presentation,
+// and storefront/technical labels. The contextual carousel should be driven by
+// the first bucket, not by generic metadata such as "Singleplayer" or "2D".
 // ---------------------------------------------------------------------------
 
-const NON_DISCRIMINATING_TAGS = new Set([
+const VERY_HIGH_VALUE_TAGS = new Set([
+  'roguelite',
+  'roguelike',
+  'deckbuilding',
+  'deckbuilder',
+  'card-battler',
+  'souls-like',
+  'soulslike',
+  'metroidvania',
+  'colony-sim',
+  'colony-simulation',
+  'extraction-shooter',
+  'crpg',
+  'computer-role-playing-game',
+  'factory-automation',
+  'automation',
+  'city-builder',
+  'city-building',
+  'immersive-sim',
+  'bullet-heaven',
+  'survivors-like',
+  'party-rpg',
+  'tactical-rpg',
+  'turn-based-tactics',
+  'survival-horror',
+  'life-sim',
+  'farming-sim',
+  '4x',
+  'grand-strategy',
+  'real-time-strategy',
+  'base-building',
+]);
+
+const MECHANIC_TAGS = new Set([
+  'stealth',
+  'crafting',
+  'survival',
+  'open-world',
+  'sandbox',
+  'management',
+  'resource-management',
+  'turn-based',
+  'turn-based-combat',
+  'tactical',
+  'strategy-rpg',
+  'hack-and-slash',
+  'loot',
+  'looter-shooter',
+  'platformer',
+  'puzzle-platformer',
+  'precision-platformer',
+  'tower-defense',
+  'rhythm',
+  'fighting',
+  'racing',
+  'soulslike',
+]);
+
+const THEME_TAGS = new Set([
+  'sci-fi',
+  'science-fiction',
+  'horror',
+  'fantasy',
+  'dark-fantasy',
+  'post-apocalyptic',
+  'cyberpunk',
+  'space',
+  'war',
+  'military',
+  'zombies',
+  'lovecraftian',
+]);
+
+const PRESENTATION_TAGS = new Set([
+  'first-person',
+  'third-person',
+  'isometric',
+  'top-down',
+  'side-scroller',
+  'side-scrolling',
+  '2-5d',
+]);
+
+const GENERIC_TAGS = new Set([
+  '2d',
+  '3d',
   'singleplayer',
   'multiplayer',
   'co-op',
@@ -50,6 +137,7 @@ const NON_DISCRIMINATING_TAGS = new Set([
   'partial-controller-support',
   'steam-cloud',
   'controller',
+  'controller-support',
   'linux',
   'macos',
   'windows',
@@ -59,8 +147,47 @@ const NON_DISCRIMINATING_TAGS = new Set([
   'cute',
   'funny',
   'casual',
+  'indie',
+  'pixel-graphics',
+  'retro',
+  'early-access',
+  'score-attack',
 ]);
 
+const NON_DISCRIMINATING_TAGS = GENERIC_TAGS;
+
+function tagWeight(slug: string): number {
+  if (VERY_HIGH_VALUE_TAGS.has(slug)) return 18;
+  if (MECHANIC_TAGS.has(slug)) return 12;
+  if (THEME_TAGS.has(slug)) return 4;
+  if (PRESENTATION_TAGS.has(slug)) return 2;
+  if (GENERIC_TAGS.has(slug)) return 0.35;
+  return 7;
+}
+
+function meaningfulTagWeight(slug: string): number {
+  return GENERIC_TAGS.has(slug) ? 0 : tagWeight(slug);
+}
+
+function rareTagMultiplier(slug: string, corpusFrequency: Map<string, number>): number {
+  if (GENERIC_TAGS.has(slug)) return 0.25;
+  const frequency = corpusFrequency.get(slug) ?? 0;
+  if (VERY_HIGH_VALUE_TAGS.has(slug)) return 1.45;
+  if (frequency >= 8) return 0.65;
+  if (frequency >= 4) return 0.85;
+  if (frequency <= 1) return 1.25;
+  return 1;
+}
+
+function buildUserTagFrequency(userGames: Game[]): Map<string, number> {
+  const frequency = new Map<string, number>();
+  for (const userGame of userGames) {
+    for (const slug of new Set((userGame.rawgTags ?? []).map(toSlug))) {
+      frequency.set(slug, (frequency.get(slug) ?? 0) + 1);
+    }
+  }
+  return frequency;
+}
 // ---------------------------------------------------------------------------
 // Scoring helpers
 // ---------------------------------------------------------------------------
@@ -68,12 +195,31 @@ const NON_DISCRIMINATING_TAGS = new Set([
 function computeTagMatchScore(
   candidateTagSlugs: string[],
   currentGameTagSlugs: string[],
-): number {
-  const specificMatches = candidateTagSlugs.filter(
-    (slug) => !NON_DISCRIMINATING_TAGS.has(slug) && currentGameTagSlugs.includes(slug),
-  ).length;
-  // Each specific match: +8 pts, capped at 40.
-  return Math.min(40, specificMatches * 8);
+  tagFrequency: Map<string, number>,
+): { score: number; meaningfulMatches: number } {
+  let rawScore = 0;
+  let meaningfulMatches = 0;
+  for (const slug of new Set(candidateTagSlugs)) {
+    if (!currentGameTagSlugs.includes(slug)) continue;
+    const weighted = tagWeight(slug) * rareTagMultiplier(slug, tagFrequency);
+    rawScore += weighted;
+    if (meaningfulTagWeight(slug) >= 4) meaningfulMatches += 1;
+  }
+
+  const synergy = meaningfulMatches >= 2 ? 1.35 : 1;
+  return {
+    score: Math.round(Math.min(55, rawScore * synergy)),
+    meaningfulMatches,
+  };
+}
+
+
+export function scoreContextualTagOverlapForTest(candidateTagSlugs: string[], currentGameTagSlugs: string[], corpusTagSlugs: string[] = []): { score: number; meaningfulMatches: number } {
+  const frequency = new Map<string, number>();
+  for (const slug of corpusTagSlugs.map(toSlug)) {
+    frequency.set(slug, (frequency.get(slug) ?? 0) + 1);
+  }
+  return computeTagMatchScore(candidateTagSlugs.map(toSlug), currentGameTagSlugs.map(toSlug), frequency);
 }
 
 function computeGenreMatchScore(
@@ -81,7 +227,7 @@ function computeGenreMatchScore(
   currentGameGenres: string[],
 ): number {
   const matches = candidateGenres.filter((g) => currentGameGenres.includes(g)).length;
-  return Math.min(15, matches * 7);
+  return Math.min(18, matches * 9);
 }
 
 function computeProfileAffinity(
@@ -220,11 +366,13 @@ export async function fetchContextualRecommendations(
 
   const currentGameGenres = game.genres ?? [];
   const currentTagSlugs = (game.rawgTags ?? []).map(toSlug);
+  const tagFrequency = buildUserTagFrequency(userGames);
 
   // Specific tags are those not in the non-discriminating set — used for the
   // tag pool query so RAWG returns semantically similar games.
   const specificTagSlugs = currentTagSlugs
-    .filter((slug) => !NON_DISCRIMINATING_TAGS.has(slug))
+    .filter((slug) => meaningfulTagWeight(slug) >= 4)
+    .sort((a, b) => (tagWeight(b) * rareTagMultiplier(b, tagFrequency)) - (tagWeight(a) * rareTagMultiplier(a, tagFrequency)))
     .slice(0, 5);
 
   const cached = cache.get(key);
@@ -319,7 +467,8 @@ export async function fetchContextualRecommendations(
 
       const franchise = inSeries ? 50 : 0;
       const rawgSuggested = inSuggested ? 40 : 0;
-      const tagMatch = computeTagMatchScore(candidateTagSlugs, currentTagSlugs);
+      const tagMatchResult = computeTagMatchScore(candidateTagSlugs, currentTagSlugs, tagFrequency);
+      const tagMatch = tagMatchResult.score;
       const genreMatch = computeGenreMatchScore(candidateGenres, currentGameGenres);
       const profileScore = computeProfileAffinity(candidateGenres, candidateTagSlugs, profile);
       const profileAffinity = profileScore.affinity;
@@ -354,8 +503,9 @@ export async function fetchContextualRecommendations(
         candidateGenres[0] ??
         '';
 
-      return { result, score, reason, primaryTag };
+      return { result, score, reason, primaryTag, meaningfulMatches: tagMatchResult.meaningfulMatches };
     })
+    .filter((item) => item.score.franchise > 0 || item.score.rawgSuggested > 0 || item.meaningfulMatches >= 2 || item.score.tagMatch >= 18)
     .sort((a, b) => b.score.total - a.score.total);
 
   const diverse = applyDiversityFilter(scored, 14);
