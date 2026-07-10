@@ -38,8 +38,7 @@ const telemetryDebugStorageKey = 'questshelf.telemetryDebug.v1';
 
 export type AnalyticsConfig = {
   enabled: boolean;
-  webhookUrl: string;
-  analyticsKey: string;
+  endpointUrl: string;
 };
 
 export type TrackAnalyticsOptions = {
@@ -62,8 +61,7 @@ export type TelemetryDebugResult = {
 export function getAnalyticsConfig(): AnalyticsConfig {
   return {
     enabled: import.meta.env.VITE_QS_ANALYTICS_ENABLED === 'true',
-    webhookUrl: import.meta.env.VITE_QS_ANALYTICS_WEBHOOK_URL ?? '',
-    analyticsKey: import.meta.env.VITE_QS_ANALYTICS_KEY ?? '',
+    endpointUrl: (import.meta.env.VITE_QS_ANALYTICS_ENDPOINT_URL ?? '/api/telemetry').trim() || '/api/telemetry',
   };
 }
 
@@ -74,10 +72,8 @@ export function getAnalyticsConfig(): AnalyticsConfig {
  */
 export function describeAnalyticsConfigProblem(config: AnalyticsConfig): string | null {
   if (config.enabled !== true) return 'VITE_QS_ANALYTICS_ENABLED is not "true" in this build';
-  if (!config.webhookUrl) return 'VITE_QS_ANALYTICS_WEBHOOK_URL is empty in this build';
-  if (config.webhookUrl.includes('example.invalid')) return 'VITE_QS_ANALYTICS_WEBHOOK_URL is still the example.invalid placeholder';
-  if (!config.analyticsKey) return 'VITE_QS_ANALYTICS_KEY is empty in this build';
-  if (config.analyticsKey === 'replace-with-alpha-analytics-key') return 'VITE_QS_ANALYTICS_KEY is still the placeholder value';
+  if (!config.endpointUrl) return 'VITE_QS_ANALYTICS_ENDPOINT_URL is empty in this build';
+  if (config.endpointUrl.includes('example.invalid')) return 'VITE_QS_ANALYTICS_ENDPOINT_URL is still the example.invalid placeholder';
   return null;
 }
 
@@ -112,9 +108,10 @@ function analyticsWarn(message: string) {
   if (isTelemetryDebugMode()) console.warn('[Questory analytics]', message);
 }
 
-function getSafeWebhookHost(webhookUrl: string) {
+function getSafeEndpointLabel(endpointUrl: string) {
+  if (endpointUrl.startsWith('/')) return endpointUrl;
   try {
-    return new URL(webhookUrl).host;
+    return new URL(endpointUrl).host;
   } catch {
     return null;
   }
@@ -196,7 +193,7 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
   // config, nothing is sent — the exact silent gap that makes telemetry "not fire".
   const configProblem = describeAnalyticsConfigProblem(config);
   if (configProblem) {
-    analyticsWarn(`Enabled by the user but no event can be sent: ${configProblem}. Set the VITE_QS_ANALYTICS_* env vars (see .env.example).`);
+    analyticsWarn(`Enabled by the user but no event can be sent: ${configProblem}. Set VITE_QS_ANALYTICS_ENABLED=true and configure the server-side QS_ANALYTICS_WEBHOOK_URL in Vercel.`);
     return;
   }
 
@@ -207,11 +204,11 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
   }
 
   try {
-    const response = await fetcher(config.webhookUrl, {
+    analyticsDebug(`Sending "${event.eventName}"`, { endpoint: getSafeEndpointLabel(config.endpointUrl) });
+    const response = await fetcher(config.endpointUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-make-apikey': config.analyticsKey,
       },
       body: JSON.stringify(event),
       keepalive: true,
@@ -219,13 +216,13 @@ export async function sendAnalyticsEvent(event: MinimalAnalyticsEvent, config = 
       credentials: 'omit',
     });
     if (!response.ok) {
-      analyticsWarn(`Endpoint returned HTTP ${response.status} for "${event.eventName}". Check the webhook URL/API key and that it allows CORS + a custom header from this origin.`);
+      analyticsWarn(`Endpoint returned HTTP ${response.status} for "${event.eventName}". Check /api/telemetry function logs and the server-side Make webhook configuration.`);
     } else {
       analyticsDebug(`Sent "${event.eventName}"`);
     }
   } catch (error) {
-    // Network error or (most often on web) a blocked CORS preflight. Silent in prod.
-    analyticsDebug('Send failed (network or CORS preflight) — failing silently', error);
+    // Network errors are silent in production and must never affect app behavior.
+    analyticsDebug('Send failed — failing silently', error);
   }
 }
 
@@ -237,7 +234,7 @@ export async function runTelemetrySelfTest(fetcher: typeof fetch = fetch, config
     sent: false,
     telemetryEnabled: settings.isAnalyticsEnabled,
     endpointConfigured: !configProblem,
-    requestHost: getSafeWebhookHost(config.webhookUrl),
+    requestHost: getSafeEndpointLabel(config.endpointUrl),
     configProblem: configProblem ?? undefined,
   };
 
@@ -249,7 +246,7 @@ export async function runTelemetrySelfTest(fetcher: typeof fetch = fetch, config
   }
 
   if (configProblem) {
-    analyticsWarn(`Telemetry self-test skipped: ${configProblem}. Vercel production builds must define VITE_QS_ANALYTICS_ENABLED=true, VITE_QS_ANALYTICS_WEBHOOK_URL, and VITE_QS_ANALYTICS_KEY.`);
+    analyticsWarn(`Telemetry self-test skipped: ${configProblem}. Vercel production builds must define VITE_QS_ANALYTICS_ENABLED=true and the Vercel function must define QS_ANALYTICS_WEBHOOK_URL.`);
     return result;
   }
 
@@ -262,11 +259,11 @@ export async function runTelemetrySelfTest(fetcher: typeof fetch = fetch, config
   });
 
   try {
-    const response = await fetcher(config.webhookUrl, {
+    analyticsDebug(`Sending "${event.eventName}"`, { endpoint: getSafeEndpointLabel(config.endpointUrl) });
+    const response = await fetcher(config.endpointUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-make-apikey': config.analyticsKey,
       },
       body: JSON.stringify(event),
       keepalive: true,
@@ -279,7 +276,7 @@ export async function runTelemetrySelfTest(fetcher: typeof fetch = fetch, config
     analyticsDebug('Telemetry self-test completed', result);
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
-    analyticsWarn(`Telemetry self-test failed before an HTTP response was visible. Likely network, CORS/preflight, CSP, offline, or service-worker interference. Host: ${result.requestHost ?? 'unavailable'}. Error: ${result.error}`);
+    analyticsWarn(`Telemetry self-test failed before an HTTP response was visible. Likely network, CSP, offline, ad-blocking, or service-worker interference. Endpoint: ${result.requestHost ?? 'unavailable'}. Error: ${result.error}`);
   }
 
   return result;
