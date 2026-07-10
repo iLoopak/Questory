@@ -11,16 +11,12 @@ export const maxCustomAvatarFileSize = 10 * 1024 * 1024;
 export type BuiltInAvatarId = 'controller' | 'achievement-hunter' | 'retro-explorer' | 'rpg-adventurer' | 'sci-fi-pilot' | 'fantasy-hero' | 'collector' | 'backlog-slayer' | 'curator' | 'platform-hopper' | 'handheld-hero' | 'playing-right-now' | 'metadata-master' | 'art-conservator' | 'queue-commander' | 'century-club';
 export type ShelfAvatarSelection = 'app-icon' | 'steam' | `built-in:${BuiltInAvatarId}` | 'custom';
 
-export type FeaturedGameMode = 'automatic-most-played' | 'automatic-achievement-completion' | 'automatic-recently-played' | 'manual';
-
 export type ShelfIdentitySettings = {
   avatarSelection: ShelfAvatarSelection;
   shelfAvatar: ShelfAvatarSelection;
   customAvatarDataUrl: string;
   shelfName: string;
   selectedActiveBadgeId: QuestShelfAchievementId | '';
-  featuredGameMode: FeaturedGameMode;
-  manualFeaturedGameId: string;
 };
 
 export const builtInAvatars: Array<{ id: BuiltInAvatarId; label: string; icon: string }> = [
@@ -44,8 +40,6 @@ const emptyIdentity: ShelfIdentitySettings = {
   customAvatarDataUrl: '',
   shelfName: '',
   selectedActiveBadgeId: '',
-  featuredGameMode: 'automatic-most-played',
-  manualFeaturedGameId: '',
 };
 
 export function loadShelfIdentitySettings(): ShelfIdentitySettings {
@@ -67,21 +61,7 @@ export function normalizeShelfIdentitySettings(value: unknown): ShelfIdentitySet
     customAvatarDataUrl,
     shelfName: sanitizeShelfNickname(parsed.shelfName),
     selectedActiveBadgeId: normalizeActiveBadgeId(parsed.selectedActiveBadgeId),
-    featuredGameMode: normalizeFeaturedGameMode(parsed.featuredGameMode),
-    manualFeaturedGameId: typeof parsed.manualFeaturedGameId === 'string' ? parsed.manualFeaturedGameId : '',
   };
-}
-
-export function normalizeFeaturedGameMode(value: unknown): FeaturedGameMode {
-  if (
-    value === 'automatic-most-played'
-    || value === 'automatic-achievement-completion'
-    || value === 'automatic-recently-played'
-    || value === 'manual'
-  ) {
-    return value;
-  }
-  return 'automatic-most-played';
 }
 
 function normalizeActiveBadgeId(value: unknown): ShelfIdentitySettings['selectedActiveBadgeId'] {
@@ -129,58 +109,6 @@ export function normalizeAvatarSelection(value: unknown): ShelfAvatarSelection {
 
 export function getComputedShelfTitle(games: Game[]) {
   return getLegacyComputedShelfTitle(games);
-}
-
-
-export function getComputedFeaturedGame(games: Game[]) {
-  return getAutomaticMostPlayedFeaturedGame(getLibraryGames(games));
-}
-
-export function getResolvedFeaturedGame(games: Game[], settings?: Pick<ShelfIdentitySettings, 'featuredGameMode' | 'manualFeaturedGameId'> | null) {
-  const libraryGames = getLibraryGames(games);
-  const mode = normalizeFeaturedGameMode(settings?.featuredGameMode);
-
-  if (mode === 'manual') {
-    const manualGame = libraryGames.find((game) => game.id === settings?.manualFeaturedGameId);
-    if (manualGame) return manualGame;
-    return getAutomaticMostPlayedFeaturedGame(libraryGames);
-  }
-
-  if (mode === 'automatic-achievement-completion') return getHighestAchievementCompletionFeaturedGame(libraryGames);
-  if (mode === 'automatic-recently-played') return getMostRecentlyPlayedFeaturedGame(libraryGames);
-  return getAutomaticMostPlayedFeaturedGame(libraryGames);
-}
-
-function getLibraryGames(games: Game[]) {
-  return games.filter((game) => game.collectionType === 'library');
-}
-
-function getAutomaticMostPlayedFeaturedGame(libraryGames: Game[]) {
-  return libraryGames
-    .map((game) => ({ game, score: getFeaturedGameScore(game) }))
-    .filter(({ score }) => score > 0)
-    .sort((first, second) => second.score - first.score || first.game.title.localeCompare(second.game.title))[0]?.game ?? null;
-}
-
-function getHighestAchievementCompletionFeaturedGame(libraryGames: Game[]) {
-  return libraryGames
-    .filter((game) => typeof game.steamAchievementsPercent === 'number' && typeof game.steamAchievementsTotal === 'number' && game.steamAchievementsTotal > 0)
-    .sort((first, second) => (second.steamAchievementsPercent ?? 0) - (first.steamAchievementsPercent ?? 0) || first.title.localeCompare(second.title))[0] ?? getAutomaticMostPlayedFeaturedGame(libraryGames);
-}
-
-function getMostRecentlyPlayedFeaturedGame(libraryGames: Game[]) {
-  return libraryGames
-    .filter((game) => Boolean(game.lastPlayedAt))
-    .sort((first, second) => Date.parse(second.lastPlayedAt ?? '') - Date.parse(first.lastPlayedAt ?? '') || first.title.localeCompare(second.title))[0] ?? getAutomaticMostPlayedFeaturedGame(libraryGames);
-}
-
-function getFeaturedGameScore(game: Game) {
-  return (game.favorite ? 10_000 : 0)
-    + Math.max(0, game.playtimeHours ?? 0) * 100
-    + (game.status === 'Playing' ? 750 : 0)
-    + (game.status === 'Finished' ? 500 : 0)
-    + (game.rating ?? 0) * 50
-    + (game.steamAchievementsPercent ?? 0);
 }
 
 

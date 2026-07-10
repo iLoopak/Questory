@@ -8,7 +8,7 @@ type HomeRouteProps = {
   queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'openQueue' | 'playQueueGameNow' | 'homeSteamSyncGameIds'>;
   review: Pick<AppRouterReviewModel, 'reviewModeState' | 'startReviewMode'>;
   sync: Pick<AppRouterSyncModel, 'itadDealSyncState' | 'steamAchievementSyncState' | 'steamPlaytimeRefreshState' | 'isImportingNewSteamGames' | 'syncWishlistDeals' | 'importNewSteamGames' | 'syncSteamAchievements' | 'refreshSteamPlaytime'>;
-  shelf: Pick<AppRouterShelfModel, 'personalizedQuestShelfTitle' | 'computedShelfTitle' | 'resolvedFeaturedGame' | 'shelfIdentity' | 'steamAvatarUrl'>;
+  shelf: Pick<AppRouterShelfModel, 'personalizedQuestShelfTitle' | 'computedShelfTitle' | 'shelfIdentity' | 'steamAvatarUrl'>;
   discovery: Pick<AppRouterDiscoveryModel, 'handleSelectDiscoveryGame' | 'openDiscoveryPreview' | 'discoveryInboxRawgIds'>;
 };
 
@@ -17,7 +17,6 @@ export function HomeRoute({ core, games, queue, review, sync, shelf, discovery }
     <HomePanel
       appTitle={shelf.personalizedQuestShelfTitle}
       shelfTitle={shelf.computedShelfTitle}
-      featuredGame={shelf.resolvedFeaturedGame}
       avatar={<ShelfAvatar {...shelf.shelfIdentity} steamAvatarUrl={shelf.steamAvatarUrl} sizeClassName="h-14 w-14" />}
       games={games.games}
       ignoredReviewGameIds={games.reviewIgnoredGameIds}

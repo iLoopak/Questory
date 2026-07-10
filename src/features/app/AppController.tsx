@@ -146,7 +146,6 @@ export function AppController() {
     targetQueuePlatform,
   } = usePlatformQueueController(games);
   const {
-    resolvedFeaturedGame,
     isShelfProfileOpen,
     libraryOwnerNickname,
     personalizedQuestShelfTitle,
@@ -1055,7 +1054,6 @@ export function AppController() {
               <ShelfProfilePopover
                 activeAchievement={activeShelfAchievement}
                 avatar={<ShelfAvatar {...shelfIdentity} steamAvatarUrl={steamAvatarUrl} sizeClassName="h-12 w-12" />}
-                featuredGame={resolvedFeaturedGame}
                 onOpenSettings={openSettingsFromShelfProfile}
                 shelfName={personalizedQuestShelfTitle}
                 shelfOverview={shelfOverview}
@@ -1139,7 +1137,7 @@ export function AppController() {
           queue={{ platformQueueState, queueSummary, activeQueuePlatforms, targetQueuePlatform, homeSteamSyncGameIds, openQueue, openBacklogPicker, addGameToQueue, addQueuePlatform, updateQueueLimit, setPlatformQueueState, moveQueueGame, moveQueueGameToPlatform, playQueueGameNow, updateCurrentlyPlayingGame, removeQueueGame, playGameFromCompactRow, finishGameFromCompactRow, dropGameFromCompactRow }}
           review={{ reviewModeState, activeReviewSource, confirmCancelConvention, handleReviewAction, startReviewMode, setReviewSource, restoreReviewIgnoredGames }}
           sync={{ itadDealSyncState, steamAchievementSyncState, steamPlaytimeRefreshState, steamWishlistSyncState, isImportingNewSteamGames, isHltbSyncing, syncSteamAchievements, refreshSteamPlaytime, syncWishlistDeals, syncSteamWishlist, syncHltb, importNewSteamGames }}
-          shelf={{ personalizedQuestShelfTitle, computedShelfTitle, resolvedFeaturedGame, shelfIdentity, steamAvatarUrl, libraryOwnerNickname, questShelfAchievements, setLibraryOwnerNickname, setShelfIdentity }}
+          shelf={{ personalizedQuestShelfTitle, computedShelfTitle, shelfIdentity, steamAvatarUrl, libraryOwnerNickname, questShelfAchievements, setLibraryOwnerNickname, setShelfIdentity }}
           discovery={{ discoveryInboxItems, discoveryInboxRawgIds, handleSelectDiscoveryGame, openDiscoveryPreview, addToDiscoveryInbox, promoteDiscoveryToWishlist, promoteDiscoveryToPlans, promoteInboxDiscoveryToLibrary, promoteInboxDiscoveryToWishlist, promoteInboxDiscoveryToPlans, handleInboxIgnore }}
           onboarding={{ completedOnboardingItemIds, skippedOnboardingItemIds, isOnboardingOpen, isOnboardingComplete, markOnboardingItemComplete, markOnboardingItemsComplete, hideOnboarding, skipOnboardingItem, handleOnboardingAction, restartOnboarding }}
           settings={{ activeSettingsCategory, autoBackupSignal, setupTasks, runtimeEnvironment, resolvedTheme, themePreference, appTemplatePreference, accentColorPreference, secondaryAccentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, neonButtonStylePreference, language, navigationVisibility, controllerProfileId, detectedProfileId, isControllerDebugEnabled, isLandscapeLockEnabled, steamPersonaName: steamProfileName, setIsRawgApiKeySet, handleSteamProfileNameChange, setNavigationVisibility, setThemePreference, setAppTemplatePreference, setAccentColorPreference, setSecondaryAccentColorPreference, setGradientOrientationPreference, setNeonButtonGradientBalancePreference, setNeonButtonGradientMidpointPreference, setNeonButtonStylePreference, setLanguage, setControllerProfileId, setIsControllerDebugEnabled, setIsLandscapeLockEnabled, handleBackupExported, handleBackupImported, unignoreSteamGame }}

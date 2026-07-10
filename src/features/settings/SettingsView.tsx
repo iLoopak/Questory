@@ -336,7 +336,6 @@ export function SettingsView({
           {activeCategory === 'Retro' ? (
             <div className="space-y-4">
               <RetroImportPanel
-                games={games}
                 importedGamesHiddenByFilters={lastRetroImportsHiddenByFilters}
                 onAddImportedToQueue={onAddRetroImportedToQueue}
                 onClearLibraryFilters={onClearLibraryFilters}
@@ -353,7 +352,6 @@ export function SettingsView({
               <PersonalizationSettingsPanel
                 personalizedQuestShelfTitle={personalizedQuestShelfTitle}
                 shelfIdentity={shelfIdentity}
-                games={games}
                 achievements={questShelfAchievements}
                 activeAchievementTitle={activeAchievementTitle}
                 steamAvatarUrl={steamAvatarUrl}
