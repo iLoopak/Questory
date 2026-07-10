@@ -19,6 +19,11 @@ export interface DiscoveryInboxState {
   nextQueue: DiscoveryInboxItem[];
 }
 
+export interface AppendDiscoveryInboxRecommendationsResult {
+  state: DiscoveryInboxState;
+  addedItems: DiscoveryInboxItem[];
+}
+
 const emptyDiscoveryInboxState: DiscoveryInboxState = {
   activeQueue: [],
   nextQueue: [],
@@ -87,6 +92,64 @@ export function deferDiscoveryInboxItemForFutureSession(state: DiscoveryInboxSta
     activeQueue: removeDiscoveryInboxItemForSession(state.activeQueue, id),
     nextQueue: upsertDeferredDiscoveryInboxItem(state.nextQueue, skippedItem),
   };
+}
+
+export function appendDiscoveryInboxRecommendations(
+  state: DiscoveryInboxState,
+  games: Array<{ game: DiscoveryGame; reason?: string }>,
+): AppendDiscoveryInboxRecommendationsResult {
+  const identitySet = new Set([
+    ...state.activeQueue.map(getDiscoveryInboxItemIdentity),
+    ...state.nextQueue.map(getDiscoveryInboxItemIdentity),
+  ]);
+  const createdAt = Date.now();
+  const addedItems: DiscoveryInboxItem[] = [];
+
+  for (const { game, reason } of games) {
+    const identity = getDiscoveryGameIdentity(game);
+    if (!identity || identitySet.has(identity)) continue;
+    identitySet.add(identity);
+    addedItems.push({
+      id: `inbox-${createdAt}-${game.rawgId}-${addedItems.length}`,
+      rawgId: game.rawgId,
+      game,
+      source: 'recommendation',
+      reason: reason ?? 'Recommended for your Discovery Inbox',
+      createdAt,
+    });
+  }
+
+  if (addedItems.length === 0) return { state, addedItems };
+
+  const stateHasPendingSkippedRun = state.activeQueue.length === 0 && state.nextQueue.length > 0;
+  const nextState = stateHasPendingSkippedRun
+    ? { ...state, nextQueue: [...state.nextQueue, ...addedItems] }
+    : { ...state, activeQueue: [...state.activeQueue, ...addedItems] };
+
+  return { state: nextState, addedItems };
+}
+
+export function getDiscoveryInboxItemIdentity(item: DiscoveryInboxItem): string {
+  return getDiscoveryGameIdentity(item.game) || `rawg:${item.rawgId}`;
+}
+
+export function getDiscoveryGameIdentity(game: DiscoveryGame): string {
+  if (Number.isFinite(game.rawgId) && game.rawgId > 0) return `rawg:${game.rawgId}`;
+  const normalizedTitle = normalizeDiscoveryInboxIdentity(game.title);
+  const normalizedPlatform = normalizeDiscoveryInboxIdentity(game.platforms[0]);
+  if (normalizedPlatform && normalizedTitle) return `platform-title:${normalizedPlatform}:${normalizedTitle}`;
+  return normalizedTitle ? `title:${normalizedTitle}` : '';
+}
+
+function normalizeDiscoveryInboxIdentity(value: string | null | undefined): string {
+  return (value ?? '')
+    .trim()
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 export function restoreDeferredDiscoveryInboxItem(state: DiscoveryInboxState, rawgId: number): DiscoveryInboxState {

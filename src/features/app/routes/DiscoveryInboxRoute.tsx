@@ -3,7 +3,7 @@ import { DiscoveryInboxPanel } from '../../../components/DiscoveryInboxPanel';
 import type { AppRouterDiscoveryModel } from '../AppSectionRouter';
 
 type DiscoveryInboxRouteProps = {
-  discovery: Pick<AppRouterDiscoveryModel, 'discoveryInboxItems' | 'promoteInboxDiscoveryToLibrary' | 'promoteInboxDiscoveryToWishlist' | 'promoteInboxDiscoveryToPlans' | 'handleInboxIgnore' | 'handleInboxSkip' | 'startDiscoveryInboxRun'>;
+  discovery: Pick<AppRouterDiscoveryModel, 'discoveryInboxItems' | 'requestDiscoveryInboxRecommendations' | 'isRequestingDiscoveryInboxRecommendations' | 'promoteInboxDiscoveryToLibrary' | 'promoteInboxDiscoveryToWishlist' | 'promoteInboxDiscoveryToPlans' | 'handleInboxIgnore' | 'handleInboxSkip' | 'startDiscoveryInboxRun'>;
 };
 
 export function DiscoveryInboxRoute({ discovery }: DiscoveryInboxRouteProps) {
@@ -18,6 +18,8 @@ export function DiscoveryInboxRoute({ discovery }: DiscoveryInboxRouteProps) {
       onAddToWishlist={discovery.promoteInboxDiscoveryToWishlist}
       onAddToPlans={discovery.promoteInboxDiscoveryToPlans}
       onIgnore={discovery.handleInboxIgnore}
+      isRequestingRecommendations={discovery.isRequestingDiscoveryInboxRecommendations}
+      onRequestRecommendations={discovery.requestDiscoveryInboxRecommendations}
       onSkip={discovery.handleInboxSkip}
     />
   );

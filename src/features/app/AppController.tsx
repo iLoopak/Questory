@@ -287,6 +287,8 @@ export function AppController() {
     closePreview: closeDiscoveryPreview,
     openPreview: openDiscoveryPreview,
     removeFromInbox: removeFromDiscoveryInbox,
+    requestInboxRecommendations: requestDiscoveryInboxRecommendations,
+    isRequestingInboxRecommendations: isRequestingDiscoveryInboxRecommendations,
     skipInboxItem: skipDiscoveryInboxItem,
     startInboxRun: startDiscoveryInboxRun,
   } = useDiscoveryController({ games, t, addToastNotification });
@@ -1144,7 +1146,7 @@ export function AppController() {
           review={{ reviewModeState, activeReviewSource, confirmCancelConvention, handleReviewAction, startReviewMode, setReviewSource, restoreReviewIgnoredGames }}
           sync={{ itadDealSyncState, steamAchievementSyncState, steamPlaytimeRefreshState, steamWishlistSyncState, isImportingNewSteamGames, isHltbSyncing, syncSteamAchievements, refreshSteamPlaytime, syncWishlistDeals, syncSteamWishlist, syncHltb, importNewSteamGames }}
           shelf={{ personalizedQuestShelfTitle, computedShelfTitle, shelfIdentity, steamAvatarUrl, libraryOwnerNickname, questShelfAchievements, setLibraryOwnerNickname, setShelfIdentity }}
-          discovery={{ discoveryInboxItems, discoveryInboxRawgIds, handleSelectDiscoveryGame, openDiscoveryPreview, addToDiscoveryInbox, promoteDiscoveryToWishlist, promoteDiscoveryToPlans, promoteInboxDiscoveryToLibrary, promoteInboxDiscoveryToWishlist, promoteInboxDiscoveryToPlans, handleInboxIgnore, handleInboxSkip, startDiscoveryInboxRun }}
+          discovery={{ discoveryInboxItems, discoveryInboxRawgIds, requestDiscoveryInboxRecommendations, isRequestingDiscoveryInboxRecommendations, handleSelectDiscoveryGame, openDiscoveryPreview, addToDiscoveryInbox, promoteDiscoveryToWishlist, promoteDiscoveryToPlans, promoteInboxDiscoveryToLibrary, promoteInboxDiscoveryToWishlist, promoteInboxDiscoveryToPlans, handleInboxIgnore, handleInboxSkip, startDiscoveryInboxRun }}
           onboarding={{ completedOnboardingItemIds, skippedOnboardingItemIds, isOnboardingOpen, isOnboardingComplete, markOnboardingItemComplete, markOnboardingItemsComplete, hideOnboarding, skipOnboardingItem, handleOnboardingAction, restartOnboarding }}
           settings={{ activeSettingsCategory, autoBackupSignal, setupTasks, runtimeEnvironment, resolvedTheme, themePreference, appTemplatePreference, accentColorPreference, secondaryAccentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, neonButtonStylePreference, language, navigationVisibility, controllerProfileId, detectedProfileId, isControllerDebugEnabled, isLandscapeLockEnabled, steamPersonaName: steamProfileName, setIsRawgApiKeySet, handleSteamProfileNameChange, setNavigationVisibility, setThemePreference, setAppTemplatePreference, setAccentColorPreference, setSecondaryAccentColorPreference, setGradientOrientationPreference, setNeonButtonGradientBalancePreference, setNeonButtonGradientMidpointPreference, setNeonButtonStylePreference, setLanguage, setControllerProfileId, setIsControllerDebugEnabled, setIsLandscapeLockEnabled, handleBackupExported, handleBackupImported, unignoreSteamGame }}
           metadata={{ metadataSelectionRequest, refreshingMetadataGameIds, updateGameArtwork, updateGameMetadata, updateGameMetadataManagement, refreshGameMetadataFromActions, startMetadataWorkflow, ensureRawgMetadataForGame }}
