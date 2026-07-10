@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { removeDiscoveryInboxItemForSession, type DiscoveryInboxItem } from '../src/lib/discoveryInboxStorage';
+import { deferDiscoveryInboxItemForFutureSession, removeDiscoveryInboxItemForSession, restoreDeferredDiscoveryInboxItem, type DiscoveryInboxItem } from '../src/lib/discoveryInboxStorage';
 
 function makeItem(id: string, rawgId: number): DiscoveryInboxItem {
   return {
@@ -38,4 +38,30 @@ test('skipping the final Discovery Inbox item exhausts the active queue', () => 
   const items = [makeItem('B', 2)];
 
   assert.deepEqual(removeDiscoveryInboxItemForSession(items, 'B'), []);
+});
+
+
+test('skipping a Discovery Inbox item persists it in the deferred queue', () => {
+  const state = {
+    activeQueue: [makeItem('A', 1), makeItem('B', 2), makeItem('C', 3)],
+    deferredQueue: [makeItem('old-skip', 9)],
+  };
+
+  const updated = deferDiscoveryInboxItemForFutureSession(state, 'B');
+
+  assert.deepEqual(updated.activeQueue.map((item) => item.id), ['A', 'C']);
+  assert.deepEqual(updated.deferredQueue.map((item) => item.id), ['old-skip', 'B']);
+});
+
+test('restoring a deferred Discovery Inbox item moves it into the next active queue', () => {
+  const deferredItem = makeItem('B', 2);
+  const state = {
+    activeQueue: [makeItem('A', 1), makeItem('C', 3)],
+    deferredQueue: [deferredItem],
+  };
+
+  const updated = restoreDeferredDiscoveryInboxItem(state, 2);
+
+  assert.deepEqual(updated.activeQueue.map((item) => item.id), ['A', 'C', 'B']);
+  assert.deepEqual(updated.deferredQueue, []);
 });

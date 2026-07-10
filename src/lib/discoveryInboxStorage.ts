@@ -14,7 +14,17 @@ export interface DiscoveryInboxItem {
   createdAt: number;
 }
 
-function normalizeDiscoveryInbox(value: unknown): DiscoveryInboxItem[] {
+export interface DiscoveryInboxState {
+  activeQueue: DiscoveryInboxItem[];
+  deferredQueue: DiscoveryInboxItem[];
+}
+
+const emptyDiscoveryInboxState: DiscoveryInboxState = {
+  activeQueue: [],
+  deferredQueue: [],
+};
+
+function normalizeDiscoveryInboxItems(value: unknown): DiscoveryInboxItem[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is DiscoveryInboxItem =>
     item != null &&
@@ -26,14 +36,63 @@ function normalizeDiscoveryInbox(value: unknown): DiscoveryInboxItem[] {
   );
 }
 
+function normalizeDiscoveryInboxState(value: unknown): DiscoveryInboxState {
+  if (Array.isArray(value)) {
+    return { ...emptyDiscoveryInboxState, activeQueue: normalizeDiscoveryInboxItems(value) };
+  }
+
+  if (value == null || typeof value !== 'object') return emptyDiscoveryInboxState;
+
+  return {
+    activeQueue: normalizeDiscoveryInboxItems((value as DiscoveryInboxState).activeQueue),
+    deferredQueue: normalizeDiscoveryInboxItems((value as DiscoveryInboxState).deferredQueue),
+  };
+}
+
+export function loadDiscoveryInboxState(): DiscoveryInboxState {
+  return loadLocalJson(STORAGE_KEY, emptyDiscoveryInboxState, normalizeDiscoveryInboxState);
+}
+
+export function saveDiscoveryInboxState(state: DiscoveryInboxState): void {
+  savePersistedJson(STORAGE_KEY, normalizeDiscoveryInboxState(state));
+}
+
 export function loadDiscoveryInbox(): DiscoveryInboxItem[] {
-  return loadLocalJson(STORAGE_KEY, [], normalizeDiscoveryInbox);
+  return loadDiscoveryInboxState().activeQueue;
 }
 
 export function saveDiscoveryInbox(items: DiscoveryInboxItem[]): void {
-  savePersistedJson(STORAGE_KEY, items);
+  const currentState = loadDiscoveryInboxState();
+  saveDiscoveryInboxState({ ...currentState, activeQueue: items });
 }
 
 export function removeDiscoveryInboxItemForSession(items: DiscoveryInboxItem[], id: string): DiscoveryInboxItem[] {
   return items.filter((item) => item.id !== id);
+}
+
+export function deferDiscoveryInboxItemForFutureSession(state: DiscoveryInboxState, id: string): DiscoveryInboxState {
+  const skippedItem = state.activeQueue.find((item) => item.id === id);
+  if (!skippedItem) return state;
+
+  return {
+    activeQueue: removeDiscoveryInboxItemForSession(state.activeQueue, id),
+    deferredQueue: upsertDeferredDiscoveryInboxItem(state.deferredQueue, skippedItem),
+  };
+}
+
+export function restoreDeferredDiscoveryInboxItem(state: DiscoveryInboxState, rawgId: number): DiscoveryInboxState {
+  const deferredItem = state.deferredQueue.find((item) => item.rawgId === rawgId);
+  if (!deferredItem || state.activeQueue.some((item) => item.rawgId === rawgId)) return state;
+
+  return {
+    activeQueue: [...state.activeQueue, deferredItem],
+    deferredQueue: state.deferredQueue.filter((item) => item.rawgId !== rawgId),
+  };
+}
+
+function upsertDeferredDiscoveryInboxItem(items: DiscoveryInboxItem[], item: DiscoveryInboxItem): DiscoveryInboxItem[] {
+  const existingIndex = items.findIndex((currentItem) => currentItem.rawgId === item.rawgId);
+  if (existingIndex < 0) return [...items, item];
+
+  return items.map((currentItem, index) => (index === existingIndex ? item : currentItem));
 }
