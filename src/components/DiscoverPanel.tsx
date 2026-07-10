@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Game } from '../types/game';
-import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../lib/discovery';
-import { GameCard } from './GameCard';
+import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
+import { DiscoverGameCard } from './discovery/DiscoverGameCard';
 import { EmptyState } from './EmptyState';
-import { RatingBadgeStack } from './RatingBadgeStack';
 import { useI18n, type TFunction } from '../i18n';
 import {
   fetchTrendingGames,
@@ -31,17 +30,17 @@ function getDiscoveryContext(candidate: DiscoveryCandidate, t: TFunction): strin
   return candidate.reason ?? undefined;
 }
 
-// ── Loading skeleton (proportions match GameCard) ─────────────────────────────
+// ── Loading skeleton (proportions match DiscoverGameCard) ─────────────────────
 
 function DiscoverGridSkeleton() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2.5 sm:gap-3">
       {Array.from({ length: 12 }, (_, i) => (
         <div
           key={i}
-          className="qs-glass min-h-[260px] overflow-hidden rounded-lg border sm:min-h-[292px]"
+          className="qs-glass min-h-[292px] overflow-hidden rounded-lg border"
         >
-          <div className="aspect-[16/9] max-h-32 animate-pulse bg-ink-800 sm:max-h-36" />
+          <div className="aspect-[16/9] max-h-36 animate-pulse bg-ink-800" />
           <div className="space-y-2 p-3 sm:p-3.5">
             <div className="h-5 w-3/4 animate-pulse rounded bg-ink-800" />
             <div className="mt-2 h-5 w-1/2 animate-pulse rounded bg-ink-800" />
@@ -108,11 +107,6 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [games, discoveryInboxRawgIds, t, releaseRefreshToken]);
 
-  const adaptedGames = useMemo(
-    () => (candidates ?? []).map((c) => discoveryCandidateToGame(c, games, 'discover')),
-    [candidates, games],
-  );
-
   return (
     <div className="space-y-8 px-3 pb-24 pt-4">
       <ReleaseCalendarSection
@@ -144,24 +138,19 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2.5 sm:gap-3">
-            {candidates.map((candidate, i) => {
-              const game = adaptedGames[i];
-              if (!game) return null;
-
+            {candidates.map((candidate) => {
               const canAddToInbox =
                 !candidate.libraryStatus && !candidate.inboxStatus && onAddToInbox != null;
-              const metacritic = candidate.game.metacritic;
               const context = getDiscoveryContext(candidate, t);
 
               return (
-                <GameCard
-                  key={game.id}
-                  game={game}
-                  suppressWantToPlayStatus={candidate.libraryStatus === null}
-                  detailsLabel={t('action.preview')}
-                  hideActionMenu
-                  onOpenDetails={() => onOpenGame(candidate)}
-                  primaryAction={
+                <DiscoverGameCard
+                  key={candidate.game.rawgId}
+                  game={candidate.game}
+                  context={context}
+                  contextTone={candidate.inboxStatus ? 'status' : 'muted'}
+                  primaryAction={{ label: t('action.preview'), onClick: () => onOpenGame(candidate) }}
+                  secondaryAction={
                     canAddToInbox
                       ? {
                           label: t('action.reviewLater'),
@@ -169,16 +158,6 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
                         }
                       : undefined
                   }
-                  coverBadgeTopRight={
-                    <RatingBadgeStack
-                      className="absolute right-3 top-3 z-10 items-end"
-                      game={game}
-                      metacriticScore={metacritic}
-                    />
-                  }
-                  suppressRawgRatingBadge
-                  discoveryContext={context}
-                  discoveryContextTone="muted"
                 />
               );
             })}
@@ -251,31 +230,20 @@ function ReleaseCalendarSection({
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2.5 sm:gap-3">
         {candidates.slice(0, 6).map((candidate) => {
-          const game = discoveryCandidateToGame(candidate, [], 'discover');
           return (
-            <GameCard
+            <DiscoverGameCard
               key={candidate.game.rawgId}
-              game={game}
-              suppressWantToPlayStatus
-              detailsLabel="Preview"
-              hideActionMenu
-              onOpenDetails={() => onOpenGame(candidate)}
-              primaryAction={onAddToWishlist ? { label: 'Wishlist', onClick: () => onAddToWishlist(candidate.game) } : undefined}
-              secondaryActions={[
-                ...(onAddToPlans ? [{ label: 'Plan', onClick: () => onAddToPlans(candidate.game) }] : []),
+              game={candidate.game}
+              variant="upcoming"
+              meta={<span className="inline-flex rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-xs font-bold text-mint">{formatReleaseDate(candidate.game.released)}</span>}
+              context={candidate.reason ?? 'Matched to your library taste'}
+              contextTone="accent"
+              primaryAction={{ label: 'Preview', onClick: () => onOpenGame(candidate) }}
+              secondaryAction={onAddToPlans ? { label: 'Plan', onClick: () => onAddToPlans(candidate.game) } : onAddToWishlist ? { label: 'Wishlist', onClick: () => onAddToWishlist(candidate.game) } : undefined}
+              overflowActions={[
+                ...(onAddToWishlist && onAddToPlans ? [{ label: 'Wishlist', onClick: () => onAddToWishlist(candidate.game) }] : []),
                 { label: 'Ignore', onClick: () => onIgnore(candidate), tone: 'danger' as const },
               ]}
-              coverBadgeTopRight={
-                <RatingBadgeStack
-                  className="absolute right-3 top-3 z-10 items-end"
-                  game={game}
-                  metacriticScore={candidate.game.metacritic}
-                />
-              }
-              suppressRawgRatingBadge
-              metaEyebrow={<span className="inline-flex rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-xs font-bold text-mint">{formatReleaseDate(candidate.game.released)}</span>}
-              discoveryContext={candidate.reason ?? 'Matched to your library taste'}
-              discoveryContextTone="accent"
             />
           );
         })}
