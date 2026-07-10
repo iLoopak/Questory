@@ -12,8 +12,6 @@ import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache'
 // ---------------------------------------------------------------------------
 
 const TARGET_PERSONAL_RECOMMENDATIONS = 12;
-const PERSONALIZED_FLOOR_BEFORE_TRENDING = 10;
-const TRENDING_FALLBACK_LIMIT_WITH_PERSONALIZED = 2;
 const DEBUG_RECOMMENDATIONS = import.meta.env.DEV && import.meta.env.VITE_DEBUG_RECOMMENDATIONS === 'true';
 
 type CandidateSource =
@@ -22,8 +20,7 @@ type CandidateSource =
   | 'plans-wishlist'
   | 'recently-interacted'
   | 'affinity-relaxed'
-  | 'second-order'
-  | 'trending-fallback';
+  | 'second-order';
 
 type ScoredCandidate = {
   result: RawgSearchResult;
@@ -40,6 +37,55 @@ function debugRecommendationPipeline(events: DebugEvent[]): void {
   console.groupCollapsed(`[QuestShelf recommendations] ${events.length} pipeline events`);
   for (const event of events) console.debug(event);
   console.groupEnd();
+}
+
+type RecommendationInputCounts = {
+  libraryCount: number;
+  finishedCount: number;
+  ratedCount: number;
+  playingCount: number;
+  platformPlanCount: number;
+  wishlistCount: number;
+};
+
+type RecommendationReportOptions = {
+  fromCache?: boolean;
+  finalCandidates: DiscoveryCandidate[];
+  normalizedCandidates?: DiscoveryCandidate[];
+  seedTitles?: string[];
+  rawPersonalizedCandidateCount?: number;
+  normalizedCandidateCount?: number;
+};
+
+function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions): void {
+  if (!DEBUG_RECOMMENDATIONS) return;
+  const rejected = events.filter((event) => event.event === 'candidate_rejected');
+  const reasonIncludes = (fragment: string) => rejected.filter((event) => String(event.reason ?? '').includes(fragment)).length;
+  const report = {
+    ...counts,
+    seedCount: options.seedTitles?.length ?? 0,
+    seedTitles: options.seedTitles ?? [],
+    rawPersonalizedCandidateCount: options.rawPersonalizedCandidateCount ?? events.filter((event) => event.event === 'candidate_accepted').length,
+    normalizedCandidateCount: options.normalizedCandidateCount ?? options.finalCandidates.length,
+    excludedCounts: {
+      owned: rejected.filter((event) => event.reason === 'owned' || event.reason === 'wishlist').length,
+      finished: rejected.filter((event) => event.reason === 'finished').length,
+      ignored: 0,
+      dropped: rejected.filter((event) => event.reason === 'dropped').length,
+      duplicate: rejected.filter((event) => event.reason === 'duplicate').length,
+      missingMetadata: 0,
+      lowScore: reasonIncludes('below-threshold'),
+      platformMismatch: 0,
+      alreadyInDiscoveryInbox: (options.normalizedCandidates ?? options.finalCandidates).filter((candidate) => candidate.inboxStatus).length,
+    },
+    finalPersonalizedCount: options.finalCandidates.length,
+    trendingFallbackTriggered: false,
+    trendingFallbackReason: null,
+    finalRenderedSources: [...new Set(options.finalCandidates.map((candidate) => candidate.source ?? 'personalized'))],
+    fromCache: options.fromCache === true,
+  };
+  console.debug('[QuestShelf recommendations] diagnostic report', report);
+  debugRecommendationPipeline(events);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +143,6 @@ export function scorePersonalRecommendationCandidate(
 }
 
 function generateReason(result: RawgSearchResult, score: RecommendationScore, profile: UserProfile, source: CandidateSource, anchorTitle?: string): string {
-  if (source === 'trending-fallback') return 'Trending fallback';
   if (anchorTitle && source === 'liked-game-similar') return `Because you liked ${anchorTitle}`;
   if (anchorTitle && source === 'plans-wishlist') return `Related to your interest in ${anchorTitle}`;
   if (anchorTitle && source === 'recently-interacted') return `Similar to ${anchorTitle}`;
@@ -158,18 +203,18 @@ async function collectFromResults(
       events.push({ event: 'candidate_rejected', source, rawgId: result.id, title: result.name, score: score.total, reason: libraryMatch.reason });
       continue;
     }
-    if (score.total < options.minScore && source !== 'trending-fallback') {
+    if (score.total < options.minScore) {
       events.push({ event: 'candidate_rejected', source, rawgId: result.id, title: result.name, score: score.total, reason: `below-threshold:${options.minScore}` });
       continue;
     }
     seen.add(result.id);
     output.push({ result, score, source, anchorTitle: options.anchorTitle, reason: generateReason(result, score, profile, source, options.anchorTitle) });
-    events.push({ event: 'candidate_accepted', source, rawgId: result.id, title: result.name, score: score.total, reason: output.at(-1)?.reason });
+    events.push({ event: 'candidate_accepted', source, rawgId: result.id, title: result.name, score: score.total, reason: output.at(-1)?.reason, anchorTitle: options.anchorTitle });
   }
   return output;
 }
 
-function applyDiversityFilter(scored: ScoredCandidate[], max: number, events: DebugEvent[], hasPersonalizedCandidates = true): ScoredCandidate[] {
+function applyDiversityFilter(scored: ScoredCandidate[], max: number, events: DebugEvent[]): ScoredCandidate[] {
   const genreCounts = new Map<string, number>();
   const sourceCounts = new Map<CandidateSource, number>();
   const output: ScoredCandidate[] = [];
@@ -178,7 +223,7 @@ function applyDiversityFilter(scored: ScoredCandidate[], max: number, events: De
     const primaryGenre = item.result.genres?.[0]?.name ?? 'unknown';
     const genreCount = genreCounts.get(primaryGenre) ?? 0;
     const sourceCount = sourceCounts.get(item.source) ?? 0;
-    const sourceLimit = item.source === 'trending-fallback' ? (hasPersonalizedCandidates ? TRENDING_FALLBACK_LIMIT_WITH_PERSONALIZED : max) : 5;
+    const sourceLimit = 5;
     if (genreCount >= 3) {
       events.push({ event: 'candidate_rejected', source: item.source, rawgId: item.result.id, title: item.result.name, score: item.score.total, reason: `genre-diversity:${primaryGenre}` });
       continue;
@@ -217,32 +262,47 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
   const profile = buildUserProfile(userGames);
   const fp = profileFingerprint(userGames);
   const events: DebugEvent[] = [];
+  const counts = {
+    libraryCount: userGames.filter((game) => game.collectionType === 'library').length,
+    finishedCount: userGames.filter((game) => game.status === 'Finished').length,
+    ratedCount: userGames.filter((game) => typeof game.rating === 'number' && game.rating > 0).length,
+    playingCount: userGames.filter((game) => game.status === 'Playing').length,
+    platformPlanCount: userGames.filter((game) => game.status === 'Want to play').length,
+    wishlistCount: userGames.filter((game) => game.collectionType === 'wishlist').length,
+  };
 
   const freshCache = await getFreshCacheEntry(fp);
   if (freshCache) {
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
-    debugRecommendationPipeline(events);
-    return applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score));
+    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: freshCache.candidates });
+    return applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
   }
 
-  if (profile.topGenres.length === 0) return [];
+  if (profile.topGenres.length === 0) {
+    events.push({ event: 'pipeline_stopped', reason: 'no-profile-genres' });
+    debugRecommendationReport(events, counts, { finalCandidates: [] });
+    return [];
+  }
 
+  const likedSeeds = getPositiveSignalGames(userGames).slice(0, 5);
+  const planWishlistSeeds = getPlanAndWishlistGames(userGames);
+  const recentSeeds = getRecentlyInteractedGames(userGames);
+  const seedTitles = [...likedSeeds, ...planWishlistSeeds, ...recentSeeds].map((game) => game.title);
   const seen = new Set<number>();
   const collected: ScoredCandidate[] = [];
   const addStage = async (name: CandidateSource, producer: () => Promise<Array<{ results: RawgSearchResult[]; anchorTitle?: string }>>, minScore: number, relaxation = 0) => {
-    if (collected.length >= PERSONALIZED_FLOOR_BEFORE_TRENDING) return;
     const before = collected.length;
     for (const batch of await producer()) collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle }));
     events.push({ event: 'stage_complete', source: name, produced: collected.length - before, totalPersonalized: collected.length, minScore, relaxation });
   };
 
-  await addStage('liked-game-similar', async () => Promise.all(getPositiveSignalGames(userGames).slice(0, 5).map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 22);
+  await addStage('liked-game-similar', async () => Promise.all(likedSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 22);
 
   await addStage('affinity-strict', async () => [{ results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 3).map((g) => g.slug).join(','), tags: profile.topTags.slice(0, 5).join(',') || undefined, metacriticMin: profile.avgMetacritic != null && profile.avgMetacritic >= 70 ? Math.max(55, profile.avgMetacritic - 18) : undefined, pageSize: 40 }) }], 24);
 
-  await addStage('plans-wishlist', async () => Promise.all(getPlanAndWishlistGames(userGames).map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 18, 1);
+  await addStage('plans-wishlist', async () => Promise.all(planWishlistSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 18, 1);
 
-  await addStage('recently-interacted', async () => Promise.all(getRecentlyInteractedGames(userGames).map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 16, 1);
+  await addStage('recently-interacted', async () => Promise.all(recentSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 16, 1);
 
   await addStage('affinity-relaxed', async () => [
     { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), pageSize: 40 }) },
@@ -252,21 +312,12 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
 
   await addStage('second-order', async () => Promise.all(collected.slice(0, 3).map(async (item) => ({ anchorTitle: item.result.name, results: await fetchSuggestedGames(item.result.id) }))), 10, 3);
 
-  let ranked = collected.sort((a, b) => b.score.total - a.score.total);
-  const personalizedCountBeforeTrending = ranked.length;
-  if (ranked.length < PERSONALIZED_FLOOR_BEFORE_TRENDING) {
-    events.push({ event: 'fallback_considered', fallback: 'trending', personalizedCandidates: ranked.length, reason: `below-floor:${PERSONALIZED_FLOOR_BEFORE_TRENDING}` });
-    const trending = await collectFromResults(await fetchRecommendedGames({ ordering: '-added', pageSize: 24 }), 'trending-fallback', profile, userGames, seen, events, { minScore: 0, relaxation: 3 });
-    const allowedTrending = ranked.length > 0 ? Math.min(TRENDING_FALLBACK_LIMIT_WITH_PERSONALIZED, TARGET_PERSONAL_RECOMMENDATIONS - ranked.length) : TARGET_PERSONAL_RECOMMENDATIONS;
-    ranked = [...ranked, ...trending.slice(0, Math.max(0, allowedTrending))];
-    events.push({ event: 'fallback_selected', fallback: 'trending', added: Math.max(0, ranked.length - personalizedCountBeforeTrending), personalizedCandidates: personalizedCountBeforeTrending });
-  }
-
-  const diverse = applyDiversityFilter(ranked, TARGET_PERSONAL_RECOMMENDATIONS, events, personalizedCountBeforeTrending > 0);
-  const candidates = applyLibraryStatus(diverse.map(({ result }) => mapRawgResult(result)), userGames, diverse.map(({ reason }) => reason), inboxRawgIds, diverse.map(({ score }) => score.total));
-  const pool = candidates.filter((c) => !c.excluded);
-  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.filter((c) => c.source !== 'trending-fallback').length, trending: diverse.filter((c) => c.source === 'trending-fallback').length });
-  debugRecommendationPipeline(events);
+  const ranked = collected.sort((a, b) => b.score.total - a.score.total);
+  const diverse = applyDiversityFilter(ranked, TARGET_PERSONAL_RECOMMENDATIONS, events);
+  const candidates = applyLibraryStatus(diverse.map(({ result }) => mapRawgResult(result)), userGames, diverse.map(({ reason }) => reason), inboxRawgIds, diverse.map(({ score }) => score.total), diverse.map(({ source }) => source));
+  const pool = candidates.filter((c) => !c.excluded && !c.inboxStatus);
+  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: 0 });
+  debugRecommendationReport(events, counts, { finalCandidates: pool, normalizedCandidates: candidates, seedTitles, rawPersonalizedCandidateCount: collected.length, normalizedCandidateCount: candidates.length });
 
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
   return pool;
@@ -278,6 +329,7 @@ function applyLibraryStatus(
   reasons?: (string | undefined)[],
   inboxRawgIds: Set<number> = new Set(),
   scores?: number[],
+  sources?: Array<CandidateSource | undefined>,
 ): DiscoveryCandidate[] {
   return games.map((game, i) => {
     const match = userGames.find((g) => g.rawgId === game.rawgId);
@@ -289,6 +341,6 @@ function applyLibraryStatus(
       excluded = true;
       exclusionReason = match.status === 'Dropped' ? 'dropped' : match.status === 'Finished' ? 'finished' : match.collectionType === 'wishlist' ? 'wishlist' : 'owned';
     }
-    return { game, libraryStatus, inboxStatus, excluded, exclusionReason, score: scores?.[i] ?? (libraryStatus === null ? 0 : -30), reason: reasons?.[i] };
+    return { game, libraryStatus, inboxStatus, excluded, exclusionReason, score: scores?.[i] ?? (libraryStatus === null ? 0 : -30), reason: reasons?.[i], source: sources?.[i] };
   });
 }

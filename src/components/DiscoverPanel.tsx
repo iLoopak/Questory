@@ -4,11 +4,6 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 import { DiscoverGameCard } from './discovery/DiscoverGameCard';
 import { EmptyState } from './EmptyState';
 import { useI18n, type TFunction } from '../i18n';
-import {
-  fetchTrendingGames,
-  fetchHiddenGems,
-  fetchRecentlyReleasedGames,
-} from '../services/discoverFeedsService';
 import { fetchPersonalRecommendations } from '../services/personalRecommendationsService';
 import { fetchPersonalizedReleaseCalendar, ignoreReleaseCalendarGame } from '../services/releaseCalendarService';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
@@ -31,6 +26,8 @@ function getDiscoveryContext(candidate: DiscoveryCandidate, t: TFunction): strin
 }
 
 // ── Loading skeleton (proportions match DiscoverGameCard) ─────────────────────
+
+const DEV_RECOMMENDATION_EMPTY_STATE = import.meta.env.DEV;
 
 function DiscoverGridSkeleton() {
   return (
@@ -67,24 +64,16 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
       fetchPersonalRecommendations(games, discoveryInboxRawgIds).catch(
         (): DiscoveryCandidate[] => [],
       ),
-      fetchTrendingGames(games, discoveryInboxRawgIds).catch((): DiscoveryCandidate[] => []),
-      fetchHiddenGems(games, discoveryInboxRawgIds).catch((): DiscoveryCandidate[] => []),
-      fetchRecentlyReleasedGames(games, discoveryInboxRawgIds).catch(
-        (): DiscoveryCandidate[] => [],
-      ),
-    ]).then(([releaseCalendar, recommended, trending, hiddenGems, recent]) => {
+    ]).then(([releaseCalendar, recommended]) => {
       if (cancelled) return;
 
-      // Deduplicate by rawgId. Priority: Recommended > Trending > Hidden Gem > Recent.
+      // Deduplicate personalized recommendations only. Trending is intentionally
+      // not used as a visible fallback for this section; development should show
+      // an honest empty state when personalization returns no valid candidates.
       const seen = new Set<number>();
       const all: DiscoveryCandidate[] = [];
 
-      const tagged = [
-        ...recommended,
-        ...trending.map((c) => ({ ...c, reason: c.reason ?? t('discover.reason.trending') })),
-        ...hiddenGems.map((c) => ({ ...c, reason: c.reason ?? t('discover.reason.hiddenGem') })),
-        ...recent.map((c) => ({ ...c, reason: c.reason ?? t('discover.reason.recentlyReleased') })),
-      ];
+      const tagged = recommended;
 
       for (const c of tagged) {
         if (seen.has(c.game.rawgId)) continue;
@@ -132,8 +121,8 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
           <div className="mx-auto max-w-md py-16">
             <EmptyState
               icon="compass"
-              title={t('discover.empty.title')}
-              text={t('discover.empty.text')}
+              title={DEV_RECOMMENDATION_EMPTY_STATE ? 'No personalized recommendations produced' : t('discover.empty.title')}
+              text={DEV_RECOMMENDATION_EMPTY_STATE ? 'Trending fallback is disabled for debugging; check the recommendation diagnostic report for pipeline counts and exclusions.' : t('discover.empty.text')}
             />
           </div>
         ) : (
