@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Game } from '../types/game';
 import { isMissingOrGeneratedCover } from '../lib/gameCoverImages';
@@ -121,95 +121,23 @@ function ScreenshotLightbox({ screenshots, initialIndex, gameTitle, onClose }: L
 
 // ─── Strip ────────────────────────────────────────────────────────────────────
 
-type ScreenshotStripProps = {
-  game: Game;
-  className?: string;
-};
-
-export function ScreenshotStrip({ game, className = '' }: ScreenshotStripProps) {
-  const { screenshots, loading, refetch } = useGameScreenshots(game);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
-
-  // Show "Find screenshots" prompt only for games with missing/generated cover art
-  // and no screenshots after the fetch resolves.
-  const hasMissingArt = isMissingOrGeneratedCover(game.coverImage);
-  const showFindPrompt = !loading && screenshots.length === 0 && hasMissingArt;
-
-  // Return null when there's nothing to show and no prompt to display.
-  if (!loading && screenshots.length === 0 && !showFindPrompt) return null;
-
-  return (
-    <div className={`screenshot-strip ${className}`} ref={stripRef}>
-      {loading ? (
-        // Skeleton placeholders
-        <div aria-hidden="true" className="flex gap-1.5 overflow-hidden">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-12 w-[5.5rem] flex-shrink-0 animate-pulse rounded-lg bg-white/8"
-            />
-          ))}
-        </div>
-      ) : screenshots.length > 0 ? (
-        // Screenshot thumbnails
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-          {screenshots.map((url, i) => (
-            <button
-              key={url}
-              aria-label={`View screenshot ${i + 1} of ${screenshots.length} for ${game.title}`}
-              className="group flex-shrink-0 overflow-hidden rounded-lg border border-white/10 transition hover:border-white/30 focus-visible:border-accent focus-visible:outline-none"
-              onClick={() => setLightboxIndex(i)}
-              type="button"
-            >
-              <img
-                alt=""
-                aria-hidden="true"
-                className="h-12 w-[5.5rem] object-cover transition group-hover:brightness-110"
-                decoding="async"
-                draggable={false}
-                loading="lazy"
-                src={url}
-              />
-            </button>
-          ))}
-        </div>
-      ) : (
-        // "Find screenshots" prompt for games with no art and no screenshots
-        <button
-          className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-slate-200 focus-visible:border-accent focus-visible:outline-none"
-          onClick={refetch}
-          type="button"
-        >
-          <Icon name="image" />
-          Find screenshots
-        </button>
-      )}
-
-      {lightboxIndex !== null && (
-        <ScreenshotLightbox
-          gameTitle={game.title}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          screenshots={screenshots}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── Discovery variant ────────────────────────────────────────────────────────
-// Same thumbnail strip + lightbox, but accepts a rawgId instead of a Game.
-// Shares the screenshot cache with ScreenshotStrip so entries are reused.
-
-type DiscoveryScreenshotStripProps = {
-  rawgId: number;
+type GameScreenshotGalleryProps = {
   title: string;
+  screenshots: string[];
+  loading?: boolean;
   className?: string;
+  skeletonCount?: number;
+  thumbnailClassName?: string;
 };
 
-export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: DiscoveryScreenshotStripProps) {
-  const { screenshots, loading } = useDiscoveryScreenshots(rawgId);
+export function GameScreenshotGallery({
+  title,
+  screenshots,
+  loading = false,
+  className = '',
+  skeletonCount = 3,
+  thumbnailClassName = 'h-12 w-[5.5rem]',
+}: GameScreenshotGalleryProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   if (!loading && screenshots.length === 0) return null;
@@ -218,8 +146,11 @@ export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: Disc
     <div className={`screenshot-strip ${className}`}>
       {loading ? (
         <div aria-hidden="true" className="flex gap-1.5 overflow-hidden">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-12 w-[5.5rem] flex-shrink-0 animate-pulse rounded-lg bg-white/8" />
+          {Array.from({ length: skeletonCount }).map((_, i) => (
+            <div
+              key={i}
+              className={`${thumbnailClassName} flex-shrink-0 animate-pulse rounded-lg bg-white/8`}
+            />
           ))}
         </div>
       ) : (
@@ -229,13 +160,17 @@ export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: Disc
               key={url}
               aria-label={`View screenshot ${i + 1} of ${screenshots.length} for ${title}`}
               className="group flex-shrink-0 overflow-hidden rounded-lg border border-white/10 transition hover:border-white/30 focus-visible:border-accent focus-visible:outline-none"
-              onClick={() => setLightboxIndex(i)}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setLightboxIndex(i);
+              }}
               type="button"
             >
               <img
                 alt=""
                 aria-hidden="true"
-                className="h-12 w-[5.5rem] object-cover transition group-hover:brightness-110"
+                className={`${thumbnailClassName} object-cover transition group-hover:brightness-110`}
                 decoding="async"
                 draggable={false}
                 loading="lazy"
@@ -255,5 +190,62 @@ export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: Disc
         />
       )}
     </div>
+  );
+}
+
+type ScreenshotStripProps = {
+  game: Game;
+  className?: string;
+};
+
+export function ScreenshotStrip({ game, className = '' }: ScreenshotStripProps) {
+  const { screenshots, loading, refetch } = useGameScreenshots(game);
+
+  // Show "Find screenshots" prompt only for games with missing/generated cover art
+  // and no screenshots after the fetch resolves.
+  const hasMissingArt = isMissingOrGeneratedCover(game.coverImage);
+  const showFindPrompt = !loading && screenshots.length === 0 && hasMissingArt;
+
+  // Return null when there's nothing to show and no prompt to display.
+  if (!loading && screenshots.length === 0 && !showFindPrompt) return null;
+
+  if (loading || screenshots.length > 0) {
+    return <GameScreenshotGallery className={className} loading={loading} screenshots={screenshots} title={game.title} />;
+  }
+
+  return (
+    <div className={`screenshot-strip ${className}`}>
+      <button
+        className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-slate-200 focus-visible:border-accent focus-visible:outline-none"
+        onClick={refetch}
+        type="button"
+      >
+        <Icon name="image" />
+        Find screenshots
+      </button>
+    </div>
+  );
+}
+
+// ─── Discovery variant ────────────────────────────────────────────────────────
+// Same thumbnail strip + lightbox, but accepts a rawgId instead of a Game.
+// Shares the screenshot cache with ScreenshotStrip so entries are reused.
+
+type DiscoveryScreenshotStripProps = {
+  rawgId: number;
+  title: string;
+  className?: string;
+};
+
+export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: DiscoveryScreenshotStripProps) {
+  const { screenshots, loading } = useDiscoveryScreenshots(rawgId);
+
+  return (
+    <GameScreenshotGallery
+      className={className}
+      loading={loading}
+      screenshots={screenshots}
+      title={title}
+    />
   );
 }
