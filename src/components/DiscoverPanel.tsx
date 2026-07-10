@@ -4,7 +4,7 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 import { DiscoverGameCard } from './discovery/DiscoverGameCard';
 import { EmptyState } from './EmptyState';
 import { useI18n, type TFunction } from '../i18n';
-import { fetchPersonalRecommendations } from '../services/personalRecommendationsService';
+import { fetchPersonalRecommendations, reportRecommendationSurfaceDiagnostics } from '../services/personalRecommendationsService';
 import { fetchPersonalizedReleaseCalendar, ignoreReleaseCalendarGame } from '../services/releaseCalendarService';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 
@@ -67,9 +67,9 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
     ]).then(([releaseCalendar, recommended]) => {
       if (cancelled) return;
 
-      // Deduplicate personalized recommendations only. Trending is intentionally
-      // not used as a visible fallback for this section; development should show
-      // an honest empty state when personalization returns no valid candidates.
+      // Deduplicate the shared recommendation result. The service owns the
+      // source waterfall (personalized, broad discovery, stale cache, trending)
+      // so Home, Discover, and Discovery Inbox consume the same pipeline.
       const seen = new Set<number>();
       const all: DiscoveryCandidate[] = [];
 
@@ -84,6 +84,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
         }
       }
 
+      reportRecommendationSurfaceDiagnostics('discover', all.length, all.length > 0 ? 'rendered' : 'empty-after-discover-selector');
       setUpcoming(releaseCalendar);
       setCandidates(all);
     });

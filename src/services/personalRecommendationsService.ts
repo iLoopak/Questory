@@ -20,7 +20,9 @@ type CandidateSource =
   | 'plans-wishlist'
   | 'recently-interacted'
   | 'affinity-relaxed'
-  | 'second-order';
+  | 'second-order'
+  | 'broad-discovery'
+  | 'trending';
 
 type ScoredCandidate = {
   result: RawgSearchResult;
@@ -31,6 +33,61 @@ type ScoredCandidate = {
 };
 
 type DebugEvent = Record<string, unknown> & { event: string };
+
+type RecommendationSurface = 'service' | 'home' | 'discover' | 'discovery-inbox';
+
+type RecommendationDiagnosticsReport = {
+  hydrationReady: boolean;
+  libraryCount: number;
+  finishedCount: number;
+  playingCount: number;
+  plannedCount: number;
+  wishlistCount: number;
+  seedCount: number;
+  providerCandidateCount: number;
+  localAffinityCandidateCount: number;
+  broadDiscoveryCandidateCount: number;
+  trendingCandidateCount: number;
+  normalizedCount: number;
+  excludedCounts: {
+    owned: number;
+    finished: number;
+    dropped: number;
+    ignored: number;
+    discoveryInbox: number;
+    skippedForNextDiscoveryRun: number;
+    duplicate: number;
+    lowScore: number;
+    missingArtwork: number;
+    missingMetadata: number;
+    platformMismatch: number;
+    seenOnly: number;
+  };
+  finalRecommendationCount: number;
+  cachedRecommendationCount: number;
+  homeSelectorCount: number;
+  discoverSelectorCount: number;
+  homeRenderReason: string;
+  discoverRenderReason: string;
+  lastGenerationError: string | null;
+  cacheAge: number | null;
+};
+
+const lastSurfaceCounts = { homeSelectorCount: 0, discoverSelectorCount: 0, homeRenderReason: 'not-rendered', discoverRenderReason: 'not-rendered' };
+let lastDiagnosticsReport: RecommendationDiagnosticsReport | null = null;
+
+export function reportRecommendationSurfaceDiagnostics(surface: RecommendationSurface, selectorCount: number, renderReason: string): void {
+  if (!DEBUG_RECOMMENDATIONS) return;
+  if (surface === 'home') {
+    lastSurfaceCounts.homeSelectorCount = selectorCount;
+    lastSurfaceCounts.homeRenderReason = renderReason;
+  }
+  if (surface === 'discover') {
+    lastSurfaceCounts.discoverSelectorCount = selectorCount;
+    lastSurfaceCounts.discoverRenderReason = renderReason;
+  }
+  console.debug('[QuestShelf recommendations] surface report', { surface, selectorCount, renderReason, sharedReport: lastDiagnosticsReport });
+}
 
 function debugRecommendationPipeline(events: DebugEvent[]): void {
   if (!DEBUG_RECOMMENDATIONS || events.length === 0) return;
@@ -57,33 +114,50 @@ type RecommendationReportOptions = {
   normalizedCandidateCount?: number;
 };
 
-function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions): void {
+function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions & { cacheAge?: number | null; lastGenerationError?: string | null }): void {
   if (!DEBUG_RECOMMENDATIONS) return;
   const rejected = events.filter((event) => event.event === 'candidate_rejected');
   const reasonIncludes = (fragment: string) => rejected.filter((event) => String(event.reason ?? '').includes(fragment)).length;
-  const report = {
-    ...counts,
+  const stageCount = (source: CandidateSource) => events
+    .filter((event) => event.event === 'stage_complete' && event.source === source)
+    .reduce((sum, event) => sum + (typeof event.produced === 'number' ? event.produced : 0), 0);
+  const providerCandidateCount = events
+    .filter((event) => event.event === 'provider_batch')
+    .reduce((sum, event) => sum + (typeof event.count === 'number' ? event.count : 0), 0);
+  const report: RecommendationDiagnosticsReport = {
+    hydrationReady: true,
+    libraryCount: counts.libraryCount,
+    finishedCount: counts.finishedCount,
+    playingCount: counts.playingCount,
+    plannedCount: counts.platformPlanCount,
+    wishlistCount: counts.wishlistCount,
     seedCount: options.seedTitles?.length ?? 0,
-    seedTitles: options.seedTitles ?? [],
-    rawPersonalizedCandidateCount: options.rawPersonalizedCandidateCount ?? events.filter((event) => event.event === 'candidate_accepted').length,
-    normalizedCandidateCount: options.normalizedCandidateCount ?? options.finalCandidates.length,
+    providerCandidateCount,
+    localAffinityCandidateCount: stageCount('liked-game-similar') + stageCount('affinity-strict') + stageCount('plans-wishlist') + stageCount('recently-interacted') + stageCount('affinity-relaxed') + stageCount('second-order'),
+    broadDiscoveryCandidateCount: stageCount('broad-discovery'),
+    trendingCandidateCount: stageCount('trending'),
+    normalizedCount: options.normalizedCandidateCount ?? options.finalCandidates.length,
     excludedCounts: {
       owned: rejected.filter((event) => event.reason === 'owned' || event.reason === 'wishlist').length,
       finished: rejected.filter((event) => event.reason === 'finished').length,
-      ignored: 0,
       dropped: rejected.filter((event) => event.reason === 'dropped').length,
+      ignored: 0,
+      discoveryInbox: (options.normalizedCandidates ?? options.finalCandidates).filter((candidate) => candidate.inboxStatus).length,
+      skippedForNextDiscoveryRun: 0,
       duplicate: rejected.filter((event) => event.reason === 'duplicate').length,
-      missingMetadata: 0,
       lowScore: reasonIncludes('below-threshold'),
+      missingArtwork: 0,
+      missingMetadata: 0,
       platformMismatch: 0,
-      alreadyInDiscoveryInbox: (options.normalizedCandidates ?? options.finalCandidates).filter((candidate) => candidate.inboxStatus).length,
+      seenOnly: 0,
     },
-    finalPersonalizedCount: options.finalCandidates.length,
-    trendingFallbackTriggered: false,
-    trendingFallbackReason: null,
-    finalRenderedSources: [...new Set(options.finalCandidates.map((candidate) => candidate.source ?? 'personalized'))],
-    fromCache: options.fromCache === true,
+    finalRecommendationCount: options.finalCandidates.length,
+    cachedRecommendationCount: options.fromCache ? options.finalCandidates.length : 0,
+    ...lastSurfaceCounts,
+    lastGenerationError: options.lastGenerationError ?? null,
+    cacheAge: options.cacheAge ?? null,
   };
+  lastDiagnosticsReport = report;
   console.debug('[QuestShelf recommendations] diagnostic report', report);
   debugRecommendationPipeline(events);
 }
@@ -305,14 +379,8 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
   const freshCache = await getFreshCacheEntry(fp);
   if (freshCache) {
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
-    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: freshCache.candidates });
+    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: freshCache.candidates, cacheAge: Date.now() - freshCache.fetchedAt });
     return applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
-  }
-
-  if (profile.topGenres.length === 0) {
-    events.push({ event: 'pipeline_stopped', reason: 'no-profile-genres' });
-    debugRecommendationReport(events, counts, { finalCandidates: [] });
-    return [];
   }
 
   const likedSeeds = getPositiveSignalGames(userGames).slice(0, 5);
@@ -323,7 +391,10 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
   const collected: ScoredCandidate[] = [];
   const addStage = async (name: CandidateSource, producer: () => Promise<Array<{ results: RawgSearchResult[]; anchorTitle?: string }>>, minScore: number, relaxation = 0) => {
     const before = collected.length;
-    for (const batch of await producer()) collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle }));
+    for (const batch of await producer()) {
+      events.push({ event: 'provider_batch', source: name, count: batch.results.length, anchorTitle: batch.anchorTitle });
+      collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle }));
+    }
     events.push({ event: 'stage_complete', source: name, produced: collected.length - before, totalPersonalized: collected.length, minScore, relaxation });
   };
 
@@ -331,19 +402,31 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
 
   const preferredPlatforms = getPreferredRawgPlatforms(profile);
 
-  await addStage('affinity-strict', async () => [{ results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 3).map((g) => g.slug).join(','), tags: profile.topTags.slice(0, 3).join(',') || undefined, platforms: preferredPlatforms, metacriticMin: profile.avgMetacritic != null && profile.avgMetacritic >= 70 ? Math.max(55, profile.avgMetacritic - 18) : undefined, pageSize: 40 }) }], 24);
+
+  if (profile.topGenres.length > 0) {
+    await addStage('affinity-strict', async () => [{ results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 3).map((g) => g.slug).join(','), tags: profile.topTags.slice(0, 3).join(',') || undefined, platforms: preferredPlatforms, metacriticMin: profile.avgMetacritic != null && profile.avgMetacritic >= 70 ? Math.max(55, profile.avgMetacritic - 18) : undefined, pageSize: 40 }) }], 24);
+  }
 
   await addStage('plans-wishlist', async () => Promise.all(planWishlistSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 18, 1);
 
   await addStage('recently-interacted', async () => Promise.all(recentSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 16, 1);
 
-  await addStage('affinity-relaxed', async () => [
-    { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), platforms: preferredPlatforms, pageSize: 40 }) },
-    { results: profile.topTags.length > 0 ? await fetchRecommendedGames({ tags: profile.topTags.slice(0, 6).join(','), platforms: preferredPlatforms, pageSize: 40 }) : [] },
-    { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), ordering: '-added', pageSize: 40 }) },
-    { results: profile.topTags[0] ? await fetchRecommendedGames({ tags: profile.topTags[0], genres: profile.topGenres[0]?.slug, ordering: '-released', pageSize: 40 }) : [] },
-    { results: await fetchRecommendedGames({ genres: profile.topGenres[0]?.slug, dates: getUpcomingDateRange(), ordering: '-added', platforms: preferredPlatforms, pageSize: 30 }) },
-  ], 8, 3);
+  if (profile.topGenres.length > 0) {
+    await addStage('affinity-relaxed', async () => [
+      { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), platforms: preferredPlatforms, pageSize: 40 }) },
+      { results: profile.topTags.length > 0 ? await fetchRecommendedGames({ tags: profile.topTags.slice(0, 6).join(','), platforms: preferredPlatforms, pageSize: 40 }) : [] },
+      { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), ordering: '-added', pageSize: 40 }) },
+      { results: profile.topTags[0] ? await fetchRecommendedGames({ tags: profile.topTags[0], genres: profile.topGenres[0]?.slug, ordering: '-released', pageSize: 40 }) : [] },
+      { results: await fetchRecommendedGames({ genres: profile.topGenres[0]?.slug, dates: getUpcomingDateRange(), ordering: '-added', platforms: preferredPlatforms, pageSize: 30 }) },
+    ], 8, 3);
+  }
+
+  if (collected.length < TARGET_PERSONAL_RECOMMENDATIONS) {
+    await addStage('broad-discovery', async () => [
+      { results: await fetchRecommendedGames({ platforms: preferredPlatforms, ordering: '-rating', pageSize: 40 }) },
+      { results: await fetchRecommendedGames({ platforms: preferredPlatforms, ordering: '-added', pageSize: 40 }) },
+    ], profile.topGenres.length > 0 ? 4 : -20, 4);
+  }
 
   await addStage('second-order', async () => Promise.all(collected.slice(0, 3).map(async (item) => ({ anchorTitle: item.result.name, results: await fetchSuggestedGames(item.result.id) }))), 10, 3);
 
@@ -356,10 +439,22 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
     if (staleCache?.candidates.length) {
       const cacheCandidates = applyLibraryStatus(staleCache.candidates.map((c) => c.game), userGames, staleCache.candidates.map((c) => c.reason), inboxRawgIds, staleCache.candidates.map((c) => c.score), staleCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus && !seen.has(c.game.rawgId));
       pool = [...pool, ...cacheCandidates].slice(0, TARGET_PERSONAL_RECOMMENDATIONS);
+      cacheCandidates.forEach((candidate) => seen.add(candidate.game.rawgId));
       events.push({ event: 'stale_cache_backfill', added: cacheCandidates.length, total: pool.length });
     }
   }
-  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: 0 });
+
+  if (pool.length < TARGET_PERSONAL_RECOMMENDATIONS / 2) {
+    await addStage('trending', async () => [
+      { results: await fetchRecommendedGames({ ordering: '-added', pageSize: 40 }) },
+      { results: await fetchRecommendedGames({ ordering: '-rating', pageSize: 40 }) },
+    ], -20, 4);
+    const reranked = collected.sort((a, b) => b.score.total - a.score.total);
+    const rediverse = applyDiversityFilter(reranked, TARGET_PERSONAL_RECOMMENDATIONS, events);
+    const expandedCandidates = applyLibraryStatus(rediverse.map(({ result }) => mapRawgResult(result)), userGames, rediverse.map(({ reason }) => reason), inboxRawgIds, rediverse.map(({ score }) => score.total), rediverse.map(({ source }) => source));
+    pool = expandedCandidates.filter((c) => !c.excluded && !c.inboxStatus).slice(0, TARGET_PERSONAL_RECOMMENDATIONS);
+  }
+  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: pool.filter((candidate) => candidate.source === 'trending').length });
   debugRecommendationReport(events, counts, { finalCandidates: pool, normalizedCandidates: candidates, seedTitles, rawPersonalizedCandidateCount: collected.length, normalizedCandidateCount: candidates.length });
 
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
