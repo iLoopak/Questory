@@ -28,6 +28,7 @@ const testFiles = [
   { entry: 'scripts/settingsEntrypoints.test.ts', out: 'settingsEntrypoints.test.mjs' },
   { entry: 'scripts/backupStorage.test.ts', out: 'backupStorage.test.mjs' },
   { entry: 'scripts/reviewQueueOrder.test.ts', out: 'reviewQueueOrder.test.mjs' },
+  { entry: 'scripts/discoveryInboxStorage.test.ts', out: 'discoveryInboxStorage.test.mjs' },
   { entry: 'scripts/multiGameImport.test.ts', out: 'multiGameImport.test.mjs' },
   { entry: 'scripts/recommendations.test.ts', out: 'recommendations.test.mjs' },
   { entry: 'scripts/discoveryPreviewArtwork.test.ts', out: 'discoveryPreviewArtwork.test.mjs' },
