@@ -2,12 +2,10 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import type { TFunction } from '../../i18n';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
-import type { Game } from '../../types/game';
 
 type ShelfProfilePopoverProps = {
   activeAchievement?: QuestShelfAchievementProgress | null;
   avatar: ReactNode;
-  featuredGame?: Game | null;
   onOpenSettings: () => void;
   shelfName: string;
   shelfOverview: ShelfOverviewCounts;
@@ -30,7 +28,6 @@ type ShelfOverviewStat = {
 export function ShelfProfilePopover({
   activeAchievement,
   avatar,
-  featuredGame,
   onOpenSettings,
   shelfName,
   shelfOverview,
@@ -54,11 +51,6 @@ export function ShelfProfilePopover({
           iconName={activeAchievement?.icon ?? 'trophy'}
           label={t('shelfProfile.activeBadge')}
           value={activeAchievement?.title ?? t('shelfProfile.noActiveBadge')}
-        />
-        <ShelfProfileRow
-          iconName="check-circle"
-          label={t('shelfProfile.featuredGame')}
-          value={featuredGame?.title ?? t('shelfProfile.noFeaturedGame')}
         />
       </div>
 

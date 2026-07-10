@@ -3568,8 +3568,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
   gap: 0.375rem;
 }
 
-.qs-achievement-chip,
-.qs-featured-game-chip {
+.qs-achievement-chip {
   display: inline-flex;
   height: 2.25rem;
   min-width: 0;
@@ -3591,9 +3590,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 .qs-achievement-chip:hover,
-.qs-featured-game-chip:hover,
-.qs-achievement-chip:focus-visible,
-.qs-featured-game-chip:focus-visible {
+.qs-achievement-chip:focus-visible {
   border-color: var(--qs-chip-hover-border, rgb(var(--accent-rgb) / 0.44));
   background: var(--qs-chip-hover-bg, rgb(var(--accent-rgb) / 0.16));
   color: var(--qs-chip-hover-text, var(--text-primary));
@@ -3650,13 +3647,6 @@ body.qs-controller-active .qs-compact-card:focus-within {
   --qs-chip-icon-bg: rgb(var(--success-rgb) / 0.16);
 }
 
-.qs-featured-game-chip {
-  max-width: 14rem;
-  --qs-chip-bg: rgb(var(--ink-900-rgb) / 0.76);
-  --qs-chip-border: rgb(var(--skyglass-rgb) / 0.18);
-  --qs-chip-text: rgb(var(--text-secondary-rgb));
-  --qs-chip-hover-bg: rgb(var(--accent-rgb) / 0.12);
-}
 
 @media (max-width: 760px) {
   .qs-toolbar-highlight-chips {
@@ -3664,8 +3654,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
     flex: 1 1 auto;
   }
 
-  .qs-achievement-chip,
-  .qs-featured-game-chip {
+  .qs-achievement-chip {
     max-width: 10.5rem;
     padding-right: 0.5rem;
     padding-left: 0.5rem;
@@ -3684,8 +3673,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
     max-width: 100%;
   }
 
-  .qs-achievement-chip,
-  .qs-featured-game-chip {
+  .qs-achievement-chip {
     max-width: 8.75rem;
   }
 }

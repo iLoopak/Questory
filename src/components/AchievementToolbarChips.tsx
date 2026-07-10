@@ -1,38 +1,22 @@
 import { Icon } from './Icon';
 import type { QuestShelfAchievementProgress } from '../lib/questShelfAchievements';
-import type { Game } from '../types/game';
 
 type AchievementToolbarChipsProps = {
   activeAchievement?: QuestShelfAchievementProgress | null;
-  featuredGame?: Game | null;
   onOpenAchievementSettings?: () => void;
-  onOpenDetails: (gameId: string) => void;
 };
 
 export function AchievementToolbarChips({
   activeAchievement,
-  featuredGame,
   onOpenAchievementSettings,
-  onOpenDetails,
 }: AchievementToolbarChipsProps) {
-  if (!activeAchievement && !featuredGame) {
+  if (!activeAchievement) {
     return null;
   }
 
   return (
     <div className="qs-toolbar-highlight-chips" aria-label="Toolbar highlights">
       {activeAchievement ? <ActiveAchievementToolbarChip achievement={activeAchievement} onClick={onOpenAchievementSettings} /> : null}
-      {featuredGame ? (
-        <button
-          className="qs-featured-game-chip"
-          onClick={() => onOpenDetails(featuredGame.id)}
-          title={`Featured: ${featuredGame.title}`}
-          type="button"
-        >
-          <Icon name="check-circle" size={14} strokeWidth={2.15} />
-          <span className="truncate">Featured: {featuredGame.title}</span>
-        </button>
-      ) : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { getPersonalizedQuestShelfTitle, loadAppPersonalizationSettings, sanitizeLibraryOwnerNickname, saveAppPersonalizationSettings } from '../../lib/appPersonalization';
-import { getResolvedFeaturedGame, getResolvedShelfName, loadShelfIdentitySettings, normalizeShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
+import { getResolvedShelfName, loadShelfIdentitySettings, normalizeShelfIdentitySettings, saveShelfIdentitySettings, type ShelfIdentitySettings } from '../../lib/shelfIdentity';
 import type { Game } from '../../types/game';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 
@@ -14,7 +14,6 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
 
   const legacyQuestShelfTitle = useMemo(() => getPersonalizedQuestShelfTitle(libraryOwnerNickname, steamProfileName), [libraryOwnerNickname, steamProfileName]);
   const personalizedQuestShelfTitle = useMemo(() => getResolvedShelfName(shelfIdentity.shelfName, legacyQuestShelfTitle, language), [language, legacyQuestShelfTitle, shelfIdentity.shelfName]);
-  const resolvedFeaturedGame = useMemo(() => getResolvedFeaturedGame(games, shelfIdentity), [games, shelfIdentity]);
   const shelfOverview = useMemo(() => ({
     games: games.filter((game) => game.collectionType === 'library').length,
     platforms: platformQueueState.activePlatforms.length,
@@ -39,5 +38,5 @@ export function useShelfProfileController(games: Game[], platformQueueState: Pla
     return () => { document.removeEventListener('pointerdown', handlePointerDown); document.removeEventListener('keydown', handleKeyDown); };
   }, [isShelfProfileOpen]);
 
-  return { resolvedFeaturedGame, isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
+  return { isShelfProfileOpen, libraryOwnerNickname, personalizedQuestShelfTitle, setIsShelfProfileOpen, setLibraryOwnerNickname, setShelfIdentity, shelfIdentity, shelfOverview, shelfProfileRef };
 }

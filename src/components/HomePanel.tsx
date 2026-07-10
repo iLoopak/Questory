@@ -31,7 +31,6 @@ type HomePanelProps = {
   appTitle?: string;
   avatar?: ReactNode;
   shelfTitle?: string;
-  featuredGame?: Game | null;
   games: Game[];
   ignoredReviewGameIds: Set<string>;
   playActivity?: PlayActivityRecord[];
@@ -71,7 +70,6 @@ export function HomePanel({
   appTitle = 'Questory',
   avatar,
   shelfTitle = '',
-  featuredGame = null,
   games,
   ignoredReviewGameIds,
   playActivity = [],
@@ -287,9 +285,8 @@ export function HomePanel({
       nextReviewCandidate,
       continuePlayingGames,
       libraryGames,
-      featuredGame,
     });
-  }, [continuePlayingGames, featuredGame, libraryGames, nextAdventureEntries, nextReviewCandidate, queueGhostVariant]);
+  }, [continuePlayingGames, libraryGames, nextAdventureEntries, nextReviewCandidate, queueGhostVariant]);
 
   const greeting = useRef<string | null>(null);
   if (!greeting.current) {
@@ -639,16 +636,6 @@ export function HomePanel({
               </>
             ) : null}
           </div>
-          {featuredGame ? (
-            <button
-              className="max-w-[160px] truncate rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-xs font-semibold text-mint transition hover:bg-mint/20"
-              data-home-focus="true"
-              onClick={() => onOpenDetails(featuredGame)}
-              type="button"
-            >
-              ⭐ {featuredGame.title}
-            </button>
-          ) : null}
         </div>
         {showGhost && queueGhostSlot && (
           <div className={`queue-ghost-wrapper queue-ghost-slot--${queueGhostSlot}`}>
@@ -1431,15 +1418,12 @@ function pickQueueGhostCover({
   nextReviewCandidate,
   continuePlayingGames,
   libraryGames,
-  featuredGame,
 }: {
   nextAdventureEntries: NextAdventureEntry[];
   nextReviewCandidate: Game | null;
   continuePlayingGames: Game[];
   libraryGames: Game[];
-  featuredGame: Game | null;
 }): QueueGhostCover | null {
-  const featuredId = featuredGame?.id ?? null;
   const randomLibraryGames = [...libraryGames].sort(() => Math.random() - 0.5);
   const priorityGames = [
     nextAdventureEntries[0]?.game,
@@ -1449,7 +1433,6 @@ function pickQueueGhostCover({
   ].filter((game): game is Game => Boolean(game));
 
   return (
-    findUsableGhostCover(priorityGames.filter((game) => game.id !== featuredId)) ??
     findUsableGhostCover(priorityGames)
   );
 }
