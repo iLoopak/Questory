@@ -79,6 +79,22 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     });
   }, []);
 
+  const skipInboxItem = useCallback((id: string) => {
+    setInboxItems((currentItems) => {
+      const itemIndex = currentItems.findIndex((item) => item.id === id);
+      if (itemIndex < 0 || currentItems.length <= 1) return currentItems;
+
+      const skippedItem = currentItems[itemIndex];
+      const updated = [
+        ...currentItems.slice(0, itemIndex),
+        ...currentItems.slice(itemIndex + 1),
+        skippedItem,
+      ];
+      saveDiscoveryInbox(updated);
+      return updated;
+    });
+  }, []);
+
   return {
     inboxItems,
     inboxRawgIds,
@@ -87,5 +103,6 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     closePreview,
     openPreview,
     removeFromInbox,
+    skipInboxItem,
   };
 }
