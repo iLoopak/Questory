@@ -1,5 +1,4 @@
-export const analyticsSchemaVersion = 2 as const;
-
+export const analyticsSchemaVersion = 2;
 export const telemetryEventRegistry = {
   app_session_started: { required: ['install_mode','library_size_bucket','has_completed_onboarding','telemetry_schema_version'], optional: [], enums: { runtime: ['pwa','browser','capacitor_android','unknown'], install_mode: ['installed','browser_tab','unknown'], library_size_bucket: ['empty','1_25','26_100','101_300','301_1000','1000_plus'] } },
   onboarding_completed: { required: ['completion_path','integrations_configured_bucket'], optional: [], enums: { completion_path: ['fresh_install','existing_library','skipped_optional_steps'], integrations_configured_bucket: ['none','one','multiple'] } },
@@ -41,13 +40,4 @@ export const telemetryEventRegistry = {
   library_view_changed: { required: ['view'], optional: [], enums: { view: ['grid','shelf','compact'] } },
   language_changed: { required: ['language'], optional: [], enums: { language: ['cs','en','other'] } },
   operation_failed: { required: ['operation','error_category','recoverable'], optional: [], enums: { operation: ['app_startup','storage_read','storage_write','library_import','metadata_fetch','artwork_fetch','recommendation_fetch','achievements_sync','backup_export','backup_restore','telemetry_proxy','other'], error_category: ['network','timeout','authentication','rate_limit','provider_unavailable','invalid_response','parsing','storage','unsupported','unknown'], runtime: ['pwa','browser','capacitor_android','unknown'] } },
-} as const;
-
-export type AnalyticsEventName = keyof typeof telemetryEventRegistry;
-export const analyticsEventNames = Object.keys(telemetryEventRegistry) as AnalyticsEventName[];
-export type AnalyticsSchemaVersion = typeof analyticsSchemaVersion;
-export type AnalyticsRuntime = 'pwa' | 'browser' | 'capacitor_android' | 'unknown';
-export type TelemetryPropertyValue = string | number | boolean;
-export type TelemetryProperties = Record<string, TelemetryPropertyValue>;
-export type MinimalAnalyticsEvent = { schemaVersion: AnalyticsSchemaVersion; eventName: AnalyticsEventName; eventId: string; timestamp: string; appVersion: string; runtime: AnalyticsRuntime; sessionId?: string } & TelemetryProperties;
-export type AnalyticsCounts = { librarySize: number; wishlistSize: number; platformCount: number; playingCount: number; queueCount: number };
+};

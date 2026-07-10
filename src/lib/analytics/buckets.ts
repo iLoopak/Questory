@@ -1,15 +1,9 @@
-import type { CountBucket } from './types';
-
-export function bucketCount(count: number): CountBucket {
-  if (!Number.isFinite(count) || count <= 0) return '0';
-  if (count === 1) return '1';
-  if (count <= 5) return '2-5';
-  if (count <= 10) return '6-10';
-  if (count <= 25) return '11-25';
-  if (count <= 50) return '26-50';
-  if (count <= 100) return '51-100';
-  if (count <= 250) return '101-250';
-  if (count <= 500) return '251-500';
-  if (count <= 1000) return '501-1000';
-  return '1000+';
-}
+export function bucketLibrarySize(count: number) { if (!Number.isFinite(count) || count <= 0) return 'empty'; if (count <= 25) return '1_25'; if (count <= 100) return '26_100'; if (count <= 300) return '101_300'; if (count <= 1000) return '301_1000'; return '1000_plus'; }
+export function bucketItemCount(count: number) { if (!Number.isFinite(count) || count <= 0) return 'zero'; if (count <= 10) return '1_10'; if (count <= 50) return '11_50'; if (count <= 200) return '51_200'; if (count <= 500) return '201_500'; return '500_plus'; }
+export function bucketDuplicateCount(count: number) { if (!Number.isFinite(count) || count <= 0) return 'zero'; if (count <= 10) return '1_10'; if (count <= 50) return '11_50'; return '51_plus'; }
+export function bucketDuration(milliseconds: number) { if (!Number.isFinite(milliseconds) || milliseconds < 2000) return 'under_2s'; if (milliseconds < 10000) return '2_10s'; if (milliseconds < 30000) return '10_30s'; if (milliseconds < 120000) return '30_120s'; return 'over_120s'; }
+export function bucketQueuePosition(index: number, total: number) { if (!Number.isFinite(index) || !Number.isFinite(total) || total <= 1) return 'early'; const ratio = Math.max(0, Math.min(index, total - 1)) / (total - 1); if (ratio < 1 / 3) return 'early'; if (ratio < 2 / 3) return 'middle'; return 'late'; }
+export function bucketSmallGroup(count: number) { if (!Number.isFinite(count) || count <= 0) return 'zero'; if (count <= 5) return '1_5'; if (count <= 10) return '6_10'; return '11_plus'; }
+export function bucketScope(count: number) { if (!Number.isFinite(count) || count <= 1) return 'one'; if (count <= 10) return '2_10'; if (count <= 50) return '11_50'; if (count <= 200) return '51_200'; return '200_plus'; }
+export function sanitizeErrorCategory(error: unknown) { const text = String(error instanceof Error ? `${error.name} ${error.message}` : error ?? '').toLowerCase(); if (text.includes('timeout') || text.includes('abort')) return 'timeout'; if (text.includes('auth') || text.includes('401') || text.includes('403')) return 'authentication'; if (text.includes('rate') || text.includes('429')) return 'rate_limit'; if (text.includes('network') || text.includes('fetch')) return 'network'; if (text.includes('parse') || text.includes('json')) return 'parsing'; if (text.includes('storage') || text.includes('quota')) return 'storage'; if (text.includes('support')) return 'unsupported'; if (text.includes('response')) return 'invalid_response'; return 'unknown'; }
+export const bucketCount = bucketItemCount;

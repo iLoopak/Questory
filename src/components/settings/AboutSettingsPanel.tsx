@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useI18n } from '../../i18n';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
-import { isTelemetryDebugMode, loadAnalyticsSettings, runTelemetrySelfTest, updateAnalyticsEnabled } from '../../lib/analytics';
+import { isTelemetryDebugMode, loadAnalyticsSettings, runTelemetrySelfTest, trackAnalyticsEvent, updateAnalyticsEnabled } from '../../lib/analytics';
 import { SettingsSection } from './SettingsSection';
 
 export function AboutSettingsPanel({
@@ -15,7 +15,10 @@ export function AboutSettingsPanel({
   const telemetryDebugMode = isTelemetryDebugMode();
 
   function handleAnalyticsEnabledChange(isAnalyticsEnabled: boolean) {
-    setAnalyticsSettings(updateAnalyticsEnabled(isAnalyticsEnabled));
+    if (!isAnalyticsEnabled && analyticsSettings.isAnalyticsEnabled) trackAnalyticsEvent('telemetry_disabled', { source: 'settings' });
+    const nextSettings = updateAnalyticsEnabled(isAnalyticsEnabled);
+    setAnalyticsSettings(nextSettings);
+    if (isAnalyticsEnabled) trackAnalyticsEvent('telemetry_enabled', { source: 'settings' });
   }
 
   return (
