@@ -15,6 +15,7 @@ type PlatformIdentityFieldsProps = {
   onArtworkUrlChange: (artworkUrl: string) => void;
   onPlatformTagChange: (platformTag: string) => void;
   onPresetArtwork: (preset: PlatformArtworkPreset) => void;
+  showPlatformTag?: boolean;
 };
 
 export function PlatformIdentityFields({
@@ -25,6 +26,7 @@ export function PlatformIdentityFields({
   onArtworkUrlChange,
   onPlatformTagChange,
   onPresetArtwork,
+  showPlatformTag = true,
 }: PlatformIdentityFieldsProps) {
   const { t } = useI18n();
 
@@ -67,11 +69,13 @@ export function PlatformIdentityFields({
           <button className="min-h-9 rounded-md border border-red-300/30 px-3 py-1 text-xs font-semibold text-red-100 hover:bg-red-500/10" onClick={() => onArtworkUrlChange('')} type="button">{t('toolbar.clear')}</button>
         </div>
       </div>
-      <label className="grid gap-1">
-        <span className="text-xs font-semibold text-slate-400">{t('settings.platformTag')}</span>
-        <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="handheld, pc, retro..." value={platformTag} onChange={(event) => onPlatformTagChange(event.target.value)} />
-        <span className="text-xs text-slate-500">{t('settings.platformTagHelp')}</span>
-      </label>
+      {showPlatformTag ? (
+        <label className="grid gap-1">
+          <span className="text-xs font-semibold text-slate-400">{t('settings.platformTag')}</span>
+          <input className="h-9 rounded-md border border-white/10 bg-ink-900 px-2 text-sm text-white outline-none focus:border-mint" placeholder="handheld, pc, retro..." value={platformTag} onChange={(event) => onPlatformTagChange(event.target.value)} />
+          <span className="text-xs text-slate-500">{t('settings.platformTagHelp')}</span>
+        </label>
+      ) : null}
     </div>
   );
 }

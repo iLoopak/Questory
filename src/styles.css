@@ -4836,3 +4836,12 @@ body.qs-controller-active .qs-compact-card:focus-within {
   .qs-platform-hub-card--fading { opacity: 0; }
   .qs-platform-hub-card--booting { filter: brightness(0.98); }
 }
+
+.qs-platform-plan-step {
+  animation: qs-platform-plan-step-in 220ms ease both;
+}
+
+@keyframes qs-platform-plan-step-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
