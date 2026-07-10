@@ -69,6 +69,8 @@ export interface DiscoveryCandidate {
   score: number;
   /** Human-readable explanation set by the personal recommendations engine. */
   reason?: string;
+  /** Internal source label for recommendation diagnostics and debug rendering. */
+  source?: string;
 }
 
 // ---------------------------------------------------------------------------
