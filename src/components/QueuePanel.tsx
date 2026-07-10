@@ -180,19 +180,21 @@ export function QueuePanel({
 
   return (
     <section className="qs-queue-shell relative flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
-      {!selectedPlatform ? (
-        <button
-          aria-label="Create Platform Plan"
-          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-md bg-mint text-ink-950 shadow-glow transition hover:bg-mint/90"
-          onClick={() => setIsPlatformModalOpen(true)}
-          title="Create Platform Plan"
-          type="button"
-        >
-          <Icon name="plus" size={18} strokeWidth={2.5} />
-        </button>
-      ) : null}
-      <header className="mb-3 space-y-3 px-1 pr-12">
-        <h2 className="text-lg font-semibold text-white">{t('queue.platforms')}</h2>
+      <header className="qs-platform-plans-header mb-3 space-y-3 px-1">
+        <div className="qs-platform-plans-title-row flex min-w-0 items-center justify-between gap-3">
+          <h2 className="min-w-0 text-lg font-semibold text-white">{t('queue.platforms')}</h2>
+          {!selectedPlatform ? (
+            <button
+              aria-label="Create Platform Plan"
+              className="qs-platform-add-button grid h-9 w-9 shrink-0 place-items-center rounded-md bg-mint text-ink-950 shadow-glow transition"
+              onClick={() => setIsPlatformModalOpen(true)}
+              title="Create Platform Plan"
+              type="button"
+            >
+              <Icon name="plus" size={18} strokeWidth={2.5} />
+            </button>
+          ) : null}
+        </div>
         {selectedPlatform ? (
           <div className="qs-platform-detail-header flex min-w-0 items-center justify-between gap-3">
             <button
