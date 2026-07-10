@@ -7,6 +7,7 @@ import {
   loadDiscoveryInboxState,
   restoreDeferredDiscoveryInboxItem,
   saveDiscoveryInboxState,
+  startDiscoveryInboxRun,
   type DiscoveryInboxItem,
 } from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
@@ -24,7 +25,11 @@ type UseDiscoveryControllerOptions = {
 };
 
 export function useDiscoveryController({ games, t, addToastNotification }: UseDiscoveryControllerOptions) {
-  const [inboxState, setInboxState] = useState(() => loadDiscoveryInboxState());
+  const [inboxState, setInboxState] = useState(() => {
+    const state = startDiscoveryInboxRun(loadDiscoveryInboxState());
+    saveDiscoveryInboxState(state);
+    return state;
+  });
   const inboxItems = inboxState.activeQueue;
   const [previewCandidate, setPreviewCandidate] = useState<DiscoveryCandidate | null>(null);
 
@@ -89,6 +94,16 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     });
   }, []);
 
+  const startInboxRun = useCallback(() => {
+    setInboxState((currentState) => {
+      const updatedState = startDiscoveryInboxRun(currentState);
+      if (updatedState === currentState) return currentState;
+
+      saveDiscoveryInboxState(updatedState);
+      return updatedState;
+    });
+  }, []);
+
   const skipInboxItem = useCallback((id: string) => {
     setInboxState((currentState) => {
       const updatedState = deferDiscoveryInboxItemForFutureSession(currentState, id);
@@ -108,5 +123,6 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     openPreview,
     removeFromInbox,
     skipInboxItem,
+    startInboxRun,
   };
 }
