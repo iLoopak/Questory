@@ -12,7 +12,7 @@ import {
 import { getControllerButtonLabels, type ConfirmCancelConvention } from '../lib/controllerProfiles';
 import { useControllerAction } from '../lib/controllerActions';
 import { useI18n, type TFunction } from '../i18n';
-import { getGameCoverSources, getGeneratedFallbackCover, hasFallbackArtwork } from '../lib/gameCoverImages';
+import { getGameCoverSources, getGeneratedFallbackCover } from '../lib/gameCoverImages';
 import { getProviderLinks } from '../lib/gameSelectors';
 import { GameCoverImage } from './GameCoverImage';
 import { useGamepadDetection } from '../hooks/useGamepadDetection';
@@ -23,6 +23,7 @@ import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
+import { QueueCompletionScreen } from './QueueCompletionScreen';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ScreenshotStrip } from './ScreenshotStrip';
 import { RatingBadgeStack } from './RatingBadgeStack';
@@ -299,13 +300,6 @@ export function ReviewModePanel({
   const lifetimeReviewedCount = initialReviewedCountRef.current + completedCount;
   const fullRemainingCount = Math.max(0, baseSourceGames.length - completedCount);
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
-  const processedGames = useMemo(() =>
-    sessionGameIds
-      .filter((id) => processedGameIds.has(id))
-      .map((id) => gamesById.get(id))
-      .filter((g): g is Game => g !== undefined),
-    [sessionGameIds, processedGameIds, gamesById],
-  );
   const sessionSummary = useMemo(() => buildReviewSessionSummary(reviewHistory, gamesById), [gamesById, reviewHistory]);
 
   useEffect(() => {
@@ -674,12 +668,9 @@ export function ReviewModePanel({
           ) : (
             <ReviewComplete
               sessionSummary={sessionSummary}
-              processedGames={processedGames}
               queuePlatforms={queuePlatforms}
               reviewedCount={completedCount}
-              lifetimeReviewedCount={lifetimeReviewedCount}
               remainingCount={fullRemainingCount}
-              sourceLabel={sourceLabel}
               onOpenQueue={onOpenQueue}
               onReturnToLibrary={onReturnToLibrary}
               onReviewAnother={() => {
@@ -1446,161 +1437,59 @@ function ReviewSourceEmpty({
 
 function ReviewComplete({
   sessionSummary,
-  processedGames,
   queuePlatforms,
   reviewedCount,
-  lifetimeReviewedCount,
   remainingCount,
-  sourceLabel,
   onOpenQueue,
   onReturnToLibrary,
   onReviewAnother,
 }: {
   sessionSummary: ReviewSessionSummary;
-  processedGames: Game[];
   queuePlatforms: GamePlatform[];
   reviewedCount: number;
-  lifetimeReviewedCount: number;
   remainingCount: number;
-  sourceLabel: string;
   onOpenQueue: () => void;
   onReturnToLibrary: () => void;
   onReviewAnother: () => void;
 }) {
-  const { actionStats, highlights } = sessionSummary;
+  const { actionStats } = sessionSummary;
+  const committedCount = actionStats.queued + actionStats.playing + actionStats.finished + actionStats.wishlisted;
   const noPlatformsWarning = actionStats.queued > 0 && queuePlatforms.length === 0;
-  const reviewedTotal = lifetimeReviewedCount + remainingCount;
-  const progressPercent = reviewedTotal > 0 ? Math.round((lifetimeReviewedCount / reviewedTotal) * 100) : 100;
+  const isQueueEmpty = remainingCount === 0;
+  const chips = [
+    actionStats.queued > 0 ? { label: `${actionStats.queued} added to Plans`, tone: 'accent' as const, value: actionStats.queued } : null,
+    actionStats.playing > 0 ? { label: `${actionStats.playing} Playing Now`, tone: 'accent' as const, value: actionStats.playing } : null,
+    actionStats.finished > 0 ? { label: `${actionStats.finished} Finished`, tone: 'neutral' as const, value: actionStats.finished } : null,
+    actionStats.wishlisted > 0 ? { label: `${actionStats.wishlisted} added to Wishlist`, tone: 'neutral' as const, value: actionStats.wishlisted } : null,
+    actionStats.dropped > 0 ? { label: `${actionStats.dropped} Dropped`, tone: 'muted' as const, value: actionStats.dropped } : null,
+    actionStats.skipped > 0 ? { label: `${actionStats.skipped} skipped`, tone: 'muted' as const, value: actionStats.skipped } : null,
+    actionStats.ignored > 0 ? { label: `${actionStats.ignored} ignored`, tone: 'muted' as const, value: actionStats.ignored } : null,
+  ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
+  const actions = isQueueEmpty
+    ? [
+        ...(actionStats.queued > 0 || noPlatformsWarning ? [{ label: noPlatformsWarning ? 'Set Up Platform Plans' : 'Open Platform Plans', onClick: onOpenQueue, variant: 'secondary' as const }] : []),
+        { label: 'Return to Library', onClick: onReturnToLibrary, variant: 'ghost' as const },
+      ]
+    : [
+        { label: 'Start next batch', onClick: onReviewAnother, variant: 'primary' as const },
+        ...(actionStats.queued > 0 || noPlatformsWarning ? [{ label: noPlatformsWarning ? 'Set Up Platform Plans' : 'Open Platform Plans', onClick: onOpenQueue, variant: 'secondary' as const }] : []),
+        { label: 'Return to Library', onClick: onReturnToLibrary, variant: 'ghost' as const },
+      ];
 
   return (
-    <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
-      <div className="max-w-3xl">
-        <div className="text-xs font-semibold uppercase tracking-spread text-mint">Quest Queue Session Complete</div>
-        <h3 className="mt-2 text-3xl font-semibold text-white">Great work!</h3>
-        <p className="mt-3 text-sm font-medium text-slate-300">
-          {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} reviewed · {remainingCount} remaining
-        </p>
-        <BatchCelebrationCovers games={processedGames} />
-        <div className="mt-5 rounded-2xl border border-skyglass/15 bg-ink-950/60 p-4 text-left">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="qs-label-caps text-accent">{sourceLabel} progress</div>
-              <div className="mt-1 text-sm font-semibold text-white">{progressPercent}% completed</div>
-            </div>
-            <div className="text-right text-xs text-slate-400">
-              <div><span className="font-semibold text-white">{lifetimeReviewedCount}</span> reviewed</div>
-              <div><span className="font-semibold text-white">{remainingCount}</span> remaining</div>
-            </div>
-          </div>
-          <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10" aria-label={`${progressPercent}% completed`}>
-            <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </div>
-        {highlights.length > 0 && (
-          <div className="mt-4 space-y-3 rounded-2xl border border-skyglass/15 bg-ink-950/60 p-4 text-left">
-            <div className="qs-label-caps text-muted">Session highlights</div>
-            {highlights.map((group) => (
-              <div key={group.label}>
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200"><Icon name={group.icon} size={14} /> <span>{group.label}</span><span className="text-mint/70">·</span><span className="text-white">{group.count}</span></div>
-                <div className="flex gap-1.5 overflow-hidden">
-                  {group.games.slice(0, 8).map((game) => (
-                    <span key={game.id} className="block h-16 w-11 shrink-0 overflow-hidden rounded-md border border-white/10 bg-ink-800" title={game.title}>
-                      <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="lazy" />
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {noPlatformsWarning ? (
-          <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-left">
-            <div className="text-sm font-semibold text-amber-200">
-              {actionStats.queued} {actionStats.queued === 1 ? 'game was' : 'games were'} sent to Platform Plans — but no platforms are configured yet.
-            </div>
-            <p className="mt-1 text-xs text-amber-100/70">Set up at least one platform so your queued games have somewhere to go.</p>
-            <button
-              className="mt-3 h-9 rounded-md bg-amber-300/80 px-4 text-sm font-semibold text-ink-950 transition hover:bg-amber-300"
-              onClick={onOpenQueue}
-              type="button"
-            >
-              Set Up Platform Plans
-            </button>
-          </div>
-        ) : null}
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <button
-            className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
-            onClick={onReviewAnother}
-            type="button"
-          >
-            Continue Reviewing
-          </button>
-          {actionStats.queued > 0 ? (
-            <button
-              className="min-h-12 rounded-xl border border-mint/30 bg-mint/10 px-5 text-sm font-semibold text-mint transition hover:bg-mint/20"
-              onClick={onOpenQueue}
-              type="button"
-            >
-              Open Platform Plans
-            </button>
-          ) : null}
-          <button
-            className="min-h-12 rounded-xl border border-skyglass/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-mint/10 hover:text-white"
-            onClick={onReturnToLibrary}
-            type="button"
-          >
-            Return to Library
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const TILE_ROTATIONS = [-8, -3, 5, -1, 7, -5, 2, -6, -9, 4, -2, 6];
-const TILE_FLOAT_VARIANTS = ['a', 'b', 'c', 'a', 'c', 'b', 'a', 'c', 'b', 'a', 'c', 'b'] as const;
-const TILE_DURATIONS = [2.6, 3.0, 2.4, 2.8, 2.5, 2.9, 2.7, 2.6, 3.1, 2.5, 2.8, 2.7];
-const TILE_DELAYS = [0, 0.3, 0.15, 0.55, 0.4, 0.7, 0.2, 0.5, 0.1, 0.6, 0.35, 0.45];
-const MAX_TILES = 8;
-
-function BatchCelebrationCovers({ games }: { games: Game[] }) {
-  const tiles = useMemo(() => {
-    const withArt = games.filter((g) => !hasFallbackArtwork(g));
-    const withFallback = games.filter((g) => hasFallbackArtwork(g));
-    return [...withArt, ...withFallback].slice(0, MAX_TILES);
-  }, [games]);
-
-  if (tiles.length === 0) return null;
-
-  return (
-    <div aria-hidden="true" className="qs-batch-celebration-strip mt-5 flex items-end justify-center gap-1.5 overflow-hidden" style={{ height: '5.5rem' }}>
-      {tiles.map((game, index) => {
-        const rotation = TILE_ROTATIONS[index] ?? 0;
-        const variant = TILE_FLOAT_VARIANTS[index] ?? 'a';
-        const duration = TILE_DURATIONS[index] ?? 2.7;
-        const delay = TILE_DELAYS[index] ?? 0;
-
-        return (
-          <span
-            key={game.id}
-            className="qs-batch-cover-tile relative block h-16 w-11 shrink-0 overflow-hidden rounded-md border border-white/10 bg-ink-800 shadow-md"
-            style={{
-              '--tile-rotate': `${rotation}deg`,
-              animationName: `qs-float-${variant}`,
-              animationDuration: `${duration}s`,
-              animationDelay: `${delay}s`,
-              animationTimingFunction: 'ease-in-out',
-              animationIterationCount: 'infinite',
-              animationDirection: 'alternate',
-              animationFillMode: 'both',
-            } as CSSProperties}
-          >
-            <GameCoverImage className="h-full w-full object-cover" decoding="async" game={game} loading="eager" />
-          </span>
-        );
-      })}
-    </div>
+    <QueueCompletionScreen
+      actions={actions}
+      chips={chips}
+      eyebrow="QUEST QUEUE COMPLETE"
+      footer={noPlatformsWarning ? 'Set up at least one platform so your queued games have somewhere to go.' : isQueueEmpty ? 'Your Quest Queue is clear for now.' : 'Your next batch is ready when you are.'}
+      heading={isQueueEmpty ? 'Queue cleared!' : 'Batch cleared!'}
+      state={isQueueEmpty ? 'queue-empty' : 'batch-complete'}
+      summary={`You reviewed ${reviewedCount} ${reviewedCount === 1 ? 'game' : 'games'} from your queue.`}
+      stats={[
+        { label: 'Reviewed', value: reviewedCount, helper: 'This batch', tone: 'warm' },
+        { label: 'Committed', value: committedCount, helper: 'Active outcomes', tone: 'accent' },
+      ]}
+    />
   );
 }
 
