@@ -2783,6 +2783,16 @@ textarea,
 }
 
 
+
+.qs-platform-detail-header {
+  animation: qs-platform-detail-header-reveal 260ms ease 160ms both;
+}
+
+@keyframes qs-platform-detail-header-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Platform Plan Identity artwork uses a wide 1080×340 banner ratio. */
 .qs-platform-artwork-banner {
   aspect-ratio: 1080 / 340;
@@ -4810,6 +4820,7 @@ body.qs-controller-active .qs-compact-card:focus-within {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .qs-platform-detail-header,
   .qs-platform-hub-card,
   .qs-platform-hub-artwork img,
   .qs-platform-hub-artwork-fallback,

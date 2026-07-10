@@ -182,48 +182,19 @@ export function QueuePanel({
     <section className="qs-queue-shell flex min-w-0 flex-col rounded-lg border border-skyglass/15 bg-ink-900/70 p-2 sm:p-3">
       <header className="mb-3 space-y-3 px-1">
         <h2 className="text-lg font-semibold text-white">{t('queue.platforms')}</h2>
-        {selectedPlatform && activeQueuePlatforms.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <div className="qs-platform-progress flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1" aria-label="Platform Plans navigation">
-              {activeQueuePlatforms.map((platform) => {
-                const planned = visibleQueueEntries.filter((entry) => entry.targetPlatform === platform).length;
-                const playing = playingGamesByPlatform.get(platform)?.length ?? 0;
-                const cardAccent = getPlatformAccentColor(queueState, platform);
-                return (
-                  <button
-                    key={platform}
-                    className="min-w-[8rem] max-w-[11rem] shrink-0 rounded-xl border px-3 py-2 text-left transition"
-                    style={{
-                      borderColor: `color-mix(in srgb, ${cardAccent} 32%, rgb(255 255 255 / 0.06))`,
-                      backgroundColor: `color-mix(in srgb, ${cardAccent} 7%, rgb(2 6 23 / 0.6))`,
-                    }}
-                    onClick={() => setSelectedPlatform(platform)}
-                    type="button"
-                  >
-                    <div className="truncate text-sm font-semibold text-white">{platform}</div>
-                    <div className="mt-1.5 flex gap-3 text-xs">
-                      <span>
-                        <span className="font-bold" style={{ color: cardAccent }}>{playing}</span>
-                        <span className="ml-1 text-slate-500">Playing</span>
-                      </span>
-                      <span>
-                        <span className="font-bold" style={{ color: cardAccent }}>{planned}</span>
-                        <span className="ml-1 text-slate-500">{t('queue.planned')}</span>
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        {selectedPlatform ? (
+          <div className="qs-platform-detail-header flex min-w-0 items-center justify-between gap-3">
             <button
-              aria-label={t('queue.addPlatform')}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-mint text-ink-950 transition hover:bg-mint/90"
-              onClick={() => setIsPlatformModalOpen(true)}
-              title={t('queue.addPlatform')}
+              className="qs-platform-back-button inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-slate-300 transition hover:border-mint/40 hover:bg-mint/10 hover:text-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mint"
+              onClick={returnToPlatformHub}
               type="button"
             >
-              <Icon name="plus" size={18} strokeWidth={2.5} />
+              <Icon name="chevron-left" size={16} />
+              <span>All platforms</span>
             </button>
+            <div className="min-w-0 truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" aria-current="page">
+              {selectedPlatform}
+            </div>
           </div>
         ) : null}
       </header>
@@ -303,7 +274,6 @@ export function QueuePanel({
             }}
             queueScrollRef={contentScrollRef}
             queueEntries={visibleQueueEntries.filter((entry) => entry.targetPlatform === selectedPlatform).sort(compareQueueEntries)}
-            onBackToHub={returnToPlatformHub}
             onHidePlatform={(platform) => onQueueStateChange(hideQueuePlatform(queueState, platform))}
             onIdentityChange={(changes) => onQueueStateChange(updatePlatformQueueVisualSettings(queueState, selectedPlatform, changes))}
             onLimitChange={onLimitChange}
@@ -750,7 +720,6 @@ function PlatformQueueColumn({
   maxActiveGames,
   isHighlighted,
   isFocusedExperience = false,
-  onBackToHub,
   platform,
   platformOptions,
   platformTag,
@@ -780,7 +749,6 @@ function PlatformQueueColumn({
   maxActiveGames: number;
   isHighlighted: boolean;
   isFocusedExperience?: boolean;
-  onBackToHub?: () => void;
   platform: GamePlatform;
   platformOptions: GamePlatform[];
   platformTag: string;
@@ -884,12 +852,6 @@ function PlatformQueueColumn({
   return (
     <>
     <section ref={setPlatformRef} style={accentStyle} className={`qs-platform-column overflow-hidden rounded-2xl border bg-ink-950/80 p-4 ${isHighlighted ? 'qs-platform-column--highlighted' : ''} ${isFocusedExperience ? 'qs-platform-column--focused-experience' : ''} ${hasGames ? 'qs-platform-column--populated' : ''} ${!hasGames && !isHighlighted ? 'opacity-80' : ''}`}>
-      {onBackToHub ? (
-        <button className="qs-platform-back-button mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-mint/40 hover:text-mint" onClick={onBackToHub} type="button">
-          <Icon name="chevron-left" size={16} />
-          <span>Back to all platforms</span>
-        </button>
-      ) : null}
       {displayArtworkUrl ? (
         <div className="qs-platform-artwork-banner qs-platform-artwork-header relative -mx-4 -mt-4 mb-3 overflow-hidden">
           <img alt="" className="h-full w-full object-cover object-center opacity-88" src={displayArtworkUrl} />
