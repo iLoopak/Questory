@@ -13,7 +13,7 @@ import { exportQuestShelfBackupFile } from '../lib/backupExport';
 import { ShelfAvatar, ShelfIdentityEditor } from './ShelfIdentity';
 import { getComputedShelfTitle, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 import { getOnboardingProgress, onboardingItemIds, type OnboardingItemId } from '../lib/onboardingStorage';
-import { loadAnalyticsSettings, updateAnalyticsEnabled } from '../lib/analytics';
+import { loadAnalyticsSettings, trackAnalyticsEvent, updateAnalyticsEnabled } from '../lib/analytics';
 import { defaultAccentColor, normalizeAccentColor, type AccentColorPreference, type AppTemplatePreference } from '../lib/themePreferences';
 import type { Game } from '../types/game';
 import type { SteamSettings } from '../types/steam';
@@ -178,7 +178,7 @@ export function OnboardingChecklist({
             {activeStep.id === 'steam-connect' ? <SteamStep games={games} isComplete={stepComplete} onComplete={() => onComplete('steam-connect')} onContinue={goNext} onImportGames={onImportGames} onSkip={skipStep} onSteamLibraryImported={onSteamLibraryImported} onSteamProfileNameChange={onSteamProfileNameChange} /> : null}
             {activeStep.id === 'make-it-yours' ? <PersonalizeStep accentColorPreference={accentColorPreference} appTemplatePreference={appTemplatePreference} games={games} gameCount={libraryGameCount} libraryOwnerNickname={libraryOwnerNickname} onAccentColorChange={onAccentColorChange} onAppTemplatePreferenceChange={onAppTemplatePreferenceChange} onComplete={() => { onComplete('make-it-yours'); goNext(); }} onSkip={skipStep} onLibraryOwnerNicknameChange={onLibraryOwnerNicknameChange} onShelfIdentityChange={onShelfIdentityChange} personalizedQuestShelfTitle={onboardingQuestShelfTitle} shelfIdentity={shelfIdentity} steamAvatarUrl={steamAvatarUrl} steamPersonaName={steamPersonaName} platformCount={libraryPlatformCount} /> : null}
             {activeStep.id === 'how-it-works' ? <HowItWorksStep onComplete={() => { onComplete('how-it-works'); goNext(); }} onSkip={skipStep} /> : null}
-            {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={onboardingQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${onboardingProgress.completed}/${onboardingProgress.total}`} /> : null}
+            {activeStep.id === 'ready' ? <FinishStep analyticsSettings={analyticsSettings} shelfTitle={getComputedShelfTitle(games)} gameCount={libraryGameCount} onAnalyticsChoose={(isEnabled) => { const nextSettings = updateAnalyticsEnabled(isEnabled); setAnalyticsSettings(nextSettings); if (isEnabled) trackAnalyticsEvent('telemetry_enabled', { source: 'onboarding' }); onComplete('analytics-notice'); }} onComplete={() => onComplete('ready')} onOpenLibrary={onOpenLibrary} onOpenQueue={onOpenQueue} personalizedQuestShelfTitle={onboardingQuestShelfTitle} platformCount={libraryPlatformCount} progress={`${onboardingProgress.completed}/${onboardingProgress.total}`} /> : null}
           </div>
         </div>
 

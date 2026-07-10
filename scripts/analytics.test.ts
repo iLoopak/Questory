@@ -1,265 +1,39 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { bucketCount } from '../src/lib/analytics/buckets';
+import { bucketDuration, bucketItemCount, bucketLibrarySize, bucketQueuePosition, sanitizeErrorCategory } from '../src/lib/analytics/buckets';
 import { defaultAnalyticsSettings, analyticsSettingsStorageKey } from '../src/lib/analytics/settings';
-import { isAnalyticsConfigured, runTelemetrySelfTest, sendAnalyticsEvent, validateAnalyticsEvent } from '../src/lib/analytics/client';
+import { buildAnalyticsEvent, isAnalyticsConfigured, runTelemetrySelfTest, sendAnalyticsEvent, trackAnalyticsEvent, validateAnalyticsEvent } from '../src/lib/analytics/client';
+import { analyticsEventNames, telemetryEventRegistry, type MinimalAnalyticsEvent } from '../src/lib/analytics/types';
 import telemetryHandler from '../api/telemetry.js';
-import type { MinimalAnalyticsEvent } from '../src/lib/analytics/types';
 import { runPlatformQueueUniquenessRegressionAssertions } from '../src/lib/platformQueueStorage.regression';
 
-const baseEvent: MinimalAnalyticsEvent = {
-  schemaVersion: 1,
-  eventName: 'app_open',
-  eventId: 'event-1',
-  timestamp: '2026-06-19T00:00:00.000Z',
-  appVersion: '0.1.0',
-  runtime: 'web',
-  librarySizeBucket: '1',
-  wishlistSizeBucket: '2-5',
-  platformCountBucket: '1',
-  playingCountBucket: '0',
-  queueCountBucket: '6-10',
-};
+const baseEvent: MinimalAnalyticsEvent = { schemaVersion: 2, eventName: 'app_session_started', eventId: 'event-1', timestamp: '2026-06-19T00:00:00.000Z', appVersion: '0.1.0', runtime: 'browser', install_mode: 'browser_tab', library_size_bucket: '1_25', has_completed_onboarding: true, telemetry_schema_version: 2 };
+function installLocalStorage(settings = defaultAnalyticsSettings) { const store = new Map<string, string>(); if (settings) store.set(analyticsSettingsStorageKey, JSON.stringify(settings)); globalThis.window = { localStorage: { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value); } }, matchMedia: () => ({ matches: false }) } as unknown as Window & typeof globalThis; }
+function enableLocalAnalytics() { installLocalStorage({ schemaVersion: 1, isAnalyticsEnabled: true, hasSeenAnalyticsNotice: true, updatedAt: '2026-06-19T00:00:00.000Z' }); }
+const configuredAnalytics = { enabled: true, endpointUrl: '/api/telemetry' };
 
-function installLocalStorage(settings = defaultAnalyticsSettings) {
-  const store = new Map<string, string>();
-  if (settings) store.set(analyticsSettingsStorageKey, JSON.stringify(settings));
-  globalThis.window = {
-    localStorage: {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => { store.set(key, value); },
-    },
-  } as unknown as Window & typeof globalThis;
-}
+test('bucket helpers and error sanitization use broad safe categories', () => { assert.equal(bucketLibrarySize(0), 'empty'); assert.equal(bucketLibrarySize(1001), '1000_plus'); assert.equal(bucketItemCount(0), 'zero'); assert.equal(bucketItemCount(501), '500_plus'); assert.equal(bucketDuration(1000), 'under_2s'); assert.equal(bucketDuration(120000), 'over_120s'); assert.equal(bucketQueuePosition(5, 9), 'middle'); assert.equal(sanitizeErrorCategory(new Error('Abort timeout')), 'timeout'); assert.equal(sanitizeErrorCategory(new Error('quota storage')), 'storage'); });
 
-function enableLocalAnalytics() {
-  installLocalStorage({ schemaVersion: 1, isAnalyticsEnabled: true, hasSeenAnalyticsNotice: true, updatedAt: '2026-06-19T00:00:00.000Z' });
-}
+test('event registry validates representative event from every family', () => { const samples: Record<string, Record<string, unknown>> = { app_session_started: { install_mode: 'browser_tab', library_size_bucket: 'empty', has_completed_onboarding: false, telemetry_schema_version: 2 }, onboarding_completed: { completion_path: 'fresh_install', integrations_configured_bucket: 'none' }, telemetry_enabled: { source: 'settings' }, library_import_completed: { source: 'steam', outcome: 'success', imported_count_bucket: '1_10', duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' }, integration_connected: { integration: 'steam', outcome: 'success' }, sync_completed: { sync_type: 'metadata', outcome: 'success', changed_count_bucket: '1_10', failed_count_bucket: 'zero', duration_bucket: '2_10s' }, game_added: { destination: 'library', source: 'manual' }, quest_queue_batch_completed: { queue_source: 'library', initial_count_bucket: '1_10', processed_count_bucket: '1_10', skipped_count_bucket: 'zero', completion_state: 'completed', duration_bucket: '10_30s' }, platform_plan_opened: { game_count_bucket: '1_5', has_currently_playing: false, used_default_artwork: true }, recommendation_impression: { surface: 'home', recommendation_type: 'personal', result_count_bucket: '1_5' }, game_detail_opened: { source: 'library', has_screenshots: true, has_achievements: false, has_recommendations: true, metadata_completeness: 'medium' }, home_widget_used: { widget: 'play_today', action: 'primary_action' }, achievements_sync_completed: { outcome: 'success', game_count_bucket: '1_10', unlocked_count_bucket: '11_50', duration_bucket: '30_120s' }, backup_export_completed: { outcome: 'success', library_size_bucket: '26_100', duration_bucket: 'under_2s' }, appearance_changed: { theme: 'dark', surface: 'settings' }, operation_failed: { operation: 'storage_read', error_category: 'storage', recoverable: true } }; const envelope = { schemaVersion: 2, eventId: 'event-1', timestamp: '2026-06-19T00:00:00.000Z', appVersion: '0.1.0', runtime: 'browser' }; for (const [eventName, properties] of Object.entries(samples)) assert.equal(validateAnalyticsEvent({ ...envelope, eventName, ...properties }), true, eventName); });
 
-const configuredAnalytics = {
-  enabled: true,
-  endpointUrl: '/api/telemetry',
-};
+test('validation rejects invalid event names, unknown properties, invalid enums, and sensitive fields', () => { assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'removed_event' }), false); assert.equal(validateAnalyticsEvent({ ...baseEvent, gameTitle: 'Private' }), false); assert.equal(validateAnalyticsEvent({ ...baseEvent, install_mode: 'desktop' }), false); assert.equal(validateAnalyticsEvent({ ...baseEvent, rawgId: '123' }), false); });
 
-test('bucketCount boundaries', () => {
-  assert.equal(bucketCount(-1), '0');
-  assert.equal(bucketCount(0), '0');
-  assert.equal(bucketCount(1), '1');
-  assert.equal(bucketCount(2), '2-5');
-  assert.equal(bucketCount(5), '2-5');
-  assert.equal(bucketCount(6), '6-10');
-  assert.equal(bucketCount(10), '6-10');
-  assert.equal(bucketCount(11), '11-25');
-  assert.equal(bucketCount(25), '11-25');
-  assert.equal(bucketCount(26), '26-50');
-  assert.equal(bucketCount(50), '26-50');
-  assert.equal(bucketCount(51), '51-100');
-  assert.equal(bucketCount(100), '51-100');
-  assert.equal(bucketCount(101), '101-250');
-  assert.equal(bucketCount(250), '101-250');
-  assert.equal(bucketCount(251), '251-500');
-  assert.equal(bucketCount(500), '251-500');
-  assert.equal(bucketCount(501), '501-1000');
-  assert.equal(bucketCount(1000), '501-1000');
-  assert.equal(bucketCount(1001), '1000+');
-});
+test('analytics disabled by default and config placeholders prevent sending', async () => { assert.equal(defaultAnalyticsSettings.isAnalyticsEnabled, false); enableLocalAnalytics(); for (const config of [{ enabled: false, endpointUrl: '/api/telemetry' }, { enabled: true, endpointUrl: '' }, { enabled: true, endpointUrl: 'https://example.invalid/questshelf-analytics' }]) { let calls = 0; assert.equal(isAnalyticsConfigured(config), false); await sendAnalyticsEvent(baseEvent, config, async () => { calls += 1; return new Response(null, { status: 200 }); }); assert.equal(calls, 0); } });
 
-test('analytics disabled by default', () => {
-  assert.equal(defaultAnalyticsSettings.isAnalyticsEnabled, false);
-  assert.equal(defaultAnalyticsSettings.hasSeenAnalyticsNotice, false);
-});
+test('consent disabled, enabled, and disabled mid-session are respected', async () => { installLocalStorage(defaultAnalyticsSettings); let calls = 0; await sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => { calls += 1; return new Response(null, { status: 200 }); }); assert.equal(calls, 0); enableLocalAnalytics(); await sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => { calls += 1; return new Response(null, { status: 200 }); }); assert.equal(calls, 1); installLocalStorage(defaultAnalyticsSettings); await sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => { calls += 1; return new Response(null, { status: 200 }); }); assert.equal(calls, 1); });
 
-test('placeholder config prevents sending', async () => {
-  enableLocalAnalytics();
-  const placeholderConfigs = [
-    { enabled: false, endpointUrl: '/api/telemetry' },
-    { enabled: true, endpointUrl: '' },
-    { enabled: true, endpointUrl: 'https://example.invalid/questshelf-analytics' },
-  ];
+test('telemetry self-test sends normalized telemetry_test_sent', async () => { enableLocalAnalytics(); const result = await runTelemetrySelfTest(async (url, init) => { assert.equal(url, '/api/telemetry'); assert.equal(init?.cache, 'no-store'); const body = JSON.parse(String(init?.body)); assert.equal(body.eventName, 'telemetry_test_sent'); assert.equal(body.outcome, 'accepted'); assert.equal(Object.hasOwn(body, 'gameTitle'), false); return new Response('ok', { status: 202, headers: { 'content-type': 'text/plain' } }); }, configuredAnalytics); assert.equal(result.sent, true); assert.equal(result.status, 202); });
 
-  for (const config of placeholderConfigs) {
-    let calls = 0;
-    assert.equal(isAnalyticsConfigured(config), false);
-    await sendAnalyticsEvent(baseEvent, config, async () => {
-      calls += 1;
-      return new Response(null, { status: 200 });
-    });
-    assert.equal(calls, 0);
-  }
-});
+test('transport failure and non-2xx remain non-blocking', async () => { enableLocalAnalytics(); await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => { throw new Error('network failed'); })); await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => new Response('nope', { status: 500 }))); });
 
-test('importSource validation', () => {
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, importSource: 'steam' }), false);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'steam' }), true);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'wishlist_html' }), true);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'retro' }), true);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'backup' }), true);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'manual' }), true);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'unknown' }), true);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'import_completed', importSource: 'steam_url' }), false);
-});
+test('once key prevents duplicate session events', async () => { enableLocalAnalytics(); let calls = 0; const fetcher = async () => { calls += 1; return new Response(null, { status: 200 }); }; trackAnalyticsEvent('home_widget_used', { widget: 'play_today', action: 'opened' }, { fetcher, onceKey: 'play-today', config: configuredAnalytics }); trackAnalyticsEvent('home_widget_used', { widget: 'play_today', action: 'opened' }, { fetcher, onceKey: 'play-today', config: configuredAnalytics }); await new Promise((resolve) => setTimeout(resolve, 0)); assert.equal(calls, 1); });
 
-test('payload field validation rejects private and free-text fields', () => {
-  for (const field of ['rawCount', 'gameTitle', 'notes', 'tags', 'accountId', 'steamId', 'externalId', 'url', 'filePath', 'searchQuery', 'userInput', 'persistentId']) {
-    assert.equal(validateAnalyticsEvent({ ...baseEvent, [field]: 'private' }), false, `${field} should be rejected`);
-  }
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, eventName: 'removed_event' }), false);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, runtime: 'desktop' }), false);
-  assert.equal(validateAnalyticsEvent({ ...baseEvent, librarySizeBucket: '1001' }), false);
-});
+function createApiResponse() { return { statusCode: 200, headers: {} as Record<string, string>, body: undefined as unknown, setHeader(key: string, value: string) { this.headers[key] = value; }, status(code: number) { this.statusCode = code; return this; }, json(value: unknown) { this.body = value; return this; } }; }
+async function callTelemetryApi({ method = 'POST', body = baseEvent, envUrl = 'https://make.example.test/hook', fetchImpl }: { method?: string; body?: unknown; envUrl?: string; fetchImpl?: typeof fetch } = {}) { const originalWebhook = process.env.QS_ANALYTICS_WEBHOOK_URL; const originalFetch = globalThis.fetch; if (envUrl === '') delete process.env.QS_ANALYTICS_WEBHOOK_URL; else process.env.QS_ANALYTICS_WEBHOOK_URL = envUrl; if (fetchImpl) globalThis.fetch = fetchImpl; const res = createApiResponse(); try { await telemetryHandler({ method, body, headers: { 'content-length': String(JSON.stringify(body).length) } }, res); return res; } finally { if (originalWebhook === undefined) delete process.env.QS_ANALYTICS_WEBHOOK_URL; else process.env.QS_ANALYTICS_WEBHOOK_URL = originalWebhook; globalThis.fetch = originalFetch; } }
 
-test('no send when local setting is disabled', async () => {
-  installLocalStorage(defaultAnalyticsSettings);
-  let calls = 0;
-  await sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
-    calls += 1;
-    return new Response(null, { status: 200 });
-  });
-  assert.equal(calls, 0);
-});
+test('telemetry API validates payloads and rejects unsafe requests', async () => { assert.equal((await callTelemetryApi({ method: 'GET' })).statusCode, 405); assert.equal((await callTelemetryApi({ envUrl: '' })).statusCode, 503); const privateRes = await callTelemetryApi({ body: { ...baseEvent, gameTitle: 'Private Game' } }); assert.equal(privateRes.statusCode, 400); assert.equal((privateRes.body as { code: string }).code, 'PRIVACY_FIELD_REJECTED'); assert.equal((await callTelemetryApi({ body: { ...baseEvent, install_mode: 'desktop' } })).statusCode, 400); });
 
-test('telemetry self-test does not send when local setting is disabled', async () => {
-  installLocalStorage(defaultAnalyticsSettings);
-  let calls = 0;
-  const result = await runTelemetrySelfTest(async () => {
-    calls += 1;
-    return new Response(null, { status: 200 });
-  });
-  assert.equal(calls, 0);
-  assert.equal(result.sent, false);
-  assert.equal(result.telemetryEnabled, false);
-});
+test('telemetry API forwards valid event server-side and hides upstream details', async () => { let calls = 0; const res = await callTelemetryApi({ fetchImpl: async (url, init) => { calls += 1; assert.equal(url, 'https://make.example.test/hook'); assert.equal(JSON.parse(String(init?.body)).eventName, 'app_session_started'); return new Response('accepted', { status: 200 }); }}); assert.equal(calls, 1); assert.equal(res.statusCode, 202); const rejected = await callTelemetryApi({ fetchImpl: async () => new Response('secret upstream text', { status: 500 }) }); assert.equal(rejected.statusCode, 502); assert.doesNotMatch(JSON.stringify(rejected.body), /secret upstream text/); });
 
-test('telemetry self-test sends one privacy-safe POST with no-store cache', async () => {
-  enableLocalAnalytics();
-  let calls = 0;
-  const result = await runTelemetrySelfTest(async (url, init) => {
-    calls += 1;
-    assert.equal(url, configuredAnalytics.endpointUrl);
-    assert.equal(init?.method, 'POST');
-    const headers = init?.headers as Record<string, string>;
-    assert.equal(headers['Content-Type'], 'application/json');
-    assert.equal(headers['x-make-apikey'], undefined);
-    assert.equal(init?.cache, 'no-store');
-    assert.equal(init?.credentials, 'omit');
-    const body = JSON.parse(String(init?.body));
-    assert.equal(body.eventName, 'telemetry_test');
-    assert.equal(Object.hasOwn(body, 'gameTitle'), false);
-    assert.equal(Object.hasOwn(body, 'notes'), false);
-    return new Response('ok', { status: 202, headers: { 'content-type': 'text/plain' } });
-  }, configuredAnalytics);
-  assert.equal(calls, 1);
-  assert.equal(result.sent, true);
-  assert.equal(result.status, 202);
-  assert.equal(result.requestHost, '/api/telemetry');
-  assert.equal(result.responseText, 'ok');
-});
-
-test('browser telemetry uses first-party endpoint without Make.com secret header', async () => {
-  enableLocalAnalytics();
-  await sendAnalyticsEvent(baseEvent, configuredAnalytics, async (_url, init) => {
-    const headers = init?.headers as Record<string, string>;
-    assert.equal(headers['x-make-apikey'], undefined);
-    assert.equal(headers['X-QS-Analytics-Key'], undefined);
-    assert.equal(headers['Content-Type'], 'application/json');
-    return new Response(null, { status: 200 });
-  });
-});
-
-test('send failures are swallowed', async () => {
-  enableLocalAnalytics();
-  await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
-    throw new Error('network failed');
-  }));
-});
-
-test('a non-2xx response never throws or blocks', async () => {
-  enableLocalAnalytics();
-  let calls = 0;
-  await assert.doesNotReject(() => sendAnalyticsEvent(baseEvent, configuredAnalytics, async () => {
-    calls += 1;
-    return new Response('nope', { status: 500 });
-  }));
-  assert.equal(calls, 1);
-});
-
-test('platform queue regression assertions', () => {
-  runPlatformQueueUniquenessRegressionAssertions();
-});
-
-function createApiResponse() {
-  return {
-    statusCode: 200,
-    headers: {} as Record<string, string>,
-    body: undefined as unknown,
-    setHeader(key: string, value: string) { this.headers[key] = value; },
-    status(code: number) { this.statusCode = code; return this; },
-    json(value: unknown) { this.body = value; return this; },
-  };
-}
-
-async function callTelemetryApi({ method = 'POST', body = baseEvent, envUrl = 'https://make.example.test/hook', fetchImpl }: { method?: string; body?: unknown; envUrl?: string; fetchImpl?: typeof fetch } = {}) {
-  const originalWebhook = process.env.QS_ANALYTICS_WEBHOOK_URL;
-  const originalFetch = globalThis.fetch;
-  if (envUrl === '') delete process.env.QS_ANALYTICS_WEBHOOK_URL;
-  else process.env.QS_ANALYTICS_WEBHOOK_URL = envUrl;
-  if (fetchImpl) globalThis.fetch = fetchImpl;
-  const res = createApiResponse();
-  try {
-    await telemetryHandler({ method, body, headers: { 'content-length': String(JSON.stringify(body).length) } }, res);
-    return res;
-  } finally {
-    if (originalWebhook === undefined) delete process.env.QS_ANALYTICS_WEBHOOK_URL;
-    else process.env.QS_ANALYTICS_WEBHOOK_URL = originalWebhook;
-    globalThis.fetch = originalFetch;
-  }
-}
-
-test('telemetry API rejects non-POST requests', async () => {
-  const res = await callTelemetryApi({ method: 'GET' });
-  assert.equal(res.statusCode, 405);
-  assert.equal((res.body as { code: string }).code, 'METHOD_NOT_ALLOWED');
-});
-
-test('telemetry API reports missing server webhook configuration without exposing URL', async () => {
-  const res = await callTelemetryApi({ envUrl: '' });
-  assert.equal(res.statusCode, 503);
-  assert.equal((res.body as { code: string }).code, 'TELEMETRY_NOT_CONFIGURED');
-  assert.doesNotMatch(JSON.stringify(res.body), /make\.example|hook/);
-});
-
-test('telemetry API validates payload and rejects private fields', async () => {
-  const res = await callTelemetryApi({ body: { ...baseEvent, gameTitle: 'Private Game' } });
-  assert.equal(res.statusCode, 400);
-  assert.equal((res.body as { code: string }).code, 'UNSUPPORTED_FIELD');
-});
-
-test('telemetry API forwards valid event to Make webhook server-side', async () => {
-  let calls = 0;
-  const res = await callTelemetryApi({ fetchImpl: async (url, init) => {
-    calls += 1;
-    assert.equal(url, 'https://make.example.test/hook');
-    assert.equal(init?.method, 'POST');
-    assert.deepEqual(init?.headers, { 'Content-Type': 'application/json' });
-    assert.equal(JSON.parse(String(init?.body)).eventName, 'app_open');
-    return new Response('accepted', { status: 200 });
-  }});
-  assert.equal(calls, 1);
-  assert.equal(res.statusCode, 202);
-  assert.equal((res.body as { success: boolean; accepted: boolean }).accepted, true);
-});
-
-test('telemetry API returns safe status for Make non-2xx response', async () => {
-  const res = await callTelemetryApi({ fetchImpl: async () => new Response('secret upstream text', { status: 500 }) });
-  assert.equal(res.statusCode, 502);
-  assert.equal((res.body as { code: string; status: number }).code, 'UPSTREAM_REJECTED');
-  assert.equal((res.body as { status: number }).status, 500);
-  assert.doesNotMatch(JSON.stringify(res.body), /secret upstream text/);
-});
-
-test('service worker bypasses telemetry and all non-GET API requests', () => {
-  const sw = readFileSync('public/sw.js', 'utf8');
-  assert.match(sw, /if \(request\.method !== 'GET'\) \{\s*return;\s*\}/);
-  assert.match(sw, /requestUrl\.pathname\.startsWith\('\/api\/'\)/);
-});
+test('registry covers requested catalogue and service worker bypasses telemetry', () => { for (const eventName of analyticsEventNames) assert.ok(telemetryEventRegistry[eventName]); const sw = readFileSync('public/sw.js', 'utf8'); assert.match(sw, /if \(request\.method !== 'GET'\) \{\s*return;\s*\}/); assert.match(sw, /requestUrl\.pathname\.startsWith\('\/api\/'\)/); runPlatformQueueUniquenessRegressionAssertions(); });

@@ -198,7 +198,7 @@ export function AppController() {
     skipOnboardingItem,
     skippedOnboardingItemIds,
   } = useOnboardingController({ setActiveNavItem, setActiveSettingsCategory, setIsAddGameOpen, setSelectedGameId });
-  const { trackMinimalAnalyticsEvent } = useAnalytics({
+  const { trackMinimalAnalyticsEvent, counts, bucketItemCount } = useAnalytics({
     activeNavItem,
     activeQueuePlatforms,
     activeSettingsCategory,
@@ -542,7 +542,7 @@ export function AppController() {
     const createdGames = importGames(importedGames);
     if (createdGames.length > 0) {
       markOnboardingItemComplete('retro-import');
-      trackMinimalAnalyticsEvent('import_completed', 'retro');
+      trackMinimalAnalyticsEvent('library_import_completed', { source: 'retro_file', outcome: 'success', imported_count_bucket: bucketItemCount(createdGames.length), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
     }
     setLastRetroImportGameIds(createdGames.map((game) => game.id));
     return createdGames;
@@ -552,7 +552,7 @@ export function AppController() {
   function importSteamGames(importedGames: Game[]) {
     const createdGames = importGames(importedGames);
     if (createdGames.length > 0) {
-      trackMinimalAnalyticsEvent('import_completed', 'steam');
+      trackMinimalAnalyticsEvent('library_import_completed', { source: 'steam', outcome: 'success', imported_count_bucket: bucketItemCount(createdGames.length), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
     }
     return createdGames;
   }
@@ -646,7 +646,7 @@ export function AppController() {
         setPlatformQueueState((currentState) =>
           createdGames.reduce((nextState, game) => addGameToPlatformQueue(nextState, game, game.platform), currentState),
         );
-        trackMinimalAnalyticsEvent('import_completed', 'steam');
+        trackMinimalAnalyticsEvent('library_import_completed', { source: 'steam', outcome: 'success', imported_count_bucket: bucketItemCount(ownedGames.length), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
       }
 
       const duplicateCount = ownedGames.filter((game) => librarySteamAppIds.has(game.appid)).length;
@@ -680,7 +680,7 @@ export function AppController() {
   function importMultiGameItemsWithAnalytics(...args: Parameters<typeof importMultiGameItems>) {
     const summary = importMultiGameItems(...args);
     if (summary.importedCount > 0 || summary.updatedExisting > 0) {
-      trackMinimalAnalyticsEvent('import_completed', summary.source === 'playstation-library' ? 'unknown' : 'manual');
+      trackMinimalAnalyticsEvent('library_import_completed', { source: summary.source === 'playstation-library' ? 'playstation_bookmarklet' : 'manual', outcome: 'success', imported_count_bucket: bucketItemCount(summary.importedCount + summary.updatedExisting), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
     }
     return summary;
   }
@@ -688,20 +688,20 @@ export function AppController() {
   function importSteamWishlistHtmlItemsWithAnalytics(...args: Parameters<typeof importSteamWishlistHtmlItems>) {
     const summary = importSteamWishlistHtmlItems(...args);
     if (summary.addedCount > 0) {
-      trackMinimalAnalyticsEvent('import_completed', 'wishlist_html');
+      trackMinimalAnalyticsEvent('library_import_completed', { source: 'other', outcome: 'success', imported_count_bucket: bucketItemCount(summary.addedCount), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
     }
     return summary;
   }
 
   function handleBackupExported() {
     markOnboardingItemComplete('backup-exported');
-    trackMinimalAnalyticsEvent('backup_exported');
+    trackMinimalAnalyticsEvent('backup_export_completed', { outcome: 'success', library_size_bucket: counts.librarySize <= 0 ? 'empty' : counts.librarySize <= 25 ? '1_25' : counts.librarySize <= 100 ? '26_100' : counts.librarySize <= 300 ? '101_300' : counts.librarySize <= 1000 ? '301_1000' : '1000_plus', duration_bucket: 'under_2s' });
     onBackupExported();
   }
 
   function handleBackupImported() {
-    trackMinimalAnalyticsEvent('backup_imported');
-    trackMinimalAnalyticsEvent('import_completed', 'backup');
+    trackMinimalAnalyticsEvent('backup_restore_completed', { outcome: 'success', restored_count_bucket: bucketItemCount(counts.librarySize), duration_bucket: 'under_2s', migration_required: false });
+    trackMinimalAnalyticsEvent('library_import_completed', { source: 'backup_restore', outcome: 'success', imported_count_bucket: bucketItemCount(counts.librarySize), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
     onBackupImported();
   }
 
