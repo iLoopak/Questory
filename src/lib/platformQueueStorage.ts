@@ -1,9 +1,10 @@
 import type { Game, GamePlatform } from '../types/game';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { getStorageAdapter } from './storageAdapter';
 import { resolveDefaultPlatformArtwork } from './platformArtwork';
 
 const STORAGE_KEY = 'questshelf.platformQueues.v1';
-const platformQueueSchemaVersion = 1;
+const platformQueueSchemaVersion = 2;
 
 export const queuePriorityOptions = ['low', 'normal', 'high'] as const;
 export type QueuePriority = (typeof queuePriorityOptions)[number];
@@ -30,6 +31,29 @@ export type PlatformQueueSettings = {
 export type PlatformQueueState = {
   activePlatforms: GamePlatform[];
   entries: PlatformQueueEntry[];
+  schemaVersion: typeof platformQueueSchemaVersion;
+  settings: PlatformQueueSettings[];
+};
+
+export type PersistedPlatformPlanItem = {
+  expectedCompletionDate?: string;
+  estimatedPlaytime?: number | null;
+  gameId: string;
+  queueNotes?: string;
+  queuePriority?: QueuePriority;
+  queuedAt?: string;
+};
+
+export type PersistedPlatformPlan = {
+  gameIds: string[];
+  id: string;
+  items?: PersistedPlatformPlanItem[];
+  platform: GamePlatform;
+};
+
+export type PersistedPlatformQueueState = {
+  activePlatforms: GamePlatform[];
+  plans: PersistedPlatformPlan[];
   schemaVersion: typeof platformQueueSchemaVersion;
   settings: PlatformQueueSettings[];
 };
@@ -141,11 +165,73 @@ const emptyQueueState: PlatformQueueState = {
 };
 
 export function loadPlatformQueueState(): PlatformQueueState {
-  return loadLocalJson(STORAGE_KEY, emptyQueueState, normalizePlatformQueueState);
+  const state = loadLocalJson(STORAGE_KEY, emptyQueueState, normalizePlatformQueueState);
+  migrateLegacyPlatformQueueStorage(state);
+  return state;
 }
 
 export function savePlatformQueueState(state: PlatformQueueState) {
-  savePersistedJson(STORAGE_KEY, normalizePlatformQueueState(state));
+  savePersistedJson(STORAGE_KEY, serializePlatformQueueState(state));
+}
+
+export function normalizePlatformQueuePersistedState(value: unknown): PersistedPlatformQueueState {
+  return serializePlatformQueueState(normalizePlatformQueueState(value));
+}
+
+export function serializePlatformQueueState(state: PlatformQueueState): PersistedPlatformQueueState {
+  const normalized = normalizePlatformQueueState(state);
+  const groupedEntries = new Map<GamePlatform, PlatformQueueEntry[]>();
+
+  normalized.entries.forEach((entry) => {
+    const entries = groupedEntries.get(entry.targetPlatform) ?? [];
+    entries.push(entry);
+    groupedEntries.set(entry.targetPlatform, entries);
+  });
+
+  return {
+    activePlatforms: normalized.activePlatforms,
+    plans: Array.from(groupedEntries.entries()).map(([platform, entries]) => ({
+      gameIds: [...entries].sort(compareQueueEntries).map((entry) => entry.gameId),
+      id: getPlatformPlanId(platform),
+      items: [...entries].sort(compareQueueEntries).map((entry) => ({
+        expectedCompletionDate: entry.expectedCompletionDate,
+        estimatedPlaytime: entry.estimatedPlaytime,
+        gameId: entry.gameId,
+        queueNotes: entry.queueNotes || undefined,
+        queuePriority: entry.queuePriority === 'normal' ? undefined : entry.queuePriority,
+        queuedAt: entry.queuedAt,
+      })),
+      platform,
+    })),
+    schemaVersion: platformQueueSchemaVersion,
+    settings: normalized.settings,
+  };
+}
+
+
+function migrateLegacyPlatformQueueStorage(state: PlatformQueueState) {
+  const storedValue = getStorageAdapter().readLocal(STORAGE_KEY);
+  if (!storedValue) {
+    return;
+  }
+
+  try {
+    const parsedValue = JSON.parse(storedValue) as Partial<PlatformQueueState> & Partial<PersistedPlatformQueueState>;
+    if (!Array.isArray(parsedValue.entries) || Array.isArray(parsedValue.plans)) {
+      return;
+    }
+
+    const persistedState = serializePlatformQueueState(state);
+    savePersistedJson(STORAGE_KEY, persistedState);
+
+    const verifiedValue = getStorageAdapter().readLocal(STORAGE_KEY);
+    if (!verifiedValue) {
+      return;
+    }
+    normalizePlatformQueueState(JSON.parse(verifiedValue));
+  } catch {
+    // Leave the existing payload untouched so the migration can retry on a later load/write.
+  }
 }
 
 export function getQueuePlatforms(games: Game[], state: PlatformQueueState): GamePlatform[] {
@@ -495,8 +581,12 @@ export function compareQueueEntries(first: PlatformQueueEntry, second: PlatformQ
 }
 
 export function normalizePlatformQueueState(value: unknown): PlatformQueueState {
-  const parsedState = value && typeof value === 'object' ? (value as Partial<PlatformQueueState>) : {};
-  const entries = Array.isArray(parsedState.entries) ? parsedState.entries.filter(isQueueEntry) : [];
+  const parsedState = value && typeof value === 'object' ? (value as Partial<PlatformQueueState> & Partial<PersistedPlatformQueueState>) : {};
+  const entries = Array.isArray(parsedState.entries)
+    ? parsedState.entries.filter(isQueueEntry)
+    : Array.isArray(parsedState.plans)
+      ? entriesFromPersistedPlans(parsedState.plans)
+      : [];
   const settings = Array.isArray(parsedState.settings) ? parsedState.settings.filter(isQueueSetting) : [];
   const hasSavedActivePlatforms = Array.isArray(parsedState.activePlatforms);
   const activePlatforms = hasSavedActivePlatforms
@@ -509,6 +599,43 @@ export function normalizePlatformQueueState(value: unknown): PlatformQueueState 
     schemaVersion: platformQueueSchemaVersion,
     settings: settings.map(normalizeQueueSetting),
   });
+}
+
+
+function entriesFromPersistedPlans(plans: PersistedPlatformPlan[]): PlatformQueueEntry[] {
+  return plans.flatMap((plan) => {
+    if (!plan || typeof plan !== 'object' || typeof plan.platform !== 'string' || !Array.isArray(plan.gameIds)) {
+      return [];
+    }
+
+    const platform = normalizePlatformName(plan.platform);
+    const itemsByGameId = new Map(
+      (Array.isArray(plan.items) ? plan.items : [])
+        .filter((item): item is PersistedPlatformPlanItem => Boolean(item) && typeof item === 'object' && typeof item.gameId === 'string')
+        .map((item) => [item.gameId.trim(), item]),
+    );
+
+    return plan.gameIds
+      .filter((gameId): gameId is string => typeof gameId === 'string' && Boolean(gameId.trim()))
+      .map((gameId, index) => {
+        const normalizedGameId = gameId.trim();
+        const item = itemsByGameId.get(normalizedGameId);
+        return {
+          expectedCompletionDate: typeof item?.expectedCompletionDate === 'string' ? item.expectedCompletionDate : undefined,
+          estimatedPlaytime: typeof item?.estimatedPlaytime === 'number' ? item.estimatedPlaytime : item?.estimatedPlaytime === null ? null : null,
+          gameId: normalizedGameId,
+          queueNotes: typeof item?.queueNotes === 'string' ? item.queueNotes : '',
+          queuePosition: index + 1,
+          queuePriority: isQueuePriority(item?.queuePriority) ? item.queuePriority : 'normal',
+          queuedAt: typeof item?.queuedAt === 'string' ? item.queuedAt : new Date(0).toISOString(),
+          targetPlatform: platform,
+        } satisfies PlatformQueueEntry;
+      });
+  });
+}
+
+function getPlatformPlanId(platform: GamePlatform) {
+  return `platform:${normalizePlatformName(platform).toLowerCase()}`;
 }
 
 function upsertPlatformQueueSetting(
@@ -617,6 +744,10 @@ function normalizePlatformList(platforms: GamePlatform[]): GamePlatform[] {
 
 function normalizePlatformName(platform: GamePlatform) {
   return platform.trim() as GamePlatform;
+}
+
+function isQueuePriority(value: unknown): value is QueuePriority {
+  return typeof value === 'string' && queuePriorityOptions.includes(value as QueuePriority);
 }
 
 function isQueueEntry(value: unknown): value is PlatformQueueEntry {

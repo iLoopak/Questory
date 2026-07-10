@@ -4,6 +4,8 @@ import {
   addGameToPlatformQueueTop,
   getVisiblePlatformQueueEntries,
   moveQueueEntry,
+  moveQueueEntryToPlatform,
+  normalizePlatformQueuePersistedState,
   normalizePlatformQueueState,
   removeCurrentlyPlayingFromPlatformQueue,
   updatePlatformQueueVisualSettings,
@@ -29,7 +31,7 @@ const baseGame: Game = {
 const emptyState: PlatformQueueState = {
   activePlatforms: ['PS2'],
   entries: [],
-  schemaVersion: 1,
+  schemaVersion: 2,
   settings: [],
 };
 
@@ -120,7 +122,7 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
   assertPlatformEntryCount(reorderState, secondGame.id, 'PS2', 1);
   assertPlatformEntryCount(reorderState, thirdGame.id, 'PS2', 1);
 
-  const customEmptyState = addActiveQueuePlatform({ activePlatforms: [], entries: [], schemaVersion: 1, settings: [] }, 'Analogue Pocket');
+  const customEmptyState = addActiveQueuePlatform({ activePlatforms: [], entries: [], schemaVersion: 2, settings: [] }, 'Analogue Pocket');
   const hydratedCustomEmptyState = normalizePlatformQueueState(JSON.parse(JSON.stringify(customEmptyState)));
   if (!hydratedCustomEmptyState.activePlatforms.includes('Analogue Pocket')) {
     throw new Error('Expected empty custom platform to survive normalization/hydration.');
@@ -139,7 +141,7 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
 
   const persistentArtwork = 'data:image/png;base64,cGVyc2lzdGVudC1hcnR3b3Jr';
   const identityState = updatePlatformQueueVisualSettings(
-    addActiveQueuePlatform({ activePlatforms: [], entries: [], schemaVersion: 1, settings: [] }, 'Analogue Pocket'),
+    addActiveQueuePlatform({ activePlatforms: [], entries: [], schemaVersion: 2, settings: [] }, 'Analogue Pocket'),
     'Analogue Pocket',
     { accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' },
   );
@@ -152,7 +154,7 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
   const legacyIdentityState = normalizePlatformQueueState({
     activePlatforms: ['Analogue Pocket'],
     entries: [],
-    schemaVersion: 1,
+    schemaVersion: 2,
     settings: [{ platform: 'Analogue Pocket', accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' }],
   });
   const legacyIdentity = legacyIdentityState.settings.find((setting) => setting.platform === 'Analogue Pocket');
@@ -163,11 +165,64 @@ export function runPlatformQueueUniquenessRegressionAssertions() {
   const temporaryArtworkState = normalizePlatformQueueState({
     activePlatforms: ['Analogue Pocket'],
     entries: [],
-    schemaVersion: 1,
+    schemaVersion: 2,
     settings: [{ platform: 'Analogue Pocket', maxActiveGames: 3, artworkUrl: 'blob:http://localhost/not-persistent' }],
   });
   if (temporaryArtworkState.settings.find((setting) => setting.platform === 'Analogue Pocket')?.artworkUrl) {
     throw new Error('Expected temporary blob/object artwork URLs to be rejected during hydration.');
+  }
+
+  const legacyState = {
+    activePlatforms: ['Analogue Pocket'],
+    entries: [
+      { gameId: 'alpha', targetPlatform: 'Analogue Pocket', queuedAt: '2026-01-01T00:00:00.000Z', queuePosition: 2, queueNotes: 'second', queuePriority: 'high', estimatedPlaytime: 12, description: 'ignored duplicate game metadata' },
+      { gameId: 'missing-game', targetPlatform: 'Analogue Pocket', queuedAt: '2026-01-02T00:00:00.000Z', queuePosition: 1, queueNotes: '', queuePriority: 'normal', coverImage: 'https://example.test/cover.jpg' },
+      { gameId: 'alpha', targetPlatform: 'Analogue Pocket', queuedAt: '2026-01-03T00:00:00.000Z', queuePosition: 99, queueNotes: 'duplicate', queuePriority: 'low' },
+    ],
+    schemaVersion: 1,
+    settings: [{ platform: 'Analogue Pocket', maxActiveGames: 5, accentColor: '#8b5cf6', artworkUrl: persistentArtwork, platformTag: 'fpga' }],
+  };
+  const migrated = normalizePlatformQueuePersistedState(legacyState);
+  if (migrated.schemaVersion !== 2 || !Array.isArray(migrated.plans) || migrated.plans[0]?.gameIds.join('|') !== 'missing-game|alpha') {
+    throw new Error('Expected legacy platform queue migration to write normalized plans with preserved ordering and missing-game references.');
+  }
+  if (JSON.stringify(migrated).includes('example.test') || JSON.stringify(migrated).includes('description')) {
+    throw new Error('Expected migration to discard duplicated game/artwork metadata from legacy entries.');
+  }
+  const migratedAgain = normalizePlatformQueuePersistedState(migrated);
+  if (migratedAgain.plans.length !== migrated.plans.length || migratedAgain.plans[0]?.gameIds.join('|') !== migrated.plans[0]?.gameIds.join('|')) {
+    throw new Error('Expected platform queue migration to be idempotent.');
+  }
+  const hydratedMigrated = normalizePlatformQueueState(migrated);
+  assertPlatformEntryCount(hydratedMigrated, 'alpha', 'Analogue Pocket', 1);
+  assertPlatformEntryCount(hydratedMigrated, 'missing-game', 'Analogue Pocket', 1);
+
+  let movedState = normalizePlatformQueueState(migrated);
+  movedState = moveQueueEntryToPlatform(movedState, 'alpha', 'Steam Deck', 'Analogue Pocket');
+  assertPlatformEntryCount(movedState, 'alpha', 'Steam Deck', 1);
+  movedState = removeGameFromPlatformQueue(movedState, 'alpha', 'Steam Deck');
+  assertPlatformEntryCount(movedState, 'alpha', 'Steam Deck', 0);
+
+  const largeLegacyState = {
+    activePlatforms: ['Steam Deck'],
+    entries: Array.from({ length: 1000 }, (_, index) => ({
+      gameId: `game-${index}`,
+      targetPlatform: 'Steam Deck',
+      queuedAt: '2026-01-01T00:00:00.000Z',
+      queuePosition: index + 1,
+      queueNotes: '',
+      queuePriority: 'normal',
+      coverImage: `https://images.example.test/${index}.jpg`,
+      screenshots: Array.from({ length: 5 }, (__, shot) => `https://images.example.test/${index}-${shot}.jpg`),
+      rawgMetadata: { description: 'Long duplicated description '.repeat(20), rating: 4.5 },
+    })),
+    schemaVersion: 1,
+    settings: [],
+  };
+  const largeLegacyBytes = JSON.stringify(largeLegacyState).length;
+  const largeNormalizedBytes = JSON.stringify(normalizePlatformQueuePersistedState(largeLegacyState)).length;
+  if (largeNormalizedBytes >= largeLegacyBytes / 2) {
+    throw new Error(`Expected normalized large-library payload to be much smaller than duplicated legacy payload (${largeNormalizedBytes} vs ${largeLegacyBytes}).`);
   }
 
 }
