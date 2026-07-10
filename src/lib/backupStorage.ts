@@ -3,7 +3,7 @@ import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnore
 import { gameRepository, loadGames, normalizeLoadedGames } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
-import { normalizePlatformQueueState } from './platformQueueStorage';
+import { normalizePlatformQueuePersistedState } from './platformQueueStorage';
 import { loadPlayActivity, normalizePlayActivityRecords, playActivityRepository } from './playActivityStorage';
 import { loadRawgMetadataCache, normalizeRawgMetadataCache, rawgMetadataCacheRepository } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
@@ -455,7 +455,7 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
     case 'questshelf.onboarding.v1':
       return normalizeOnboardingState(value);
     case 'questshelf.platformQueues.v1':
-      return normalizePlatformQueueState(value);
+      return normalizePlatformQueuePersistedState(value);
     case 'questshelf.reviewMode.v1':
       return normalizeReviewModeState(value);
     case 'questshelf.appPersonalization.v1':
