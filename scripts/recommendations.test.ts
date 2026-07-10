@@ -3,6 +3,7 @@ import test from 'node:test';
 import { buildUserProfile } from '../src/lib/userProfile';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
 import { scorePersonalRecommendationCandidate } from '../src/services/personalRecommendationsService';
+import { scoreContextualTagOverlapForTest } from '../src/services/contextualRecommendationsService';
 import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds, rankReleaseCalendarResults } from '../src/services/releaseCalendarService';
 import type { Game } from '../src/types/game';
 import type { DiscoveryGame } from '../src/lib/discovery';
@@ -58,6 +59,17 @@ function discovery(overrides: Partial<DiscoveryGame>): DiscoveryGame {
     slug: null,
   };
 }
+
+
+test('contextual recommendations rank niche gameplay overlap above generic tag overlap', () => {
+  const current = ['roguelite', 'deckbuilder', 'singleplayer', 'indie', '2d', 'controller'];
+  const niche = scoreContextualTagOverlapForTest(['roguelite', 'deckbuilder'], current);
+  const generic = scoreContextualTagOverlapForTest(['singleplayer', 'indie', '2d', 'controller', 'pixel-graphics', '3d'], current);
+
+  assert.ok(niche.score > generic.score);
+  assert.ok(niche.meaningfulMatches >= 2);
+  assert.equal(generic.meaningfulMatches, 0);
+});
 
 test('highly rated finished games raise matching candidate scores', () => {
   const profile = buildUserProfile([game({ id: 'hades', status: 'Finished', rating: 5, genres: ['Action'], rawgTags: ['roguelite'] })]);
