@@ -1477,14 +1477,9 @@ function ReviewComplete({
       <div className="max-w-3xl">
         <div className="text-xs font-semibold uppercase tracking-spread text-mint">Quest Queue Session Complete</div>
         <h3 className="mt-2 text-3xl font-semibold text-white">Great work!</h3>
-        <p className="mt-3 text-sm text-slate-400">
-          You reviewed {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} from {sourceLabel}{reviewedCount > 0 ? ' — every decision improves your library' : ''}.
+        <p className="mt-3 text-sm font-medium text-slate-300">
+          {reviewedCount} {reviewedCount === 1 ? 'game' : 'games'} reviewed · {remainingCount} remaining
         </p>
-        {remainingCount > 0 && (
-          <p className="mt-2 text-xs text-slate-500">
-            Quest Queue reviews in focused 20-game sessions to keep decisions quick and manageable. {remainingCount} {remainingCount === 1 ? 'game remains' : 'games remain'} for your next session.
-          </p>
-        )}
         <BatchCelebrationCovers games={processedGames} />
         <div className="mt-5 rounded-2xl border border-skyglass/15 bg-ink-950/60 p-4 text-left">
           <div className="flex items-center justify-between gap-3">
