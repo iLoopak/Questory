@@ -5,6 +5,7 @@ import type { RawgSearchResult } from '../types/rawg';
 import { buildUserProfile, profileFingerprint } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames } from './rawgApi';
+import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 
 // ---------------------------------------------------------------------------
 // Recommendation scoring
@@ -131,33 +132,21 @@ let cache: CacheEntry | null = null;
 const CACHE_STORAGE_KEY = 'questshelf.personalRecommendations.v1';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-function readStoredCache(): CacheEntry | null {
-  if (typeof localStorage === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(CACHE_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CacheEntry>;
-    if (!Array.isArray(parsed.candidates) || typeof parsed.fingerprint !== 'string' || typeof parsed.fetchedAt !== 'number') {
-      return null;
-    }
-    return { candidates: parsed.candidates as DiscoveryCandidate[], fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
-  } catch {
+async function readStoredCache(): Promise<CacheEntry | null> {
+  const parsed = await readAppCacheValue<Partial<CacheEntry>>(CACHE_STORAGE_KEY);
+  if (!parsed || !Array.isArray(parsed.candidates) || typeof parsed.fingerprint !== 'string' || typeof parsed.fetchedAt !== 'number') {
     return null;
   }
+  return { candidates: parsed.candidates as DiscoveryCandidate[], fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
 }
 
 function writeStoredCache(entry: CacheEntry): void {
   cache = entry;
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entry));
-  } catch {
-    // In-memory cache still keeps the current session fast if persistent storage is unavailable.
-  }
+  void writeAppCacheValue(CACHE_STORAGE_KEY, entry);
 }
 
-function getFreshCacheEntry(fingerprint: string): CacheEntry | null {
-  const entry = cache?.fingerprint === fingerprint ? cache : readStoredCache();
+async function getFreshCacheEntry(fingerprint: string): Promise<CacheEntry | null> {
+  const entry = cache?.fingerprint === fingerprint ? cache : await readStoredCache();
   if (!entry || entry.fingerprint !== fingerprint) return null;
   if (Date.now() - entry.fetchedAt >= CACHE_TTL_MS) return null;
   cache = entry;
@@ -172,7 +161,7 @@ export async function fetchPersonalRecommendations(
   const fp = profileFingerprint(userGames);
 
   // Return cached result if fingerprint and daily TTL are still valid.
-  const freshCache = getFreshCacheEntry(fp);
+  const freshCache = await getFreshCacheEntry(fp);
   if (freshCache) {
     // Re-apply library/inbox status from current state (may have changed without profile change).
     // Preserve original reason strings from the cached pool.

@@ -8,12 +8,18 @@ import { getStorageAdapter } from './storageAdapter';
 import { getGameRepositoryStatus } from './gameStorage';
 import { getRawgMetadataCacheStatus } from './rawgMetadataCache';
 import { getPlayActivityStoreStatus } from './playActivityStorage';
+import { getAppCacheStatus, type AppCacheStatus } from './indexedDbAppCache';
 import type { GameRepositoryStatus } from './indexedDbGameRepository';
 import type { RawgMetadataCacheStatus } from './rawgMetadataCacheRepository';
 import type { PlayActivityStoreStatus } from './indexedDbPlayActivityRepository';
 
 const QUESTSHELF_PREFIX = 'questshelf.';
 const GAMES_KEY = 'questshelf.games.v1';
+const INDEXEDDB_CACHE_KEYS = new Set([
+  'questshelf.screenshots.v1',
+  'questshelf.personalRecommendations.v1',
+  'questshelf.releaseCalendar.v2',
+]);
 
 export type StorageKeySize = {
   key: string;
@@ -44,6 +50,7 @@ export type StorageDiagnostics = {
   gameStore: GameRepositoryStatus;
   rawgCacheStore: RawgMetadataCacheStatus;
   playActivityStore: PlayActivityStoreStatus;
+  appCacheStore: AppCacheStatus;
   /** Whether the IndexedDB API exists in this environment (the store backend depends on it). */
   indexedDbAvailable: boolean;
 };
@@ -69,6 +76,9 @@ export function getLocalStorageBreakdown(): LocalStorageBreakdown {
     const value = adapter.readLocal(key) ?? '';
     const bytes = byteLength(key) + byteLength(value);
     totalBytes += bytes;
+    if (INDEXEDDB_CACHE_KEYS.has(key)) {
+      continue;
+    }
     if (key === GAMES_KEY) {
       gamesBytes = bytes;
     }
@@ -111,6 +121,7 @@ export async function getStorageDiagnostics(): Promise<StorageDiagnostics> {
     gameStore: getGameRepositoryStatus(),
     rawgCacheStore: getRawgMetadataCacheStatus(),
     playActivityStore: getPlayActivityStoreStatus(),
+    appCacheStore: await getAppCacheStatus(),
     indexedDbAvailable: typeof indexedDB !== 'undefined',
   };
 }

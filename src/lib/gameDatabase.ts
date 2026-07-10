@@ -10,9 +10,11 @@ import type { Game } from '../types/game';
 import type { RawgMetadataCacheEntry } from './rawgMetadataCache';
 import type { PlayActivityRecord } from './playActivityStorage';
 
+export type AppCacheRow = { key: string; value: unknown; updatedAt: number };
+
 export const GAME_DATABASE_NAME = 'questory';
 /** Dexie schema version for the shared Questory database. Bumped when a store is added. */
-export const QUESTORY_DB_VERSION = 3;
+export const QUESTORY_DB_VERSION = 4;
 
 /** RAWG cache row: the entry plus its cache key as the inbound primary key. */
 export type RawgMetadataCacheRow = { key: string } & RawgMetadataCacheEntry;
@@ -21,6 +23,7 @@ export class QuestoryDatabase extends Dexie {
   games!: Table<Game, string>;
   rawgMetadataCache!: Table<RawgMetadataCacheRow, string>;
   playActivity!: Table<PlayActivityRecord, string>;
+  appCaches!: Table<AppCacheRow, string>;
 
   constructor() {
     super(GAME_DATABASE_NAME);
@@ -38,6 +41,13 @@ export class QuestoryDatabase extends Dexie {
       games: 'id, collectionType, status, platform, steamAppId, rawgId, updatedAt',
       rawgMetadataCache: 'key, rawgId, cachedAt',
       playActivity: 'id, gameId, date, source, type, detectedAt',
+    });
+    // v4: small-keyed heavy/cache datasets previously stored as whole localStorage blobs.
+    this.version(4).stores({
+      games: 'id, collectionType, status, platform, steamAppId, rawgId, updatedAt',
+      rawgMetadataCache: 'key, rawgId, cachedAt',
+      playActivity: 'id, gameId, date, source, type, detectedAt',
+      appCaches: 'key, updatedAt',
     });
   }
 }
