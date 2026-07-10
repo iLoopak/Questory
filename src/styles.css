@@ -3886,6 +3886,25 @@ body.qs-controller-active .qs-compact-card:focus-within {
   to   { transform: translateY(-11px) rotate(var(--tile-rotate, 0deg)); }
 }
 
+.qs-batch-cover-tile {
+  animation: qs-float-a 6s ease-in-out infinite alternate;
+  transform: rotate(var(--tile-rotate, 0deg));
+  transform-origin: center;
+  will-change: transform;
+}
+
+.qs-batch-cover-tile:nth-of-type(3n + 1) {
+  animation-name: qs-float-a;
+}
+
+.qs-batch-cover-tile:nth-of-type(3n + 2) {
+  animation-name: qs-float-b;
+}
+
+.qs-batch-cover-tile:nth-of-type(3n) {
+  animation-name: qs-float-c;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .qs-batch-cover-tile {
     animation: none !important;

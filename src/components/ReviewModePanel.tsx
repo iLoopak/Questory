@@ -23,7 +23,7 @@ import { PlatformIdentityBadge } from './PlatformIdentityBadge';
 import { getReviewSourceLabel, reviewSourceOptions, type ReviewModeState, type ReviewSource } from '../lib/reviewModeStorage';
 import type { Game, GamePlatform } from '../types/game';
 import { Icon, type IconName } from './Icon';
-import { QueueCompletionScreen } from './QueueCompletionScreen';
+import { QueueCompletionScreen, type QueueCompletionArtwork } from './QueueCompletionScreen';
 import { QueueGhost, pickQueueGhostSlot, releaseQueueGhostHabitat, shouldShowQueueGhostInHabitat } from './QueueGhost';
 import { ScreenshotStrip } from './ScreenshotStrip';
 import { RatingBadgeStack } from './RatingBadgeStack';
@@ -1465,6 +1465,7 @@ function ReviewComplete({
     actionStats.skipped > 0 ? { label: `${actionStats.skipped} skipped`, tone: 'muted' as const, value: actionStats.skipped } : null,
     actionStats.ignored > 0 ? { label: `${actionStats.ignored} ignored`, tone: 'muted' as const, value: actionStats.ignored } : null,
   ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
+  const artwork = getQuestQueueCompletionArtwork(sessionSummary);
   const actions = isQueueEmpty
     ? [
         ...(actionStats.queued > 0 || noPlatformsWarning ? [{ label: noPlatformsWarning ? 'Set Up Platform Plans' : 'Open Platform Plans', onClick: onOpenQueue, variant: 'secondary' as const }] : []),
@@ -1479,6 +1480,7 @@ function ReviewComplete({
   return (
     <QueueCompletionScreen
       actions={actions}
+      artwork={artwork}
       chips={chips}
       eyebrow="QUEST QUEUE COMPLETE"
       footer={noPlatformsWarning ? 'Set up at least one platform so your queued games have somewhere to go.' : isQueueEmpty ? 'Your Quest Queue is clear for now.' : 'Your next batch is ready when you are.'}
@@ -1491,6 +1493,18 @@ function ReviewComplete({
       ]}
     />
   );
+}
+
+function getQuestQueueCompletionArtwork(sessionSummary: ReviewSessionSummary): QueueCompletionArtwork[] {
+  const seen = new Set<string>();
+  return sessionSummary.highlights
+    .flatMap((highlight) => highlight.games)
+    .flatMap((game) => getGameCoverSources(game, { includeGeneratedFallback: false }).map((url) => ({ alt: game.title, id: game.id, url })))
+    .filter((item) => {
+      if (!item.url || seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
 }
 
 const sessionReportActions: Array<{ action: ReviewModeAction; key: keyof ReviewActionStats; icon: IconName; label: string }> = [
