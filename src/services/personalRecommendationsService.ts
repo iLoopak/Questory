@@ -2,7 +2,7 @@ import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryExclusionReason } from '../lib/discovery';
 import type { UserProfile } from '../lib/userProfile';
 import type { RawgSearchResult } from '../types/rawg';
-import { buildUserProfile, getRecommendationSignalWeight, profileFingerprint } from '../lib/userProfile';
+import { buildUserProfile, getRecommendationSignalWeight, preferenceTagWeight, profileFingerprint, toSlug } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames, fetchSuggestedGames } from './rawgApi';
 import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
@@ -109,7 +109,7 @@ export function scorePersonalRecommendationCandidate(
   relaxation = 0,
 ): RecommendationScore {
   const candidateGenres = (result.genres ?? []).map((g) => g.name);
-  const candidateTags = (result.tags ?? []).map((t) => t.slug ?? t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
+  const candidateTags = (result.tags ?? []).map((t) => t.slug ?? toSlug(t.name));
   const candidateDevelopers = (result as RawgSearchResult & { developers?: Array<{ name: string }> }).developers?.map((d) => d.name) ?? [];
   const candidatePlatforms = (result.platforms ?? []).map((p) => p.platform.name);
 
@@ -118,11 +118,17 @@ export function scorePersonalRecommendationCandidate(
   const consideredPlatforms = profile.topPlatforms.slice(0, Math.min(profile.topPlatforms.length, 3 + relaxation));
 
   const totalGenreWeight = consideredGenres.reduce((s, g) => s + g.weight, 0) || 1;
+  const consideredTagWeights = profile.topTagWeights.length > 0
+    ? profile.topTagWeights.slice(0, Math.min(profile.topTagWeights.length, 8 + relaxation * 3))
+    : consideredTags.map((name) => ({ name, weight: preferenceTagWeight(name) }));
+  const totalTagWeight = consideredTagWeights.reduce((s, tag) => s + tag.weight, 0) || 1;
   const genreMatch = Math.round(Math.min(50, consideredGenres.reduce((sum, pg) => (
     candidateGenres.includes(pg.name) ? sum + (pg.weight / totalGenreWeight) * 50 : sum
   ), 0)));
 
-  const tagMatch = Math.min(30, consideredTags.filter((tag) => candidateTags.includes(tag)).length * (relaxation >= 2 ? 5 : 6));
+  const tagMatch = Math.round(Math.min(36, consideredTagWeights.reduce((sum, tag) => (
+    candidateTags.includes(tag.name) ? sum + (tag.weight / totalTagWeight) * 36 : sum
+  ), 0)));
   const developerMatch = Math.min(15, profile.topDevelopers.filter((dev) => candidateDevelopers.includes(dev)).length * 8);
   const platformMatch = Math.min(10, consideredPlatforms.filter((platform) => candidatePlatforms.includes(platform) || candidatePlatforms.includes(platform === 'Steam' ? 'PC' : platform)).length * (relaxation >= 2 ? 4 : 5));
 
@@ -138,7 +144,10 @@ export function scorePersonalRecommendationCandidate(
     metacriticMatch = Math.round(Math.max(0, 10 - diff / (5 + relaxation * 2)));
   }
 
-  const total = genreMatch + tagMatch + developerMatch + platformMatch + negativeMatch + metacriticMatch;
+  const qualityMatch = Math.min(12, Math.round(((result.rating ?? 0) >= 4 ? 6 : 0) + Math.min(6, Math.log10(Math.max(1, result.ratings_count ?? 0)))));
+  const releaseYear = result.released ? Number.parseInt(result.released.slice(0, 4), 10) : 0;
+  const recencyMatch = Number.isFinite(releaseYear) && releaseYear >= new Date().getUTCFullYear() - 3 ? 4 : 0;
+  const total = genreMatch + tagMatch + developerMatch + platformMatch + negativeMatch + metacriticMatch + qualityMatch + recencyMatch;
   return { genreMatch, tagMatch, developerMatch, platformMatch, negativeMatch, metacriticMatch, ownershipPenalty: 0, total };
 }
 
@@ -166,7 +175,25 @@ function getPositiveSignalGames(userGames: Game[]): Game[] {
 }
 
 function getPlanAndWishlistGames(userGames: Game[]): Game[] {
-  return userGames.filter((game) => game.rawgId && (game.collectionType === 'wishlist' || game.status === 'Want to play')).slice(0, 5);
+  return userGames
+    .filter((game) => game.rawgId && (game.collectionType === 'wishlist' || game.status === 'Want to play'))
+    .sort((a, b) => getRecommendationSignalWeight(b).weight - getRecommendationSignalWeight(a).weight)
+    .slice(0, 6);
+}
+
+const RAWG_PLATFORM_IDS: Record<string, string> = {
+  Steam: '4', PC: '4', PS5: '187', PS4: '18', Switch: '7', 'Switch 2': '7', Android: '21',
+};
+
+function getPreferredRawgPlatforms(profile: UserProfile): string | undefined {
+  const ids = [...new Set(profile.topPlatforms.map((platform) => RAWG_PLATFORM_IDS[platform]).filter(Boolean))];
+  return ids.slice(0, 3).join(',') || undefined;
+}
+
+function getUpcomingDateRange(months = 9, now = new Date()): string {
+  const start = now.toISOString().slice(0, 10);
+  const endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + months, now.getUTCDate()));
+  return `${start},${endDate.toISOString().slice(0, 10)}`;
 }
 
 function getRecentlyInteractedGames(userGames: Game[]): Game[] {
@@ -251,6 +278,10 @@ async function readStoredCache(): Promise<CacheEntry | null> {
   return { candidates: parsed.candidates as DiscoveryCandidate[], fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
 }
 function writeStoredCache(entry: CacheEntry): void { cache = entry; void writeAppCacheValue(CACHE_STORAGE_KEY, entry); }
+async function getAnyStoredCacheEntry(): Promise<CacheEntry | null> {
+  return cache ?? await readStoredCache();
+}
+
 async function getFreshCacheEntry(fingerprint: string): Promise<CacheEntry | null> {
   const entry = cache?.fingerprint === fingerprint ? cache : await readStoredCache();
   if (!entry || entry.fingerprint !== fingerprint || Date.now() - entry.fetchedAt >= CACHE_TTL_MS) return null;
@@ -298,24 +329,36 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
 
   await addStage('liked-game-similar', async () => Promise.all(likedSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 22);
 
-  await addStage('affinity-strict', async () => [{ results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 3).map((g) => g.slug).join(','), tags: profile.topTags.slice(0, 5).join(',') || undefined, metacriticMin: profile.avgMetacritic != null && profile.avgMetacritic >= 70 ? Math.max(55, profile.avgMetacritic - 18) : undefined, pageSize: 40 }) }], 24);
+  const preferredPlatforms = getPreferredRawgPlatforms(profile);
+
+  await addStage('affinity-strict', async () => [{ results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 3).map((g) => g.slug).join(','), tags: profile.topTags.slice(0, 3).join(',') || undefined, platforms: preferredPlatforms, metacriticMin: profile.avgMetacritic != null && profile.avgMetacritic >= 70 ? Math.max(55, profile.avgMetacritic - 18) : undefined, pageSize: 40 }) }], 24);
 
   await addStage('plans-wishlist', async () => Promise.all(planWishlistSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 18, 1);
 
   await addStage('recently-interacted', async () => Promise.all(recentSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 16, 1);
 
   await addStage('affinity-relaxed', async () => [
-    { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), pageSize: 40 }) },
-    { results: profile.topTags.length > 0 ? await fetchRecommendedGames({ tags: profile.topTags.slice(0, 8).join(','), pageSize: 40 }) : [] },
+    { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), platforms: preferredPlatforms, pageSize: 40 }) },
+    { results: profile.topTags.length > 0 ? await fetchRecommendedGames({ tags: profile.topTags.slice(0, 6).join(','), platforms: preferredPlatforms, pageSize: 40 }) : [] },
     { results: await fetchRecommendedGames({ genres: profile.topGenres.slice(0, 5).map((g) => g.slug).join(','), ordering: '-added', pageSize: 40 }) },
-  ], 12, 2);
+    { results: profile.topTags[0] ? await fetchRecommendedGames({ tags: profile.topTags[0], genres: profile.topGenres[0]?.slug, ordering: '-released', pageSize: 40 }) : [] },
+    { results: await fetchRecommendedGames({ genres: profile.topGenres[0]?.slug, dates: getUpcomingDateRange(), ordering: '-added', platforms: preferredPlatforms, pageSize: 30 }) },
+  ], 8, 3);
 
   await addStage('second-order', async () => Promise.all(collected.slice(0, 3).map(async (item) => ({ anchorTitle: item.result.name, results: await fetchSuggestedGames(item.result.id) }))), 10, 3);
 
   const ranked = collected.sort((a, b) => b.score.total - a.score.total);
   const diverse = applyDiversityFilter(ranked, TARGET_PERSONAL_RECOMMENDATIONS, events);
   const candidates = applyLibraryStatus(diverse.map(({ result }) => mapRawgResult(result)), userGames, diverse.map(({ reason }) => reason), inboxRawgIds, diverse.map(({ score }) => score.total), diverse.map(({ source }) => source));
-  const pool = candidates.filter((c) => !c.excluded && !c.inboxStatus);
+  let pool = candidates.filter((c) => !c.excluded && !c.inboxStatus);
+  if (pool.length < TARGET_PERSONAL_RECOMMENDATIONS / 2) {
+    const staleCache = await getAnyStoredCacheEntry();
+    if (staleCache?.candidates.length) {
+      const cacheCandidates = applyLibraryStatus(staleCache.candidates.map((c) => c.game), userGames, staleCache.candidates.map((c) => c.reason), inboxRawgIds, staleCache.candidates.map((c) => c.score), staleCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus && !seen.has(c.game.rawgId));
+      pool = [...pool, ...cacheCandidates].slice(0, TARGET_PERSONAL_RECOMMENDATIONS);
+      events.push({ event: 'stale_cache_backfill', added: cacheCandidates.length, total: pool.length });
+    }
+  }
   events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: 0 });
   debugRecommendationReport(events, counts, { finalCandidates: pool, normalizedCandidates: candidates, seedTitles, rawPersonalizedCandidateCount: collected.length, normalizedCandidateCount: candidates.length });
 

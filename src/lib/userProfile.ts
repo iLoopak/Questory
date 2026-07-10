@@ -18,6 +18,7 @@ export interface SignalWeight {
 export interface UserProfile {
   topGenres: GenreWeight[]; // sorted by positive weight, max 5
   topTags: string[];        // top 8 positively weighted RAWG tags
+  topTagWeights: SignalWeight[]; // sorted, weighted gameplay/theme affinity
   topDevelopers: string[];  // top 3 positively weighted developers
   topPlatforms: string[];   // top 5 positively weighted platforms
   negativeGenres: GenreWeight[];
@@ -80,6 +81,50 @@ export function toSlug(name: string): string {
 const THRESHOLD_ANALYZED = 8;
 const THRESHOLD_FINISHED = 3;
 
+const VERY_HIGH_VALUE_TAGS = new Set([
+  'roguelite', 'roguelike', 'deckbuilding', 'deckbuilder', 'card-battler',
+  'souls-like', 'soulslike', 'metroidvania', 'immersive-sim', 'tactical-rpg',
+  'turn-based-tactics', 'factory-automation', 'automation', 'colony-sim',
+  'colony-simulation', 'city-builder', 'city-building', 'extraction-shooter',
+  'crpg', 'computer-role-playing-game', 'bullet-heaven', 'survivors-like',
+  'survival-horror', 'life-sim', 'farming-sim', '4x', 'grand-strategy',
+  'real-time-strategy', 'base-building',
+]);
+
+const MECHANIC_TAGS = new Set([
+  'stealth', 'crafting', 'survival', 'open-world', 'sandbox', 'management',
+  'resource-management', 'turn-based', 'turn-based-combat', 'tactical',
+  'strategy-rpg', 'hack-and-slash', 'loot', 'looter-shooter', 'platformer',
+  'puzzle-platformer', 'precision-platformer', 'tower-defense', 'rhythm',
+  'fighting', 'racing', 'soulslike',
+]);
+
+const THEME_TAGS = new Set([
+  'sci-fi', 'science-fiction', 'horror', 'dark-fantasy', 'post-apocalyptic',
+  'cyberpunk', 'space', 'war', 'military', 'zombies', 'lovecraftian',
+]);
+
+const PRESENTATION_TAGS = new Set(['first-person', 'third-person', 'isometric', 'top-down', 'side-scroller', 'side-scrolling', '2-5d']);
+
+const GENERIC_TAGS = new Set([
+  '2d', '3d', 'singleplayer', 'multiplayer', 'co-op', 'online-co-op',
+  'local-co-op', 'great-soundtrack', 'atmospheric', 'story-rich', 'dark',
+  'violent', 'exploration', 'steam-achievements', 'full-controller-support',
+  'partial-controller-support', 'steam-cloud', 'controller', 'controller-support',
+  'linux', 'macos', 'windows', 'difficult', 'relaxing', 'colorful', 'cute',
+  'funny', 'casual', 'indie', 'pixel-graphics', 'retro', 'early-access',
+  'score-attack', 'fantasy',
+]);
+
+export function preferenceTagWeight(slug: string): number {
+  if (VERY_HIGH_VALUE_TAGS.has(slug)) return 18;
+  if (MECHANIC_TAGS.has(slug)) return 12;
+  if (THEME_TAGS.has(slug)) return 4;
+  if (PRESENTATION_TAGS.has(slug)) return 2;
+  if (GENERIC_TAGS.has(slug)) return 0.35;
+  return 7;
+}
+
 export function getUserProfileReadiness(games: Game[]): ProfileReadiness {
   const analyzed = games.filter(
     (g) => g.collectionType === 'library' && (g.genres?.length ?? 0) > 0,
@@ -114,19 +159,22 @@ export interface PreferenceProfileDebug {
 
 export function getRecommendationSignalWeight(game: Game): { weight: number; reason: string } {
   if (game.status === 'Dropped') return { weight: -5, reason: 'dropped' };
-  if (game.collectionType === 'wishlist') return { weight: 1, reason: 'wishlist/planned' };
-  if (game.status === 'Playing') return { weight: 3, reason: 'currently playing' };
+  if (game.favorite) return { weight: 6, reason: 'favorite' };
+  if (game.status === 'Playing') return { weight: 4, reason: 'currently playing' };
   if (game.status === 'Finished') {
     if (typeof game.rating === 'number') {
       if (game.rating >= 4) return { weight: 5, reason: 'high-rated finished' };
       if (game.rating === 3) return { weight: 2, reason: 'mid-rated finished' };
       if (game.rating > 0 && game.rating <= 2) return { weight: -3, reason: 'low-rated finished' };
     }
-    return { weight: 2, reason: 'finished' };
+    return { weight: 3.5, reason: 'finished' };
   }
-  if (game.status === 'Want to play') return { weight: 1, reason: 'planned' };
+  if (game.playtimeHours >= 40 && game.collectionType === 'library') return { weight: 3.5, reason: 'played a lot' };
+  if (game.playtimeHours >= 20 && game.collectionType === 'library') return { weight: 2.5, reason: 'played a lot' };
+  if (game.collectionType === 'wishlist') return { weight: game.priority === 'high' ? 2.5 : 2, reason: 'wishlist' };
+  if (game.status === 'Want to play') return { weight: 2, reason: 'planned' };
   if (game.status === 'Paused') return { weight: -0.5, reason: 'paused/later' };
-  if (game.playtimeHours >= 20 && game.collectionType === 'library') return { weight: 1.5, reason: 'played a lot' };
+  if (game.collectionType === 'library' && ((game.genres?.length ?? 0) > 0 || (game.rawgTags?.length ?? 0) > 0)) return { weight: 0.35, reason: 'owned' };
   return { weight: 0, reason: 'neutral' };
 }
 
@@ -137,7 +185,8 @@ function buildFrequencyMap(
   const map = new Map<string, number>();
   for (const { game, weight } of items) {
     for (const value of extract(game)) {
-      if (value.trim()) map.set(value, (map.get(value) ?? 0) + weight);
+      const normalized = value.trim();
+      if (normalized) map.set(normalized, (map.get(normalized) ?? 0) + weight);
     }
   }
   return map;
@@ -161,13 +210,16 @@ export function buildUserProfile(games: Game[]): UserProfile {
   }
 
   const genreMap = buildFrequencyMap(positive, (g) => g.genres ?? []);
-  const tagMap = buildFrequencyMap(positive, (g) => g.rawgTags ?? []);
+  const tagMap = buildFrequencyMap(positive, (g) => (g.rawgTags ?? []).map(toSlug));
   const devMap = buildFrequencyMap(positive, (g) => g.developers ?? []);
   const platformMap = buildFrequencyMap(positive, (g) => [g.platform]);
   const negativeGenreMap = buildFrequencyMap(negative, (g) => g.genres ?? []);
-  const negativeTagMap = buildFrequencyMap(negative, (g) => g.rawgTags ?? []);
+  const negativeTagMap = buildFrequencyMap(negative, (g) => (g.rawgTags ?? []).map(toSlug));
   const negativeDevMap = buildFrequencyMap(negative, (g) => g.developers ?? []);
   const negativePlatformMap = buildFrequencyMap(negative, (g) => [g.platform]);
+
+  for (const [tag, weight] of [...tagMap.entries()]) tagMap.set(tag, weight * preferenceTagWeight(tag));
+  for (const [tag, weight] of [...negativeTagMap.entries()]) negativeTagMap.set(tag, weight * preferenceTagWeight(tag));
 
   const topGenreNames = topN(genreMap, 5);
   const topGenres: GenreWeight[] = topGenreNames.map((name) => ({
@@ -197,7 +249,8 @@ export function buildUserProfile(games: Game[]): UserProfile {
 
   return {
     topGenres,
-    topTags: topN(tagMap, 8),
+    topTags: topN(tagMap, 10),
+    topTagWeights: topN(tagMap, 12).map((name) => ({ name, weight: tagMap.get(name) ?? 0 })),
     topDevelopers: topN(devMap, 3),
     topPlatforms: topN(platformMap, 5),
     negativeGenres: topN(negativeGenreMap, 5).map((name) => ({ name, slug: toSlug(name), weight: negativeGenreMap.get(name) ?? 0 })),
