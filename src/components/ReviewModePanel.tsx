@@ -150,8 +150,7 @@ type ReviewActionStats = {
 
 type ReviewSessionSummary = {
   actionStats: ReviewActionStats;
-  highlights: Array<{ action: ReviewModeAction; games: Game[]; icon: IconName; label: string }>;
-  platformBreakdown: Array<{ platform: GamePlatform; count: number }>;
+  highlights: Array<{ action: ReviewModeAction; count: number; games: Game[]; icon: IconName; label: string }>;
 };
 
 const emptyReviewActionStats: ReviewActionStats = {
@@ -1468,13 +1467,10 @@ function ReviewComplete({
   onReturnToLibrary: () => void;
   onReviewAnother: () => void;
 }) {
-  const { actionStats, highlights, platformBreakdown } = sessionSummary;
-  const hasStats = Object.values(actionStats).some((count) => count > 0);
+  const { actionStats, highlights } = sessionSummary;
   const noPlatformsWarning = actionStats.queued > 0 && queuePlatforms.length === 0;
   const reviewedTotal = lifetimeReviewedCount + remainingCount;
   const progressPercent = reviewedTotal > 0 ? Math.round((lifetimeReviewedCount / reviewedTotal) * 100) : 100;
-  const estimatedSessionsRemaining = remainingCount > 0 && reviewedCount > 0 ? Math.ceil(remainingCount / reviewedCount) : 0;
-  const motivation = getSessionMotivation(actionStats, reviewedCount, remainingCount, estimatedSessionsRemaining);
 
   return (
     <div className="grid min-h-full place-items-center rounded-[1.5rem] border border-white/10 bg-ink-900/70 p-5 text-center">
@@ -1505,39 +1501,12 @@ function ReviewComplete({
             <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
-        {hasStats && (
-          <div className="mt-4 grid gap-2 text-left sm:grid-cols-2 lg:grid-cols-3">
-            {getSessionStatItems(actionStats).map((item) => item.count > 0 ? (
-              <div key={item.label} className="flex items-center gap-3 rounded-xl border border-skyglass/15 bg-ink-950/60 p-3">
-                <span className="grid h-9 w-9 place-items-center rounded-full border border-mint/20 bg-mint/10 text-mint"><Icon name={item.icon} /></span>
-                <div className="min-w-0">
-                  <div className="text-lg font-semibold text-white">{item.count} <span className="text-mint/70">→</span></div>
-                  <div className="truncate text-xs text-slate-400">{item.label}</div>
-                </div>
-              </div>
-            ) : null)}
-          </div>
-        )}
-        {platformBreakdown.length > 0 && (
-          <div className="mt-4 rounded-2xl border border-mint/20 bg-mint/5 p-4 text-left">
-            <div className="text-sm font-semibold text-mint">Platform Plans</div>
-            <div className="mt-3 grid gap-1.5 text-sm">
-              {platformBreakdown.map((item) => (
-                <div key={item.platform} className="flex items-baseline gap-2 text-slate-300">
-                  <span className="truncate">{item.platform}</span>
-                  <span className="min-w-6 flex-1 border-b border-dotted border-skyglass/20" />
-                  <span className="font-semibold text-white">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         {highlights.length > 0 && (
           <div className="mt-4 space-y-3 rounded-2xl border border-skyglass/15 bg-ink-950/60 p-4 text-left">
             <div className="qs-label-caps text-muted">Session highlights</div>
             {highlights.map((group) => (
               <div key={group.label}>
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200"><Icon name={group.icon} size={14} /> {group.label}</div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200"><Icon name={group.icon} size={14} /> <span>{group.label}</span><span className="text-mint/70">·</span><span className="text-white">{group.count}</span></div>
                 <div className="flex gap-1.5 overflow-hidden">
                   {group.games.slice(0, 8).map((game) => (
                     <span key={game.id} className="block h-16 w-11 shrink-0 overflow-hidden rounded-md border border-white/10 bg-ink-800" title={game.title}>
@@ -1547,14 +1516,6 @@ function ReviewComplete({
                 </div>
               </div>
             ))}
-          </div>
-        )}
-        <div className="mt-4 rounded-xl border border-skyglass/15 bg-white/[0.03] p-3 text-sm text-slate-300">{motivation}</div>
-        {actionStats.queued > 0 && !noPlatformsWarning && (
-          <div className="mt-4 rounded-xl border border-mint/20 bg-mint/5 p-3 text-center">
-            <p className="text-sm text-slate-300">
-              {actionStats.queued} {actionStats.queued === 1 ? 'game was' : 'games were'} added to Platform Plans — open it to see them and start playing.
-            </p>
           </div>
         )}
         {noPlatformsWarning ? (
@@ -1572,7 +1533,7 @@ function ReviewComplete({
             </button>
           </div>
         ) : null}
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
           <button
             className="min-h-12 rounded-xl border border-mint/30 bg-mint px-5 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             onClick={onReviewAnother}
@@ -1661,8 +1622,6 @@ const sessionReportActions: Array<{ action: ReviewModeAction; key: keyof ReviewA
 function buildReviewSessionSummary(decisions: ReviewSessionDecision[], gamesById: Map<string, Game>): ReviewSessionSummary {
   const actionStats = { ...emptyReviewActionStats };
   const gamesByAction = new Map<ReviewModeAction, Game[]>();
-  const platformCounts = new Map<GamePlatform, number>();
-
   for (const decision of decisions) {
     const config = sessionReportActions.find((item) => item.action === decision.action);
     if (!config) continue;
@@ -1673,46 +1632,16 @@ function buildReviewSessionSummary(decisions: ReviewSessionDecision[], gamesById
     if (game) {
       gamesByAction.set(decision.action, [...(gamesByAction.get(decision.action) ?? []), game]);
     }
-
-    if (decision.action === 'queue' && decision.targetPlatform) {
-      platformCounts.set(decision.targetPlatform, (platformCounts.get(decision.targetPlatform) ?? 0) + 1);
-    }
   }
 
   return {
     actionStats,
     highlights: sessionReportActions
-      .map((item) => ({ action: item.action, games: gamesByAction.get(item.action) ?? [], icon: item.icon, label: item.label }))
+      .map((item) => ({ action: item.action, count: actionStats[item.key], games: gamesByAction.get(item.action) ?? [], icon: item.icon, label: item.label }))
       .filter((group) => group.games.length > 0),
-    platformBreakdown: Array.from(platformCounts, ([platform, count]) => ({ platform, count }))
-      .sort((first, second) => second.count - first.count || first.platform.localeCompare(second.platform)),
   };
 }
 
-function getSessionStatItems(actionStats: ReviewActionStats) {
-  return sessionReportActions.map((item) => ({ ...item, count: actionStats[item.key] }));
-}
-
-function getSessionMotivation(actionStats: ReviewActionStats, reviewedCount: number, remainingCount: number, sessionsRemaining: number) {
-  if (actionStats.queued > 0) {
-    return `You moved ${actionStats.queued} ${actionStats.queued === 1 ? 'game' : 'games'} closer to actually being played.`;
-  }
-
-  if (actionStats.dropped > 0 || actionStats.ignored > 0) {
-    const shrunkBy = actionStats.dropped + actionStats.ignored;
-    return `Nice! Your backlog shrank by ${shrunkBy} ${shrunkBy === 1 ? 'game' : 'games'} today.`;
-  }
-
-  if (sessionsRemaining > 0) {
-    return `Only ${sessionsRemaining} focused ${sessionsRemaining === 1 ? 'session remains' : 'sessions remain'} to finish this backlog at today's pace.`;
-  }
-
-  if (remainingCount === 0 && reviewedCount > 0) {
-    return 'Quest Queue is clear for this group — your library is more focused now.';
-  }
-
-  return 'Great progress — every decision makes your library easier to act on.';
-}
 
 function matchesReviewSource(game: Game, source: ReviewSource) {
   if (source === 'backlog') {
