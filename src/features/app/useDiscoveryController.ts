@@ -12,7 +12,8 @@ import {
   type DiscoveryInboxItem,
 } from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
-import { fetchPersonalRecommendations } from '../../services/personalRecommendationsService';
+import { buildPersonalizedRecommendations } from '../../lib/personalizedRecommendations';
+import { fetchGameSeries, fetchRecommendedGames, fetchSuggestedGames } from '../../services/rawgApi';
 import { trackAnalyticsEvent } from '../../lib/analytics';
 
 type ToastNotification = {
@@ -119,7 +120,14 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
         ...latestState.activeQueue.map((item) => item.rawgId),
         ...latestState.nextQueue.map((item) => item.rawgId),
       ]);
-      const candidates = await fetchPersonalRecommendations(games, queuedRawgIds);
+      const { candidates } = await buildPersonalizedRecommendations(games, {
+        inboxRawgIds: queuedRawgIds,
+        forceRefresh: true,
+        fetchers: {
+          similar: async (rawgId) => [...await fetchSuggestedGames(rawgId), ...await fetchGameSeries(rawgId)],
+          discover: fetchRecommendedGames,
+        },
+      });
       const validCandidates = candidates
         .filter((candidate) => !candidate.excluded && candidate.libraryStatus === null && !candidate.inboxStatus)
         .slice(0, 10);

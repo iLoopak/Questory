@@ -4,9 +4,9 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 import { DiscoverGameCard } from './discovery/DiscoverGameCard';
 import { EmptyState } from './EmptyState';
 import { useI18n, type TFunction } from '../i18n';
-import { fetchPersonalRecommendations, reportRecommendationSurfaceDiagnostics } from '../services/personalRecommendationsService';
 import { fetchPersonalizedReleaseCalendar, ignoreReleaseCalendarGame } from '../services/releaseCalendarService';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
+import { usePersonalizedRecommendations } from '../hooks/usePersonalizedRecommendations';
 
 type DiscoverPanelProps = {
   games: Game[];
@@ -52,50 +52,18 @@ function DiscoverGridSkeleton() {
 
 export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings }: DiscoverPanelProps) {
   const { t } = useI18n();
-  const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
+  const { candidates: personalizedCandidates, loading: recommendationsLoading } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
+  const candidates = recommendationsLoading && personalizedCandidates.length === 0 ? null : personalizedCandidates.filter((candidate) => candidate.libraryStatus === null);
   const [upcoming, setUpcoming] = useState<DiscoveryCandidate[] | null>(null);
   const [releaseRefreshToken, setReleaseRefreshToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-
-    Promise.all([
-      fetchPersonalizedReleaseCalendar(games, discoveryInboxRawgIds, { forceRefresh: releaseRefreshToken > 0 }).catch((): DiscoveryCandidate[] => []),
-      fetchPersonalRecommendations(games, discoveryInboxRawgIds).catch(
-        (): DiscoveryCandidate[] => [],
-      ),
-    ]).then(([releaseCalendar, recommended]) => {
-      if (cancelled) return;
-
-      // Deduplicate the shared recommendation result. The service owns the
-      // source waterfall (personalized, broad discovery, stale cache, trending)
-      // so Home, Discover, and Discovery Inbox consume the same pipeline.
-      const seen = new Set<number>();
-      const all: DiscoveryCandidate[] = [];
-
-      const tagged = recommended;
-
-      for (const c of tagged) {
-        if (seen.has(c.game.rawgId)) continue;
-        seen.add(c.game.rawgId);
-        // Skip games already in the user's library or wishlist.
-        if (c.libraryStatus === null) {
-          all.push(c);
-        }
-      }
-
-      reportRecommendationSurfaceDiagnostics('discover', all.length, all.length > 0 ? 'rendered' : 'empty-after-discover-selector');
-      setUpcoming(releaseCalendar);
-      setCandidates(all);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-    // games / discoveryInboxRawgIds re-stamp library and inbox status each time;
-    // RAWG responses are served from module-level caches so re-fetching is fast.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [games, discoveryInboxRawgIds, t, releaseRefreshToken]);
+    fetchPersonalizedReleaseCalendar(games, discoveryInboxRawgIds, { forceRefresh: releaseRefreshToken > 0 })
+      .then((releaseCalendar) => { if (!cancelled) setUpcoming(releaseCalendar); })
+      .catch(() => { if (!cancelled) setUpcoming([]); });
+    return () => { cancelled = true; };
+  }, [games, discoveryInboxRawgIds, releaseRefreshToken]);
 
   return (
     <div className="space-y-8 px-3 pb-24 pt-4">

@@ -1,7 +1,7 @@
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from '../discovery/DiscoveryGameCard';
-import { useHomeRecommendations } from '../../hooks/useHomeRecommendations';
+import { usePersonalizedRecommendations } from '../../hooks/usePersonalizedRecommendations';
 import { Icon } from '../Icon';
 
 type HomeRecommendationsSectionProps = {
@@ -20,7 +20,7 @@ export function HomeRecommendationsSection({
   onSelectGame,
   onOpenPreview,
 }: HomeRecommendationsSectionProps) {
-  const { candidates, loading, error, diagnostics, refresh, isRefreshing } = useHomeRecommendations(games, inboxRawgIds, libraryGameCount > 0);
+  const { candidates, loading, error, diagnostics, refresh, isRefreshing } = usePersonalizedRecommendations(games, inboxRawgIds, libraryGameCount > 0);
   const dev = import.meta.env.DEV;
 
   if (!onSelectGame) return null;
