@@ -25,6 +25,9 @@ export type RawgSearchResult = {
   }>;
   /** RAWG returns tags in list results — includes slug for comparison. */
   tags?: RawgListItem[];
+  /** Present on detail responses and some proxied list responses. */
+  developers?: RawgListItem[];
+  publishers?: RawgListItem[];
 };
 
 export type RawgListItem = {
@@ -37,8 +40,6 @@ export type RawgListItem = {
 export type RawgGameDetails = RawgSearchResult & {
   genres?: RawgListItem[];
   tags?: RawgListItem[];
-  developers?: RawgListItem[];
-  publishers?: RawgListItem[];
   description_raw?: string;
 };
 

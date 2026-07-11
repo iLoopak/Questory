@@ -20,10 +20,13 @@ export interface UserProfile {
   topTags: string[];        // top 8 positively weighted RAWG tags
   topTagWeights: SignalWeight[]; // sorted, weighted gameplay/theme affinity
   topDevelopers: string[];  // top 3 positively weighted developers
+  topDeveloperWeights: SignalWeight[];
+  topFranchises: SignalWeight[];
   topPlatforms: string[];   // top 5 positively weighted platforms
   negativeGenres: GenreWeight[];
   negativeTags: SignalWeight[];
   negativeDevelopers: SignalWeight[];
+  negativeFranchises: SignalWeight[];
   negativePlatforms: SignalWeight[];
   avgMetacritic: number | null;
   avgPlaytimeHours: number | null;
@@ -91,12 +94,20 @@ const VERY_HIGH_VALUE_TAGS = new Set([
   'real-time-strategy', 'base-building',
 ]);
 
+const DISTINCTIVE_GENRES = new Set(['RPG', 'Strategy', 'Simulation', 'Puzzle', 'Platformer', 'Racing', 'Fighting', 'Shooter']);
+const BROAD_GENRES = new Set(['Action', 'Adventure', 'Indie', 'Casual', 'Family', 'Arcade']);
+
 const MECHANIC_TAGS = new Set([
   'stealth', 'crafting', 'survival', 'open-world', 'sandbox', 'management',
   'resource-management', 'turn-based', 'turn-based-combat', 'tactical',
   'strategy-rpg', 'hack-and-slash', 'loot', 'looter-shooter', 'platformer',
   'puzzle-platformer', 'precision-platformer', 'tower-defense', 'rhythm',
   'fighting', 'racing', 'soulslike',
+]);
+
+const BROAD_TAGS = new Set([
+  'open-world', 'sandbox', 'survival', 'crafting', 'action', 'adventure',
+  'role-playing', 'rpg', 'shooter', 'strategy', 'multiplayer', 'singleplayer',
 ]);
 
 const THEME_TAGS = new Set([
@@ -125,9 +136,30 @@ export function isGenericPreferenceTag(slugOrName: string): boolean {
   return GENERIC_TAGS.has(toSlug(slugOrName));
 }
 
+export function isDistinctivePreferenceTag(slugOrName: string): boolean {
+  const slug = toSlug(slugOrName);
+  return VERY_HIGH_VALUE_TAGS.has(slug) || (MECHANIC_TAGS.has(slug) && !BROAD_TAGS.has(slug));
+}
+
+export function signalInformationValue(kind: 'genre' | 'tag', nameOrSlug: string): number {
+  if (kind === 'genre') {
+    if (BROAD_GENRES.has(nameOrSlug)) return 0.45;
+    if (DISTINCTIVE_GENRES.has(nameOrSlug)) return 1.05;
+    return 0.8;
+  }
+  const slug = toSlug(nameOrSlug);
+  if (isGenericPreferenceTag(slug)) return 0;
+  if (VERY_HIGH_VALUE_TAGS.has(slug)) return 1.35;
+  if (BROAD_TAGS.has(slug)) return 0.55;
+  if (MECHANIC_TAGS.has(slug)) return 1.1;
+  if (THEME_TAGS.has(slug)) return 0.8;
+  if (PRESENTATION_TAGS.has(slug)) return 0.55;
+  return 0.9;
+}
+
 export function preferenceTagWeight(slug: string): number {
   if (VERY_HIGH_VALUE_TAGS.has(slug)) return 18;
-  if (MECHANIC_TAGS.has(slug)) return 12;
+  if (MECHANIC_TAGS.has(slug)) return BROAD_TAGS.has(slug) ? 5 : 12;
   if (THEME_TAGS.has(slug)) return 4;
   if (PRESENTATION_TAGS.has(slug)) return 2;
   if (GENERIC_TAGS.has(slug)) return 0.35;
@@ -167,23 +199,34 @@ export interface PreferenceProfileDebug {
 }
 
 export function getRecommendationSignalWeight(game: Game): { weight: number; reason: string } {
-  if (game.status === 'Dropped') return { weight: -5, reason: 'dropped' };
-  if (game.favorite) return { weight: 6, reason: 'favorite' };
-  if (game.status === 'Playing') return { weight: 4, reason: 'currently playing' };
+  const rating = typeof game.rating === 'number' ? game.rating : null;
+  if (game.status === 'Dropped') return { weight: rating != null && rating <= 2 ? -7 : -5, reason: 'dropped' };
+
+  let weight = 0;
+  const reasons: string[] = [];
+  if (game.favorite) { weight += 8; reasons.push('favorite'); }
   if (game.status === 'Finished') {
-    if (typeof game.rating === 'number') {
-      if (game.rating >= 4) return { weight: 5, reason: 'high-rated finished' };
-      if (game.rating === 3) return { weight: 2, reason: 'mid-rated finished' };
-      if (game.rating > 0 && game.rating <= 2) return { weight: -3, reason: 'low-rated finished' };
+    if (rating != null) {
+      if (rating >= 5) { weight += 9; reasons.push('5-star finished'); }
+      else if (rating >= 4) { weight += 5.5; reasons.push('4-star finished'); }
+      else if (rating === 3) { weight += 1.5; reasons.push('3-star finished'); }
+      else if (rating > 0) return { weight: -5, reason: 'low-rated finished' };
+    } else {
+      weight += 2.5;
+      reasons.push('finished');
     }
-    return { weight: 3.5, reason: 'finished' };
   }
-  if (game.playtimeHours >= 40 && game.collectionType === 'library') return { weight: 3.5, reason: 'played a lot' };
-  if (game.playtimeHours >= 20 && game.collectionType === 'library') return { weight: 2.5, reason: 'played a lot' };
-  if (game.collectionType === 'wishlist') return { weight: game.priority === 'high' ? 2.5 : 2, reason: 'wishlist' };
-  if (game.status === 'Want to play') return { weight: 2, reason: 'planned' };
+  if (game.status === 'Playing') { weight += 4; reasons.push('currently playing'); }
+  if (game.collectionType === 'library') {
+    if (game.playtimeHours >= 80) { weight += 2.5; reasons.push('very high playtime'); }
+    else if (game.playtimeHours >= 40) { weight += 2; reasons.push('high playtime'); }
+    else if (game.playtimeHours >= 20) { weight += 2; reasons.push('meaningful playtime'); }
+  }
+  if (game.collectionType === 'wishlist') { weight += game.priority === 'high' ? 2.2 : 1.6; reasons.push('wishlist'); }
+  if (game.status === 'Want to play') { weight += 1.4; reasons.push('planned'); }
   if (game.status === 'Paused') return { weight: -0.5, reason: 'paused/later' };
-  if (game.collectionType === 'library' && ((game.genres?.length ?? 0) > 0 || (game.rawgTags?.length ?? 0) > 0)) return { weight: 0.35, reason: 'owned' };
+  if (weight > 0) return { weight: Math.min(12, weight), reason: reasons.join(' + ') };
+  if (game.collectionType === 'library' && ((game.genres?.length ?? 0) > 0 || (game.rawgTags?.length ?? 0) > 0)) return { weight: 0.12, reason: 'owned' };
   return { weight: 0, reason: 'neutral' };
 }
 
@@ -211,6 +254,28 @@ function getTasteTags(game: Game): string[] {
   return [...seen];
 }
 
+function compressFrequencyMap(map: Map<string, number>): void {
+  for (const [key, weight] of [...map.entries()]) {
+    map.set(key, Math.log1p(Math.max(0, weight)) * 4);
+  }
+}
+
+function normalizeDeveloperName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+export function recommendationFranchiseKey(value: string | undefined | null): string | null {
+  const slug = toSlug(value ?? '');
+  if (!slug) return null;
+  const cleaned = slug
+    .replace(/\b(\d+|ii|iii|iv|v|vi|vii|viii|ix|x|remake|remastered|remaster|redux|definitive|deluxe|ultimate|edition|complete|goty|hd)\b/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const parts = cleaned.split('-').filter(Boolean);
+  if (parts.length < 2) return null;
+  return parts.slice(0, Math.min(3, parts.length)).join('-');
+}
+
 function topN<K>(map: Map<K, number>, n: number): K[] {
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -232,15 +297,46 @@ export function buildUserProfile(games: Game[]): UserProfile {
   const tagMap = buildFrequencyMap(positive, getTasteTags);
   const devMap = buildFrequencyMap(positive, (g) => g.developers ?? []);
   const platformMap = buildFrequencyMap(positive, (g) => [g.platform]);
+  const franchiseMap = buildFrequencyMap(positive, (g) => {
+    const key = recommendationFranchiseKey(g.rawgSlug ?? g.rawgTitle ?? g.title);
+    return key ? [key] : [];
+  });
   const negativeGenreMap = buildFrequencyMap(negative, (g) => g.genres ?? []);
   const negativeTagMap = buildFrequencyMap(negative, getTasteTags);
   const negativeDevMap = buildFrequencyMap(negative, (g) => g.developers ?? []);
+  const negativeFranchiseMap = buildFrequencyMap(negative, (g) => {
+    const key = recommendationFranchiseKey(g.rawgSlug ?? g.rawgTitle ?? g.title);
+    return key ? [key] : [];
+  });
   const negativePlatformMap = buildFrequencyMap(negative, (g) => [g.platform]);
+
+  [genreMap, tagMap, devMap, platformMap, franchiseMap, negativeGenreMap, negativeTagMap, negativeDevMap, negativePlatformMap, negativeFranchiseMap].forEach(compressFrequencyMap);
 
   for (const [tag, weight] of [...tagMap.entries()]) tagMap.set(tag, weight * preferenceTagWeight(tag));
   for (const [tag, weight] of [...negativeTagMap.entries()]) negativeTagMap.set(tag, weight * preferenceTagWeight(tag));
 
-  const topGenreNames = topN(genreMap, 5);
+  for (const [genre, weight] of [...genreMap.entries()]) genreMap.set(genre, weight * signalInformationValue('genre', genre));
+  for (const [genre, weight] of [...negativeGenreMap.entries()]) negativeGenreMap.set(genre, weight * signalInformationValue('genre', genre));
+  for (const [developer, weight] of [...devMap.entries()]) {
+    devMap.delete(developer);
+    devMap.set(normalizeDeveloperName(developer), weight);
+  }
+  for (const [developer, weight] of [...negativeDevMap.entries()]) {
+    negativeDevMap.delete(developer);
+    negativeDevMap.set(normalizeDeveloperName(developer), weight);
+  }
+
+  const topGenreNames = topN(genreMap, 6);
+  const positiveFranchiseCounts = new Map<string, number>();
+  for (const { game } of positive) {
+    const key = recommendationFranchiseKey(game.rawgSlug ?? game.rawgTitle ?? game.title);
+    if (key) positiveFranchiseCounts.set(key, (positiveFranchiseCounts.get(key) ?? 0) + 1);
+  }
+  const negativeFranchiseCounts = new Map<string, number>();
+  for (const { game } of negative) {
+    const key = recommendationFranchiseKey(game.rawgSlug ?? game.rawgTitle ?? game.title);
+    if (key) negativeFranchiseCounts.set(key, (negativeFranchiseCounts.get(key) ?? 0) + 1);
+  }
   const topGenres: GenreWeight[] = topGenreNames.map((name) => ({
     name,
     slug: toSlug(name),
@@ -270,11 +366,18 @@ export function buildUserProfile(games: Game[]): UserProfile {
     topGenres,
     topTags: topN(tagMap, 10),
     topTagWeights: topN(tagMap, 12).map((name) => ({ name, weight: tagMap.get(name) ?? 0 })),
-    topDevelopers: topN(devMap, 3),
+    topDevelopers: topN(devMap, 5),
+    topDeveloperWeights: topN(devMap, 8).map((name) => ({ name, weight: devMap.get(name) ?? 0 })),
+    topFranchises: topN(franchiseMap, 8)
+      .map((name) => ({ name, weight: franchiseMap.get(name) ?? 0 }))
+      .filter((signal) => (positiveFranchiseCounts.get(signal.name) ?? 0) >= 2),
     topPlatforms: topN(platformMap, 5),
     negativeGenres: topN(negativeGenreMap, 5).map((name) => ({ name, slug: toSlug(name), weight: negativeGenreMap.get(name) ?? 0 })),
     negativeTags: topN(negativeTagMap, 8).map((name) => ({ name, weight: negativeTagMap.get(name) ?? 0 })),
     negativeDevelopers: topN(negativeDevMap, 3).map((name) => ({ name, weight: negativeDevMap.get(name) ?? 0 })),
+    negativeFranchises: topN(negativeFranchiseMap, 8)
+      .map((name) => ({ name, weight: negativeFranchiseMap.get(name) ?? 0 }))
+      .filter((signal) => (negativeFranchiseCounts.get(signal.name) ?? 0) >= 2),
     negativePlatforms: topN(negativePlatformMap, 5).map((name) => ({ name, weight: negativePlatformMap.get(name) ?? 0 })),
     avgMetacritic,
     avgPlaytimeHours,

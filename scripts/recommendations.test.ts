@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
-import { scorePersonalRecommendationCandidate } from '../src/services/personalRecommendationsService';
+import { generateRecommendationReasonForTest, scorePersonalRecommendationCandidate, selectRecommendationSeeds } from '../src/services/personalRecommendationsService';
 import { scoreContextualTagOverlapForTest } from '../src/services/contextualRecommendationsService';
 import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds, rankReleaseCalendarResults } from '../src/services/releaseCalendarService';
 import type { Game } from '../src/types/game';
@@ -26,6 +26,8 @@ function game(overrides: Partial<Game>): Game {
     notes: '',
     collectionType: overrides.collectionType ?? 'library',
     rawgId: overrides.rawgId,
+    rawgSlug: overrides.rawgSlug,
+    rawgTitle: overrides.rawgTitle,
   };
 }
 
@@ -40,6 +42,7 @@ function rawg(overrides: Partial<RawgSearchResult>): RawgSearchResult {
     platforms: overrides.platforms ?? [{ platform: { id: 4, name: 'PC', slug: 'pc' } }],
     genres: overrides.genres ?? [],
     tags: overrides.tags ?? [],
+    developers: overrides.developers,
     released: overrides.released ?? null,
     slug: overrides.slug ?? null,
   };
@@ -141,6 +144,179 @@ test('storefront and app metadata never become recommendation taste tags', () =>
 
   assert.equal(isGenericPreferenceTag('steam achievements'), true);
   assert.deepEqual(profile.topTags.sort(), ['deckbuilding', 'roguelite'].sort());
+});
+
+test('personal recommendation score dimensions stay within configured caps', () => {
+  const profile = buildUserProfile([
+    game({ id: 'a', title: 'Dragon Quest Alpha', rawgId: 1, rawgSlug: 'dragon-quest-alpha', status: 'Finished', rating: 5, genres: ['RPG', 'Strategy'], rawgTags: ['turn-based-combat', 'tactical-rpg'], developers: ['Studio A'], playtimeHours: 90 }),
+    game({ id: 'b', title: 'Dragon Quest Beta', rawgId: 2, rawgSlug: 'dragon-quest-beta', status: 'Finished', rating: 5, genres: ['RPG'], rawgTags: ['turn-based-combat'], developers: ['Studio A'], playtimeHours: 60 }),
+  ]);
+  const score = scorePersonalRecommendationCandidate(rawg({
+    name: 'Dragon Quest Gamma',
+    slug: 'dragon-quest-gamma',
+    metacritic: 95,
+    rating: 4.8,
+    ratings_count: 5000,
+    released: '2026-01-01',
+    genres: [{ id: 1, name: 'RPG', slug: 'role-playing-games-rpg' }, { id: 2, name: 'Strategy', slug: 'strategy' }],
+    tags: [{ id: 1, name: 'Turn-Based Combat', slug: 'turn-based-combat' }, { id: 2, name: 'Tactical RPG', slug: 'tactical-rpg' }],
+    developers: [{ id: 1, name: 'Studio A', slug: 'studio-a' }],
+  }), profile, 0, { source: 'liked-game-series' });
+
+  assert.ok(score.genreMatch <= 50);
+  assert.ok(score.tagMatch <= 36);
+  assert.ok(score.developerMatch <= 18);
+  assert.ok(score.franchiseMatch <= 18);
+  assert.ok(score.platformMatch <= 10);
+  assert.ok(score.seedSimilarity <= 24);
+  assert.ok(score.qualityMatch <= 12);
+  assert.ok(score.recencyMatch <= 4);
+  assert.ok(score.negativeMatch >= -40);
+});
+
+test('distinctive tag matches beat many broad or generic matches', () => {
+  const profile = buildUserProfile([
+    game({ id: 'liked', status: 'Finished', rating: 5, genres: ['Strategy'], rawgTags: ['deckbuilding', 'roguelite'] }),
+    ...Array.from({ length: 25 }, (_, index) => game({ id: `owned-${index}`, status: 'Want to play', genres: ['Action'], rawgTags: ['open world', 'singleplayer'], collectionType: 'library' })),
+  ]);
+  const distinctive = scorePersonalRecommendationCandidate(rawg({ genres: [{ id: 1, name: 'Strategy', slug: 'strategy' }], tags: [{ id: 1, name: 'Deckbuilding', slug: 'deckbuilding' }] }), profile);
+  const broad = scorePersonalRecommendationCandidate(rawg({
+    genres: [{ id: 2, name: 'Action', slug: 'action' }, { id: 3, name: 'Adventure', slug: 'adventure' }],
+    tags: ['Open World', 'Singleplayer', 'Multiplayer', 'Sandbox'].map((name, id) => ({ id, name, slug: toSlug(name) })),
+  }), profile);
+
+  assert.ok(distinctive.total > broad.total);
+  assert.ok(distinctive.tagMatch > broad.tagMatch);
+});
+
+test('highly rated games outweigh hundreds of weak owned backlog items', () => {
+  const backlog = Array.from({ length: 250 }, (_, index) => game({ id: `weak-${index}`, title: `Weak ${index}`, status: 'Want to play', genres: ['Action'], rawgTags: ['open world'], rawgId: index + 1000 }));
+  const profile = buildUserProfile([
+    ...backlog,
+    game({ id: 'strong-a', status: 'Finished', rating: 5, genres: ['Strategy'], rawgTags: ['deckbuilding'], playtimeHours: 70 }),
+    game({ id: 'strong-b', status: 'Finished', rating: 4, genres: ['Strategy'], rawgTags: ['roguelite'], playtimeHours: 55 }),
+  ]);
+
+  assert.equal(profile.topGenres[0]?.name, 'Strategy');
+  assert.ok(profile.topTags.includes('deckbuilding'));
+});
+
+test('low-rated and dropped games create bounded negative overlap', () => {
+  const oneBad = buildUserProfile([game({ id: 'bad', status: 'Finished', rating: 1, genres: ['Shooter'], rawgTags: ['military'] })]);
+  const repeatedBad = buildUserProfile([
+    game({ id: 'bad-a', status: 'Finished', rating: 1, genres: ['Shooter'], rawgTags: ['military'] }),
+    game({ id: 'bad-b', status: 'Dropped', genres: ['Shooter'], rawgTags: ['military'] }),
+  ]);
+  const candidate = rawg({ genres: [{ id: 1, name: 'Shooter', slug: 'shooter' }], tags: [{ id: 1, name: 'Military', slug: 'military' }] });
+  const oneScore = scorePersonalRecommendationCandidate(candidate, oneBad);
+  const repeatedScore = scorePersonalRecommendationCandidate(candidate, repeatedBad);
+
+  assert.ok(oneScore.negativeMatch < 0);
+  assert.ok(repeatedScore.negativeMatch <= oneScore.negativeMatch);
+  assert.ok(repeatedScore.negativeMatch >= -40);
+  assert.deepEqual(repeatedScore.negativeTags, ['military']);
+});
+
+test('one disliked broad genre does not suppress several liked distinctive signals', () => {
+  const profile = buildUserProfile([
+    game({ id: 'liked-a', status: 'Finished', rating: 5, genres: ['Action'], rawgTags: ['soulslike'] }),
+    game({ id: 'liked-b', status: 'Finished', rating: 5, genres: ['Action'], rawgTags: ['metroidvania'] }),
+    game({ id: 'bad', status: 'Dropped', genres: ['Action'], rawgTags: ['open world'] }),
+  ]);
+  const score = scorePersonalRecommendationCandidate(rawg({
+    genres: [{ id: 1, name: 'Action', slug: 'action' }],
+    tags: [{ id: 1, name: 'Soulslike', slug: 'soulslike' }, { id: 2, name: 'Metroidvania', slug: 'metroidvania' }],
+  }), profile);
+
+  assert.ok(score.total > 0);
+  assert.ok(score.tagMatch > Math.abs(score.negativeMatch));
+});
+
+test('mixed liked and disliked evidence remains transparent in score breakdown', () => {
+  const profile = buildUserProfile([
+    game({ id: 'liked', status: 'Finished', rating: 5, genres: ['Strategy'], rawgTags: ['tactical-rpg'] }),
+    game({ id: 'bad', status: 'Dropped', genres: ['Strategy'], rawgTags: ['military'] }),
+  ]);
+  const score = scorePersonalRecommendationCandidate(rawg({
+    genres: [{ id: 1, name: 'Strategy', slug: 'strategy' }],
+    tags: [{ id: 1, name: 'Tactical RPG', slug: 'tactical-rpg' }, { id: 2, name: 'Military', slug: 'military' }],
+  }), profile);
+
+  assert.ok(score.positiveTags.includes('tactical-rpg'));
+  assert.ok(score.negativeTags.includes('military'));
+  assert.ok(score.total > score.negativeMatch);
+});
+
+test('seed selection is deterministic, tie-broken by rating and playtime, and excludes low-rated games', () => {
+  const games = [
+    game({ id: 'low', title: 'Low Rated', rawgId: 1, status: 'Finished', rating: 1, genres: ['Action'], rawgTags: ['soulslike'] }),
+    game({ id: 'playtime', title: 'Playtime Pick', rawgId: 2, status: 'Finished', rating: 4, playtimeHours: 120, genres: ['Action'], rawgTags: ['soulslike'] }),
+    game({ id: 'rating', title: 'Rating Pick', rawgId: 3, status: 'Finished', rating: 5, playtimeHours: 10, genres: ['Strategy'], rawgTags: ['deckbuilding'] }),
+  ];
+  const first = selectRecommendationSeeds(games, 3).seeds.map((seed) => seed.game.id);
+  const second = selectRecommendationSeeds([...games].reverse(), 3).seeds.map((seed) => seed.game.id);
+
+  assert.deepEqual(first, second);
+  assert.equal(first[0], 'rating');
+  assert.ok(!first.includes('low'));
+});
+
+test('seed selection diversifies across meaningful taste clusters and stays bounded', () => {
+  const games = [
+    game({ id: 'deck-a', rawgId: 1, status: 'Finished', rating: 5, rawgTags: ['deckbuilding'], genres: ['Strategy'] }),
+    game({ id: 'deck-b', rawgId: 2, status: 'Finished', rating: 5, rawgTags: ['deckbuilding'], genres: ['Strategy'] }),
+    game({ id: 'soul-a', rawgId: 3, status: 'Finished', rating: 5, rawgTags: ['soulslike'], genres: ['Action'] }),
+    game({ id: 'rpg-a', rawgId: 4, status: 'Finished', rating: 5, rawgTags: ['turn-based-combat'], genres: ['RPG'] }),
+  ];
+  const { seeds } = selectRecommendationSeeds(games, 3);
+
+  assert.equal(seeds.length, 3);
+  assert.equal(new Set(seeds.map((seed) => seed.cluster)).size, 3);
+});
+
+test('developer affinity is bounded and supports positive and negative evidence', () => {
+  const likedProfile = buildUserProfile([
+    game({ id: 'dev-a', status: 'Finished', rating: 5, developers: ['Studio Good'], rawgTags: ['roguelite'], genres: ['Action'] }),
+    game({ id: 'dev-b', status: 'Finished', rating: 4, developers: ['Studio Good'], rawgTags: ['deckbuilding'], genres: ['Strategy'] }),
+  ]);
+  const dislikedProfile = buildUserProfile([
+    game({ id: 'dev-bad', status: 'Dropped', developers: ['Studio Bad'], rawgTags: ['military'], genres: ['Shooter'] }),
+  ]);
+  const liked = scorePersonalRecommendationCandidate(rawg({ developers: [{ id: 1, name: 'Studio Good', slug: 'studio-good' }] }), likedProfile);
+  const disliked = scorePersonalRecommendationCandidate(rawg({ developers: [{ id: 2, name: 'Studio Bad', slug: 'studio-bad' }] }), dislikedProfile);
+
+  assert.ok(liked.developerMatch > 0);
+  assert.ok(liked.developerMatch <= 18);
+  assert.ok(disliked.negativeDevelopers.includes('Studio Bad'));
+  assert.ok(disliked.negativeMatch < 0);
+});
+
+test('franchise affinity requires repeated profile evidence and remains bounded', () => {
+  const repeated = buildUserProfile([
+    game({ id: 'series-a', title: 'Sky Saga 1', rawgSlug: 'sky-saga-1', status: 'Finished', rating: 5, genres: ['RPG'] }),
+    game({ id: 'series-b', title: 'Sky Saga 2', rawgSlug: 'sky-saga-2', status: 'Finished', rating: 4, genres: ['RPG'] }),
+  ]);
+  const single = buildUserProfile([
+    game({ id: 'solo', title: 'Moon Saga 1', rawgSlug: 'moon-saga-1', status: 'Finished', rating: 5, genres: ['RPG'] }),
+  ]);
+  const repeatedScore = scorePersonalRecommendationCandidate(rawg({ name: 'Sky Saga 3', slug: 'sky-saga-3' }), repeated);
+  const singleScore = scorePersonalRecommendationCandidate(rawg({ name: 'Moon Saga 2', slug: 'moon-saga-2' }), single);
+
+  assert.ok(repeatedScore.franchiseMatch > 0);
+  assert.ok(repeatedScore.franchiseMatch <= 18);
+  assert.equal(singleScore.franchiseMatch, 0);
+});
+
+test('recommendation reasons reference actual strongest non-generic score signals', () => {
+  const profile = buildUserProfile([
+    game({ id: 'liked', status: 'Finished', rating: 5, rawgTags: ['deckbuilding'], genres: ['Strategy'] }),
+  ]);
+  const candidate = rawg({ tags: [{ id: 1, name: 'Deckbuilding', slug: 'deckbuilding' }] });
+  const score = scorePersonalRecommendationCandidate(candidate, profile);
+  const reason = generateRecommendationReasonForTest(candidate, score, profile, 'affinity-strict');
+
+  assert.match(reason, /Deckbuilding/);
+  assert.doesNotMatch(reason, /steam|imported|controller/i);
 });
 
 
