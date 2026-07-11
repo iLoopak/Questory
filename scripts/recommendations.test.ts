@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
-import { generateRecommendationReasonForTest, scorePersonalRecommendationCandidate, selectRecommendationSeeds } from '../src/services/personalRecommendationsService';
+import { generateRecommendationReasonForTest, scorePersonalRecommendationCandidate, selectFinalRecommendationCandidates, selectRecommendationSeeds } from '../src/services/personalRecommendationsService';
 import { scoreContextualTagOverlapForTest } from '../src/services/contextualRecommendationsService';
 import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds, rankReleaseCalendarResults } from '../src/services/releaseCalendarService';
 import type { Game } from '../src/types/game';
@@ -46,6 +46,58 @@ function rawg(overrides: Partial<RawgSearchResult>): RawgSearchResult {
     released: overrides.released ?? null,
     slug: overrides.slug ?? null,
   };
+}
+
+function scoredCandidate(overrides: {
+  id: number;
+  name: string;
+  score?: number;
+  source?: string;
+  genre?: string;
+  tag?: string;
+  developer?: string;
+  slug?: string;
+  seedKey?: string;
+  image?: string | null;
+}) {
+  const result = rawg({
+    id: overrides.id,
+    name: overrides.name,
+    slug: overrides.slug ?? toSlug(overrides.name),
+    background_image: overrides.image === undefined ? 'cover.jpg' : overrides.image,
+    genres: overrides.genre ? [{ id: 1, name: overrides.genre, slug: toSlug(overrides.genre) }] : [],
+    tags: overrides.tag ? [{ id: 1, name: overrides.tag, slug: toSlug(overrides.tag) }] : [],
+    developers: overrides.developer ? [{ id: 1, name: overrides.developer, slug: toSlug(overrides.developer) }] : [],
+  });
+  return {
+    result,
+    score: {
+      genreMatch: 20,
+      tagMatch: overrides.tag ? 20 : 0,
+      developerMatch: overrides.developer ? 8 : 0,
+      franchiseMatch: 0,
+      platformMatch: 0,
+      seedSimilarity: overrides.seedKey ? 12 : 0,
+      qualityMatch: 8,
+      recencyMatch: 0,
+      negativeMatch: 0,
+      sourceAdjustment: 0,
+      metacriticMatch: 0,
+      ownershipPenalty: 0,
+      positiveGenres: overrides.genre ? [overrides.genre] : [],
+      positiveTags: overrides.tag ? [toSlug(overrides.tag)] : [],
+      positiveDevelopers: overrides.developer ? [overrides.developer] : [],
+      positiveFranchises: [],
+      negativeGenres: [],
+      negativeTags: [],
+      negativeDevelopers: [],
+      negativeFranchises: [],
+      total: overrides.score ?? 40,
+    },
+    reason: 'test reason',
+    source: overrides.source ?? 'affinity-strict',
+    seed: overrides.seedKey ? { stableKey: overrides.seedKey, tags: [], genres: [], franchiseKey: null } : undefined,
+  } as any;
 }
 
 function discovery(overrides: Partial<DiscoveryGame>): DiscoveryGame {
@@ -317,6 +369,101 @@ test('recommendation reasons reference actual strongest non-generic score signal
 
   assert.match(reason, /Deckbuilding/);
   assert.doesNotMatch(reason, /steam|imported|controller/i);
+});
+
+test('final selection respects primary genre hard cap when alternatives exist', () => {
+  const names = ['Amber', 'Beryl', 'Cobalt', 'Dawn', 'Ember', 'Fable', 'Grove', 'Harbor'];
+  const sources = ['affinity-strict', 'liked-game-similar', 'plans-wishlist', 'affinity-relaxed'] as const;
+  const candidates = [
+    ...Array.from({ length: 8 }, (_, index) => scoredCandidate({ id: index + 1, name: `${names[index]} Action`, score: 80 - index, source: sources[index % sources.length], genre: 'Action', tag: 'soulslike', seedKey: sources[index % sources.length] === 'liked-game-similar' ? `seed-a-${index}` : undefined })),
+    ...Array.from({ length: 6 }, (_, index) => scoredCandidate({ id: index + 20, name: `${names[index]} Strategy`, score: 70 - index, source: sources[(index + 1) % sources.length], genre: 'Strategy', tag: 'deckbuilding', seedKey: sources[(index + 1) % sources.length] === 'liked-game-similar' ? `seed-s-${index}` : undefined })),
+    ...Array.from({ length: 4 }, (_, index) => scoredCandidate({ id: index + 40, name: `${names[index]} Puzzle`, score: 62 - index, source: sources[(index + 2) % sources.length], genre: 'Puzzle', tag: 'puzzle-platformer', seedKey: sources[(index + 2) % sources.length] === 'liked-game-similar' ? `seed-p-${index}` : undefined })),
+  ];
+  const { diagnostics } = selectFinalRecommendationCandidates(candidates, 10);
+
+  assert.ok((diagnostics.primaryGenreCountsAfter.action ?? 0) <= 4);
+  assert.equal(diagnostics.selectedCount, 10);
+});
+
+test('final selection does not replace a very strong candidate with a weak candidate solely for genre variety', () => {
+  const names = ['Amber', 'Beryl', 'Cobalt', 'Dawn'];
+  const candidates = [
+    ...Array.from({ length: 4 }, (_, index) => scoredCandidate({ id: index + 1, name: `${names[index]} Strong`, score: 100 - index, genre: 'Action', tag: 'soulslike' })),
+    scoredCandidate({ id: 99, name: 'Weak Puzzle', score: 2, genre: 'Puzzle', tag: 'puzzle-platformer' }),
+  ];
+  const { selected } = selectFinalRecommendationCandidates(candidates, 5);
+
+  assert.equal(selected.length, 4);
+  assert.ok(!selected.some((item) => item.result.id === 99));
+});
+
+test('franchise and developer caps prevent one series or studio from filling the shelf', () => {
+  const candidates = [
+    ...Array.from({ length: 6 }, (_, index) => scoredCandidate({ id: index + 1, name: `Sky Saga ${index + 1}`, slug: `sky-saga-${index + 1}`, score: 90 - index, genre: 'RPG', tag: 'turn-based-combat', developer: 'Studio One' })),
+    ...Array.from({ length: 6 }, (_, index) => scoredCandidate({ id: index + 20, name: `Moon Tactics ${index + 1}`, slug: `moon-tactics-${index + 1}`, score: 82 - index, genre: 'Strategy', tag: 'tactical-rpg', developer: `Studio ${index + 2}` })),
+  ];
+  const { diagnostics } = selectFinalRecommendationCandidates(candidates, 10);
+
+  assert.ok((diagnostics.franchiseCountsAfter['sky-saga'] ?? 0) <= 3);
+  assert.ok((diagnostics.developerCountsAfter['Studio One'] ?? 0) <= 3);
+});
+
+test('unknown franchise and developer metadata does not group unrelated games', () => {
+  const candidates = [
+    scoredCandidate({ id: 1, name: 'North Star', score: 60, genre: 'Puzzle' }),
+    scoredCandidate({ id: 2, name: 'South Star', score: 59, genre: 'Puzzle' }),
+    scoredCandidate({ id: 3, name: 'East Star', score: 58, genre: 'Puzzle' }),
+  ];
+  const { diagnostics } = selectFinalRecommendationCandidates(candidates, 3);
+
+  assert.equal(diagnostics.franchiseCountsAfter['star'], undefined);
+  assert.equal(diagnostics.selectedCount, 3);
+});
+
+test('source and seed balancing cap overrepresentation when alternatives exist', () => {
+  const candidates = [
+    ...Array.from({ length: 8 }, (_, index) => scoredCandidate({ id: index + 1, name: `Seed Pick ${index + 1}`, score: 90 - index, source: 'liked-game-similar', genre: index < 4 ? 'Action' : 'Strategy', tag: index < 4 ? 'soulslike' : 'deckbuilding', seedKey: 'seed-a' })),
+    ...Array.from({ length: 6 }, (_, index) => scoredCandidate({ id: index + 20, name: `Affinity Pick ${index + 1}`, score: 78 - index, source: 'affinity-strict', genre: 'RPG', tag: 'turn-based-combat', seedKey: `seed-${index + 2}` })),
+  ];
+  const { diagnostics } = selectFinalRecommendationCandidates(candidates, 10);
+
+  assert.ok((diagnostics.sourceCountsAfter.seed ?? 0) <= 7);
+  assert.ok(diagnostics.candidates.filter((candidate) => candidate.selected && candidate.seedKey === 'seed-a').length <= 3);
+});
+
+test('fallback candidates are capped and broad fallback is labeled', () => {
+  const names = ['Amber', 'Beryl', 'Cobalt', 'Dawn', 'Ember', 'Fable', 'Grove', 'Harbor'];
+  const genres = ['Strategy', 'RPG', 'Puzzle', 'Simulation', 'Racing', 'Platformer', 'Shooter', 'Fighting'];
+  const candidates = [
+    ...Array.from({ length: 8 }, (_, index) => scoredCandidate({ id: index + 1, name: `${names[index]} Personal`, score: 80 - index, source: index % 2 ? 'liked-game-similar' : 'affinity-strict', genre: genres[index], tag: index % 2 ? 'turn-based-combat' : 'deckbuilding', seedKey: index % 2 ? `seed-${index}` : undefined })),
+    ...Array.from({ length: 8 }, (_, index) => scoredCandidate({ id: index + 20, name: `${names[index]} Fallback`, score: 60 - index, source: 'trending', genre: 'Action' })),
+  ];
+  const { diagnostics } = selectFinalRecommendationCandidates(candidates, 10);
+
+  assert.ok((diagnostics.fallbackTierCountsAfter['tier3-broad'] ?? 0) <= 3);
+  assert.ok((diagnostics.fallbackTierCountsAfter['tier0-personalized'] ?? 0) + (diagnostics.fallbackTierCountsAfter['tier1-taste-quality'] ?? 0) >= 7);
+});
+
+test('near-duplicate editions collapse but sequels remain separate', () => {
+  const candidates = [
+    scoredCandidate({ id: 1, name: 'Aurora Quest', score: 60, genre: 'RPG', tag: 'turn-based-combat', image: null }),
+    scoredCandidate({ id: 2, name: 'Aurora Quest Definitive Edition', score: 65, genre: 'RPG', tag: 'turn-based-combat' }),
+    scoredCandidate({ id: 3, name: 'Aurora Quest 2', score: 58, genre: 'RPG', tag: 'turn-based-combat' }),
+  ];
+  const { selected, diagnostics } = selectFinalRecommendationCandidates(candidates, 3);
+
+  assert.ok(selected.some((item) => item.result.id === 2));
+  assert.ok(selected.some((item) => item.result.id === 3));
+  assert.ok(!selected.some((item) => item.result.id === 1));
+  assert.equal(diagnostics.nearDuplicateSuppressions.length, 1);
+});
+
+test('final selection is deterministic for identical inputs independent of input order', () => {
+  const candidates = Array.from({ length: 12 }, (_, index) => scoredCandidate({ id: index + 1, name: `Pick ${index + 1}`, score: 70 - (index % 3), genre: index % 2 ? 'Action' : 'Strategy', tag: index % 2 ? 'soulslike' : 'deckbuilding' }));
+  const first = selectFinalRecommendationCandidates(candidates, 10).selected.map((item) => item.result.id);
+  const second = selectFinalRecommendationCandidates([...candidates].reverse(), 10).selected.map((item) => item.result.id);
+
+  assert.deepEqual(first, second);
 });
 
 

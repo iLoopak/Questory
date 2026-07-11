@@ -54,6 +54,17 @@ export type RecommendationCandidateDiagnostics = {
   fallbackTier: 'personalized' | 'broad' | 'trending';
   exclusionDecisions: string[];
   scoreBreakdown?: RecommendationScore;
+  originalScore?: number;
+  finalSelectionScore?: number;
+  diversityAdjustment?: number;
+  primaryGenre?: string;
+  franchise?: string | null;
+  developer?: string | null;
+  tasteClusters?: string[];
+  primarySeed?: string | null;
+  capDecisions?: string[];
+  relaxationStep?: string;
+  selectionReason?: string;
 };
 
 type DebugEvent = Record<string, unknown> & { event: string };
@@ -101,6 +112,7 @@ type RecommendationDiagnosticsReport = {
   topPositiveSignals?: Record<string, unknown>;
   topNegativeSignals?: Record<string, unknown>;
   scoreDistribution?: { min: number; median: number; max: number } | null;
+  finalSelection?: FinalSelectionDiagnostics;
 };
 
 const lastSurfaceCounts = { homeSelectorCount: 0, discoverSelectorCount: 0, homeRenderReason: 'not-rendered', discoverRenderReason: 'not-rendered' };
@@ -148,6 +160,7 @@ type RecommendationReportOptions = {
   topPositiveSignals?: Record<string, unknown>;
   topNegativeSignals?: Record<string, unknown>;
   scoreDistribution?: { min: number; median: number; max: number } | null;
+  finalSelection?: FinalSelectionDiagnostics;
 };
 
 function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions & { cacheAge?: number | null; lastGenerationError?: string | null }): void {
@@ -198,6 +211,7 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
     topPositiveSignals: options.topPositiveSignals,
     topNegativeSignals: options.topNegativeSignals,
     scoreDistribution: options.scoreDistribution,
+    finalSelection: options.finalSelection,
   };
   lastDiagnosticsReport = report;
   console.debug('[QuestShelf recommendations] diagnostic report', report);
@@ -584,30 +598,336 @@ async function collectFromResults(
   return output;
 }
 
-function applyDiversityFilter(scored: ScoredCandidate[], max: number, events: DebugEvent[]): ScoredCandidate[] {
-  const genreCounts = new Map<string, number>();
-  const sourceCounts = new Map<CandidateSource, number>();
-  const output: ScoredCandidate[] = [];
+type FallbackTier = 'tier0-personalized' | 'tier1-taste-quality' | 'tier2-adjacent' | 'tier3-broad';
 
-  for (const item of scored) {
-    const primaryGenre = item.result.genres?.[0]?.name ?? 'unknown';
-    const genreCount = genreCounts.get(primaryGenre) ?? 0;
-    const sourceCount = sourceCounts.get(item.source) ?? 0;
-    const sourceLimit = 5;
-    if (genreCount >= 3) {
-      events.push({ event: 'candidate_rejected', source: item.source, rawgId: item.result.id, title: item.result.name, score: item.score.total, reason: `genre-diversity:${primaryGenre}` });
-      continue;
-    }
-    if (sourceCount >= sourceLimit) {
-      events.push({ event: 'candidate_rejected', source: item.source, rawgId: item.result.id, title: item.result.name, score: item.score.total, reason: `source-diversity:${item.source}` });
-      continue;
-    }
-    output.push(item);
-    genreCounts.set(primaryGenre, genreCount + 1);
-    sourceCounts.set(item.source, sourceCount + 1);
-    if (output.length >= max) break;
+type FinalSelectionCandidate = {
+  item: ScoredCandidate;
+  rawgId: number;
+  originalScore: number;
+  primaryGenre: string | null;
+  franchise: string | null;
+  developer: string | null;
+  sourceCategory: string;
+  seedKey: string | null;
+  fallbackTier: FallbackTier;
+  tasteClusters: string[];
+  duplicateKey: string;
+  metadataScore: number;
+};
+
+export type FinalSelectionCandidateDiagnostics = {
+  rawgId: number;
+  title: string;
+  selected: boolean;
+  originalScore: number;
+  finalSelectionScore: number | null;
+  diversityAdjustment: number;
+  primaryGenre: string | null;
+  franchise: string | null;
+  developer: string | null;
+  sourceCategory: string;
+  seedKey: string | null;
+  fallbackTier: FallbackTier;
+  tasteClusters: string[];
+  capDecisions: string[];
+  relaxationStep?: string;
+  selectionReason: string;
+};
+
+export type FinalSelectionDiagnostics = {
+  beforeCount: number;
+  afterDuplicateCount: number;
+  selectedCount: number;
+  sourceCountsBefore: Record<string, number>;
+  sourceCountsAfter: Record<string, number>;
+  primaryGenreCountsBefore: Record<string, number>;
+  primaryGenreCountsAfter: Record<string, number>;
+  franchiseCountsBefore: Record<string, number>;
+  franchiseCountsAfter: Record<string, number>;
+  developerCountsBefore: Record<string, number>;
+  developerCountsAfter: Record<string, number>;
+  tasteClusterCountsAfter: Record<string, number>;
+  fallbackTierCountsBefore: Record<string, number>;
+  fallbackTierCountsAfter: Record<string, number>;
+  relaxationStepsUsed: string[];
+  nearDuplicateSuppressions: Array<{ keptRawgId: number; suppressedRawgId: number; key: string; reason: string }>;
+  candidates: FinalSelectionCandidateDiagnostics[];
+};
+
+const FINAL_SELECTION_RELAXATION_STEPS = [
+  { name: 'soft caps', genre: 3, franchise: 2, developer: 2, source: 5, seed: 2, fallback: 2, minScore: 10 },
+  { name: 'relax source and seed caps', genre: 3, franchise: 2, developer: 2, source: 6, seed: 3, fallback: 2, minScore: 10 },
+  { name: 'relax developer caps', genre: 3, franchise: 2, developer: 3, source: 6, seed: 3, fallback: 2, minScore: 8 },
+  { name: 'relax genre caps', genre: 4, franchise: 2, developer: 3, source: 6, seed: 3, fallback: 3, minScore: 8 },
+  { name: 'relax franchise hard cap', genre: 4, franchise: 3, developer: 3, source: 7, seed: 3, fallback: 3, minScore: 4 },
+] as const;
+
+function stableCandidateCompare(a: FinalSelectionCandidate, b: FinalSelectionCandidate): number {
+  return b.originalScore - a.originalScore || a.item.result.id - b.item.result.id || a.item.result.name.localeCompare(b.item.result.name);
+}
+
+function incrementCount(map: Map<string, number>, key: string | null | undefined): void {
+  if (!key) return;
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function countBy<T>(items: T[], key: (item: T) => string | null | undefined): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const value = key(item);
+    if (!value) continue;
+    counts[value] = (counts[value] ?? 0) + 1;
   }
-  return output;
+  return counts;
+}
+
+function getPrimaryGenreKey(result: RawgSearchResult): string | null {
+  const genre = result.genres?.[0];
+  return genre ? (genre.slug ?? toSlug(genre.name)) : null;
+}
+
+function getPrimaryDeveloperKey(result: RawgSearchResult): string | null {
+  const developer = result.developers?.[0]?.name;
+  if (!developer) return null;
+  const normalized = normalizeDeveloperName(developer);
+  return /^(valve|sony interactive entertainment|microsoft|nintendo|electronic arts|ubisoft)$/i.test(normalized) ? null : normalized;
+}
+
+function getSourceCategory(source: CandidateSource): string {
+  if (source === 'broad-discovery' || source === 'trending') return 'fallback';
+  if (source === 'liked-game-similar' || source === 'liked-game-series' || source === 'second-order') return 'seed';
+  if (source === 'plans-wishlist') return 'intent';
+  return 'affinity';
+}
+
+function getFallbackTier(item: ScoredCandidate): FallbackTier {
+  if (item.source === 'trending') return 'tier3-broad';
+  if (item.source === 'broad-discovery') return item.score.tagMatch > 0 || item.score.genreMatch >= 20 ? 'tier2-adjacent' : 'tier3-broad';
+  if (item.score.seedSimilarity >= 12 || item.score.tagMatch >= 18 || item.score.developerMatch >= 10 || item.score.franchiseMatch >= 12) return 'tier0-personalized';
+  return 'tier1-taste-quality';
+}
+
+function editionCanonicalTitle(title: string): string {
+  return normalizeTitle(title)
+    .replace(/\b(definitive|complete|game of the year|goty|remastered|remaster|remake|deluxe|ultimate|directors cut|director s cut|enhanced|anniversary|special|gold|hd|edition|collection)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getNearDuplicateKey(result: RawgSearchResult): string {
+  const canonical = editionCanonicalTitle(result.name);
+  const sequelMatch = canonical.match(/\b(\d+|ii|iii|iv|v|vi|vii|viii|ix|x)\b/);
+  return sequelMatch ? canonical : canonical;
+}
+
+function getTasteClusters(item: ScoredCandidate): string[] {
+  const clusters = new Set<string>();
+  item.score.positiveTags.filter(isDistinctivePreferenceTag).slice(0, 3).forEach((tag) => clusters.add(`tag:${tag}`));
+  if (item.score.positiveTags.some((tag) => /turn-based|tactical/.test(tag)) && item.score.positiveGenres.includes('RPG')) clusters.add('cluster:turn-based-rpg');
+  if (item.score.positiveTags.some((tag) => /deck/.test(tag))) clusters.add('cluster:deckbuilder');
+  if (item.score.positiveTags.some((tag) => /souls/.test(tag))) clusters.add('cluster:soulslike');
+  if (item.score.positiveTags.some((tag) => /metroidvania/.test(tag))) clusters.add('cluster:metroidvania');
+  item.score.positiveGenres.slice(0, 2).forEach((genre) => clusters.add(`genre:${toSlug(genre)}`));
+  return [...clusters];
+}
+
+function toFinalSelectionCandidate(item: ScoredCandidate): FinalSelectionCandidate {
+  return {
+    item,
+    rawgId: item.result.id,
+    originalScore: item.score.total,
+    primaryGenre: getPrimaryGenreKey(item.result),
+    franchise: recommendationFranchiseKey(item.result.slug ?? item.result.name),
+    developer: getPrimaryDeveloperKey(item.result),
+    sourceCategory: getSourceCategory(item.source),
+    seedKey: item.seed ? item.seed.stableKey : null,
+    fallbackTier: getFallbackTier(item),
+    tasteClusters: getTasteClusters(item),
+    duplicateKey: getNearDuplicateKey(item.result),
+    metadataScore: (item.result.background_image ? 2 : 0) + ((item.result.genres?.length ?? 0) > 0 ? 1 : 0) + ((item.result.tags?.length ?? 0) > 0 ? 1 : 0) + (item.result.released ? 1 : 0),
+  };
+}
+
+function chooseDuplicateWinner(a: FinalSelectionCandidate, b: FinalSelectionCandidate): FinalSelectionCandidate {
+  return b.originalScore > a.originalScore ? b
+    : b.originalScore === a.originalScore && b.metadataScore > a.metadataScore ? b
+      : a;
+}
+
+function dedupeFinalSelectionCandidates(candidates: FinalSelectionCandidate[]): { candidates: FinalSelectionCandidate[]; suppressions: FinalSelectionDiagnostics['nearDuplicateSuppressions'] } {
+  const byRawg = new Map<number, FinalSelectionCandidate>();
+  const suppressions: FinalSelectionDiagnostics['nearDuplicateSuppressions'] = [];
+  for (const candidate of candidates) {
+    const existing = byRawg.get(candidate.rawgId);
+    if (!existing) {
+      byRawg.set(candidate.rawgId, candidate);
+      continue;
+    }
+    const winner = chooseDuplicateWinner(existing, candidate);
+    const loser = winner === existing ? candidate : existing;
+    byRawg.set(candidate.rawgId, winner);
+    suppressions.push({ keptRawgId: winner.rawgId, suppressedRawgId: loser.rawgId, key: String(candidate.rawgId), reason: 'duplicate rawgId' });
+  }
+
+  const byEdition = new Map<string, FinalSelectionCandidate>();
+  for (const candidate of byRawg.values()) {
+    const key = candidate.duplicateKey;
+    const existing = byEdition.get(key);
+    if (!existing || !key) {
+      byEdition.set(key || `rawg:${candidate.rawgId}`, candidate);
+      continue;
+    }
+    const winner = chooseDuplicateWinner(existing, candidate);
+    const loser = winner === existing ? candidate : existing;
+    byEdition.set(key, winner);
+    suppressions.push({ keptRawgId: winner.rawgId, suppressedRawgId: loser.rawgId, key, reason: 'near-duplicate edition' });
+  }
+  return { candidates: [...byEdition.values()].sort(stableCandidateCompare), suppressions };
+}
+
+function finalSelectionScore(
+  candidate: FinalSelectionCandidate,
+  counts: {
+    genre: Map<string, number>;
+    franchise: Map<string, number>;
+    developer: Map<string, number>;
+    source: Map<string, number>;
+    seed: Map<string, number>;
+    cluster: Map<string, number>;
+    fallback: Map<string, number>;
+  },
+): { score: number; adjustment: number; decisions: string[] } {
+  let adjustment = 0;
+  const decisions: string[] = [];
+  if (candidate.primaryGenre && (counts.genre.get(candidate.primaryGenre) ?? 0) > 0) { adjustment -= 4; decisions.push('genre repetition penalty'); }
+  if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) > 0) { adjustment -= 6; decisions.push('franchise repetition penalty'); }
+  if (candidate.developer && (counts.developer.get(candidate.developer) ?? 0) > 0) { adjustment -= 3; decisions.push('developer repetition penalty'); }
+  if ((counts.source.get(candidate.sourceCategory) ?? 0) >= 3) { adjustment -= 3; decisions.push('source balance penalty'); }
+  if (candidate.seedKey && (counts.seed.get(candidate.seedKey) ?? 0) > 0) { adjustment -= 4; decisions.push('seed repetition penalty'); }
+  if (candidate.fallbackTier === 'tier3-broad') { adjustment -= 10; decisions.push('broad fallback penalty'); }
+  if (candidate.tasteClusters.some((cluster) => !(counts.cluster.get(cluster) ?? 0))) { adjustment += 4; decisions.push('new taste cluster bonus'); }
+  return { score: candidate.originalScore + adjustment, adjustment, decisions };
+}
+
+export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], max = TARGET_PERSONAL_RECOMMENDATIONS): { selected: ScoredCandidate[]; diagnostics: FinalSelectionDiagnostics } {
+  const raw = scored.map(toFinalSelectionCandidate);
+  const { candidates, suppressions } = dedupeFinalSelectionCandidates(raw);
+  const selected: FinalSelectionCandidate[] = [];
+  const selectedKeys = new Set<number>();
+  const diagnostics = new Map<number, FinalSelectionCandidateDiagnostics>();
+  const counts = {
+    genre: new Map<string, number>(),
+    franchise: new Map<string, number>(),
+    developer: new Map<string, number>(),
+    source: new Map<string, number>(),
+    seed: new Map<string, number>(),
+    cluster: new Map<string, number>(),
+    fallback: new Map<string, number>(),
+  };
+  const relaxationStepsUsed: string[] = [];
+
+  for (const step of FINAL_SELECTION_RELAXATION_STEPS) {
+    let addedInStep = false;
+    while (selected.length < max) {
+      const eligible = candidates
+        .filter((candidate) => !selectedKeys.has(candidate.rawgId))
+        .map((candidate) => {
+          const capDecisions: string[] = [];
+          if (candidate.originalScore < step.minScore) capDecisions.push(`below relevance floor:${step.minScore}`);
+          if (candidate.primaryGenre && (counts.genre.get(candidate.primaryGenre) ?? 0) >= step.genre) capDecisions.push(`genre cap:${candidate.primaryGenre}`);
+          if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) >= step.franchise) capDecisions.push(`franchise cap:${candidate.franchise}`);
+          if (candidate.developer && (counts.developer.get(candidate.developer) ?? 0) >= step.developer) capDecisions.push(`developer cap:${candidate.developer}`);
+          if ((counts.source.get(candidate.sourceCategory) ?? 0) >= step.source) capDecisions.push(`source cap:${candidate.sourceCategory}`);
+          if (candidate.seedKey && (counts.seed.get(candidate.seedKey) ?? 0) >= step.seed) capDecisions.push(`seed cap`);
+          if ((candidate.fallbackTier === 'tier2-adjacent' || candidate.fallbackTier === 'tier3-broad') && (counts.fallback.get('fallback') ?? 0) >= step.fallback) capDecisions.push(`fallback cap`);
+          const selection = finalSelectionScore(candidate, counts);
+          return { candidate, selection, capDecisions };
+        })
+        .filter((entry) => entry.capDecisions.length === 0)
+        .sort((a, b) => b.selection.score - a.selection.score || stableCandidateCompare(a.candidate, b.candidate));
+      const next = eligible[0];
+      if (!next) break;
+      selected.push(next.candidate);
+      selectedKeys.add(next.candidate.rawgId);
+      incrementCount(counts.genre, next.candidate.primaryGenre);
+      incrementCount(counts.franchise, next.candidate.franchise);
+      incrementCount(counts.developer, next.candidate.developer);
+      incrementCount(counts.source, next.candidate.sourceCategory);
+      incrementCount(counts.seed, next.candidate.seedKey);
+      next.candidate.tasteClusters.forEach((cluster) => incrementCount(counts.cluster, cluster));
+      if (next.candidate.fallbackTier === 'tier2-adjacent' || next.candidate.fallbackTier === 'tier3-broad') incrementCount(counts.fallback, 'fallback');
+      diagnostics.set(next.candidate.rawgId, {
+        rawgId: next.candidate.rawgId,
+        title: next.candidate.item.result.name,
+        selected: true,
+        originalScore: next.candidate.originalScore,
+        finalSelectionScore: next.selection.score,
+        diversityAdjustment: next.selection.adjustment,
+        primaryGenre: next.candidate.primaryGenre,
+        franchise: next.candidate.franchise,
+        developer: next.candidate.developer,
+        sourceCategory: next.candidate.sourceCategory,
+        seedKey: next.candidate.seedKey,
+        fallbackTier: next.candidate.fallbackTier,
+        tasteClusters: next.candidate.tasteClusters,
+        capDecisions: next.selection.decisions,
+        relaxationStep: step.name,
+        selectionReason: next.selection.decisions.join('; ') || 'highest relevant candidate within caps',
+      });
+      addedInStep = true;
+    }
+    if (addedInStep) relaxationStepsUsed.push(step.name);
+    if (selected.length >= max) break;
+  }
+
+  for (const candidate of candidates) {
+    if (diagnostics.has(candidate.rawgId)) continue;
+    const selection = finalSelectionScore(candidate, counts);
+    const capDecisions: string[] = [];
+    if (candidate.primaryGenre && (counts.genre.get(candidate.primaryGenre) ?? 0) >= FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.genre) capDecisions.push(`genre cap:${candidate.primaryGenre}`);
+    if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) >= FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.franchise) capDecisions.push(`franchise cap:${candidate.franchise}`);
+    if (candidate.developer && (counts.developer.get(candidate.developer) ?? 0) >= FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.developer) capDecisions.push(`developer cap:${candidate.developer}`);
+    diagnostics.set(candidate.rawgId, {
+      rawgId: candidate.rawgId,
+      title: candidate.item.result.name,
+      selected: false,
+      originalScore: candidate.originalScore,
+      finalSelectionScore: selection.score,
+      diversityAdjustment: selection.adjustment,
+      primaryGenre: candidate.primaryGenre,
+      franchise: candidate.franchise,
+      developer: candidate.developer,
+      sourceCategory: candidate.sourceCategory,
+      seedKey: candidate.seedKey,
+      fallbackTier: candidate.fallbackTier,
+      tasteClusters: candidate.tasteClusters,
+      capDecisions,
+      selectionReason: capDecisions[0] ?? 'outside final selection',
+    });
+  }
+
+  return {
+    selected: selected.map((candidate) => candidate.item),
+    diagnostics: {
+      beforeCount: raw.length,
+      afterDuplicateCount: candidates.length,
+      selectedCount: selected.length,
+      sourceCountsBefore: countBy(candidates, (candidate) => candidate.sourceCategory),
+      sourceCountsAfter: countBy(selected, (candidate) => candidate.sourceCategory),
+      primaryGenreCountsBefore: countBy(candidates, (candidate) => candidate.primaryGenre),
+      primaryGenreCountsAfter: countBy(selected, (candidate) => candidate.primaryGenre),
+      franchiseCountsBefore: countBy(candidates, (candidate) => candidate.franchise),
+      franchiseCountsAfter: countBy(selected, (candidate) => candidate.franchise),
+      developerCountsBefore: countBy(candidates, (candidate) => candidate.developer),
+      developerCountsAfter: countBy(selected, (candidate) => candidate.developer),
+      tasteClusterCountsAfter: countBy(selected.flatMap((candidate) => candidate.tasteClusters), (cluster) => cluster),
+      fallbackTierCountsBefore: countBy(candidates, (candidate) => candidate.fallbackTier),
+      fallbackTierCountsAfter: countBy(selected, (candidate) => candidate.fallbackTier),
+      relaxationStepsUsed,
+      nearDuplicateSuppressions: suppressions,
+      candidates: [...diagnostics.values()].sort((a, b) => Number(b.selected) - Number(a.selected) || b.originalScore - a.originalScore || a.rawgId - b.rawgId),
+    },
+  };
 }
 
 interface CacheEntry { candidates: DiscoveryCandidate[]; fingerprint: string; fetchedAt: number; }
@@ -660,12 +980,14 @@ function buildCandidateDiagnostics(
   scored: ScoredCandidate[],
   finalCandidates: DiscoveryCandidate[],
   events: DebugEvent[],
+  finalSelection?: FinalSelectionDiagnostics,
 ): RecommendationCandidateDiagnostics[] {
   if (!DEBUG_RECOMMENDATIONS) return [];
   const byRawgId = new Map(scored.map((item) => [item.result.id, item]));
   return finalCandidates.map((candidate) => {
     const scoredCandidate = byRawgId.get(candidate.game.rawgId);
     const score = scoredCandidate?.score;
+    const selection = finalSelection?.candidates.find((item) => item.rawgId === candidate.game.rawgId);
     const positive = [
       score && score.genreMatch > 0 ? `genres +${score.genreMatch}` : null,
       score && score.tagMatch > 0 ? `tags +${score.tagMatch}` : null,
@@ -700,6 +1022,17 @@ function buildCandidateDiagnostics(
         .filter((event) => event.event === 'candidate_rejected' && event.rawgId === candidate.game.rawgId)
         .map((event) => String(event.reason ?? 'rejected')),
       scoreBreakdown: score,
+      originalScore: selection?.originalScore,
+      finalSelectionScore: selection?.finalSelectionScore ?? undefined,
+      diversityAdjustment: selection?.diversityAdjustment,
+      primaryGenre: selection?.primaryGenre ?? undefined,
+      franchise: selection?.franchise,
+      developer: selection?.developer,
+      tasteClusters: selection?.tasteClusters,
+      primarySeed: selection?.seedKey ?? null,
+      capDecisions: selection?.capDecisions,
+      relaxationStep: selection?.relaxationStep,
+      selectionReason: selection?.selectionReason,
     };
   });
 }
@@ -825,9 +1158,11 @@ export async function fetchPersonalRecommendationsResult(
 
   await addStage('second-order', async () => Promise.all(collected.slice(0, 3).map(async (item) => ({ anchorTitle: item.result.name, results: await fetchSuggestedGames(item.result.id) }))), 10, 3);
 
-  const ranked = collected.sort((a, b) => b.score.total - a.score.total);
-  const diverse = applyDiversityFilter(ranked, TARGET_PERSONAL_RECOMMENDATIONS, events);
-  const candidates = applyLibraryStatus(diverse.map(({ result }) => mapRawgResult(result)), userGames, diverse.map(({ reason }) => reason), inboxRawgIds, diverse.map(({ score }) => score.total), diverse.map(({ source }) => source));
+  const ranked = collected.sort((a, b) => b.score.total - a.score.total || a.result.id - b.result.id);
+  let finalSelection = selectFinalRecommendationCandidates(ranked, TARGET_PERSONAL_RECOMMENDATIONS);
+  finalSelection.diagnostics.nearDuplicateSuppressions.forEach((suppression) => events.push({ event: 'candidate_rejected', ...suppression, reason: 'near-duplicate' }));
+  finalSelection.diagnostics.candidates.forEach((candidate) => events.push({ event: candidate.selected ? 'final_candidate_selected' : 'final_candidate_rejected', ...candidate }));
+  const candidates = applyLibraryStatus(finalSelection.selected.map(({ result }) => mapRawgResult(result)), userGames, finalSelection.selected.map(({ reason }) => reason), inboxRawgIds, finalSelection.selected.map(({ score }) => score.total), finalSelection.selected.map(({ source }) => source));
   let pool = candidates.filter((c) => !c.excluded && !c.inboxStatus);
   if (pool.length < TARGET_PERSONAL_RECOMMENDATIONS / 2) {
     const staleCache = await getAnyStoredCacheEntry();
@@ -844,13 +1179,15 @@ export async function fetchPersonalRecommendationsResult(
       { results: await fetchRecommendedGames({ ordering: '-added', pageSize: 40 }) },
       { results: await fetchRecommendedGames({ ordering: '-rating', pageSize: 40 }) },
     ], -20, 4);
-    const reranked = collected.sort((a, b) => b.score.total - a.score.total);
-    const rediverse = applyDiversityFilter(reranked, TARGET_PERSONAL_RECOMMENDATIONS, events);
-    const expandedCandidates = applyLibraryStatus(rediverse.map(({ result }) => mapRawgResult(result)), userGames, rediverse.map(({ reason }) => reason), inboxRawgIds, rediverse.map(({ score }) => score.total), rediverse.map(({ source }) => source));
+    const reranked = collected.sort((a, b) => b.score.total - a.score.total || a.result.id - b.result.id);
+    finalSelection = selectFinalRecommendationCandidates(reranked, TARGET_PERSONAL_RECOMMENDATIONS);
+    finalSelection.diagnostics.nearDuplicateSuppressions.forEach((suppression) => events.push({ event: 'candidate_rejected', ...suppression, reason: 'near-duplicate' }));
+    finalSelection.diagnostics.candidates.forEach((candidate) => events.push({ event: candidate.selected ? 'final_candidate_selected' : 'final_candidate_rejected', ...candidate }));
+    const expandedCandidates = applyLibraryStatus(finalSelection.selected.map(({ result }) => mapRawgResult(result)), userGames, finalSelection.selected.map(({ reason }) => reason), inboxRawgIds, finalSelection.selected.map(({ score }) => score.total), finalSelection.selected.map(({ source }) => source));
     pool = expandedCandidates.filter((c) => !c.excluded && !c.inboxStatus).slice(0, TARGET_PERSONAL_RECOMMENDATIONS);
   }
-  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: pool.filter((candidate) => candidate.source === 'trending').length });
-  const candidateDiagnostics = buildCandidateDiagnostics(collected, pool, events);
+  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: finalSelection.selected.length, trending: pool.filter((candidate) => candidate.source === 'trending').length });
+  const candidateDiagnostics = buildCandidateDiagnostics(collected, pool, events, finalSelection.diagnostics);
   debugRecommendationReport(events, counts, {
     finalCandidates: pool,
     normalizedCandidates: candidates,
@@ -873,6 +1210,7 @@ export async function fetchPersonalRecommendationsResult(
       franchises: profile.negativeFranchises.slice(0, 5),
     },
     scoreDistribution: scoreDistribution(collected.map((item) => item.score.total)),
+    finalSelection: finalSelection.diagnostics,
   });
 
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
