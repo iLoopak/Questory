@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
 import { getRecommendationState } from '../src/lib/recommendationState';
+import { recommendationBenchmarkProfiles } from '../src/lib/recommendationBenchmarks';
+import { normalizeRecommendationFeedbackRecords } from '../src/lib/recommendationFeedback';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
 import { generateRecommendationReasonForTest, scorePersonalRecommendationCandidate, selectFinalRecommendationCandidates, selectRecommendationSeeds, validatePersonalRecommendationCacheEntry } from '../src/services/personalRecommendationsService';
 import { scoreContextualTagOverlapForTest } from '../src/services/contextualRecommendationsService';
@@ -160,6 +162,29 @@ test('personal recommendation cache validation rejects incompatible or malformed
   assert.equal(validatePersonalRecommendationCacheEntry({ version: 2, fingerprint: 'abc', fetchedAt: now, expiresAt: now + 1000, candidates: [validCandidate] }, now), null);
   assert.equal(validatePersonalRecommendationCacheEntry({ version: 3, fingerprint: 'abc', fetchedAt: now, expiresAt: now - 1, candidates: [validCandidate] }, now), null);
   assert.equal(validatePersonalRecommendationCacheEntry({ version: 3, fingerprint: 'abc', fetchedAt: now, expiresAt: now + 1000, candidates: [{ ...validCandidate, score: Number.NaN }] }, now), null);
+});
+
+test('recommendation feedback storage normalizes distinct feedback semantics', () => {
+  const records = normalizeRecommendationFeedbackRecords([
+    { rawgId: 10, normalizedTitle: 'Hidden Game', feedbackType: 'hide', createdAt: 100, surface: 'discover', metadata: { tags: ['soulslike'], genres: ['Action'], developers: ['Studio'], franchise: 'hidden-game' } },
+    { rawgId: 11, normalizedTitle: 'Less Game', feedbackType: 'less_like_this', createdAt: 101, surface: 'home', metadata: { tags: ['deckbuilding'], genres: ['Strategy'] } },
+    { rawgId: 12, normalizedTitle: 'Bad', feedbackType: 'unknown', createdAt: 102 },
+  ]);
+
+  assert.equal(records.length, 2);
+  assert.equal(records[0].feedbackType, 'hide');
+  assert.equal(records[1].feedbackType, 'less_like_this');
+  assert.deepEqual(records[0].metadata.tags, ['soulslike']);
+});
+
+test('synthetic recommendation benchmark profiles produce expected profile signals', () => {
+  assert.equal(recommendationBenchmarkProfiles.length >= 14, true);
+  for (const benchmark of recommendationBenchmarkProfiles) {
+    const profile = buildUserProfile(benchmark.games);
+    if (benchmark.expected.minPositiveTags) assert.ok(profile.topTags.length >= benchmark.expected.minPositiveTags, benchmark.id);
+    if (benchmark.expected.hasNegativeSignals) assert.ok(profile.negativeGenres.length + profile.negativeTags.length + profile.negativeFranchises.length > 0, benchmark.id);
+    if (benchmark.expected.minReadyGames) assert.ok(benchmark.games.length >= benchmark.expected.minReadyGames, benchmark.id);
+  }
 });
 
 test('highly rated finished games raise matching candidate scores', () => {
@@ -442,6 +467,16 @@ test('franchise and developer caps prevent one series or studio from filling the
 
   assert.ok((diagnostics.franchiseCountsAfter['sky-saga'] ?? 0) <= 3);
   assert.ok((diagnostics.developerCountsAfter['Studio One'] ?? 0) <= 3);
+});
+
+test('reduced franchise repetition preference tightens final franchise caps', () => {
+  const candidates = [
+    ...Array.from({ length: 6 }, (_, index) => scoredCandidate({ id: index + 1, name: `Sky Saga ${index + 1}`, slug: `sky-saga-${index + 1}`, score: 90 - index, genre: 'RPG', tag: 'turn-based-combat', developer: `Studio ${index}` })),
+    ...Array.from({ length: 6 }, (_, index) => scoredCandidate({ id: index + 20, name: `Moon Tactics ${index + 1}`, slug: `moon-tactics-${index + 1}`, score: 82 - index, genre: 'Strategy', tag: 'tactical-rpg', developer: `Moon Studio ${index}` })),
+  ];
+  const { diagnostics } = selectFinalRecommendationCandidates(candidates, 10, { reduceFranchiseRepetition: true });
+
+  assert.ok((diagnostics.franchiseCountsAfter['sky-saga'] ?? 0) <= 2);
 });
 
 test('unknown franchise and developer metadata does not group unrelated games', () => {

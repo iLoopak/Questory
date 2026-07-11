@@ -32,6 +32,44 @@ The detail engine fetches current-game suggested, series, tag-pool, and genre-po
 
 The final selector applies deterministic caps for primary genre, franchise, developer, source category, seed, fallback tier, near-duplicate editions, and taste clusters. Relaxation steps fill sparse shelves without allowing weak candidates to replace clearly stronger relevant candidates.
 
+## Quality Metrics
+
+Recommendation quality is monitored with property-based metrics rather than clicks alone:
+
+- Coverage: non-empty shelves, personalized versus fallback counts, source coverage, and taste-cluster coverage.
+- Relevance proxies: opened, wishlisted, planned, added to library, started, finished, dropped, explicitly hidden, and explicitly rejected recommendations.
+- Diversity: genre, franchise, developer, source, seed, repeated recommendation, and near-duplicate concentration.
+- Stability and freshness: shelf churn, exposure count, cache age, refresh success, and time since meaningful profile changes.
+- Confidence: fallback tier mix, score distribution, selected/rejected margin, and multi-signal support.
+
+Clicks are treated as curiosity, not proof of recommendation quality.
+
+## Feedback And Controls
+
+User feedback is stored locally under `questshelf.recommendationFeedback.v1` and is included in backups. Exposure/fatigue counters live under `questshelf.recommendationExposure.v1` and are not backed up.
+
+Feedback semantics are distinct:
+
+- Hide recommendation: excludes the exact game only.
+- Not interested: excludes the exact game and adds a mild bounded negative signal.
+- Show less like this: excludes the exact game and adds a stronger bounded metadata penalty.
+- Already played: excludes the exact game without treating it as dislike.
+- More like this: adds a bounded positive signal where used.
+
+Settings expose a small preference surface: Familiar/Balanced/Exploratory discovery style, newer-release preference, and reduced franchise repetition. These settings are included in the recommendation fingerprint.
+
+Repeated exposures add a bounded fatigue penalty after several shelf appearances. Strong candidates may remain, but comparable alternatives can rotate in.
+
+## Versioning
+
+The engine tracks three separate versions:
+
+- cache schema version: persisted payload compatibility;
+- engine implementation version: pipeline and data-contract changes;
+- scoring configuration version: weight and tuning changes.
+
+Weight-only changes should bump the scoring version, not the cache schema version. Storage shape changes should bump schema versions.
+
 ## Cache lifecycle
 
 Personal recommendation cache entries live under `questshelf.personalRecommendations.v2` in IndexedDB app caches. Payloads include an explicit schema version and expiry time and are validated before use. Invalid, expired, or incompatible entries are discarded safely.

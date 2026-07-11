@@ -12,6 +12,15 @@ import { getSteamProfileDisplayName, loadSteamSettings, saveSteamSettings } from
 import { getSteamPlayerSummary } from '../../services/steamApi';
 import type { QuestShelfAchievementProgress } from '../../lib/questShelfAchievements';
 import { SettingsSection } from './SettingsSection';
+import {
+  clearRecommendationFeedback,
+  loadRecommendationFeedback,
+  loadRecommendationPreferences,
+  removeRecommendationFeedback,
+  saveRecommendationPreferences,
+  type RecommendationPreferences,
+} from '../../lib/recommendationFeedback';
+import { clearPersonalRecommendationCaches } from '../../services/personalRecommendationsService';
 
 const personalizationAvatarOptions: Array<{
   label: string;
@@ -56,6 +65,8 @@ export function PersonalizationSettingsPanel({
   const [avatarUploadStatus, setAvatarUploadStatus] = useState('');
   const [avatarUploadError, setAvatarUploadError] = useState('');
   const [isImportingSteamAvatar, setIsImportingSteamAvatar] = useState(false);
+  const [recommendationPreferences, setRecommendationPreferences] = useState<RecommendationPreferences>(() => loadRecommendationPreferences());
+  const [recommendationFeedback, setRecommendationFeedback] = useState(() => loadRecommendationFeedback());
 
   function updateShelfName(shelfName: string) {
     onShelfIdentityChange({ ...shelfIdentity, shelfName });
@@ -123,6 +134,29 @@ export function PersonalizationSettingsPanel({
 
   function updateActiveBadge(selectedActiveBadgeId: ShelfIdentitySettings['selectedActiveBadgeId']) {
     onShelfIdentityChange({ ...shelfIdentity, selectedActiveBadgeId });
+  }
+
+  function updateRecommendationPreferences(next: RecommendationPreferences) {
+    setRecommendationPreferences(next);
+    saveRecommendationPreferences(next);
+    void clearPersonalRecommendationCaches();
+  }
+
+  function undoRecommendationFeedback(rawgId: number | null, normalizedTitle: string) {
+    removeRecommendationFeedback(rawgId, normalizedTitle);
+    setRecommendationFeedback(loadRecommendationFeedback());
+    void clearPersonalRecommendationCaches();
+  }
+
+  function resetRecommendationFeedback() {
+    if (!window.confirm('Reset recommendation feedback? Hidden games and less-like-this preferences will be cleared.')) return;
+    clearRecommendationFeedback();
+    setRecommendationFeedback([]);
+    void clearPersonalRecommendationCaches();
+  }
+
+  function resetRecommendationCache() {
+    void clearPersonalRecommendationCaches();
   }
 
   const activeAchievement = achievements.find((achievement) => achievement.title === activeAchievementTitle);
@@ -274,6 +308,62 @@ export function PersonalizationSettingsPanel({
           </div>
         </div>
       </div>
+      <div className="mt-4 space-y-4 rounded-lg border border-skyglass/15 bg-ink-950/80 p-3">
+        <div>
+          <div className="qs-label-caps text-muted">Recommendation preferences</div>
+          <p className="mt-1 text-sm leading-6 text-slate-400">Ratings, playtime, and statuses remain the strongest signals. These controls only tune the final shelf.</p>
+        </div>
+        <label className="block">
+          <span className="text-sm font-semibold text-white">Discovery style</span>
+          <select
+            className="mt-2 h-10 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition focus:border-mint"
+            onChange={(event) => updateRecommendationPreferences({ ...recommendationPreferences, explorationMode: event.target.value as RecommendationPreferences['explorationMode'] })}
+            value={recommendationPreferences.explorationMode}
+          >
+            <option value="familiar">Familiar</option>
+            <option value="balanced">Balanced</option>
+            <option value="exploratory">Exploratory</option>
+          </select>
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <RecommendationPreferenceToggle
+            checked={recommendationPreferences.preferNewerReleases}
+            label="Prefer newer releases"
+            onChange={(checked) => updateRecommendationPreferences({ ...recommendationPreferences, preferNewerReleases: checked })}
+          />
+          <RecommendationPreferenceToggle
+            checked={recommendationPreferences.reduceFranchiseRepetition}
+            label="Reduce franchise repetition"
+            onChange={(checked) => updateRecommendationPreferences({ ...recommendationPreferences, reduceFranchiseRepetition: checked })}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white" onClick={resetRecommendationCache} type="button">Reset recommendation cache</button>
+          <button className="h-10 rounded-md border border-red-400/30 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10" onClick={resetRecommendationFeedback} type="button">Reset feedback</button>
+        </div>
+        {recommendationFeedback.length > 0 ? (
+          <div className="space-y-2">
+            <div className="text-sm font-semibold text-white">Recent feedback</div>
+            <div className="grid gap-2">
+              {recommendationFeedback.slice(-6).reverse().map((record) => (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-skyglass/10 bg-ink-900/70 px-3 py-2 text-sm" key={`${record.rawgId ?? record.normalizedTitle}:${record.createdAt}`}>
+                  <span className="min-w-0 truncate text-slate-300">{record.feedbackType.replaceAll('_', ' ')} · {record.normalizedTitle}</span>
+                  <button className="shrink-0 text-xs font-semibold text-mint hover:text-white" onClick={() => undoRecommendationFeedback(record.rawgId, record.normalizedTitle)} type="button">Undo</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </SettingsSection>
+  );
+}
+
+function RecommendationPreferenceToggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-skyglass/15 bg-ink-900/70 px-3 py-2 text-sm text-slate-200">
+      <input checked={checked} className="h-4 w-4 accent-mint" onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+      <span>{label}</span>
+    </label>
   );
 }

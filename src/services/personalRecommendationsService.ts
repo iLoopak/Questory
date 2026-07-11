@@ -17,6 +17,22 @@ import { fetchGameSeries, fetchRecommendedGames, fetchSuggestedGames } from './r
 import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 import type { RecommendationEngineStatus } from '../lib/recommendationState';
 import { bucketDuration, bucketSmallGroup, trackAnalyticsEvent } from '../lib/analytics';
+import {
+  loadRecommendationExposure,
+  loadRecommendationFeedback,
+  loadRecommendationPreferences,
+  normalizeRecommendationTitle,
+  recordRecommendationExposures,
+  type RecommendationFeedbackRecord,
+  type RecommendationPreferences,
+} from '../lib/recommendationFeedback';
+import {
+  RECOMMENDATION_CACHE_SCHEMA_VERSION,
+  RECOMMENDATION_ENGINE_VERSION,
+  RECOMMENDATION_SCORING_VERSION,
+  recommendationConfig,
+} from '../lib/recommendationConfig';
+import { summarizeRecommendationQuality, type RecommendationQualitySummary } from '../lib/recommendationQuality';
 
 // ---------------------------------------------------------------------------
 // Recommendation waterfall
@@ -119,6 +135,11 @@ type RecommendationDiagnosticsReport = {
   performance?: Record<string, number>;
   cacheStatus?: 'hit' | 'miss' | 'stale' | 'invalid' | 'bypass';
   partialFailureCount?: number;
+  engineVersion?: string;
+  scoringVersion?: string;
+  feedbackSignalCount?: number;
+  exposureSignalCount?: number;
+  qualitySummary?: RecommendationQualitySummary;
 };
 
 const lastSurfaceCounts = { homeSelectorCount: 0, discoverSelectorCount: 0, homeRenderReason: 'not-rendered', discoverRenderReason: 'not-rendered' };
@@ -170,6 +191,9 @@ type RecommendationReportOptions = {
   performance?: Record<string, number>;
   cacheStatus?: 'hit' | 'miss' | 'stale' | 'invalid' | 'bypass';
   partialFailureCount?: number;
+  feedbackSignalCount?: number;
+  exposureSignalCount?: number;
+  qualitySummary?: RecommendationQualitySummary;
 };
 
 function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions & { cacheAge?: number | null; lastGenerationError?: string | null }): void {
@@ -224,6 +248,11 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
     performance: options.performance,
     cacheStatus: options.cacheStatus,
     partialFailureCount: options.partialFailureCount,
+    engineVersion: RECOMMENDATION_ENGINE_VERSION,
+    scoringVersion: RECOMMENDATION_SCORING_VERSION,
+    feedbackSignalCount: options.feedbackSignalCount,
+    exposureSignalCount: options.exposureSignalCount,
+    qualitySummary: options.qualitySummary,
   };
   lastDiagnosticsReport = report;
   console.debug('[QuestShelf recommendations] diagnostic report', report);
@@ -277,12 +306,114 @@ type ScoreContext = {
   relaxation?: number;
 };
 
+type FeedbackContext = {
+  feedback: RecommendationFeedbackRecord[];
+  preferences: RecommendationPreferences;
+  exposureCounts: Map<string, number>;
+};
+
 function clampScore(value: number, min: number, max: number): number {
   return Math.round(Math.max(min, Math.min(max, value)));
 }
 
 function normalizeDeveloperName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
+}
+
+function feedbackIdentityForResult(result: RawgSearchResult): { rawgId: number; title: string } {
+  return { rawgId: result.id, title: normalizeRecommendationTitle(result.name) };
+}
+
+function feedbackRecordMatchesResult(record: RecommendationFeedbackRecord, result: RawgSearchResult): boolean {
+  const identity = feedbackIdentityForResult(result);
+  return record.rawgId === identity.rawgId || record.normalizedTitle === identity.title;
+}
+
+function getCandidateMetadata(result: RawgSearchResult): { genres: string[]; tags: string[]; developers: string[]; franchise: string | null } {
+  return {
+    genres: (result.genres ?? []).map((genre) => toSlug(genre.name)),
+    tags: (result.tags ?? []).map((tag) => toSlug(tag.slug ?? tag.name)),
+    developers: (result.developers ?? []).map((developer) => normalizeDeveloperName(developer.name)),
+    franchise: recommendationFranchiseKey(result.slug ?? result.name),
+  };
+}
+
+function scoreFeedbackAdjustment(result: RawgSearchResult, context: FeedbackContext): { adjustment: number; reasons: string[]; excluded?: string } {
+  const metadata = getCandidateMetadata(result);
+  const identity = feedbackIdentityForResult(result);
+  let adjustment = 0;
+  const reasons: string[] = [];
+
+  for (const record of context.feedback) {
+    if (feedbackRecordMatchesResult(record, result)) {
+      if (record.feedbackType === 'hide') return { adjustment: -100, reasons: ['hidden exact recommendation'], excluded: 'feedback-hide' };
+      if (record.feedbackType === 'already_played') return { adjustment: -100, reasons: ['already played externally'], excluded: 'feedback-already-played' };
+      if (record.feedbackType === 'not_interested') return { adjustment: -recommendationConfig.feedback.notInterestedPenalty, reasons: ['not interested exact recommendation'], excluded: 'feedback-not-interested' };
+      if (record.feedbackType === 'less_like_this') return { adjustment: -recommendationConfig.feedback.lessLikeThisPenalty, reasons: ['less like this exact recommendation'], excluded: 'feedback-less-like-this' };
+      if (record.feedbackType === 'more_like_this') { adjustment += recommendationConfig.feedback.moreLikeThisBonus; reasons.push('more like this exact bonus'); }
+    }
+
+    const sharedTags = record.metadata.tags.filter((tag) => metadata.tags.includes(tag) && isDistinctivePreferenceTag(tag)).length;
+    const sharedGenres = record.metadata.genres.filter((genre) => metadata.genres.includes(genre)).length;
+    const sharedDeveloper = record.metadata.developers.some((developer) => metadata.developers.includes(developer));
+    const sharedFranchise = record.metadata.franchise && record.metadata.franchise === metadata.franchise;
+    if (record.feedbackType === 'not_interested' || record.feedbackType === 'less_like_this') {
+      const strength = record.feedbackType === 'less_like_this' ? 2 : 1;
+      const metadataPenalty = Math.min(
+        recommendationConfig.feedback.maxMetadataPenalty,
+        sharedTags * 4 * strength + Math.min(1, sharedGenres) * 2 * strength + (sharedDeveloper ? 4 * strength : 0) + (sharedFranchise ? 6 * strength : 0),
+      );
+      if (metadataPenalty > 0) {
+        adjustment -= metadataPenalty;
+        reasons.push(`${record.feedbackType} metadata penalty`);
+      }
+    }
+    if (record.feedbackType === 'more_like_this') {
+      const bonus = Math.min(recommendationConfig.feedback.moreLikeThisBonus, sharedTags * 2 + (sharedFranchise ? 4 : 0));
+      if (bonus > 0) {
+        adjustment += bonus;
+        reasons.push('more like this metadata bonus');
+      }
+    }
+  }
+
+  const exposureCount = context.exposureCounts.get(`id:${identity.rawgId}`) ?? context.exposureCounts.get(`title:${identity.title}`) ?? 0;
+  if (exposureCount > recommendationConfig.exposure.fatigueAfter) {
+    const penalty = Math.min(recommendationConfig.exposure.maxPenalty, (exposureCount - recommendationConfig.exposure.fatigueAfter) * recommendationConfig.exposure.penaltyPerExposure);
+    adjustment -= penalty;
+    reasons.push(`fatigue penalty:${penalty}`);
+  }
+  return { adjustment, reasons };
+}
+
+function scorePreferenceAdjustment(result: RawgSearchResult, source: CandidateSource, score: RecommendationScore, preferences: RecommendationPreferences): { adjustment: number; reasons: string[] } {
+  let adjustment = 0;
+  const reasons: string[] = [];
+  if (preferences.preferNewerReleases && result.released) {
+    const releaseYear = Number.parseInt(result.released.slice(0, 4), 10);
+    if (Number.isFinite(releaseYear) && releaseYear >= new Date().getUTCFullYear() - 2) {
+      adjustment += 3;
+      reasons.push('newer release preference');
+    }
+  }
+  if (source === 'broad-discovery' && (score.tagMatch > 0 || score.genreMatch >= recommendationConfig.exploration.minScore)) {
+    if (preferences.explorationMode === 'exploratory') {
+      adjustment += 4;
+      reasons.push('exploratory adjacent bonus');
+    } else if (preferences.explorationMode === 'familiar') {
+      adjustment -= recommendationConfig.exploration.scorePenalty;
+      reasons.push('familiar mode exploration penalty');
+    }
+  }
+  return { adjustment, reasons };
+}
+
+function recommendationPreferenceFingerprint(preferences: RecommendationPreferences, feedback: RecommendationFeedbackRecord[]): string {
+  const feedbackKey = feedback
+    .map((record) => [record.rawgId ?? record.normalizedTitle, record.feedbackType, record.createdAt].join(':'))
+    .sort()
+    .join('|');
+  return `${preferences.explorationMode}:${preferences.preferShorterGames}:${preferences.preferNewerReleases}:${preferences.reduceFranchiseRepetition}::${feedbackKey}`;
 }
 
 function weightedOverlap<T extends { name: string; weight: number }>(
@@ -585,11 +716,20 @@ async function collectFromResults(
   userGames: Game[],
   seen: Set<number>,
   events: DebugEvent[],
+  feedbackContext: FeedbackContext,
   options: { minScore: number; relaxation?: number; anchorTitle?: string; seed?: SelectedRecommendationSeed },
 ): Promise<ScoredCandidate[]> {
   const output: ScoredCandidate[] = [];
   for (const result of results) {
     const score = scorePersonalRecommendationCandidate(result, profile, options.relaxation ?? 0, { source, seed: options.seed });
+    const feedbackAdjustment = scoreFeedbackAdjustment(result, feedbackContext);
+    if (feedbackAdjustment.excluded) {
+      events.push({ event: 'candidate_rejected', source, rawgId: result.id, title: result.name, score: score.total, reason: feedbackAdjustment.excluded, feedbackReasons: feedbackAdjustment.reasons });
+      continue;
+    }
+    const preferenceAdjustment = scorePreferenceAdjustment(result, source, score, feedbackContext.preferences);
+    score.sourceAdjustment += feedbackAdjustment.adjustment + preferenceAdjustment.adjustment;
+    score.total += feedbackAdjustment.adjustment + preferenceAdjustment.adjustment;
     const libraryMatch = hasLibraryMatch(result, userGames);
     if (seen.has(result.id)) {
       events.push({ event: 'candidate_rejected', source, rawgId: result.id, title: result.name, score: score.total, reason: 'duplicate' });
@@ -605,7 +745,7 @@ async function collectFromResults(
     }
     seen.add(result.id);
     output.push({ result, score, source, anchorTitle: options.anchorTitle, seed: options.seed, reason: generateRecommendationReasonForTest(result, score, profile, source, options.anchorTitle) });
-    events.push({ event: 'candidate_accepted', source, rawgId: result.id, title: result.name, score: score.total, reason: output.at(-1)?.reason, anchorTitle: options.anchorTitle, scoreBreakdown: score });
+    events.push({ event: 'candidate_accepted', source, rawgId: result.id, title: result.name, score: score.total, reason: output.at(-1)?.reason, anchorTitle: options.anchorTitle, scoreBreakdown: score, feedbackReasons: feedbackAdjustment.reasons, preferenceReasons: preferenceAdjustment.reasons });
   }
   return output;
 }
@@ -821,7 +961,7 @@ function finalSelectionScore(
   return { score: candidate.originalScore + adjustment, adjustment, decisions };
 }
 
-export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], max = TARGET_PERSONAL_RECOMMENDATIONS): { selected: ScoredCandidate[]; diagnostics: FinalSelectionDiagnostics } {
+export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], max = TARGET_PERSONAL_RECOMMENDATIONS, preferences: Pick<RecommendationPreferences, 'reduceFranchiseRepetition'> = { reduceFranchiseRepetition: false }): { selected: ScoredCandidate[]; diagnostics: FinalSelectionDiagnostics } {
   const raw = scored.map(toFinalSelectionCandidate);
   const { candidates, suppressions } = dedupeFinalSelectionCandidates(raw);
   const selected: FinalSelectionCandidate[] = [];
@@ -847,7 +987,8 @@ export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], m
           const capDecisions: string[] = [];
           if (candidate.originalScore < step.minScore) capDecisions.push(`below relevance floor:${step.minScore}`);
           if (candidate.primaryGenre && (counts.genre.get(candidate.primaryGenre) ?? 0) >= step.genre) capDecisions.push(`genre cap:${candidate.primaryGenre}`);
-          if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) >= step.franchise) capDecisions.push(`franchise cap:${candidate.franchise}`);
+          const franchiseCap = Math.max(1, step.franchise - (preferences.reduceFranchiseRepetition ? 1 : 0));
+          if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) >= franchiseCap) capDecisions.push(`franchise cap:${candidate.franchise}`);
           if (candidate.developer && (counts.developer.get(candidate.developer) ?? 0) >= step.developer) capDecisions.push(`developer cap:${candidate.developer}`);
           if ((counts.source.get(candidate.sourceCategory) ?? 0) >= step.source) capDecisions.push(`source cap:${candidate.sourceCategory}`);
           if (candidate.seedKey && (counts.seed.get(candidate.seedKey) ?? 0) >= step.seed) capDecisions.push(`seed cap`);
@@ -897,7 +1038,8 @@ export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], m
     const selection = finalSelectionScore(candidate, counts);
     const capDecisions: string[] = [];
     if (candidate.primaryGenre && (counts.genre.get(candidate.primaryGenre) ?? 0) >= FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.genre) capDecisions.push(`genre cap:${candidate.primaryGenre}`);
-    if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) >= FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.franchise) capDecisions.push(`franchise cap:${candidate.franchise}`);
+    const finalFranchiseCap = Math.max(1, FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.franchise - (preferences.reduceFranchiseRepetition ? 1 : 0));
+    if (candidate.franchise && (counts.franchise.get(candidate.franchise) ?? 0) >= finalFranchiseCap) capDecisions.push(`franchise cap:${candidate.franchise}`);
     if (candidate.developer && (counts.developer.get(candidate.developer) ?? 0) >= FINAL_SELECTION_RELAXATION_STEPS.at(-1)!.developer) capDecisions.push(`developer cap:${candidate.developer}`);
     diagnostics.set(candidate.rawgId, {
       rawgId: candidate.rawgId,
@@ -944,11 +1086,11 @@ export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], m
 
 interface CacheEntry { candidates: DiscoveryCandidate[]; fingerprint: string; fetchedAt: number; }
 let cache: CacheEntry | null = null;
-const CACHE_SCHEMA_VERSION = 3;
+const CACHE_SCHEMA_VERSION = RECOMMENDATION_CACHE_SCHEMA_VERSION;
 const CACHE_STORAGE_KEY = 'questshelf.personalRecommendations.v2';
 export const PERSONAL_RECOMMENDATIONS_CACHE_KEY = CACHE_STORAGE_KEY;
 const OBSOLETE_CACHE_KEYS = ['questshelf.personalizedRecommendations.v1', 'questshelf.personalRecommendations.v1'];
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_TTL_MS = recommendationConfig.cacheTtlMs;
 const inFlightRequests = new Map<string, Promise<PersonalRecommendationsResult>>();
 
 type PersistedCacheEntry = Partial<CacheEntry> & { version?: number; expiresAt?: number };
@@ -1161,7 +1303,12 @@ async function generatePersonalRecommendationsResult(
   const profileStartedAt = performance.now();
   const profile = buildUserProfile(userGames);
   performanceMarks.profileBuildMs = Math.round(performance.now() - profileStartedAt);
-  const fp = profileFingerprint(userGames);
+  const feedback = loadRecommendationFeedback();
+  const preferences = loadRecommendationPreferences();
+  const exposure = loadRecommendationExposure();
+  const exposureCounts = new Map(exposure.map((record) => [record.rawgId != null ? `id:${record.rawgId}` : `title:${record.normalizedTitle}`, record.exposureCount]));
+  const feedbackContext: FeedbackContext = { feedback, preferences, exposureCounts };
+  const fp = `${profileFingerprint(userGames)}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
   const events: DebugEvent[] = [];
   let partialFailureCount = 0;
   const counts = {
@@ -1185,7 +1332,8 @@ async function generatePersonalRecommendationsResult(
   if (freshCache) {
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
     const cached = applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
-    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp, cacheStatus: 'hit', performance: performanceMarks });
+    recordRecommendationExposures(cached, fp);
+    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp, cacheStatus: 'hit', performance: performanceMarks, feedbackSignalCount: feedback.length, exposureSignalCount: exposure.filter((record) => record.exposureCount > recommendationConfig.exposure.fatigueAfter).length, qualitySummary: summarizeRecommendationQuality(cached) });
     trackRecommendationGenerationCompleted({ cacheStatus: 'hit', durationMs: performanceMarks.cacheReadMs ?? 0, partialFailureCount: 0, resultCount: cached.length });
     return { candidates: cached, diagnostics: getDiagnosticsReport() };
   }
@@ -1203,7 +1351,7 @@ async function generatePersonalRecommendationsResult(
     try {
       for (const batch of await producer()) {
         events.push({ event: 'provider_batch', source: name, count: batch.results.length, anchorTitle: batch.anchorTitle });
-        collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed }));
+        collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, feedbackContext, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed }));
       }
     } catch (error) {
       partialFailureCount += 1;
@@ -1252,7 +1400,7 @@ async function generatePersonalRecommendationsResult(
 
   const ranked = collected.sort((a, b) => b.score.total - a.score.total || a.result.id - b.result.id);
   const selectionStartedAt = performance.now();
-  let finalSelection = selectFinalRecommendationCandidates(ranked, TARGET_PERSONAL_RECOMMENDATIONS);
+  let finalSelection = selectFinalRecommendationCandidates(ranked, TARGET_PERSONAL_RECOMMENDATIONS, preferences);
   performanceMarks.diversitySelectionMs = Math.round(performance.now() - selectionStartedAt);
   finalSelection.diagnostics.nearDuplicateSuppressions.forEach((suppression) => events.push({ event: 'candidate_rejected', ...suppression, reason: 'near-duplicate' }));
   finalSelection.diagnostics.candidates.forEach((candidate) => events.push({ event: candidate.selected ? 'final_candidate_selected' : 'final_candidate_rejected', ...candidate }));
@@ -1275,7 +1423,7 @@ async function generatePersonalRecommendationsResult(
     ], -20, 4);
     const reranked = collected.sort((a, b) => b.score.total - a.score.total || a.result.id - b.result.id);
     const fallbackSelectionStartedAt = performance.now();
-    finalSelection = selectFinalRecommendationCandidates(reranked, TARGET_PERSONAL_RECOMMENDATIONS);
+    finalSelection = selectFinalRecommendationCandidates(reranked, TARGET_PERSONAL_RECOMMENDATIONS, preferences);
     performanceMarks.diversitySelectionMs += Math.round(performance.now() - fallbackSelectionStartedAt);
     finalSelection.diagnostics.nearDuplicateSuppressions.forEach((suppression) => events.push({ event: 'candidate_rejected', ...suppression, reason: 'near-duplicate' }));
     finalSelection.diagnostics.candidates.forEach((candidate) => events.push({ event: candidate.selected ? 'final_candidate_selected' : 'final_candidate_rejected', ...candidate }));
@@ -1311,11 +1459,15 @@ async function generatePersonalRecommendationsResult(
     performance: performanceMarks,
     cacheStatus: options.forceRefresh ? 'bypass' : 'miss',
     partialFailureCount,
+    feedbackSignalCount: feedback.length,
+    exposureSignalCount: exposure.filter((record) => record.exposureCount > recommendationConfig.exposure.fatigueAfter).length,
+    qualitySummary: summarizeRecommendationQuality(pool, finalSelection.diagnostics),
   });
 
   const cacheWriteStartedAt = performance.now();
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
   performanceMarks.cacheWriteMs = Math.round(performance.now() - cacheWriteStartedAt);
+  recordRecommendationExposures(pool, fp);
   trackRecommendationGenerationCompleted({ cacheStatus: options.forceRefresh ? 'bypass' : 'miss', durationMs: performanceMarks.totalGenerationMs, finalSelection: finalSelection.diagnostics, partialFailureCount, resultCount: pool.length });
   return { candidates: pool, diagnostics: getDiagnosticsReport() };
 }
