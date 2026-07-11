@@ -17,7 +17,7 @@ const QUESTSHELF_PREFIX = 'questshelf.';
 const GAMES_KEY = 'questshelf.games.v1';
 const INDEXEDDB_CACHE_KEYS = new Set([
   'questshelf.screenshots.v1',
-  'questshelf.personalRecommendations.v1',
+  'questshelf.personalRecommendations.v2',
   'questshelf.releaseCalendar.v2',
 ]);
 

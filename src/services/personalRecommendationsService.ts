@@ -2,9 +2,18 @@ import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryExclusionReason } from '../lib/discovery';
 import type { UserProfile } from '../lib/userProfile';
 import type { RawgSearchResult } from '../types/rawg';
-import { buildUserProfile, getRecommendationSignalWeight, preferenceTagWeight, profileFingerprint, toSlug } from '../lib/userProfile';
+import {
+  buildUserProfile,
+  getRecommendationSignalWeight,
+  isDistinctivePreferenceTag,
+  preferenceTagWeight,
+  profileFingerprint,
+  recommendationFranchiseKey,
+  signalInformationValue,
+  toSlug,
+} from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
-import { fetchRecommendedGames, fetchSuggestedGames } from './rawgApi';
+import { fetchGameSeries, fetchRecommendedGames, fetchSuggestedGames } from './rawgApi';
 import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 
 // ---------------------------------------------------------------------------
@@ -16,6 +25,7 @@ const DEBUG_RECOMMENDATIONS = import.meta.env.DEV && import.meta.env.VITE_DEBUG_
 
 type CandidateSource =
   | 'liked-game-similar'
+  | 'liked-game-series'
   | 'affinity-strict'
   | 'plans-wishlist'
   | 'recently-interacted'
@@ -30,6 +40,7 @@ type ScoredCandidate = {
   reason: string;
   source: CandidateSource;
   anchorTitle?: string;
+  seed?: SelectedRecommendationSeed;
 };
 
 export type RecommendationCandidateDiagnostics = {
@@ -42,6 +53,7 @@ export type RecommendationCandidateDiagnostics = {
   sourceSeedGames: string[];
   fallbackTier: 'personalized' | 'broad' | 'trending';
   exclusionDecisions: string[];
+  scoreBreakdown?: RecommendationScore;
 };
 
 type DebugEvent = Record<string, unknown> & { event: string };
@@ -85,6 +97,10 @@ type RecommendationDiagnosticsReport = {
   cacheAge: number | null;
   fingerprint?: string;
   candidateDiagnostics?: RecommendationCandidateDiagnostics[];
+  selectedSeeds?: SeedDiagnostics[];
+  topPositiveSignals?: Record<string, unknown>;
+  topNegativeSignals?: Record<string, unknown>;
+  scoreDistribution?: { min: number; median: number; max: number } | null;
 };
 
 const lastSurfaceCounts = { homeSelectorCount: 0, discoverSelectorCount: 0, homeRenderReason: 'not-rendered', discoverRenderReason: 'not-rendered' };
@@ -128,6 +144,10 @@ type RecommendationReportOptions = {
   normalizedCandidateCount?: number;
   fingerprint?: string;
   candidateDiagnostics?: RecommendationCandidateDiagnostics[];
+  selectedSeeds?: SeedDiagnostics[];
+  topPositiveSignals?: Record<string, unknown>;
+  topNegativeSignals?: Record<string, unknown>;
+  scoreDistribution?: { min: number; median: number; max: number } | null;
 };
 
 function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions & { cacheAge?: number | null; lastGenerationError?: string | null }): void {
@@ -149,7 +169,7 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
     wishlistCount: counts.wishlistCount,
     seedCount: options.seedTitles?.length ?? 0,
     providerCandidateCount,
-    localAffinityCandidateCount: stageCount('liked-game-similar') + stageCount('affinity-strict') + stageCount('plans-wishlist') + stageCount('recently-interacted') + stageCount('affinity-relaxed') + stageCount('second-order'),
+    localAffinityCandidateCount: stageCount('liked-game-similar') + stageCount('liked-game-series') + stageCount('affinity-strict') + stageCount('plans-wishlist') + stageCount('recently-interacted') + stageCount('affinity-relaxed') + stageCount('second-order'),
     broadDiscoveryCandidateCount: stageCount('broad-discovery'),
     trendingCandidateCount: stageCount('trending'),
     normalizedCount: options.normalizedCandidateCount ?? options.finalCandidates.length,
@@ -174,6 +194,10 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
     cacheAge: options.cacheAge ?? null,
     fingerprint: options.fingerprint,
     candidateDiagnostics: options.candidateDiagnostics,
+    selectedSeeds: options.selectedSeeds,
+    topPositiveSignals: options.topPositiveSignals,
+    topNegativeSignals: options.topNegativeSignals,
+    scoreDistribution: options.scoreDistribution,
   };
   lastDiagnosticsReport = report;
   console.debug('[QuestShelf recommendations] diagnostic report', report);
@@ -185,85 +209,303 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
 // ---------------------------------------------------------------------------
 
 export interface RecommendationScore {
-  genreMatch: number;      // 0–50: weighted overlap with user's liked genres
-  tagMatch: number;        // 0–30: weighted overlap with user's liked RAWG tags
-  developerMatch: number;  // 0–15: weighted overlap with liked developers when present
-  platformMatch: number;   // 0–10: platform-plan/library platform affinity
-  negativeMatch: number;   // penalty from low-rated/dropped signals
-  metacriticMatch: number; // 0–10: closeness to user's avg MC
+  genreMatch: number;      // 0-50
+  tagMatch: number;        // 0-36
+  developerMatch: number;  // 0-18
+  franchiseMatch: number;  // 0-18
+  platformMatch: number;   // 0-10
+  seedSimilarity: number;  // 0-24
+  qualityMatch: number;    // 0-12
+  recencyMatch: number;    // 0-4
+  negativeMatch: number;   // 0 to -40
+  sourceAdjustment: number;
+  metacriticMatch: number; // compatibility/debug subset of quality
   ownershipPenalty: number; // 0 or negative: already owned/wishlisted
+  positiveGenres: string[];
+  positiveTags: string[];
+  positiveDevelopers: string[];
+  positiveFranchises: string[];
+  negativeGenres: string[];
+  negativeTags: string[];
+  negativeDevelopers: string[];
+  negativeFranchises: string[];
   total: number;
+}
+
+const SCORE_CAPS = {
+  genre: 50,
+  tag: 36,
+  developer: 18,
+  franchise: 18,
+  platform: 10,
+  seedSimilarity: 24,
+  quality: 12,
+  recency: 4,
+  negative: 40,
+  sourceAdjustment: 8,
+} as const;
+
+type ScoreContext = {
+  source?: CandidateSource;
+  seed?: SelectedRecommendationSeed;
+  relaxation?: number;
+};
+
+function clampScore(value: number, min: number, max: number): number {
+  return Math.round(Math.max(min, Math.min(max, value)));
+}
+
+function normalizeDeveloperName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+function weightedOverlap<T extends { name: string; weight: number }>(
+  signals: T[],
+  matches: Set<string>,
+  cap: number,
+  multiplier: (name: string) => number = () => 1,
+): { score: number; matched: string[] } {
+  const considered = signals.slice(0, 10);
+  const denominator = considered.reduce((sum, signal) => sum + Math.max(0, signal.weight) * multiplier(signal.name), 0) || 1;
+  let raw = 0;
+  const matched: string[] = [];
+  for (const signal of considered) {
+    if (!matches.has(signal.name)) continue;
+    raw += Math.max(0, signal.weight) * multiplier(signal.name);
+    matched.push(signal.name);
+  }
+  return { score: clampScore((raw / denominator) * cap, 0, cap), matched };
 }
 
 export function scorePersonalRecommendationCandidate(
   result: RawgSearchResult,
   profile: UserProfile,
   relaxation = 0,
+  context: ScoreContext = {},
 ): RecommendationScore {
   const candidateGenres = (result.genres ?? []).map((g) => g.name);
   const candidateTags = (result.tags ?? []).map((t) => t.slug ?? toSlug(t.name));
-  const candidateDevelopers = (result as RawgSearchResult & { developers?: Array<{ name: string }> }).developers?.map((d) => d.name) ?? [];
+  const candidateDevelopers = (result.developers ?? []).map((d) => normalizeDeveloperName(d.name));
   const candidatePlatforms = (result.platforms ?? []).map((p) => p.platform.name);
+  const candidateFranchise = recommendationFranchiseKey(result.slug ?? result.name);
 
-  const consideredGenres = profile.topGenres.slice(0, Math.min(profile.topGenres.length, 3 + relaxation));
-  const consideredTags = profile.topTags.slice(0, Math.min(profile.topTags.length, 5 + relaxation * 3));
+  const consideredGenres = profile.topGenres.slice(0, Math.min(profile.topGenres.length, 5 + relaxation));
   const consideredPlatforms = profile.topPlatforms.slice(0, Math.min(profile.topPlatforms.length, 3 + relaxation));
+  const candidateGenreSet = new Set(candidateGenres);
+  const candidateTagSet = new Set(candidateTags);
+  const candidateDeveloperSet = new Set(candidateDevelopers);
+  const candidateFranchiseSet = new Set(candidateFranchise ? [candidateFranchise] : []);
 
-  const totalGenreWeight = consideredGenres.reduce((s, g) => s + g.weight, 0) || 1;
+  const genreOverlap = weightedOverlap(consideredGenres, candidateGenreSet, SCORE_CAPS.genre, (name) => signalInformationValue('genre', name));
   const consideredTagWeights = profile.topTagWeights.length > 0
-    ? profile.topTagWeights.slice(0, Math.min(profile.topTagWeights.length, 8 + relaxation * 3))
-    : consideredTags.map((name) => ({ name, weight: preferenceTagWeight(name) }));
-  const totalTagWeight = consideredTagWeights.reduce((s, tag) => s + tag.weight, 0) || 1;
-  const genreMatch = Math.round(Math.min(50, consideredGenres.reduce((sum, pg) => (
-    candidateGenres.includes(pg.name) ? sum + (pg.weight / totalGenreWeight) * 50 : sum
-  ), 0)));
+    ? profile.topTagWeights.slice(0, Math.min(profile.topTagWeights.length, 10 + relaxation * 2))
+    : profile.topTags.map((name) => ({ name, weight: preferenceTagWeight(name) }));
+  const tagOverlap = weightedOverlap(consideredTagWeights, candidateTagSet, SCORE_CAPS.tag, (name) => signalInformationValue('tag', name));
+  const developerOverlap = weightedOverlap(profile.topDeveloperWeights, candidateDeveloperSet, SCORE_CAPS.developer);
+  const franchiseOverlap = weightedOverlap(profile.topFranchises, candidateFranchiseSet, SCORE_CAPS.franchise);
+  const franchiseMatch = Math.max(
+    franchiseOverlap.score,
+    context.source === 'liked-game-series' ? SCORE_CAPS.franchise : 0,
+  );
+  const positiveFranchises = [...new Set([...franchiseOverlap.matched, ...(context.source === 'liked-game-series' && context.seed?.franchiseKey ? [context.seed.franchiseKey] : [])])];
 
-  const tagMatch = Math.round(Math.min(36, consideredTagWeights.reduce((sum, tag) => (
-    candidateTags.includes(tag.name) ? sum + (tag.weight / totalTagWeight) * 36 : sum
-  ), 0)));
-  const developerMatch = Math.min(15, profile.topDevelopers.filter((dev) => candidateDevelopers.includes(dev)).length * 8);
   const platformMatch = Math.min(10, consideredPlatforms.filter((platform) => candidatePlatforms.includes(platform) || candidatePlatforms.includes(platform === 'Steam' ? 'PC' : platform)).length * (relaxation >= 2 ? 4 : 5));
 
-  const negativeGenre = profile.negativeGenres.filter((ng) => candidateGenres.includes(ng.name)).reduce((sum, ng) => sum + ng.weight * 5, 0);
-  const negativeTag = profile.negativeTags.filter((nt) => candidateTags.includes(nt.name)).reduce((sum, nt) => sum + nt.weight * 3, 0);
-  const negativeDeveloper = profile.negativeDevelopers.filter((nd) => candidateDevelopers.includes(nd.name)).reduce((sum, nd) => sum + nd.weight * 4, 0);
-  const negativePlatform = profile.negativePlatforms.filter((np) => candidatePlatforms.includes(np.name)).reduce((sum, np) => sum + np.weight * 2, 0);
-  const negativeMatch = -Math.round(Math.min(45, negativeGenre + negativeTag + negativeDeveloper + negativePlatform));
+  const negativeGenreOverlap = weightedOverlap(profile.negativeGenres, candidateGenreSet, 14, (name) => signalInformationValue('genre', name));
+  const negativeTagOverlap = weightedOverlap(profile.negativeTags, candidateTagSet, 16, (name) => signalInformationValue('tag', name));
+  const negativeDeveloperOverlap = weightedOverlap(profile.negativeDevelopers, candidateDeveloperSet, 8);
+  const negativeFranchiseOverlap = weightedOverlap(profile.negativeFranchises, candidateFranchiseSet, 8);
+  const negativeMatch = -clampScore(
+    negativeGenreOverlap.score + negativeTagOverlap.score + negativeDeveloperOverlap.score + negativeFranchiseOverlap.score,
+    0,
+    SCORE_CAPS.negative,
+  );
 
   let metacriticMatch = 0;
   if (result.metacritic && profile.avgMetacritic) {
     const diff = Math.abs(result.metacritic - profile.avgMetacritic);
-    metacriticMatch = Math.round(Math.max(0, 10 - diff / (5 + relaxation * 2)));
+    metacriticMatch = clampScore(Math.max(0, 6 - diff / (8 + relaxation * 2)), 0, 6);
   }
 
-  const qualityMatch = Math.min(12, Math.round(((result.rating ?? 0) >= 4 ? 6 : 0) + Math.min(6, Math.log10(Math.max(1, result.ratings_count ?? 0)))));
+  const rawgRating = typeof result.rating === 'number' ? result.rating : 0;
+  const ratingQuality = rawgRating > 0 ? Math.max(0, (rawgRating - 3.2) / 1.8) * 4 : 0;
+  const popularityConfidence = Math.min(2, Math.log10(Math.max(1, result.ratings_count ?? 0)) / 2);
+  const qualityMatch = clampScore(metacriticMatch + ratingQuality + popularityConfidence, 0, SCORE_CAPS.quality);
   const releaseYear = result.released ? Number.parseInt(result.released.slice(0, 4), 10) : 0;
-  const recencyMatch = Number.isFinite(releaseYear) && releaseYear >= new Date().getUTCFullYear() - 3 ? 4 : 0;
-  const total = genreMatch + tagMatch + developerMatch + platformMatch + negativeMatch + metacriticMatch + qualityMatch + recencyMatch;
-  return { genreMatch, tagMatch, developerMatch, platformMatch, negativeMatch, metacriticMatch, ownershipPenalty: 0, total };
+  const recencyMatch = Number.isFinite(releaseYear) && releaseYear >= new Date().getUTCFullYear() - 3 ? SCORE_CAPS.recency : 0;
+  const seedTags = new Set(context.seed?.tags ?? []);
+  const seedGenres = new Set(context.seed?.genres ?? []);
+  const seedTagMatches = [...candidateTagSet].filter((tag) => seedTags.has(tag) && isDistinctivePreferenceTag(tag)).length;
+  const seedGenreMatches = [...candidateGenreSet].filter((genre) => seedGenres.has(genre)).length;
+  const seedSimilarity = context.seed
+    ? clampScore(seedTagMatches * 8 + seedGenreMatches * 4 + (context.source === 'liked-game-similar' ? 8 : 0), 0, SCORE_CAPS.seedSimilarity)
+    : 0;
+  const sourceAdjustment = clampScore(
+    context.source === 'liked-game-series' ? 4 :
+      context.source === 'liked-game-similar' ? 3 :
+        context.source === 'plans-wishlist' ? 1 :
+          context.source === 'broad-discovery' ? -4 :
+            context.source === 'trending' ? -8 : 0,
+    -SCORE_CAPS.sourceAdjustment,
+    SCORE_CAPS.sourceAdjustment,
+  );
+
+  const total = genreOverlap.score + tagOverlap.score + developerOverlap.score + franchiseMatch + platformMatch + seedSimilarity + qualityMatch + recencyMatch + negativeMatch + sourceAdjustment;
+  return {
+    genreMatch: genreOverlap.score,
+    tagMatch: tagOverlap.score,
+    developerMatch: developerOverlap.score,
+    franchiseMatch,
+    platformMatch,
+    seedSimilarity,
+    qualityMatch,
+    recencyMatch,
+    negativeMatch,
+    sourceAdjustment,
+    metacriticMatch,
+    ownershipPenalty: 0,
+    positiveGenres: genreOverlap.matched,
+    positiveTags: tagOverlap.matched,
+    positiveDevelopers: developerOverlap.matched,
+    positiveFranchises,
+    negativeGenres: negativeGenreOverlap.matched,
+    negativeTags: negativeTagOverlap.matched,
+    negativeDevelopers: negativeDeveloperOverlap.matched,
+    negativeFranchises: negativeFranchiseOverlap.matched,
+    total,
+  };
 }
 
-function generateReason(result: RawgSearchResult, score: RecommendationScore, profile: UserProfile, source: CandidateSource, anchorTitle?: string): string {
-  if (anchorTitle && source === 'liked-game-similar') return `Because you liked ${anchorTitle}`;
-  if (anchorTitle && source === 'plans-wishlist') return `Related to your interest in ${anchorTitle}`;
-  if (anchorTitle && source === 'recently-interacted') return `Similar to ${anchorTitle}`;
-  if (anchorTitle && source === 'second-order') return `More like ${anchorTitle}`;
+function formatSignalName(slugOrName: string): string {
+  return slugOrName
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part === 'rpg' ? 'RPG' : part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
-  const candidateGenres = (result.genres ?? []).map((g) => g.name);
-  const matched = profile.topGenres.slice(0, 3).map((pg) => pg.name).filter((name) => candidateGenres.includes(name));
-  if (matched.length >= 2) return `Matches your taste for ${matched[0]} & ${matched[1]}`;
-  if (matched.length === 1) return `Based on your ${matched[0]} preference`;
-  if (score.tagMatch > 0 && profile.topTags.length > 0) return `Similar to tags from games you liked`;
-  if (score.metacriticMatch >= 8 && result.metacritic) return `Critically acclaimed in your preferred range`;
+export function generateRecommendationReasonForTest(result: RawgSearchResult, score: RecommendationScore, profile: UserProfile, source: CandidateSource, anchorTitle?: string): string {
+  void result;
+  void profile;
+  const distinctiveTags = score.positiveTags.filter(isDistinctivePreferenceTag).slice(0, 2).map(formatSignalName);
+  if (score.franchiseMatch >= 12 && anchorTitle) return `Continues a series you have enjoyed`;
+  if (score.developerMatch >= 10 && score.positiveDevelopers[0]) return `From a developer you rate highly`;
+  if (anchorTitle && score.seedSimilarity >= 12 && source === 'liked-game-similar') return `Similar to one of your strongest library picks`;
+  if (anchorTitle && source === 'plans-wishlist') return `Matches your wishlist interest`;
+  if (distinctiveTags.length >= 2) return `Matches your ${distinctiveTags[0]} and ${distinctiveTags[1]} preferences`;
+  if (distinctiveTags.length === 1) return `Matches your ${distinctiveTags[0]} preference`;
+  if (score.positiveGenres.length >= 2 && score.genreMatch >= 24) return `Matches your ${score.positiveGenres[0]} and ${score.positiveGenres[1]} taste`;
+  if (score.qualityMatch >= 9) return `Highly rated within your taste profile`;
   return `Based on your gaming history`;
 }
 
-function getPositiveSignalGames(userGames: Game[]): Game[] {
-  return userGames
-    .map((game) => ({ game, signal: getRecommendationSignalWeight(game) }))
-    .filter(({ game, signal }) => signal.weight >= 3 && game.rawgId)
-    .sort((a, b) => b.signal.weight - a.signal.weight || (b.game.playtimeHours ?? 0) - (a.game.playtimeHours ?? 0))
-    .map(({ game }) => game);
+export type SelectedRecommendationSeed = {
+  game: Game;
+  signalScore: number;
+  reason: string;
+  cluster: string;
+  rating: number;
+  playtimeHours: number;
+  activityTime: number;
+  metadataScore: number;
+  stableKey: string;
+  tags: string[];
+  genres: string[];
+  franchiseKey: string | null;
+};
+
+export type SeedDiagnostics = {
+  rawgId: number;
+  selected: boolean;
+  signalScore: number;
+  reason: string;
+  cluster: string;
+  rank: number;
+  skippedReason?: string;
+};
+
+function getActivityTime(game: Game): number {
+  const value = game.lastPlayedAt ?? game.finishedAt ?? game.updatedAt ?? game.importedAt ?? '';
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getSeedCluster(game: Game): string {
+  const distinctiveTag = (game.rawgTags ?? []).map(toSlug).find(isDistinctivePreferenceTag);
+  if (distinctiveTag) return `tag:${distinctiveTag}`;
+  const franchise = recommendationFranchiseKey(game.rawgSlug ?? game.rawgTitle ?? game.title);
+  if (franchise) return `series:${franchise}`;
+  const genre = (game.genres ?? [])[0];
+  if (genre) return `genre:${genre}`;
+  const developer = game.developers?.[0];
+  if (developer) return `developer:${normalizeDeveloperName(developer)}`;
+  return `platform:${game.platform}`;
+}
+
+function compareSeeds(a: SelectedRecommendationSeed, b: SelectedRecommendationSeed): number {
+  return b.signalScore - a.signalScore
+    || b.rating - a.rating
+    || b.playtimeHours - a.playtimeHours
+    || b.activityTime - a.activityTime
+    || b.metadataScore - a.metadataScore
+    || a.stableKey.localeCompare(b.stableKey);
+}
+
+export function selectRecommendationSeeds(userGames: Game[], maxSeeds = 8): { seeds: SelectedRecommendationSeed[]; diagnostics: SeedDiagnostics[] } {
+  const ranked = userGames
+    .map((game): SelectedRecommendationSeed | null => {
+      const signal = getRecommendationSignalWeight(game);
+      if (!game.rawgId || signal.weight <= 0) return null;
+      const tags = (game.rawgTags ?? []).map(toSlug);
+      const genres = game.genres ?? [];
+      const metadataScore = (genres.length > 0 ? 1 : 0) + (tags.length > 0 ? 1 : 0) + ((game.developers?.length ?? 0) > 0 ? 1 : 0);
+      return {
+        game,
+        signalScore: signal.weight,
+        reason: signal.reason,
+        cluster: getSeedCluster(game),
+        rating: typeof game.rating === 'number' ? game.rating : 0,
+        playtimeHours: game.playtimeHours ?? 0,
+        activityTime: getActivityTime(game),
+        metadataScore,
+        stableKey: `${game.id}:${normalizeTitle(game.title)}`,
+        tags,
+        genres,
+        franchiseKey: recommendationFranchiseKey(game.rawgSlug ?? game.rawgTitle ?? game.title),
+      };
+    })
+    .filter((seed): seed is SelectedRecommendationSeed => Boolean(seed))
+    .sort(compareSeeds);
+
+  const selected: SelectedRecommendationSeed[] = [];
+  const selectedKeys = new Set<string>();
+  const usedClusters = new Set<string>();
+  for (const seed of ranked) {
+    if (selected.length >= maxSeeds) break;
+    if (usedClusters.has(seed.cluster)) continue;
+    selected.push(seed);
+    selectedKeys.add(seed.stableKey);
+    usedClusters.add(seed.cluster);
+  }
+  for (const seed of ranked) {
+    if (selected.length >= maxSeeds) break;
+    if (selectedKeys.has(seed.stableKey)) continue;
+    selected.push(seed);
+    selectedKeys.add(seed.stableKey);
+  }
+
+  return {
+    seeds: selected,
+    diagnostics: ranked.map((seed, index) => ({
+      rawgId: seed.game.rawgId!,
+      selected: selectedKeys.has(seed.stableKey),
+      signalScore: seed.signalScore,
+      reason: seed.reason,
+      cluster: seed.cluster,
+      rank: index + 1,
+      skippedReason: selectedKeys.has(seed.stableKey) ? undefined : usedClusters.has(seed.cluster) ? 'cluster already represented' : 'outside seed limit',
+    })),
+  };
 }
 
 function getPlanAndWishlistGames(userGames: Game[]): Game[] {
@@ -317,11 +559,11 @@ async function collectFromResults(
   userGames: Game[],
   seen: Set<number>,
   events: DebugEvent[],
-  options: { minScore: number; relaxation?: number; anchorTitle?: string },
+  options: { minScore: number; relaxation?: number; anchorTitle?: string; seed?: SelectedRecommendationSeed },
 ): Promise<ScoredCandidate[]> {
   const output: ScoredCandidate[] = [];
   for (const result of results) {
-    const score = scorePersonalRecommendationCandidate(result, profile, options.relaxation ?? 0);
+    const score = scorePersonalRecommendationCandidate(result, profile, options.relaxation ?? 0, { source, seed: options.seed });
     const libraryMatch = hasLibraryMatch(result, userGames);
     if (seen.has(result.id)) {
       events.push({ event: 'candidate_rejected', source, rawgId: result.id, title: result.name, score: score.total, reason: 'duplicate' });
@@ -336,8 +578,8 @@ async function collectFromResults(
       continue;
     }
     seen.add(result.id);
-    output.push({ result, score, source, anchorTitle: options.anchorTitle, reason: generateReason(result, score, profile, source, options.anchorTitle) });
-    events.push({ event: 'candidate_accepted', source, rawgId: result.id, title: result.name, score: score.total, reason: output.at(-1)?.reason, anchorTitle: options.anchorTitle });
+    output.push({ result, score, source, anchorTitle: options.anchorTitle, seed: options.seed, reason: generateRecommendationReasonForTest(result, score, profile, source, options.anchorTitle) });
+    events.push({ event: 'candidate_accepted', source, rawgId: result.id, title: result.name, score: score.total, reason: output.at(-1)?.reason, anchorTitle: options.anchorTitle, scoreBreakdown: score });
   }
   return output;
 }
@@ -441,15 +683,35 @@ function buildCandidateDiagnostics(
       title: candidate.game.title,
       finalScore: candidate.score,
       source,
-      strongestPositiveSignals: positive.slice(0, 3),
-      negativePenalties: negative,
-      sourceSeedGames: scoredCandidate?.anchorTitle ? [scoredCandidate.anchorTitle] : [],
+      strongestPositiveSignals: [
+        ...(score?.positiveTags.slice(0, 2).map((tag) => `tag:${tag}`) ?? []),
+        ...(score?.positiveGenres.slice(0, 2).map((genre) => `genre:${genre}`) ?? []),
+        ...(score?.positiveDevelopers.slice(0, 1).map((developer) => `developer:${developer}`) ?? []),
+        ...positive,
+      ].slice(0, 5),
+      negativePenalties: [
+        ...(score?.negativeTags.slice(0, 2).map((tag) => `tag:${tag}`) ?? []),
+        ...(score?.negativeGenres.slice(0, 2).map((genre) => `genre:${genre}`) ?? []),
+        ...negative,
+      ],
+      sourceSeedGames: scoredCandidate?.seed ? [`${scoredCandidate.seed.cluster}:${scoredCandidate.seed.reason}`] : scoredCandidate?.anchorTitle ? ['seed anchor'] : [],
       fallbackTier: source === 'trending' ? 'trending' : source === 'broad-discovery' ? 'broad' : 'personalized',
       exclusionDecisions: events
         .filter((event) => event.event === 'candidate_rejected' && event.rawgId === candidate.game.rawgId)
         .map((event) => String(event.reason ?? 'rejected')),
+      scoreBreakdown: score,
     };
   });
+}
+
+function scoreDistribution(scores: number[]): { min: number; median: number; max: number } | null {
+  if (scores.length === 0) return null;
+  const sorted = [...scores].sort((a, b) => a - b);
+  return {
+    min: sorted[0],
+    median: sorted[Math.floor(sorted.length / 2)],
+    max: sorted[sorted.length - 1],
+  };
 }
 
 export async function fetchPersonalRecommendationsResult(
@@ -510,22 +772,28 @@ export async function fetchPersonalRecommendationsResult(
     return { candidates: cached, diagnostics: getDiagnosticsReport() };
   }
 
-  const likedSeeds = getPositiveSignalGames(userGames).slice(0, 5);
+  const { seeds: selectedSeeds, diagnostics: seedDiagnostics } = selectRecommendationSeeds(userGames, 8);
+  const likedSeeds = selectedSeeds.slice(0, 6);
   const planWishlistSeeds = getPlanAndWishlistGames(userGames);
   const recentSeeds = getRecentlyInteractedGames(userGames);
-  const seedTitles = [...likedSeeds, ...planWishlistSeeds, ...recentSeeds].map((game) => game.title);
+  const seedTitles = [...likedSeeds.map((seed) => seed.game), ...planWishlistSeeds, ...recentSeeds].map((game) => game.title);
   const seen = new Set<number>();
   const collected: ScoredCandidate[] = [];
-  const addStage = async (name: CandidateSource, producer: () => Promise<Array<{ results: RawgSearchResult[]; anchorTitle?: string }>>, minScore: number, relaxation = 0) => {
+  const addStage = async (name: CandidateSource, producer: () => Promise<Array<{ results: RawgSearchResult[]; anchorTitle?: string; seed?: SelectedRecommendationSeed }>>, minScore: number, relaxation = 0) => {
     const before = collected.length;
     for (const batch of await producer()) {
       events.push({ event: 'provider_batch', source: name, count: batch.results.length, anchorTitle: batch.anchorTitle });
-      collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle }));
+      collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed }));
     }
     events.push({ event: 'stage_complete', source: name, produced: collected.length - before, totalPersonalized: collected.length, minScore, relaxation });
   };
 
-  await addStage('liked-game-similar', async () => Promise.all(likedSeeds.map(async (game) => ({ anchorTitle: game.title, results: await fetchSuggestedGames(game.rawgId!) }))), 22);
+  seedDiagnostics.filter((seed) => seed.selected).forEach((seed) => events.push({ event: 'seed_selected', ...seed }));
+  seedDiagnostics.filter((seed) => !seed.selected).slice(0, 16).forEach((seed) => events.push({ event: 'seed_skipped', ...seed }));
+
+  await addStage('liked-game-similar', async () => Promise.all(likedSeeds.map(async (seed) => ({ anchorTitle: seed.game.title, seed, results: (await fetchSuggestedGames(seed.game.rawgId!)).slice(0, 12) }))), 22);
+
+  await addStage('liked-game-series', async () => Promise.all(likedSeeds.slice(0, 3).map(async (seed) => ({ anchorTitle: seed.game.title, seed, results: (await fetchGameSeries(seed.game.rawgId!)).slice(0, 8) }))), 20);
 
   const preferredPlatforms = getPreferredRawgPlatforms(profile);
 
@@ -583,7 +851,29 @@ export async function fetchPersonalRecommendationsResult(
   }
   events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: pool.filter((candidate) => candidate.source === 'trending').length });
   const candidateDiagnostics = buildCandidateDiagnostics(collected, pool, events);
-  debugRecommendationReport(events, counts, { finalCandidates: pool, normalizedCandidates: candidates, seedTitles, rawPersonalizedCandidateCount: collected.length, normalizedCandidateCount: candidates.length, fingerprint: fp, candidateDiagnostics });
+  debugRecommendationReport(events, counts, {
+    finalCandidates: pool,
+    normalizedCandidates: candidates,
+    seedTitles,
+    rawPersonalizedCandidateCount: collected.length,
+    normalizedCandidateCount: candidates.length,
+    fingerprint: fp,
+    candidateDiagnostics,
+    selectedSeeds: seedDiagnostics,
+    topPositiveSignals: {
+      genres: profile.topGenres.slice(0, 6),
+      tags: profile.topTagWeights.slice(0, 8),
+      developers: profile.topDeveloperWeights.slice(0, 5),
+      franchises: profile.topFranchises.slice(0, 5),
+    },
+    topNegativeSignals: {
+      genres: profile.negativeGenres.slice(0, 5),
+      tags: profile.negativeTags.slice(0, 8),
+      developers: profile.negativeDevelopers.slice(0, 5),
+      franchises: profile.negativeFranchises.slice(0, 5),
+    },
+    scoreDistribution: scoreDistribution(collected.map((item) => item.score.total)),
+  });
 
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
   return { candidates: pool, diagnostics: getDiagnosticsReport() };
