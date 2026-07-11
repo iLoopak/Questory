@@ -107,6 +107,11 @@ const THEME_TAGS = new Set([
 const PRESENTATION_TAGS = new Set(['first-person', 'third-person', 'isometric', 'top-down', 'side-scroller', 'side-scrolling', '2-5d']);
 
 const GENERIC_TAGS = new Set([
+  'imported', 'steam', 'steam-trading-cards', 'trading-cards',
+  'steam-workshop', 'workshop', 'steam-leaderboards', 'steam-turn-notifications',
+  'steam-achievements', 'achievements', 'achievement', 'generic-achievements',
+  'steam-cloud', 'cloud-saves', 'cloud-save', 'cloud-saving',
+  'full-controller-support', 'partial-controller-support', 'controller-support',
   '2d', '3d', 'singleplayer', 'multiplayer', 'co-op', 'online-co-op',
   'local-co-op', 'great-soundtrack', 'atmospheric', 'story-rich', 'dark',
   'violent', 'exploration', 'steam-achievements', 'full-controller-support',
@@ -115,6 +120,10 @@ const GENERIC_TAGS = new Set([
   'funny', 'casual', 'indie', 'pixel-graphics', 'retro', 'early-access',
   'score-attack', 'fantasy',
 ]);
+
+export function isGenericPreferenceTag(slugOrName: string): boolean {
+  return GENERIC_TAGS.has(toSlug(slugOrName));
+}
 
 export function preferenceTagWeight(slug: string): number {
   if (VERY_HIGH_VALUE_TAGS.has(slug)) return 18;
@@ -192,6 +201,16 @@ function buildFrequencyMap(
   return map;
 }
 
+function getTasteTags(game: Game): string[] {
+  const seen = new Set<string>();
+  const rawgTags = (game.rawgTags ?? []).map(toSlug);
+  const userTags = (game.tags ?? []).map(toSlug);
+  for (const tag of [...rawgTags, ...userTags]) {
+    if (tag && !isGenericPreferenceTag(tag)) seen.add(tag);
+  }
+  return [...seen];
+}
+
 function topN<K>(map: Map<K, number>, n: number): K[] {
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -210,11 +229,11 @@ export function buildUserProfile(games: Game[]): UserProfile {
   }
 
   const genreMap = buildFrequencyMap(positive, (g) => g.genres ?? []);
-  const tagMap = buildFrequencyMap(positive, (g) => (g.rawgTags ?? []).map(toSlug));
+  const tagMap = buildFrequencyMap(positive, getTasteTags);
   const devMap = buildFrequencyMap(positive, (g) => g.developers ?? []);
   const platformMap = buildFrequencyMap(positive, (g) => [g.platform]);
   const negativeGenreMap = buildFrequencyMap(negative, (g) => g.genres ?? []);
-  const negativeTagMap = buildFrequencyMap(negative, (g) => (g.rawgTags ?? []).map(toSlug));
+  const negativeTagMap = buildFrequencyMap(negative, getTasteTags);
   const negativeDevMap = buildFrequencyMap(negative, (g) => g.developers ?? []);
   const negativePlatformMap = buildFrequencyMap(negative, (g) => [g.platform]);
 

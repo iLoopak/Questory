@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildUserProfile } from '../src/lib/userProfile';
+import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
 import { scorePersonalRecommendationCandidate } from '../src/services/personalRecommendationsService';
 import { scoreContextualTagOverlapForTest } from '../src/services/contextualRecommendationsService';
@@ -101,6 +101,46 @@ test('home profile changes when ratings change', () => {
   assert.equal(fiveStar.topGenres[0]?.name, 'RPG');
   assert.equal(oneStar.topGenres.length, 0);
   assert.equal(oneStar.negativeGenres[0]?.name, 'RPG');
+});
+
+test('profile uses RAWG slugs for multi-word tags and genre mappings', () => {
+  const profile = buildUserProfile([
+    game({ id: 'tag', status: 'Finished', rating: 5, genres: ['RPG', 'Action'], rawgTags: ['Turn Based Tactics', 'Steam Achievements'] }),
+  ]);
+
+  assert.equal(profile.topGenres.find((genre) => genre.name === 'RPG')?.slug, 'role-playing-games-rpg');
+  assert.equal(profile.topGenres.find((genre) => genre.name === 'Action')?.slug, 'action');
+  assert.ok(profile.topTags.includes('turn-based-tactics'));
+  assert.ok(!profile.topTags.includes('steam-achievements'));
+});
+
+test('slug fallback normalizes missing RAWG slugs for candidate scoring', () => {
+  const profile = buildUserProfile([
+    game({ id: 'liked', status: 'Finished', rating: 5, genres: ['Strategy'], rawgTags: ['Turn Based Tactics'] }),
+  ]);
+  const scored = scorePersonalRecommendationCandidate(rawg({
+    genres: [{ id: 1, name: 'Strategy', slug: 'strategy' }],
+    tags: [{ id: 1, name: 'Turn Based Tactics' }],
+  }), profile);
+
+  assert.equal(toSlug('Turn Based Tactics'), 'turn-based-tactics');
+  assert.ok(scored.tagMatch > 0);
+});
+
+test('storefront and app metadata never become recommendation taste tags', () => {
+  const profile = buildUserProfile([
+    game({
+      id: 'steam-meta',
+      status: 'Finished',
+      rating: 5,
+      genres: ['Action'],
+      rawgTags: ['imported', 'steam', 'steam achievements', 'steam cloud', 'full controller support', 'workshop', 'Roguelite'],
+      tags: ['partial controller support', 'cloud saves', 'Deckbuilding'],
+    }),
+  ]);
+
+  assert.equal(isGenericPreferenceTag('steam achievements'), true);
+  assert.deepEqual(profile.topTags.sort(), ['deckbuilding', 'roguelite'].sort());
 });
 
 

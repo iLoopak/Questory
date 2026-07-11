@@ -5,14 +5,14 @@ import type { RawgSearchResult } from '../types/rawg';
 import { buildUserProfile, getRecommendationSignalWeight, preferenceTagWeight, profileFingerprint, toSlug } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames, fetchSuggestedGames } from './rawgApi';
-import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
+import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 
 // ---------------------------------------------------------------------------
 // Recommendation waterfall
 // ---------------------------------------------------------------------------
 
 const TARGET_PERSONAL_RECOMMENDATIONS = 12;
-const DEBUG_RECOMMENDATIONS = import.meta.env.DEV && import.meta.env.VITE_DEBUG_RECOMMENDATIONS === 'true';
+const DEBUG_RECOMMENDATIONS = import.meta.env.DEV && import.meta.env.VITE_DEBUG_RECOMMENDATIONS !== 'false';
 
 type CandidateSource =
   | 'liked-game-similar'
@@ -30,6 +30,18 @@ type ScoredCandidate = {
   reason: string;
   source: CandidateSource;
   anchorTitle?: string;
+};
+
+export type RecommendationCandidateDiagnostics = {
+  rawgId: number;
+  title: string;
+  finalScore: number;
+  source: CandidateSource;
+  strongestPositiveSignals: string[];
+  negativePenalties: string[];
+  sourceSeedGames: string[];
+  fallbackTier: 'personalized' | 'broad' | 'trending';
+  exclusionDecisions: string[];
 };
 
 type DebugEvent = Record<string, unknown> & { event: string };
@@ -71,6 +83,8 @@ type RecommendationDiagnosticsReport = {
   discoverRenderReason: string;
   lastGenerationError: string | null;
   cacheAge: number | null;
+  fingerprint?: string;
+  candidateDiagnostics?: RecommendationCandidateDiagnostics[];
 };
 
 const lastSurfaceCounts = { homeSelectorCount: 0, discoverSelectorCount: 0, homeRenderReason: 'not-rendered', discoverRenderReason: 'not-rendered' };
@@ -112,6 +126,8 @@ type RecommendationReportOptions = {
   seedTitles?: string[];
   rawPersonalizedCandidateCount?: number;
   normalizedCandidateCount?: number;
+  fingerprint?: string;
+  candidateDiagnostics?: RecommendationCandidateDiagnostics[];
 };
 
 function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions & { cacheAge?: number | null; lastGenerationError?: string | null }): void {
@@ -156,6 +172,8 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
     ...lastSurfaceCounts,
     lastGenerationError: options.lastGenerationError ?? null,
     cacheAge: options.cacheAge ?? null,
+    fingerprint: options.fingerprint,
+    candidateDiagnostics: options.candidateDiagnostics,
   };
   lastDiagnosticsReport = report;
   console.debug('[QuestShelf recommendations] diagnostic report', report);
@@ -255,6 +273,10 @@ function getPlanAndWishlistGames(userGames: Game[]): Game[] {
     .slice(0, 6);
 }
 
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 const RAWG_PLATFORM_IDS: Record<string, string> = {
   Steam: '4', PC: '4', PS5: '187', PS4: '18', Switch: '7', 'Switch 2': '7', Android: '21',
 };
@@ -279,7 +301,12 @@ function getRecentlyInteractedGames(userGames: Game[]): Game[] {
 
 function hasLibraryMatch(result: RawgSearchResult, userGames: Game[]): { rejected: boolean; reason?: DiscoveryExclusionReason } {
   const match = userGames.find((game) => game.rawgId === result.id);
-  if (!match) return { rejected: false };
+  if (!match) {
+    const candidateTitle = normalizeTitle(result.name);
+    const titleMatch = userGames.find((game) => !game.rawgId && normalizeTitle(game.title) === candidateTitle);
+    if (!titleMatch) return { rejected: false };
+    return { rejected: true, reason: titleMatch.status === 'Dropped' ? 'dropped' : titleMatch.status === 'Finished' ? 'finished' : titleMatch.collectionType === 'wishlist' ? 'wishlist' : 'owned' };
+  }
   return { rejected: true, reason: match.status === 'Dropped' ? 'dropped' : match.status === 'Finished' ? 'finished' : match.collectionType === 'wishlist' ? 'wishlist' : 'owned' };
 }
 
@@ -344,6 +371,8 @@ function applyDiversityFilter(scored: ScoredCandidate[], max: number, events: De
 interface CacheEntry { candidates: DiscoveryCandidate[]; fingerprint: string; fetchedAt: number; }
 let cache: CacheEntry | null = null;
 const CACHE_STORAGE_KEY = 'questshelf.personalRecommendations.v2';
+export const PERSONAL_RECOMMENDATIONS_CACHE_KEY = CACHE_STORAGE_KEY;
+const OBSOLETE_CACHE_KEYS = ['questshelf.personalizedRecommendations.v1', 'questshelf.personalRecommendations.v1'];
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 async function readStoredCache(): Promise<CacheEntry | null> {
@@ -352,6 +381,13 @@ async function readStoredCache(): Promise<CacheEntry | null> {
   return { candidates: parsed.candidates as DiscoveryCandidate[], fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
 }
 function writeStoredCache(entry: CacheEntry): void { cache = entry; void writeAppCacheValue(CACHE_STORAGE_KEY, entry); }
+export async function clearPersonalRecommendationCaches(): Promise<void> {
+  cache = null;
+  await Promise.all([CACHE_STORAGE_KEY, ...OBSOLETE_CACHE_KEYS].map((key) => removeAppCacheValue(key)));
+  if (typeof window !== 'undefined') {
+    [CACHE_STORAGE_KEY, ...OBSOLETE_CACHE_KEYS].forEach((key) => window.localStorage.removeItem(key));
+  }
+}
 async function getAnyStoredCacheEntry(): Promise<CacheEntry | null> {
   return cache ?? await readStoredCache();
 }
@@ -363,7 +399,91 @@ async function getFreshCacheEntry(fingerprint: string): Promise<CacheEntry | nul
   return entry;
 }
 
-export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgIds: Set<number> = new Set()): Promise<DiscoveryCandidate[]> {
+export type FetchPersonalRecommendationsOptions = {
+  forceRefresh?: boolean;
+  hydrationReady?: boolean;
+  previous?: DiscoveryCandidate[];
+};
+
+export type PersonalRecommendationsResult = {
+  candidates: DiscoveryCandidate[];
+  diagnostics: RecommendationDiagnosticsReport | null;
+};
+
+function getDiagnosticsReport(): RecommendationDiagnosticsReport | null {
+  return DEBUG_RECOMMENDATIONS ? lastDiagnosticsReport : null;
+}
+
+function buildCandidateDiagnostics(
+  scored: ScoredCandidate[],
+  finalCandidates: DiscoveryCandidate[],
+  events: DebugEvent[],
+): RecommendationCandidateDiagnostics[] {
+  if (!DEBUG_RECOMMENDATIONS) return [];
+  const byRawgId = new Map(scored.map((item) => [item.result.id, item]));
+  return finalCandidates.map((candidate) => {
+    const scoredCandidate = byRawgId.get(candidate.game.rawgId);
+    const score = scoredCandidate?.score;
+    const positive = [
+      score && score.genreMatch > 0 ? `genres +${score.genreMatch}` : null,
+      score && score.tagMatch > 0 ? `tags +${score.tagMatch}` : null,
+      score && score.developerMatch > 0 ? `developers +${score.developerMatch}` : null,
+      score && score.platformMatch > 0 ? `platforms +${score.platformMatch}` : null,
+      score && score.metacriticMatch > 0 ? `metacritic +${score.metacriticMatch}` : null,
+    ].filter((value): value is string => Boolean(value));
+    const negative = [
+      score && score.negativeMatch < 0 ? `negative taste ${score.negativeMatch}` : null,
+      score && score.ownershipPenalty < 0 ? `ownership ${score.ownershipPenalty}` : null,
+    ].filter((value): value is string => Boolean(value));
+    const source = scoredCandidate?.source ?? (candidate.source as CandidateSource | undefined) ?? 'broad-discovery';
+    return {
+      rawgId: candidate.game.rawgId,
+      title: candidate.game.title,
+      finalScore: candidate.score,
+      source,
+      strongestPositiveSignals: positive.slice(0, 3),
+      negativePenalties: negative,
+      sourceSeedGames: scoredCandidate?.anchorTitle ? [scoredCandidate.anchorTitle] : [],
+      fallbackTier: source === 'trending' ? 'trending' : source === 'broad-discovery' ? 'broad' : 'personalized',
+      exclusionDecisions: events
+        .filter((event) => event.event === 'candidate_rejected' && event.rawgId === candidate.game.rawgId)
+        .map((event) => String(event.reason ?? 'rejected')),
+    };
+  });
+}
+
+export async function fetchPersonalRecommendationsResult(
+  userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
+  options: FetchPersonalRecommendationsOptions = {},
+): Promise<PersonalRecommendationsResult> {
+  if (options.hydrationReady === false) {
+    return {
+      candidates: options.previous ?? [],
+      diagnostics: DEBUG_RECOMMENDATIONS ? {
+        hydrationReady: false,
+        libraryCount: userGames.length,
+        finishedCount: 0,
+        playingCount: 0,
+        plannedCount: 0,
+        wishlistCount: 0,
+        seedCount: 0,
+        providerCandidateCount: 0,
+        localAffinityCandidateCount: 0,
+        broadDiscoveryCandidateCount: 0,
+        trendingCandidateCount: 0,
+        normalizedCount: 0,
+        excludedCounts: { owned: 0, finished: 0, dropped: 0, ignored: 0, discoveryInbox: 0, skippedForNextDiscoveryRun: 0, duplicate: 0, lowScore: 0, missingArtwork: 0, missingMetadata: 0, platformMismatch: 0, seenOnly: 0 },
+        finalRecommendationCount: 0,
+        cachedRecommendationCount: 0,
+        ...lastSurfaceCounts,
+        homeRenderReason: lastSurfaceCounts.homeRenderReason,
+        discoverRenderReason: lastSurfaceCounts.discoverRenderReason,
+        lastGenerationError: null,
+        cacheAge: null,
+      } : null,
+    };
+  }
   const profile = buildUserProfile(userGames);
   const fp = profileFingerprint(userGames);
   const events: DebugEvent[] = [];
@@ -376,11 +496,18 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
     wishlistCount: userGames.filter((game) => game.collectionType === 'wishlist').length,
   };
 
-  const freshCache = await getFreshCacheEntry(fp);
+  if (options.forceRefresh) {
+    await clearPersonalRecommendationCaches();
+  } else {
+    void clearObsoleteRecommendationCaches();
+  }
+
+  const freshCache = options.forceRefresh ? null : await getFreshCacheEntry(fp);
   if (freshCache) {
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
-    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: freshCache.candidates, cacheAge: Date.now() - freshCache.fetchedAt });
-    return applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
+    const cached = applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
+    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp });
+    return { candidates: cached, diagnostics: getDiagnosticsReport() };
   }
 
   const likedSeeds = getPositiveSignalGames(userGames).slice(0, 5);
@@ -455,10 +582,20 @@ export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgI
     pool = expandedCandidates.filter((c) => !c.excluded && !c.inboxStatus).slice(0, TARGET_PERSONAL_RECOMMENDATIONS);
   }
   events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: diverse.length, trending: pool.filter((candidate) => candidate.source === 'trending').length });
-  debugRecommendationReport(events, counts, { finalCandidates: pool, normalizedCandidates: candidates, seedTitles, rawPersonalizedCandidateCount: collected.length, normalizedCandidateCount: candidates.length });
+  const candidateDiagnostics = buildCandidateDiagnostics(collected, pool, events);
+  debugRecommendationReport(events, counts, { finalCandidates: pool, normalizedCandidates: candidates, seedTitles, rawPersonalizedCandidateCount: collected.length, normalizedCandidateCount: candidates.length, fingerprint: fp, candidateDiagnostics });
 
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
-  return pool;
+  return { candidates: pool, diagnostics: getDiagnosticsReport() };
+}
+
+async function clearObsoleteRecommendationCaches(): Promise<void> {
+  await Promise.all(OBSOLETE_CACHE_KEYS.map((key) => removeAppCacheValue(key)));
+  if (typeof window !== 'undefined') OBSOLETE_CACHE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+}
+
+export async function fetchPersonalRecommendations(userGames: Game[], inboxRawgIds: Set<number> = new Set()): Promise<DiscoveryCandidate[]> {
+  return (await fetchPersonalRecommendationsResult(userGames, inboxRawgIds)).candidates;
 }
 
 function applyLibraryStatus(
@@ -470,7 +607,7 @@ function applyLibraryStatus(
   sources?: Array<CandidateSource | undefined>,
 ): DiscoveryCandidate[] {
   return games.map((game, i) => {
-    const match = userGames.find((g) => g.rawgId === game.rawgId);
+    const match = userGames.find((g) => g.rawgId === game.rawgId) ?? userGames.find((g) => !g.rawgId && normalizeTitle(g.title) === normalizeTitle(game.title));
     const libraryStatus = match == null ? null : match.collectionType === 'wishlist' ? 'wishlist' : 'library';
     const inboxStatus = inboxRawgIds.has(game.rawgId);
     let excluded = false;

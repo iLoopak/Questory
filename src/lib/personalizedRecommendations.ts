@@ -2,6 +2,11 @@ import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from './discovery';
 import type { RawgSearchResult } from '../types/rawg';
 
+// Deprecated Wave 1 compatibility module. Live Home, Discover, and Discovery
+// Inbox recommendation flows use services/personalRecommendationsService.ts.
+// This remains only for older focused regression tests until they are rewritten
+// around the consolidated service API.
+
 export type PersonalizedRecommendationSource =
   | 'similar_game'
   | 'tag_affinity'
