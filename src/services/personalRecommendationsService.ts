@@ -15,6 +15,8 @@ import {
 import { mapRawgResult } from './discoveryService';
 import { fetchGameSeries, fetchRecommendedGames, fetchSuggestedGames } from './rawgApi';
 import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
+import type { RecommendationEngineStatus } from '../lib/recommendationState';
+import { bucketDuration, bucketSmallGroup, trackAnalyticsEvent } from '../lib/analytics';
 
 // ---------------------------------------------------------------------------
 // Recommendation waterfall
@@ -23,7 +25,7 @@ import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../l
 const TARGET_PERSONAL_RECOMMENDATIONS = 12;
 const DEBUG_RECOMMENDATIONS = import.meta.env.DEV && import.meta.env.VITE_DEBUG_RECOMMENDATIONS !== 'false';
 
-type CandidateSource =
+export type CandidateSource =
   | 'liked-game-similar'
   | 'liked-game-series'
   | 'affinity-strict'
@@ -34,7 +36,7 @@ type CandidateSource =
   | 'broad-discovery'
   | 'trending';
 
-type ScoredCandidate = {
+export type ScoredCandidate = {
   result: RawgSearchResult;
   score: RecommendationScore;
   reason: string;
@@ -72,6 +74,7 @@ type DebugEvent = Record<string, unknown> & { event: string };
 type RecommendationSurface = 'service' | 'home' | 'discover' | 'discovery-inbox';
 
 type RecommendationDiagnosticsReport = {
+  status?: RecommendationEngineStatus;
   hydrationReady: boolean;
   libraryCount: number;
   finishedCount: number;
@@ -113,6 +116,9 @@ type RecommendationDiagnosticsReport = {
   topNegativeSignals?: Record<string, unknown>;
   scoreDistribution?: { min: number; median: number; max: number } | null;
   finalSelection?: FinalSelectionDiagnostics;
+  performance?: Record<string, number>;
+  cacheStatus?: 'hit' | 'miss' | 'stale' | 'invalid' | 'bypass';
+  partialFailureCount?: number;
 };
 
 const lastSurfaceCounts = { homeSelectorCount: 0, discoverSelectorCount: 0, homeRenderReason: 'not-rendered', discoverRenderReason: 'not-rendered' };
@@ -161,6 +167,9 @@ type RecommendationReportOptions = {
   topNegativeSignals?: Record<string, unknown>;
   scoreDistribution?: { min: number; median: number; max: number } | null;
   finalSelection?: FinalSelectionDiagnostics;
+  performance?: Record<string, number>;
+  cacheStatus?: 'hit' | 'miss' | 'stale' | 'invalid' | 'bypass';
+  partialFailureCount?: number;
 };
 
 function debugRecommendationReport(events: DebugEvent[], counts: RecommendationInputCounts, options: RecommendationReportOptions & { cacheAge?: number | null; lastGenerationError?: string | null }): void {
@@ -212,6 +221,9 @@ function debugRecommendationReport(events: DebugEvent[], counts: RecommendationI
     topNegativeSignals: options.topNegativeSignals,
     scoreDistribution: options.scoreDistribution,
     finalSelection: options.finalSelection,
+    performance: options.performance,
+    cacheStatus: options.cacheStatus,
+    partialFailureCount: options.partialFailureCount,
   };
   lastDiagnosticsReport = report;
   console.debug('[QuestShelf recommendations] diagnostic report', report);
@@ -598,7 +610,7 @@ async function collectFromResults(
   return output;
 }
 
-type FallbackTier = 'tier0-personalized' | 'tier1-taste-quality' | 'tier2-adjacent' | 'tier3-broad';
+export type FallbackTier = 'tier0-personalized' | 'tier1-taste-quality' | 'tier2-adjacent' | 'tier3-broad';
 
 type FinalSelectionCandidate = {
   item: ScoredCandidate;
@@ -932,19 +944,58 @@ export function selectFinalRecommendationCandidates(scored: ScoredCandidate[], m
 
 interface CacheEntry { candidates: DiscoveryCandidate[]; fingerprint: string; fetchedAt: number; }
 let cache: CacheEntry | null = null;
+const CACHE_SCHEMA_VERSION = 3;
 const CACHE_STORAGE_KEY = 'questshelf.personalRecommendations.v2';
 export const PERSONAL_RECOMMENDATIONS_CACHE_KEY = CACHE_STORAGE_KEY;
 const OBSOLETE_CACHE_KEYS = ['questshelf.personalizedRecommendations.v1', 'questshelf.personalRecommendations.v1'];
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const inFlightRequests = new Map<string, Promise<PersonalRecommendationsResult>>();
+
+type PersistedCacheEntry = Partial<CacheEntry> & { version?: number; expiresAt?: number };
+
+function isValidCachedCandidate(value: unknown): value is DiscoveryCandidate {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<DiscoveryCandidate>;
+  const game = candidate.game as Partial<DiscoveryCandidate['game']> | undefined;
+  return Boolean(
+    game &&
+    typeof game.rawgId === 'number' &&
+    Number.isFinite(game.rawgId) &&
+    typeof game.title === 'string' &&
+    game.title.trim().length > 0 &&
+    (candidate.libraryStatus === null || candidate.libraryStatus === 'library' || candidate.libraryStatus === 'wishlist') &&
+    typeof candidate.score === 'number' &&
+    Number.isFinite(candidate.score) &&
+    (candidate.source === undefined || typeof candidate.source === 'string') &&
+    (candidate.reason === undefined || typeof candidate.reason === 'string'),
+  );
+}
+
+export function validatePersonalRecommendationCacheEntry(value: unknown, now = Date.now()): CacheEntry | null {
+  if (!value || typeof value !== 'object') return null;
+  const parsed = value as PersistedCacheEntry;
+  if (parsed.version !== CACHE_SCHEMA_VERSION) return null;
+  if (typeof parsed.fingerprint !== 'string' || parsed.fingerprint.length === 0) return null;
+  if (typeof parsed.fetchedAt !== 'number' || !Number.isFinite(parsed.fetchedAt) || parsed.fetchedAt <= 0) return null;
+  if (typeof parsed.expiresAt !== 'number' || !Number.isFinite(parsed.expiresAt) || parsed.expiresAt <= parsed.fetchedAt) return null;
+  if (parsed.expiresAt <= now) return null;
+  if (!Array.isArray(parsed.candidates) || !parsed.candidates.every(isValidCachedCandidate)) return null;
+  return { candidates: parsed.candidates, fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
+}
 
 async function readStoredCache(): Promise<CacheEntry | null> {
-  const parsed = await readAppCacheValue<Partial<CacheEntry>>(CACHE_STORAGE_KEY);
-  if (!parsed || !Array.isArray(parsed.candidates) || typeof parsed.fingerprint !== 'string' || typeof parsed.fetchedAt !== 'number') return null;
-  return { candidates: parsed.candidates as DiscoveryCandidate[], fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
+  const parsed = await readAppCacheValue<unknown>(CACHE_STORAGE_KEY);
+  const validated = validatePersonalRecommendationCacheEntry(parsed);
+  if (!validated && parsed) await removeAppCacheValue(CACHE_STORAGE_KEY);
+  return validated;
 }
-function writeStoredCache(entry: CacheEntry): void { cache = entry; void writeAppCacheValue(CACHE_STORAGE_KEY, entry); }
+function writeStoredCache(entry: CacheEntry): void {
+  cache = entry;
+  void writeAppCacheValue(CACHE_STORAGE_KEY, { ...entry, version: CACHE_SCHEMA_VERSION, expiresAt: entry.fetchedAt + CACHE_TTL_MS });
+}
 export async function clearPersonalRecommendationCaches(): Promise<void> {
   cache = null;
+  inFlightRequests.clear();
   await Promise.all([CACHE_STORAGE_KEY, ...OBSOLETE_CACHE_KEYS].map((key) => removeAppCacheValue(key)));
   if (typeof window !== 'undefined') {
     [CACHE_STORAGE_KEY, ...OBSOLETE_CACHE_KEYS].forEach((key) => window.localStorage.removeItem(key));
@@ -1047,7 +1098,32 @@ function scoreDistribution(scores: number[]): { min: number; median: number; max
   };
 }
 
-export async function fetchPersonalRecommendationsResult(
+function getTelemetryFallbackTier(finalSelection?: FinalSelectionDiagnostics): 'none' | 'personalized' | 'adjacent' | 'broad' {
+  if (!finalSelection) return 'none';
+  if ((finalSelection.fallbackTierCountsAfter['tier3-broad'] ?? 0) > 0) return 'broad';
+  if ((finalSelection.fallbackTierCountsAfter['tier2-adjacent'] ?? 0) > 0) return 'adjacent';
+  if ((finalSelection.fallbackTierCountsAfter['tier0-personalized'] ?? 0) + (finalSelection.fallbackTierCountsAfter['tier1-taste-quality'] ?? 0) > 0) return 'personalized';
+  return 'none';
+}
+
+function trackRecommendationGenerationCompleted(options: {
+  cacheStatus: 'hit' | 'miss' | 'stale' | 'invalid' | 'bypass';
+  durationMs: number;
+  finalSelection?: FinalSelectionDiagnostics;
+  partialFailureCount: number;
+  resultCount: number;
+}): void {
+  trackAnalyticsEvent('recommendation_generation_completed', {
+    outcome: options.partialFailureCount > 0 ? 'partial' : options.resultCount > 0 ? 'success' : 'empty',
+    result_count_bucket: bucketSmallGroup(options.resultCount),
+    duration_bucket: bucketDuration(options.durationMs),
+    cache_status: options.cacheStatus,
+    partial_failure_bucket: bucketSmallGroup(options.partialFailureCount),
+    fallback_tier: getTelemetryFallbackTier(options.finalSelection),
+  });
+}
+
+async function generatePersonalRecommendationsResult(
   userGames: Game[],
   inboxRawgIds: Set<number> = new Set(),
   options: FetchPersonalRecommendationsOptions = {},
@@ -1056,6 +1132,7 @@ export async function fetchPersonalRecommendationsResult(
     return {
       candidates: options.previous ?? [],
       diagnostics: DEBUG_RECOMMENDATIONS ? {
+        status: 'hydrating',
         hydrationReady: false,
         libraryCount: userGames.length,
         finishedCount: 0,
@@ -1079,9 +1156,14 @@ export async function fetchPersonalRecommendationsResult(
       } : null,
     };
   }
+  const generationStartedAt = performance.now();
+  const performanceMarks: Record<string, number> = {};
+  const profileStartedAt = performance.now();
   const profile = buildUserProfile(userGames);
+  performanceMarks.profileBuildMs = Math.round(performance.now() - profileStartedAt);
   const fp = profileFingerprint(userGames);
   const events: DebugEvent[] = [];
+  let partialFailureCount = 0;
   const counts = {
     libraryCount: userGames.filter((game) => game.collectionType === 'library').length,
     finishedCount: userGames.filter((game) => game.status === 'Finished').length,
@@ -1097,11 +1179,14 @@ export async function fetchPersonalRecommendationsResult(
     void clearObsoleteRecommendationCaches();
   }
 
+  const cacheStartedAt = performance.now();
   const freshCache = options.forceRefresh ? null : await getFreshCacheEntry(fp);
+  performanceMarks.cacheReadMs = Math.round(performance.now() - cacheStartedAt);
   if (freshCache) {
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
     const cached = applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
-    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp });
+    debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp, cacheStatus: 'hit', performance: performanceMarks });
+    trackRecommendationGenerationCompleted({ cacheStatus: 'hit', durationMs: performanceMarks.cacheReadMs ?? 0, partialFailureCount: 0, resultCount: cached.length });
     return { candidates: cached, diagnostics: getDiagnosticsReport() };
   }
 
@@ -1113,11 +1198,18 @@ export async function fetchPersonalRecommendationsResult(
   const seen = new Set<number>();
   const collected: ScoredCandidate[] = [];
   const addStage = async (name: CandidateSource, producer: () => Promise<Array<{ results: RawgSearchResult[]; anchorTitle?: string; seed?: SelectedRecommendationSeed }>>, minScore: number, relaxation = 0) => {
+    const stageStartedAt = performance.now();
     const before = collected.length;
-    for (const batch of await producer()) {
-      events.push({ event: 'provider_batch', source: name, count: batch.results.length, anchorTitle: batch.anchorTitle });
-      collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed }));
+    try {
+      for (const batch of await producer()) {
+        events.push({ event: 'provider_batch', source: name, count: batch.results.length, anchorTitle: batch.anchorTitle });
+        collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed }));
+      }
+    } catch (error) {
+      partialFailureCount += 1;
+      events.push({ event: 'stage_failed', source: name, reason: error instanceof Error ? error.name : 'unknown' });
     }
+    performanceMarks[`stage:${name}:ms`] = Math.round(performance.now() - stageStartedAt);
     events.push({ event: 'stage_complete', source: name, produced: collected.length - before, totalPersonalized: collected.length, minScore, relaxation });
   };
 
@@ -1159,7 +1251,9 @@ export async function fetchPersonalRecommendationsResult(
   await addStage('second-order', async () => Promise.all(collected.slice(0, 3).map(async (item) => ({ anchorTitle: item.result.name, results: await fetchSuggestedGames(item.result.id) }))), 10, 3);
 
   const ranked = collected.sort((a, b) => b.score.total - a.score.total || a.result.id - b.result.id);
+  const selectionStartedAt = performance.now();
   let finalSelection = selectFinalRecommendationCandidates(ranked, TARGET_PERSONAL_RECOMMENDATIONS);
+  performanceMarks.diversitySelectionMs = Math.round(performance.now() - selectionStartedAt);
   finalSelection.diagnostics.nearDuplicateSuppressions.forEach((suppression) => events.push({ event: 'candidate_rejected', ...suppression, reason: 'near-duplicate' }));
   finalSelection.diagnostics.candidates.forEach((candidate) => events.push({ event: candidate.selected ? 'final_candidate_selected' : 'final_candidate_rejected', ...candidate }));
   const candidates = applyLibraryStatus(finalSelection.selected.map(({ result }) => mapRawgResult(result)), userGames, finalSelection.selected.map(({ reason }) => reason), inboxRawgIds, finalSelection.selected.map(({ score }) => score.total), finalSelection.selected.map(({ source }) => source));
@@ -1180,13 +1274,16 @@ export async function fetchPersonalRecommendationsResult(
       { results: await fetchRecommendedGames({ ordering: '-rating', pageSize: 40 }) },
     ], -20, 4);
     const reranked = collected.sort((a, b) => b.score.total - a.score.total || a.result.id - b.result.id);
+    const fallbackSelectionStartedAt = performance.now();
     finalSelection = selectFinalRecommendationCandidates(reranked, TARGET_PERSONAL_RECOMMENDATIONS);
+    performanceMarks.diversitySelectionMs += Math.round(performance.now() - fallbackSelectionStartedAt);
     finalSelection.diagnostics.nearDuplicateSuppressions.forEach((suppression) => events.push({ event: 'candidate_rejected', ...suppression, reason: 'near-duplicate' }));
     finalSelection.diagnostics.candidates.forEach((candidate) => events.push({ event: candidate.selected ? 'final_candidate_selected' : 'final_candidate_rejected', ...candidate }));
     const expandedCandidates = applyLibraryStatus(finalSelection.selected.map(({ result }) => mapRawgResult(result)), userGames, finalSelection.selected.map(({ reason }) => reason), inboxRawgIds, finalSelection.selected.map(({ score }) => score.total), finalSelection.selected.map(({ source }) => source));
     pool = expandedCandidates.filter((c) => !c.excluded && !c.inboxStatus).slice(0, TARGET_PERSONAL_RECOMMENDATIONS);
   }
-  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: finalSelection.selected.length, trending: pool.filter((candidate) => candidate.source === 'trending').length });
+  performanceMarks.totalGenerationMs = Math.round(performance.now() - generationStartedAt);
+  events.push({ event: 'pipeline_complete', candidates: pool.length, personalized: finalSelection.selected.length, trending: pool.filter((candidate) => candidate.source === 'trending').length, partialFailureCount, durationMs: performanceMarks.totalGenerationMs });
   const candidateDiagnostics = buildCandidateDiagnostics(collected, pool, events, finalSelection.diagnostics);
   debugRecommendationReport(events, counts, {
     finalCandidates: pool,
@@ -1211,10 +1308,32 @@ export async function fetchPersonalRecommendationsResult(
     },
     scoreDistribution: scoreDistribution(collected.map((item) => item.score.total)),
     finalSelection: finalSelection.diagnostics,
+    performance: performanceMarks,
+    cacheStatus: options.forceRefresh ? 'bypass' : 'miss',
+    partialFailureCount,
   });
 
+  const cacheWriteStartedAt = performance.now();
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
+  performanceMarks.cacheWriteMs = Math.round(performance.now() - cacheWriteStartedAt);
+  trackRecommendationGenerationCompleted({ cacheStatus: options.forceRefresh ? 'bypass' : 'miss', durationMs: performanceMarks.totalGenerationMs, finalSelection: finalSelection.diagnostics, partialFailureCount, resultCount: pool.length });
   return { candidates: pool, diagnostics: getDiagnosticsReport() };
+}
+
+export async function fetchPersonalRecommendationsResult(
+  userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
+  options: FetchPersonalRecommendationsOptions = {},
+): Promise<PersonalRecommendationsResult> {
+  const fp = profileFingerprint(userGames);
+  const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
+  const requestKey = options.forceRefresh ? `force:${crypto.randomUUID()}` : `${fp}:${inboxFingerprint}:${options.hydrationReady !== false}`;
+  const existing = inFlightRequests.get(requestKey);
+  if (existing) return existing;
+  const request = generatePersonalRecommendationsResult(userGames, inboxRawgIds, options)
+    .finally(() => { inFlightRequests.delete(requestKey); });
+  inFlightRequests.set(requestKey, request);
+  return request;
 }
 
 async function clearObsoleteRecommendationCaches(): Promise<void> {

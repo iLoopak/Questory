@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
+import { getRecommendationState } from '../src/lib/recommendationState';
 import { buildDiscoveryCandidates } from '../src/services/discoveryService';
-import { generateRecommendationReasonForTest, scorePersonalRecommendationCandidate, selectFinalRecommendationCandidates, selectRecommendationSeeds } from '../src/services/personalRecommendationsService';
+import { generateRecommendationReasonForTest, scorePersonalRecommendationCandidate, selectFinalRecommendationCandidates, selectRecommendationSeeds, validatePersonalRecommendationCacheEntry } from '../src/services/personalRecommendationsService';
 import { scoreContextualTagOverlapForTest } from '../src/services/contextualRecommendationsService';
 import { getUpcomingDateRange, ignoreReleaseCalendarGame, getIgnoredReleaseRawgIds, rankReleaseCalendarResults } from '../src/services/releaseCalendarService';
 import type { Game } from '../src/types/game';
@@ -124,6 +125,41 @@ test('contextual recommendations rank niche gameplay overlap above generic tag o
   assert.ok(niche.score > generic.score);
   assert.ok(niche.meaningfulMatches >= 2);
   assert.equal(generic.meaningfulMatches, 0);
+});
+
+test('shared recommendation state treats RAWG configuration and cold-start consistently', () => {
+  const coldGames = [
+    game({ id: '1', title: 'Cold One', status: 'Backlog', collectionType: 'library', genres: ['Action'] }),
+  ];
+  const readyGames = Array.from({ length: 8 }, (_, index) => game({ id: `ready-${index}`, title: `Ready ${index}`, status: 'Finished', collectionType: 'library', genres: ['RPG'], rating: 4 }));
+
+  assert.equal(getRecommendationState({ games: readyGames, hydrationReady: true, isRawgConfigured: false }).status, 'notConfigured');
+  assert.equal(getRecommendationState({ games: readyGames, hydrationReady: false, isRawgConfigured: true }).status, 'hydrating');
+  assert.equal(getRecommendationState({ games: coldGames, hydrationReady: true, isRawgConfigured: true }).status, 'coldStart');
+  assert.equal(getRecommendationState({ games: readyGames, hydrationReady: true, isRawgConfigured: true, loading: true }).status, 'loading');
+  assert.equal(getRecommendationState({ games: readyGames, hydrationReady: true, isRawgConfigured: true, hasResults: true, isPartial: true }).status, 'partial');
+  assert.equal(getRecommendationState({ games: readyGames, hydrationReady: true, isRawgConfigured: true, hasResults: true }).status, 'ready');
+});
+
+test('personal recommendation cache validation rejects incompatible or malformed payloads', () => {
+  const now = Date.now();
+  const validCandidate = {
+    game: discovery({ rawgId: 7, title: 'Valid Pick' }),
+    libraryStatus: null,
+    inboxStatus: false,
+    excluded: false,
+    exclusionReason: null,
+    score: 42,
+    reason: 'test',
+    source: 'affinity-strict',
+  };
+
+  const valid = validatePersonalRecommendationCacheEntry({ version: 3, fingerprint: 'abc', fetchedAt: now - 100, expiresAt: now + 1000, candidates: [validCandidate] }, now);
+  assert.equal(valid?.candidates.length, 1);
+
+  assert.equal(validatePersonalRecommendationCacheEntry({ version: 2, fingerprint: 'abc', fetchedAt: now, expiresAt: now + 1000, candidates: [validCandidate] }, now), null);
+  assert.equal(validatePersonalRecommendationCacheEntry({ version: 3, fingerprint: 'abc', fetchedAt: now, expiresAt: now - 1, candidates: [validCandidate] }, now), null);
+  assert.equal(validatePersonalRecommendationCacheEntry({ version: 3, fingerprint: 'abc', fetchedAt: now, expiresAt: now + 1000, candidates: [{ ...validCandidate, score: Number.NaN }] }, now), null);
 });
 
 test('highly rated finished games raise matching candidate scores', () => {

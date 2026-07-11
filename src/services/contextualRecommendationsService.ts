@@ -1,9 +1,19 @@
 import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryCandidateStatus, DiscoveryExclusionReason } from '../lib/discovery';
-import { buildUserProfile, profileFingerprint, toSlug } from '../lib/userProfile';
+import {
+  buildUserProfile,
+  isDistinctivePreferenceTag,
+  isGenericPreferenceTag,
+  preferenceTagWeight,
+  profileFingerprint,
+  recommendationFranchiseKey,
+  signalInformationValue,
+  toSlug,
+} from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchSuggestedGames, fetchGameSeries, fetchRecommendedGames } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
+import { scorePersonalRecommendationCandidate } from './personalRecommendationsService';
 
 // ---------------------------------------------------------------------------
 // Scoring weights
@@ -28,151 +38,18 @@ export interface ContextualScore {
   total: number;
 }
 
-// ---------------------------------------------------------------------------
-// Tag taxonomy + scoring
-// RAWG tags mix gameplay, genre-ish descriptors, themes, camera/presentation,
-// and storefront/technical labels. The contextual carousel should be driven by
-// the first bucket, not by generic metadata such as "Singleplayer" or "2D".
-// ---------------------------------------------------------------------------
-
-const VERY_HIGH_VALUE_TAGS = new Set([
-  'roguelite',
-  'roguelike',
-  'deckbuilding',
-  'deckbuilder',
-  'card-battler',
-  'souls-like',
-  'soulslike',
-  'metroidvania',
-  'colony-sim',
-  'colony-simulation',
-  'extraction-shooter',
-  'crpg',
-  'computer-role-playing-game',
-  'factory-automation',
-  'automation',
-  'city-builder',
-  'city-building',
-  'immersive-sim',
-  'bullet-heaven',
-  'survivors-like',
-  'party-rpg',
-  'tactical-rpg',
-  'turn-based-tactics',
-  'survival-horror',
-  'life-sim',
-  'farming-sim',
-  '4x',
-  'grand-strategy',
-  'real-time-strategy',
-  'base-building',
-]);
-
-const MECHANIC_TAGS = new Set([
-  'stealth',
-  'crafting',
-  'survival',
-  'open-world',
-  'sandbox',
-  'management',
-  'resource-management',
-  'turn-based',
-  'turn-based-combat',
-  'tactical',
-  'strategy-rpg',
-  'hack-and-slash',
-  'loot',
-  'looter-shooter',
-  'platformer',
-  'puzzle-platformer',
-  'precision-platformer',
-  'tower-defense',
-  'rhythm',
-  'fighting',
-  'racing',
-  'soulslike',
-]);
-
-const THEME_TAGS = new Set([
-  'sci-fi',
-  'science-fiction',
-  'horror',
-  'fantasy',
-  'dark-fantasy',
-  'post-apocalyptic',
-  'cyberpunk',
-  'space',
-  'war',
-  'military',
-  'zombies',
-  'lovecraftian',
-]);
-
-const PRESENTATION_TAGS = new Set([
-  'first-person',
-  'third-person',
-  'isometric',
-  'top-down',
-  'side-scroller',
-  'side-scrolling',
-  '2-5d',
-]);
-
-const GENERIC_TAGS = new Set([
-  '2d',
-  '3d',
-  'singleplayer',
-  'multiplayer',
-  'co-op',
-  'online-co-op',
-  'local-co-op',
-  'great-soundtrack',
-  'atmospheric',
-  'story-rich',
-  'dark',
-  'violent',
-  'exploration',
-  'steam-achievements',
-  'full-controller-support',
-  'partial-controller-support',
-  'steam-cloud',
-  'controller',
-  'controller-support',
-  'linux',
-  'macos',
-  'windows',
-  'difficult',
-  'relaxing',
-  'colorful',
-  'cute',
-  'funny',
-  'casual',
-  'indie',
-  'pixel-graphics',
-  'retro',
-  'early-access',
-  'score-attack',
-]);
-
-const NON_DISCRIMINATING_TAGS = GENERIC_TAGS;
-
 function tagWeight(slug: string): number {
-  if (VERY_HIGH_VALUE_TAGS.has(slug)) return 18;
-  if (MECHANIC_TAGS.has(slug)) return 12;
-  if (THEME_TAGS.has(slug)) return 4;
-  if (PRESENTATION_TAGS.has(slug)) return 2;
-  if (GENERIC_TAGS.has(slug)) return 0.35;
-  return 7;
+  return preferenceTagWeight(slug);
 }
 
 function meaningfulTagWeight(slug: string): number {
-  return GENERIC_TAGS.has(slug) ? 0 : tagWeight(slug);
+  return isGenericPreferenceTag(slug) ? 0 : tagWeight(slug);
 }
 
 function rareTagMultiplier(slug: string, corpusFrequency: Map<string, number>): number {
-  if (GENERIC_TAGS.has(slug)) return 0.25;
+  if (isGenericPreferenceTag(slug)) return 0.25;
   const frequency = corpusFrequency.get(slug) ?? 0;
-  if (VERY_HIGH_VALUE_TAGS.has(slug)) return 1.45;
+  if (isDistinctivePreferenceTag(slug)) return 1.35;
   if (frequency >= 8) return 0.65;
   if (frequency >= 4) return 0.85;
   if (frequency <= 1) return 1.25;
@@ -203,7 +80,7 @@ function computeTagMatchScore(
     if (!currentGameTagSlugs.includes(slug)) continue;
     const weighted = tagWeight(slug) * rareTagMultiplier(slug, tagFrequency);
     rawScore += weighted;
-    if (meaningfulTagWeight(slug) >= 4) meaningfulMatches += 1;
+    if (isDistinctivePreferenceTag(slug) || meaningfulTagWeight(slug) >= 4) meaningfulMatches += 1;
   }
 
   const synergy = meaningfulMatches >= 2 ? 1.35 : 1;
@@ -226,28 +103,17 @@ function computeGenreMatchScore(
   candidateGenres: string[],
   currentGameGenres: string[],
 ): number {
-  const matches = candidateGenres.filter((g) => currentGameGenres.includes(g)).length;
-  return Math.min(18, matches * 9);
+  return Math.min(18, candidateGenres
+    .filter((genre) => currentGameGenres.includes(genre))
+    .reduce((sum, genre) => sum + 9 * signalInformationValue('genre', genre), 0));
 }
 
-function computeProfileAffinity(
-  candidateGenres: string[],
-  candidateTagSlugs: string[],
-  profile: ReturnType<typeof buildUserProfile>,
-): { affinity: number; penalty: number } {
-  const totalWeight = profile.topGenres.reduce((s, g) => s + g.weight, 0) || 1;
-  let affinity = 0;
-  for (const pg of profile.topGenres) {
-    if (candidateGenres.includes(pg.name)) {
-      affinity += (pg.weight / totalWeight) * 20;
-    }
-  }
-  affinity += Math.min(12, profile.topTags.filter((tag) => candidateTagSlugs.includes(tag)).length * 3);
-
-  const negativeGenre = profile.negativeGenres.filter((ng) => candidateGenres.includes(ng.name)).reduce((sum, ng) => sum + ng.weight * 4, 0);
-  const negativeTag = profile.negativeTags.filter((nt) => candidateTagSlugs.includes(nt.name)).reduce((sum, nt) => sum + nt.weight * 2, 0);
-  const penalty = -Math.round(Math.min(35, negativeGenre + negativeTag));
-  return { affinity: Math.round(Math.min(25, affinity)), penalty };
+function computeProfileAffinity(result: RawgSearchResult, profile: ReturnType<typeof buildUserProfile>): { affinity: number; penalty: number } {
+  const score = scorePersonalRecommendationCandidate(result, profile, 1, { source: 'affinity-relaxed' });
+  return {
+    affinity: Math.round(Math.min(25, score.genreMatch * 0.25 + score.tagMatch * 0.35 + score.developerMatch * 0.35 + score.franchiseMatch * 0.35 + score.qualityMatch * 0.4)),
+    penalty: score.negativeMatch,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +134,7 @@ function generateReason(
   const matchedTagNames = (result.tags ?? [])
     .filter((t) => {
       const slug = t.slug ?? toSlug(t.name);
-      return !NON_DISCRIMINATING_TAGS.has(slug) && currentTagSlugs.includes(slug);
+      return !isGenericPreferenceTag(slug) && currentTagSlugs.includes(slug);
     })
     .slice(0, 2)
     .map((t) => t.name);
@@ -350,6 +216,21 @@ function cacheKey(rawgId: number, userGames: Game[]): string {
   return `${rawgId}:${profileFingerprint(userGames)}`;
 }
 
+export function clearContextualRecommendationCache(): void {
+  cache.clear();
+}
+
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function findLibraryMatch(result: RawgSearchResult | DiscoveryCandidate['game'], userGames: Game[]): Game | undefined {
+  const rawgId = 'rawgId' in result ? result.rawgId : result.id;
+  const title = 'name' in result ? result.name : result.title;
+  return userGames.find((game) => game.rawgId === rawgId) ??
+    userGames.find((game) => !game.rawgId && normalizeTitle(game.title) === normalizeTitle(title));
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -371,7 +252,7 @@ export async function fetchContextualRecommendations(
   // Specific tags are those not in the non-discriminating set — used for the
   // tag pool query so RAWG returns semantically similar games.
   const specificTagSlugs = currentTagSlugs
-    .filter((slug) => meaningfulTagWeight(slug) >= 4)
+    .filter((slug) => isDistinctivePreferenceTag(slug) || meaningfulTagWeight(slug) >= 4)
     .sort((a, b) => (tagWeight(b) * rareTagMultiplier(b, tagFrequency)) - (tagWeight(a) * rareTagMultiplier(a, tagFrequency)))
     .slice(0, 5);
 
@@ -465,12 +346,14 @@ export async function fetchContextualRecommendations(
         (t) => t.slug ?? toSlug(t.name),
       );
 
-      const franchise = inSeries ? 50 : 0;
+      const sameFranchise = recommendationFranchiseKey(result.slug ?? result.name) != null &&
+        recommendationFranchiseKey(result.slug ?? result.name) === recommendationFranchiseKey(game.rawgSlug ?? game.rawgTitle ?? game.title);
+      const franchise = inSeries || sameFranchise ? 50 : 0;
       const rawgSuggested = inSuggested ? 40 : 0;
       const tagMatchResult = computeTagMatchScore(candidateTagSlugs, currentTagSlugs, tagFrequency);
       const tagMatch = tagMatchResult.score;
       const genreMatch = computeGenreMatchScore(candidateGenres, currentGameGenres);
-      const profileScore = computeProfileAffinity(candidateGenres, candidateTagSlugs, profile);
+      const profileScore = computeProfileAffinity(result, profile);
       const profileAffinity = profileScore.affinity;
       const profilePenalty = profileScore.penalty;
 
@@ -497,9 +380,9 @@ export async function fetchContextualRecommendations(
       // tag shared with the current game, or the candidate's own first tag, or genre.
       const primaryTag =
         candidateTagSlugs.find(
-          (s) => !NON_DISCRIMINATING_TAGS.has(s) && currentTagSlugs.includes(s),
+          (s) => !isGenericPreferenceTag(s) && currentTagSlugs.includes(s),
         ) ??
-        candidateTagSlugs.find((s) => !NON_DISCRIMINATING_TAGS.has(s)) ??
+        candidateTagSlugs.find((s) => !isGenericPreferenceTag(s)) ??
         candidateGenres[0] ??
         '';
 
@@ -532,7 +415,7 @@ function buildCandidates(
   return raw
     .map(({ result, score, reason }) => {
       const game = mapRawgResult(result);
-      const match = userGames.find((g) => g.rawgId === game.rawgId);
+      const match = findLibraryMatch(game, userGames);
       const libraryStatus: DiscoveryCandidateStatus =
         match == null ? null : match.collectionType === 'wishlist' ? 'wishlist' : 'library';
       const inboxStatus = inboxRawgIds.has(game.rawgId);
