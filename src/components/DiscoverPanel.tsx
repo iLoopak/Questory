@@ -53,7 +53,7 @@ function DiscoverGridSkeleton() {
 
 export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings }: DiscoverPanelProps) {
   const { t } = useI18n();
-  const { candidates: personalizedCandidates, loading: recommendationsLoading, state: recommendationState } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
+  const { candidates: personalizedCandidates, loading: recommendationsLoading, state: recommendationState, submitFeedback } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
   const candidates = recommendationsLoading && personalizedCandidates.length === 0 ? null : personalizedCandidates.filter((candidate) => candidate.libraryStatus === null);
   const [upcoming, setUpcoming] = useState<DiscoveryCandidate[] | null>(null);
   const [releaseRefreshToken, setReleaseRefreshToken] = useState(0);
@@ -117,6 +117,12 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
                         }
                       : undefined
                   }
+                  overflowActions={[
+                    { label: 'Not interested', onClick: () => submitFeedback(candidate, 'not_interested', 'discover') },
+                    { label: 'Show less like this', onClick: () => submitFeedback(candidate, 'less_like_this', 'discover') },
+                    { label: 'Already played', onClick: () => submitFeedback(candidate, 'already_played', 'discover') },
+                    { label: 'Hide recommendation', onClick: () => submitFeedback(candidate, 'hide', 'discover'), tone: 'danger' },
+                  ]}
                 />
               );
             })}

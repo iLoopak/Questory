@@ -5,6 +5,8 @@ export type QuestShelfStorageKey =
   | 'questshelf.screenshots.v1'
   | 'questshelf.personalRecommendations.v1'
   | 'questshelf.personalRecommendations.v2'
+  | 'questshelf.recommendationFeedback.v1'
+  | 'questshelf.recommendationPreferences.v1'
   | 'questshelf.releaseCalendar.v2'
   | 'questshelf.rawgSettings.v1'
   | 'questshelf.steamGridDbSettings.v1'
@@ -96,6 +98,20 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     scope: 'core',
     schema: 'Recommendation cache entry keyed by profile fingerprint.',
     store: 'collection',
+  },
+  {
+    backup: 'default',
+    key: 'questshelf.recommendationFeedback.v1',
+    purpose: 'User recommendation feedback such as exact hides, already played, and bounded preference signals.',
+    scope: 'core',
+    schema: 'RecommendationFeedbackRecord[] normalized by recommendationFeedback.',
+  },
+  {
+    backup: 'default',
+    key: 'questshelf.recommendationPreferences.v1',
+    purpose: 'Small user-facing recommendation controls such as exploration mode and fatigue/variety preferences.',
+    scope: 'core',
+    schema: 'RecommendationPreferences normalized by recommendationFeedback.',
   },
   {
     backup: 'never',

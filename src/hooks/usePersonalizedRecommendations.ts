@@ -4,6 +4,10 @@ import type { DiscoveryCandidate } from '../lib/discovery';
 import { fetchPersonalRecommendationsResult, type PersonalRecommendationsResult } from '../services/personalRecommendationsService';
 import { profileFingerprint } from '../lib/userProfile';
 import { getRecommendationState } from '../lib/recommendationState';
+import { recordRecommendationFeedback, type RecommendationFeedbackSurface, type RecommendationFeedbackType } from '../lib/recommendationFeedback';
+import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
+import { trackAnalyticsEvent } from '../lib/analytics';
+import { RECOMMENDATION_ENGINE_VERSION, RECOMMENDATION_SCORING_VERSION } from '../lib/recommendationConfig';
 
 export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<number>, hydrationReady = true) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
@@ -61,5 +65,26 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
     isStale: diagnostics?.cacheStatus === 'stale',
   }), [games, hydrationReady, loading, candidates.length, error, diagnostics]);
 
-  return { candidates, loading, error, diagnostics, state, refresh: () => run(true), isRefreshing: inFlight.current && candidates.length > 0 };
+  const submitFeedback = useCallback((candidate: DiscoveryCandidate, feedbackType: RecommendationFeedbackType, surface: RecommendationFeedbackSurface) => {
+    recordRecommendationFeedback(candidate, feedbackType, surface);
+    const position = candidates.findIndex((item) => item.game.rawgId === candidate.game.rawgId);
+    const sourceCategory = candidate.source === 'liked-game-similar' || candidate.source === 'liked-game-series' || candidate.source === 'second-order' ? 'seed'
+      : candidate.source === 'plans-wishlist' ? 'intent'
+        : candidate.source === 'broad-discovery' || candidate.source === 'trending' ? 'fallback'
+          : candidate.source ? 'affinity' : 'unknown';
+    trackAnalyticsEvent('recommendation_feedback', {
+      surface: surface === 'discovery_inbox' ? 'discover' : surface,
+      feedback_type: feedbackType,
+      source_category: sourceCategory,
+      fallback_tier: candidate.source === 'trending' ? 'broad' : candidate.source === 'broad-discovery' ? 'adjacent' : candidate.source ? 'personalized' : 'none',
+      rank_bucket: position >= 0 && position < 3 ? 'top' : position >= 0 && position < 8 ? 'middle' : 'lower',
+      engine_version: RECOMMENDATION_ENGINE_VERSION,
+      scoring_version: RECOMMENDATION_SCORING_VERSION,
+    });
+    void clearPersonalRecommendationCaches();
+    setCandidates((current) => current.filter((item) => item.game.rawgId !== candidate.game.rawgId));
+    previous.current = previous.current.filter((item) => item.game.rawgId !== candidate.game.rawgId);
+  }, []);
+
+  return { candidates, loading, error, diagnostics, state, refresh: () => run(true), submitFeedback, isRefreshing: inFlight.current && candidates.length > 0 };
 }

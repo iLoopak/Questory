@@ -78,6 +78,7 @@ import { useMainScrollBehavior } from './useMainScrollBehavior';
 import { usePlayActivity } from './usePlayActivity';
 import { useCompletionRating } from './useCompletionRating';
 import { useAnalytics } from './useAnalytics';
+import { recordRecommendationOutcome } from '../../lib/recommendationFeedback';
 import { useAchievementSystem } from './useAchievementSystem';
 import { getSafeWishlistTitleMatches, normalizeImportMatchTitle } from '../../domain/imports/titleMatching';
 
@@ -869,6 +870,7 @@ export function AppController() {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     addToWishlist({ ...base, collectionType: 'wishlist' });
+    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, 'wishlist');
     closeDiscoveryPreview();
     addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToWishlist'), { game: discoveryGame.title }) });
   }
@@ -890,6 +892,7 @@ export function AppController() {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(discoveryGame, existingIds);
     importGames([base]);
+    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, 'library');
     closeDiscoveryPreview();
     // Evolve the Preview into the Game Hub for the newly owned game so the
     // transition reads as "this game is now mine", not a navigation.
@@ -905,6 +908,7 @@ export function AppController() {
     if (!existing) {
       importGames([target]);
     }
+    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, 'plans');
     closeDiscoveryPreview();
     openBacklogPicker(target);
   }
@@ -921,6 +925,7 @@ export function AppController() {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(item.game, existingIds);
     importGames([base]);
+    recordRecommendationOutcome(item.game.rawgId, item.game.title, 'library');
     removeFromDiscoveryInbox(item.id);
   }
 
@@ -928,6 +933,7 @@ export function AppController() {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(item.game, existingIds);
     addToWishlist({ ...base, collectionType: 'wishlist' });
+    recordRecommendationOutcome(item.game.rawgId, item.game.title, 'wishlist');
     removeFromDiscoveryInbox(item.id);
   }
 
@@ -935,6 +941,7 @@ export function AppController() {
     const existingIds = new Set(games.map((g) => g.id));
     const base = createGameFromDiscovery(item.game, existingIds);
     importGames([base]);
+    recordRecommendationOutcome(item.game.rawgId, item.game.title, 'plans');
     removeFromDiscoveryInbox(item.id);
     openBacklogPicker(base);
   }

@@ -18,6 +18,7 @@ import { normalizeSteamGridDbSettings } from './steamGridDbSettingsStorage';
 import { normalizeSteamSettings } from './steamSettingsStorage';
 import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
 import { normalizeAppPersonalizationSettings } from './appPersonalization';
+import { normalizeRecommendationFeedbackRecords, normalizeRecommendationPreferences, recommendationExposureStorageKey } from './recommendationFeedback';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
 import { clearContextualRecommendationCache } from '../services/contextualRecommendationsService';
 import type { Game } from '../types/game';
@@ -248,7 +249,7 @@ export async function resetQuestShelfLocalData() {
   await gameRepository.clear();
   await rawgMetadataCacheRepository.clear();
   await playActivityRepository.clear();
-  await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys]);
+  await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys, recommendationExposureStorageKey]);
   clearContextualRecommendationCache();
   await clearPersonalRecommendationCaches();
 }
@@ -433,8 +434,11 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
     case 'questshelf.platformQueues.v1':
     case 'questshelf.reviewMode.v1':
     case 'questshelf.appPersonalization.v1':
+    case 'questshelf.recommendationPreferences.v1':
     case 'questshelf.shelfIdentity.v1':
       return isPlainObject(value);
+    case 'questshelf.recommendationFeedback.v1':
+      return Array.isArray(value);
   }
 
   return false;
@@ -470,6 +474,10 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
       return normalizeReviewModeState(value);
     case 'questshelf.appPersonalization.v1':
       return normalizeAppPersonalizationSettings(value);
+    case 'questshelf.recommendationFeedback.v1':
+      return normalizeRecommendationFeedbackRecords(value);
+    case 'questshelf.recommendationPreferences.v1':
+      return normalizeRecommendationPreferences(value);
     case 'questshelf.shelfIdentity.v1':
       return normalizeShelfIdentitySettings(value);
     case 'questshelf.libraryFilters.v1':
@@ -503,6 +511,8 @@ function getBackupSectionDisplayName(key: string): string {
     'questshelf.playActivity.v1': 'play activity',
     'questshelf.reviewMode.v1': 'quest queue settings',
     'questshelf.appPersonalization.v1': 'app personalization',
+    'questshelf.recommendationFeedback.v1': 'recommendation feedback',
+    'questshelf.recommendationPreferences.v1': 'recommendation preferences',
     'questshelf.shelfIdentity.v1': 'shelf identity',
   };
 
