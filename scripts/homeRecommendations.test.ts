@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildHomeRecommendations, buildHomeTasteProfile, selectHomeRecommendations } from '../src/lib/homeRecommendations';
+import { buildPersonalizedRecommendations, buildPersonalizedTasteProfile, selectPersonalizedRecommendations } from '../src/lib/personalizedRecommendations';
 import type { Game } from '../src/types/game';
 
 (globalThis as any).localStorage = { store: new Map<string,string>(), getItem(k:string){return this.store.get(k) ?? null}, setItem(k:string,v:string){this.store.set(k,v)}, removeItem(k:string){this.store.delete(k)} };
@@ -17,7 +17,7 @@ const established = [
 ];
 
 test('established user receives non-empty personalized recommendations and fallback is minority', async () => {
-  const result = await buildHomeRecommendations(established, { useCache:false, fetchers: { similar: async () => [rawg(10,'Wildfrost'), rawg(11,'Balatro',['Deckbuilder'])], discover: async ({ ordering }) => ordering === '-added' ? [rawg(99,'Taste Fallback')] : [rawg(12,'Cobalt Core',['Deckbuilder']), rawg(13,'Dicey Dungeons',['Roguelite'])] } });
+  const result = await buildPersonalizedRecommendations(established, { useCache:false, fetchers: { similar: async () => [rawg(10,'Wildfrost'), rawg(11,'Balatro',['Deckbuilder'])], discover: async ({ ordering }) => ordering === '-added' ? [rawg(99,'Taste Fallback')] : [rawg(12,'Cobalt Core',['Deckbuilder']), rawg(13,'Dicey Dungeons',['Roguelite'])] } });
   assert.ok(result.candidates.length >= 4);
   assert.ok(result.candidates.some(c => c.source === 'similar_game'));
   assert.ok((result.diagnostics.finalSourceMix.taste_filtered_fallback ?? 0) <= 1);
@@ -26,29 +26,29 @@ test('established user receives non-empty personalized recommendations and fallb
 
 test('sparse ratings still use finished, planned, and wishlist taste data', async () => {
   const sparse = established.map(g => ({ ...g, rating: null }));
-  const result = await buildHomeRecommendations(sparse, { useCache:false });
+  const result = await buildPersonalizedRecommendations(sparse, { useCache:false });
   assert.ok(result.candidates.length >= 1);
   assert.ok(result.candidates.some(c => c.source === 'wishlist_affinity'));
 });
 
 test('provider failure keeps local affinity and previous valid recommendations visible', async () => {
-  const previous = (await buildHomeRecommendations(established, { useCache:false })).candidates;
-  const result = await buildHomeRecommendations(established, { useCache:false, previous, fetchers: { similar: async () => { throw new Error('down'); }, discover: async () => { throw new Error('down'); } } });
+  const previous = (await buildPersonalizedRecommendations(established, { useCache:false })).candidates;
+  const result = await buildPersonalizedRecommendations(established, { useCache:false, previous, fetchers: { similar: async () => { throw new Error('down'); }, discover: async () => { throw new Error('down'); } } });
   assert.ok(result.candidates.length >= 1);
   assert.ok(result.candidates.some(c => c.source === 'wishlist_affinity'));
 });
 
 test('hydration delay does not commit empty results before data arrives', async () => {
-  const early = await buildHomeRecommendations([], { hydrationReady:false, useCache:false });
+  const early = await buildPersonalizedRecommendations([], { hydrationReady:false, useCache:false });
   assert.equal(early.candidates.length, 0);
   assert.equal(early.diagnostics.hydrationReady, false);
-  const later = await buildHomeRecommendations(established, { hydrationReady:true, useCache:false });
+  const later = await buildPersonalizedRecommendations(established, { hydrationReady:true, useCache:false });
   assert.ok(later.candidates.length > 0);
 });
 
 test('low result count renders as a valid result and skipped/seen state does not globally suppress unrelated items', () => {
   const profileGames = established;
   const candidate = { game: { rawgId: 77, title:'One Good Match', coverUrl:null, metacritic:80, rawgRating:4, rawgRatingsCount:10, platforms:['PC'], hasSteamVersion:true, genres:['Strategy'], tags:['Deckbuilder'], released:null, slug:null }, source:'tag_affinity' as const };
-  const result = selectHomeRecommendations([candidate], profileGames, buildHomeTasteProfile(profileGames), new Set());
+  const result = selectPersonalizedRecommendations([candidate], profileGames, buildPersonalizedTasteProfile(profileGames), new Set());
   assert.equal(result.length, 1);
 });

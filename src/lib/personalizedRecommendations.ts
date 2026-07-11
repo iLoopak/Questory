@@ -2,7 +2,7 @@ import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from './discovery';
 import type { RawgSearchResult } from '../types/rawg';
 
-export type HomeRecommendationSource =
+export type PersonalizedRecommendationSource =
   | 'similar_game'
   | 'tag_affinity'
   | 'genre_affinity'
@@ -10,7 +10,7 @@ export type HomeRecommendationSource =
   | 'wishlist_affinity'
   | 'taste_filtered_fallback';
 
-export type HomeRecommendationDiagnostics = {
+export type PersonalizedRecommendationDiagnostics = {
   hydrationReady: boolean;
   libraryCount: number;
   finishedCount: number;
@@ -27,9 +27,9 @@ export type HomeRecommendationDiagnostics = {
   lastError: string | null;
 };
 
-export type HomeRecommendationsResult = {
+export type PersonalizedRecommendationsResult = {
   candidates: DiscoveryCandidate[];
-  diagnostics: HomeRecommendationDiagnostics;
+  diagnostics: PersonalizedRecommendationDiagnostics;
 };
 
 type Fetchers = {
@@ -47,15 +47,15 @@ type Options = {
   previous?: DiscoveryCandidate[];
 };
 
-type Profile = ReturnType<typeof buildHomeTasteProfile>;
-type Candidate = { game: DiscoveryGame; source: HomeRecommendationSource; seedTitle?: string; fallback?: boolean };
+type Profile = ReturnType<typeof buildPersonalizedTasteProfile>;
+type Candidate = { game: DiscoveryGame; source: PersonalizedRecommendationSource; seedTitle?: string; fallback?: boolean };
 
-const CACHE_KEY = 'questshelf.homeRecommendations.v1';
+const CACHE_KEY = 'questshelf.personalizedRecommendations.v1';
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const HIGH_VALUE = new Set(['roguelite','roguelike','deckbuilder','deckbuilding','metroidvania','souls-like','soulslike','tactical rpg','immersive sim','colony sim','factory automation','automation','city builder','bullet heaven','party-based rpg','jrpg','strategy','tactics']);
 const LOW_VALUE = new Set(['2d','3d','singleplayer','multiplayer','indie','controller','pixel graphics','fantasy']);
 
-export function buildHomeTasteProfile(games: Game[]) {
+export function buildPersonalizedTasteProfile(games: Game[]) {
   const tags = new Map<string, number>();
   const genres = new Map<string, number>();
   const platforms = new Map<string, number>();
@@ -81,9 +81,9 @@ export function buildHomeTasteProfile(games: Game[]) {
   return { tags, genres, platforms, developers, seeds: seeds.slice(0, 8), stats: { libraryCount, finishedCount, ratedCount, playingCount, plannedCount, wishlistCount } };
 }
 
-export async function buildHomeRecommendations(games: Game[], options: Options = {}): Promise<HomeRecommendationsResult> {
+export async function buildPersonalizedRecommendations(games: Game[], options: Options = {}): Promise<PersonalizedRecommendationsResult> {
   const hydrationReady = options.hydrationReady ?? games.length > 0;
-  const profile = buildHomeTasteProfile(games);
+  const profile = buildPersonalizedTasteProfile(games);
   const diagnostics = baseDiagnostics(hydrationReady, profile);
   if (!hydrationReady) return { candidates: options.previous ?? [], diagnostics: { ...diagnostics, cacheStatus: 'preserved' } };
 
@@ -97,7 +97,7 @@ export async function buildHomeRecommendations(games: Game[], options: Options =
   try {
     const local = localCandidates(games, profile);
     const remote = await remoteCandidates(profile, options.fetchers, diagnostics);
-    const ranked = selectHomeRecommendations([...local, ...remote], games, profile, options.inboxRawgIds ?? new Set(), diagnostics);
+    const ranked = selectPersonalizedRecommendations([...local, ...remote], games, profile, options.inboxRawgIds ?? new Set(), diagnostics);
     if (ranked.length > 0 && options.useCache !== false) writeCache(fingerprint, ranked, options.now ?? Date.now());
     return { candidates: ranked, diagnostics: { ...diagnostics, finalCount: ranked.length, finalSourceMix: mix(ranked), cacheStatus: ranked.length ? 'write' : diagnostics.cacheStatus } };
   } catch (error) {
@@ -105,7 +105,7 @@ export async function buildHomeRecommendations(games: Game[], options: Options =
   }
 }
 
-export function selectHomeRecommendations(candidates: Candidate[], games: Game[], profile: Profile, inboxRawgIds: Set<number>, diagnostics = baseDiagnostics(true, profile)): DiscoveryCandidate[] {
+export function selectPersonalizedRecommendations(candidates: Candidate[], games: Game[], profile: Profile, inboxRawgIds: Set<number>, diagnostics = baseDiagnostics(true, profile)): DiscoveryCandidate[] {
   const byRawg = new Map<number, DiscoveryCandidate>();
   const ownedRawg = new Set(games.filter(g => g.rawgId && g.collectionType === 'library').map(g => g.rawgId as number));
   const blockedTitles = new Set(games.filter(g => g.status === 'Finished' || g.status === 'Dropped').map(g => norm(g.title)));
@@ -141,7 +141,7 @@ function localCandidates(games: Game[], profile: Profile): Candidate[] {
   return out;
 }
 
-async function remoteCandidates(profile: Profile, fetchers: Fetchers | undefined, diagnostics: HomeRecommendationDiagnostics): Promise<Candidate[]> {
+async function remoteCandidates(profile: Profile, fetchers: Fetchers | undefined, diagnostics: PersonalizedRecommendationDiagnostics): Promise<Candidate[]> {
   if (!fetchers) return [];
   const jobs: Promise<Candidate[]>[] = [];
   for (const seed of profile.seeds.slice(0, 4)) if (seed.rawgId && fetchers.similar) jobs.push(fetchers.similar(seed.rawgId).then(r => r.map(game => ({ game: rawgToDiscovery(game), source: 'similar_game' as const, seedTitle: seed.title }))));
@@ -165,7 +165,7 @@ function norm(s: string) { return s.trim().toLowerCase(); }
 function top(m: Map<string, number>, n: number) { return [...m.entries()].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,n).map(([k])=>k); }
 function inc(r: Record<string, number>, k: string) { r[k] = (r[k] ?? 0) + 1; }
 function mix(candidates: DiscoveryCandidate[]) { const r: Record<string, number> = {}; candidates.forEach(c => inc(r, c.source ?? 'unknown')); return r; }
-function baseDiagnostics(hydrationReady: boolean, profile: Profile): HomeRecommendationDiagnostics { return { hydrationReady, ...profile.stats, seedCount: profile.seeds.length, candidateCountsBySource: {}, excludedCountsByReason: {}, finalCount: 0, finalSourceMix: {}, cacheStatus: 'disabled', lastError: null }; }
+function baseDiagnostics(hydrationReady: boolean, profile: Profile): PersonalizedRecommendationDiagnostics { return { hydrationReady, ...profile.stats, seedCount: profile.seeds.length, candidateCountsBySource: {}, excludedCountsByReason: {}, finalCount: 0, finalSourceMix: {}, cacheStatus: 'disabled', lastError: null }; }
 function profileFingerprint(games: Game[]) { return games.map(g => [g.id,g.rawgId,g.status,g.rating,g.favorite,g.playtimeHours,g.collectionType,g.updatedAt].join(':')).sort().join('|'); }
 function readCache(now: number, fingerprint: string) { try { const raw = localStorage.getItem(CACHE_KEY); if (!raw) return null; const parsed = JSON.parse(raw); if (parsed.fingerprint !== fingerprint || now - parsed.createdAt > CACHE_TTL) return null; return parsed.candidates as DiscoveryCandidate[]; } catch { return null; } }
 function writeCache(fingerprint: string, candidates: DiscoveryCandidate[], now: number) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fingerprint, candidates, createdAt: now })); } catch { /* ignore */ } }
