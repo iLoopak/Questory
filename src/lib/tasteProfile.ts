@@ -52,6 +52,7 @@ export type TasteProfile = {
     confirmedAt?: string;
     changePromptedAt?: string;
     ignoredChangeAt?: string;
+    inferencePausedAt?: string;
   };
 };
 
@@ -127,11 +128,13 @@ export function buildTasteProfile(games: Game[], previous: TasteProfile = loadTa
 }
 
 export function recomputeAndSaveTasteProfile(games: Game[], now = new Date()): TasteProfile {
-  return saveTasteProfile(buildTasteProfile(games, loadTasteProfile(), now));
+  const current = loadTasteProfile();
+  return saveTasteProfile(buildTasteProfile(games, { ...current, prompt: { ...current.prompt, inferencePausedAt: undefined } }, now));
 }
 
 export function getTasteProfileForGames(games: Game[]): TasteProfile {
   const current = loadTasteProfile();
+  if (current.prompt.inferencePausedAt) return current;
   const fingerprint = tasteInputFingerprint(games);
   if (current.lastComputedFingerprint === fingerprint && current.observed.length > 0) return current;
   return recomputeAndSaveTasteProfile(games);
@@ -139,7 +142,8 @@ export function getTasteProfileForGames(games: Game[]): TasteProfile {
 
 export function resetObservedTasteProfile(): TasteProfile {
   const current = loadTasteProfile();
-  return saveTasteProfile({ ...current, observed: [], lastComputedFingerprint: '', lastUpdatedAt: new Date().toISOString(), prompt: { ...current.prompt, firstReadyAt: undefined, changePromptedAt: undefined } });
+  const now = new Date().toISOString();
+  return saveTasteProfile({ ...current, observed: [], lastComputedFingerprint: '', lastUpdatedAt: now, prompt: { ...current.prompt, firstReadyAt: undefined, changePromptedAt: undefined, inferencePausedAt: now } });
 }
 
 export function resetExplicitTasteProfile(): TasteProfile {
@@ -152,6 +156,10 @@ export function resetTemporaryTasteProfile(): TasteProfile {
   return saveTasteProfile({ ...current, temporary: [], lastUpdatedAt: new Date().toISOString() });
 }
 
+export function resetAllTasteProfile(): TasteProfile {
+  return saveTasteProfile({ ...fallbackProfile(), lastUpdatedAt: new Date().toISOString() });
+}
+
 export function confirmObservedTasteSignal(signalId: string): TasteProfile {
   const current = loadTasteProfile();
   const observed = current.observed.find((signal) => signal.id === signalId);
@@ -162,27 +170,34 @@ export function confirmObservedTasteSignal(signalId: string): TasteProfile {
 export function rejectTasteSignal(signalId: string): TasteProfile {
   const current = loadTasteProfile();
   const now = new Date().toISOString();
-  const observed = current.observed.find((signal) => signal.id === signalId);
-  if (observed) {
-    const explicit = current.explicit.filter((signal) => !(signal.kind === observed.kind && signal.key === observed.key));
-    explicit.push({
-      ...observed,
-      id: signalIdForExplicit(observed.kind, observed.key, observed.sentiment === 'love' ? 'avoid' : 'love'),
-      sentiment: observed.sentiment === 'love' ? 'avoid' : 'love',
-      origin: 'explicit',
-      confidence: 1,
-      strength: 'strong',
-      confidenceTrend: 'new',
-      confirmedAt: now,
-      rejectedAt: undefined,
-      pinned: true,
-      evidence: { gameIds: [], gameTitles: [], explanation: observed.sentiment === 'love' ? `You said ${observed.label} is not your taste.` : `You said ${observed.label} is more your taste than Questory inferred.` },
-      lastUpdatedAt: now,
-    });
-    return saveTasteProfile({ ...current, observed: current.observed.filter((signal) => signal.id !== signalId), explicit, lastUpdatedAt: now });
-  }
   const next = updateSignalAcrossLayers(current, signalId, (signal) => ({ ...signal, rejectedAt: now, hidden: true, pinned: false }));
   return saveTasteProfile({ ...next, lastUpdatedAt: now });
+}
+
+export function createOppositeTasteSignal(signalId: string): TasteProfile {
+  const current = loadTasteProfile();
+  const source = [...current.observed, ...current.explicit].find((signal) => signal.id === signalId);
+  if (!source) return current;
+  const nextSentiment: TasteSignalSentiment = source.sentiment === 'love' ? 'avoid' : 'love';
+  const now = new Date().toISOString();
+  const explicit = current.explicit.filter((signal) => !(signal.kind === source.kind && signal.key === source.key));
+  explicit.push({
+    ...source,
+    id: signalIdForExplicit(source.kind, source.key, nextSentiment),
+    sentiment: nextSentiment,
+    origin: 'explicit',
+    confidence: 1,
+    strength: 'strong',
+    confidenceTrend: 'new',
+    confirmedAt: now,
+    rejectedAt: undefined,
+    hidden: false,
+    pinned: true,
+    evidence: { gameIds: [], gameTitles: [], explanation: nextSentiment === 'avoid' ? `You explicitly marked ${source.label} as less your thing.` : `You explicitly marked ${source.label} as more your thing.` },
+    lastUpdatedAt: now,
+  });
+  const observed = current.observed.map((signal) => signal.id === source.id ? { ...signal, hidden: true, rejectedAt: now, pinned: false } : signal);
+  return saveTasteProfile({ ...current, observed, explicit, lastUpdatedAt: now });
 }
 
 export function hideTasteSignal(signalId: string): TasteProfile {
@@ -347,6 +362,8 @@ function buildObservedSignal(accumulator: SignalAccumulator, previous: TasteSign
       explanation: explainSignal(accumulator, titles),
     },
     lastUpdatedAt: now.toISOString(),
+    hidden: previous?.hidden,
+    rejectedAt: previous?.rejectedAt,
   };
 }
 
@@ -486,6 +503,7 @@ function normalizePrompt(value: unknown): TasteProfile['prompt'] {
     confirmedAt: validIso(parsed.confirmedAt) ? parsed.confirmedAt : undefined,
     changePromptedAt: validIso(parsed.changePromptedAt) ? parsed.changePromptedAt : undefined,
     ignoredChangeAt: validIso(parsed.ignoredChangeAt) ? parsed.ignoredChangeAt : undefined,
+    inferencePausedAt: validIso(parsed.inferencePausedAt) ? parsed.inferencePausedAt : undefined,
   };
 }
 

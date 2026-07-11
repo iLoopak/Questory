@@ -4,7 +4,7 @@ import { buildUserProfile, profileFingerprint, recommendationFranchiseKey, toSlu
 import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames, type RecommendedGamesParams } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
-import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
+import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile, type TasteSignal } from '../lib/tasteProfile';
 
 const CACHE_KEY = 'questshelf.releaseCalendar.v2';
@@ -282,6 +282,13 @@ async function readCache(fingerprint: string, dateRange: string): Promise<CacheE
 
 function writeCache(entry: CacheEntry): void {
   void writeAppCacheValue(CACHE_KEY, entry);
+}
+
+export function clearReleaseCalendarCache(): void {
+  void removeAppCacheValue(CACHE_KEY);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(CACHE_KEY);
+  }
 }
 
 function formatDate(date: Date): string {

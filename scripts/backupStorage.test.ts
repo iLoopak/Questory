@@ -4,6 +4,7 @@ import {
   createQuestShelfBackup,
   mergeQuestShelfBackup,
   parseQuestShelfBackupText,
+  resetQuestShelfLocalData,
   restoreQuestShelfBackup,
   questShelfAppVersion,
   questShelfBackupVersion,
@@ -22,6 +23,10 @@ const RAWG_SETTINGS_KEY = 'questshelf.rawgSettings.v1';
 const STEAM_GRID_DB_SETTINGS_KEY = 'questshelf.steamGridDbSettings.v1';
 const ITAD_SETTINGS_KEY = 'questshelf.isThereAnyDealSettings.v1';
 const STEAM_SETTINGS_KEY = 'questshelf.steamSettings.v1';
+const DISCOVERY_INBOX_KEY = 'questshelf.discoveryInbox.v1';
+const RECOMMENDATION_FEEDBACK_KEY = 'questshelf.recommendationFeedback.v1';
+const RECOMMENDATION_EXPOSURE_KEY = 'questshelf.recommendationExposure.v1';
+const TASTE_PROFILE_KEY = 'questshelf.tasteProfile.v1';
 
 // Install a fresh in-memory browser storage (window.localStorage) + StorageAdapter
 // backed by the same map, so createQuestShelfBackup's raw reads, restore/merge writes,
@@ -330,4 +335,82 @@ test('backup import hydrates legacy platform identity settings without maxActive
   const restored = JSON.parse(store.get('questshelf.platformQueues.v1')!);
   assert.equal(restored.settings[0].artworkUrl, persistentArtwork);
   assert.equal(restored.settings[0].maxActiveGames, 3);
+});
+
+test('reset local data clears generated recommendation and Taste Profile state', async () => {
+  const { store } = installMemoryStorage();
+  store.set(DISCOVERY_INBOX_KEY, JSON.stringify({ schemaVersion: 1, active: [{ rawgId: 1, title: 'Inbox Game' }], nextQueue: [{ rawgId: 2, title: 'Deferred Game' }], skipped: [{ rawgId: 3, title: 'Skipped Game' }] }));
+  store.set(RECOMMENDATION_FEEDBACK_KEY, JSON.stringify([{ rawgId: 1, normalizedTitle: 'hidden', feedbackType: 'hide', createdAt: 1, surface: 'home' }]));
+  store.set(RECOMMENDATION_EXPOSURE_KEY, JSON.stringify([{ rawgId: 1, normalizedTitle: 'seen', surface: 'home', shownAt: 1 }]));
+  store.set(TASTE_PROFILE_KEY, JSON.stringify({ observed: [{ kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }], explicit: [], temporary: [] }));
+  store.set('questshelf.personalRecommendations.v2', JSON.stringify({ stale: true }));
+  store.set('questshelf.releaseCalendarIgnoredRawgIds.v1', JSON.stringify([10]));
+
+  await resetQuestShelfLocalData();
+
+  assert.equal(store.has(DISCOVERY_INBOX_KEY), false);
+  assert.equal(store.has(RECOMMENDATION_FEEDBACK_KEY), false);
+  assert.equal(store.has(RECOMMENDATION_EXPOSURE_KEY), false);
+  assert.equal(store.has(TASTE_PROFILE_KEY), false);
+  assert.equal(store.has('questshelf.personalRecommendations.v2'), false);
+  assert.equal(store.has('questshelf.releaseCalendarIgnoredRawgIds.v1'), false);
+});
+
+test('replace restore clears disposable generated recommendation state', () => {
+  const { store } = installMemoryStorage();
+  store.set(DISCOVERY_INBOX_KEY, JSON.stringify({ schemaVersion: 1, active: [{ rawgId: 1, title: 'Old Inbox' }], nextQueue: [] }));
+  store.set(RECOMMENDATION_EXPOSURE_KEY, JSON.stringify([{ rawgId: 1, normalizedTitle: 'old', surface: 'home', shownAt: 1 }]));
+  store.set('questshelf.releaseCalendarIgnoredRawgIds.v1', JSON.stringify([99]));
+
+  restoreQuestShelfBackup(parseOrThrow(makeFreshBackup()));
+
+  assert.equal(store.has(DISCOVERY_INBOX_KEY), false);
+  assert.equal(store.has(RECOMMENDATION_EXPOSURE_KEY), false);
+  assert.equal(store.has('questshelf.releaseCalendarIgnoredRawgIds.v1'), false);
+});
+
+test('merge restore preserves explicit taste corrections, recomputes observed taste, and skips generated state', () => {
+  const { store } = installMemoryStorage();
+  store.set(TASTE_PROFILE_KEY, JSON.stringify({
+    observed: [{ kind: 'tag', key: 'old-observed', label: 'Old Observed', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-10T00:00:00Z' }],
+    explicit: [{ kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-10T00:00:00Z' }],
+    temporary: [{ kind: 'tag', key: 'cozy', label: 'Cozy', sentiment: 'love', confidence: 1, strength: 'moderate', evidence: {}, lastUpdatedAt: '2026-07-10T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z' }],
+  }));
+  store.set(RECOMMENDATION_FEEDBACK_KEY, JSON.stringify([
+    { rawgId: 7, normalizedTitle: 'same', feedbackType: 'hide', createdAt: 1, surface: 'home' },
+  ]));
+  store.set(DISCOVERY_INBOX_KEY, JSON.stringify({ schemaVersion: 1, active: [{ rawgId: 11, title: 'Do Not Keep' }], nextQueue: [] }));
+  store.set(RECOMMENDATION_EXPOSURE_KEY, JSON.stringify([{ rawgId: 11, normalizedTitle: 'seen', surface: 'home', shownAt: 1 }]));
+
+  const backup = parseOrThrow(makeFreshBackup({
+    'questshelf.games.v1': [
+      { id: 'tactics-a', title: 'Tactics A', platform: 'Steam', status: 'Finished', coverImage: '', playtimeHours: 25, rating: 5, tags: [], rawgTags: ['tactical-rpg'], genres: [], lastPlayedAt: null, notes: '', collectionType: 'library' },
+      { id: 'tactics-b', title: 'Tactics B', platform: 'Steam', status: 'Finished', coverImage: '', playtimeHours: 30, rating: 5, tags: [], rawgTags: ['tactical-rpg'], genres: [], lastPlayedAt: null, notes: '', collectionType: 'library' },
+    ],
+    [TASTE_PROFILE_KEY]: {
+      observed: [{ kind: 'tag', key: 'backup-observed', label: 'Backup Observed', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+      explicit: [{ kind: 'genre', key: 'sports', label: 'Sports', sentiment: 'avoid', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+      temporary: [{ kind: 'tag', key: 'short-games', label: 'Short Games', sentiment: 'love', confidence: 1, strength: 'moderate', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z' }],
+    },
+    [RECOMMENDATION_FEEDBACK_KEY]: [
+      { rawgId: 7, normalizedTitle: 'same', feedbackType: 'hide', createdAt: 5, surface: 'discover' },
+      { rawgId: 8, normalizedTitle: 'other', feedbackType: 'less_like_this', createdAt: 2, surface: 'discover' },
+    ],
+  }));
+
+  mergeQuestShelfBackup(backup);
+
+  const tasteProfile = JSON.parse(store.get(TASTE_PROFILE_KEY)!);
+  assert.ok(tasteProfile.explicit.some((signal: { key: string }) => signal.key === 'deckbuilding'));
+  assert.ok(tasteProfile.explicit.some((signal: { key: string }) => signal.key === 'sports'));
+  assert.ok(tasteProfile.temporary.some((signal: { key: string }) => signal.key === 'cozy'));
+  assert.ok(tasteProfile.temporary.some((signal: { key: string }) => signal.key === 'short-games'));
+  assert.ok(tasteProfile.observed.some((signal: { key: string }) => signal.key === 'tactical-rpg'));
+  assert.ok(!tasteProfile.observed.some((signal: { key: string }) => signal.key === 'backup-observed'));
+
+  const feedback = JSON.parse(store.get(RECOMMENDATION_FEEDBACK_KEY)!);
+  assert.equal(feedback.length, 2);
+  assert.equal(feedback.find((record: { rawgId: number }) => record.rawgId === 7)?.createdAt, 5);
+  assert.equal(store.has(DISCOVERY_INBOX_KEY), false);
+  assert.equal(store.has(RECOMMENDATION_EXPOSURE_KEY), false);
 });

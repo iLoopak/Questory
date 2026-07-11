@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
-import { buildTasteProfile, getActiveTasteSignals, normalizeTasteProfile } from '../src/lib/tasteProfile';
+import {
+  buildTasteProfile,
+  createOppositeTasteSignal,
+  getActiveTasteSignals,
+  getTasteProfileForGames,
+  loadTasteProfile,
+  normalizeTasteProfile,
+  recomputeAndSaveTasteProfile,
+  rejectTasteSignal,
+  resetAllTasteProfile,
+  resetObservedTasteProfile,
+  saveTasteProfile,
+  tasteProfileStorageKey,
+} from '../src/lib/tasteProfile';
 import { getStorageAdapter, setStorageAdapter, type StorageAdapter } from '../src/lib/storageAdapter';
 import { getRecommendationState } from '../src/lib/recommendationState';
 import { recommendationBenchmarkProfiles } from '../src/lib/recommendationBenchmarks';
@@ -120,6 +133,26 @@ function discovery(overrides: Partial<DiscoveryGame>): DiscoveryGame {
   };
 }
 
+function installMemoryStorage() {
+  const store = new Map<string, string>();
+  const previousAdapter = getStorageAdapter();
+  const memoryAdapter: StorageAdapter = {
+    readLocal: (key) => store.get(key) ?? null,
+    writeLocal: (key, value) => { store.set(key, value); },
+    removeLocal: (key) => { store.delete(key); },
+    localKeys: () => [...store.keys()],
+    readDurable: async () => null,
+    writeDurable: async () => {},
+    removeDurable: async () => {},
+    hasDurableBackend: async () => false,
+  };
+  setStorageAdapter(memoryAdapter);
+  return {
+    store,
+    restore: () => setStorageAdapter(previousAdapter),
+  };
+}
+
 
 test('contextual recommendations rank niche gameplay overlap above generic tag overlap', () => {
   const current = ['roguelite', 'deckbuilder', 'singleplayer', 'indie', '2d', 'controller'];
@@ -219,19 +252,7 @@ test('taste profile normalization preserves explicit and temporary layers', () =
 });
 
 test('taste profile consumes repeated recommendation feedback as observed taste evidence', () => {
-  const store = new Map<string, string>();
-  const previousAdapter = getStorageAdapter();
-  const memoryAdapter: StorageAdapter = {
-    readLocal: (key) => store.get(key) ?? null,
-    writeLocal: (key, value) => { store.set(key, value); },
-    removeLocal: (key) => { store.delete(key); },
-    localKeys: () => [...store.keys()],
-    readDurable: async () => null,
-    writeDurable: async () => {},
-    removeDurable: async () => {},
-    hasDurableBackend: async () => false,
-  };
-  setStorageAdapter(memoryAdapter);
+  const { store, restore } = installMemoryStorage();
   try {
     store.set('questshelf.recommendationFeedback.v1', JSON.stringify([
       { rawgId: 10, normalizedTitle: 'battle one', feedbackType: 'less_like_this', createdAt: 1, surface: 'discover', metadata: { genres: ['sports'], tags: ['competitive'], developers: [], franchise: null } },
@@ -243,8 +264,123 @@ test('taste profile consumes repeated recommendation feedback as observed taste 
 
     assert.ok(avoided.some((signal) => signal.label === 'Sports' && signal.supportingGameCount === 2));
   } finally {
-    setStorageAdapter(previousAdapter);
+    restore();
   }
+});
+
+test('rejecting an observed taste signal suppresses it without creating an opposite preference', () => {
+  const { restore } = installMemoryStorage();
+  try {
+    const profile = buildTasteProfile([
+      game({ id: 'deck-a', title: 'Deck A', status: 'Finished', rating: 5, rawgTags: ['deckbuilding'], playtimeHours: 30 }),
+      game({ id: 'deck-b', title: 'Deck B', status: 'Finished', rating: 5, rawgTags: ['deckbuilding'], playtimeHours: 25 }),
+    ], normalizeTasteProfile(undefined), new Date('2026-07-11T00:00:00Z'));
+    saveTasteProfile(profile);
+
+    const source = getActiveTasteSignals(profile, 'love').find((signal) => signal.key === 'deckbuilding');
+    assert.ok(source);
+
+    const rejected = rejectTasteSignal(source.id);
+    assert.equal(rejected.explicit.length, 0);
+    assert.equal(rejected.observed.find((signal) => signal.id === source.id)?.hidden, true);
+    assert.ok(getActiveTasteSignals(rejected, 'love').every((signal) => signal.key !== 'deckbuilding'));
+  } finally {
+    restore();
+  }
+});
+
+test('explicit opposite correction is separate from a plain taste rejection', () => {
+  const { restore } = installMemoryStorage();
+  try {
+    const profile = buildTasteProfile([
+      game({ id: 'sports-a', title: 'Sports A', status: 'Dropped', rating: 1, genres: ['Sports'] }),
+      game({ id: 'sports-b', title: 'Sports B', status: 'Dropped', rating: 1, genres: ['Sports'] }),
+    ], normalizeTasteProfile(undefined), new Date('2026-07-11T00:00:00Z'));
+    saveTasteProfile(profile);
+
+    const source = getActiveTasteSignals(profile, 'avoid').find((signal) => signal.key === 'sports');
+    assert.ok(source);
+
+    const corrected = createOppositeTasteSignal(source.id);
+    const explicit = corrected.explicit.find((signal) => signal.kind === source.kind && signal.key === source.key);
+    assert.equal(explicit?.sentiment, 'love');
+    assert.equal(explicit?.origin, 'explicit');
+    assert.equal(explicit?.pinned, true);
+    assert.equal(corrected.observed.find((signal) => signal.id === source.id)?.hidden, true);
+  } finally {
+    restore();
+  }
+});
+
+test('clearing inferred taste pauses automatic recompute until explicitly recomputed', () => {
+  const { restore } = installMemoryStorage();
+  try {
+    const games = [
+      game({ id: 'tactics-a', title: 'Tactics A', status: 'Finished', rating: 5, rawgTags: ['tactical-rpg'], playtimeHours: 30 }),
+      game({ id: 'tactics-b', title: 'Tactics B', status: 'Finished', rating: 5, rawgTags: ['tactical-rpg'], playtimeHours: 22 }),
+    ];
+    saveTasteProfile(normalizeTasteProfile({
+      explicit: [{ kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+      temporary: [{ kind: 'tag', key: 'cozy', label: 'Cozy', sentiment: 'love', confidence: 1, strength: 'moderate', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z' }],
+    }));
+    saveTasteProfile(buildTasteProfile(games, loadTasteProfile(), new Date('2026-07-11T00:00:00Z')));
+
+    const cleared = resetObservedTasteProfile();
+    assert.equal(cleared.observed.length, 0);
+    assert.ok(cleared.prompt.inferencePausedAt);
+
+    const stillPaused = getTasteProfileForGames(games);
+    assert.equal(stillPaused.observed.length, 0);
+    assert.equal(stillPaused.explicit.length, 1);
+    assert.equal(stillPaused.temporary.length, 1);
+
+    const recomputed = recomputeAndSaveTasteProfile(games, new Date('2026-07-11T00:01:00Z'));
+    assert.ok(recomputed.observed.length > 0);
+    assert.equal(recomputed.prompt.inferencePausedAt, undefined);
+    assert.equal(recomputed.explicit.length, 1);
+    assert.equal(recomputed.temporary.length, 1);
+  } finally {
+    restore();
+  }
+});
+
+test('reset all Taste Profile clears every layer and prompt state', () => {
+  const { store, restore } = installMemoryStorage();
+  try {
+    saveTasteProfile(normalizeTasteProfile({
+      observed: [{ kind: 'tag', key: 'soulslike', label: 'Soulslike', sentiment: 'love', confidence: 0.8, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+      explicit: [{ kind: 'genre', key: 'sports', label: 'Sports', sentiment: 'avoid', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+      temporary: [{ kind: 'tag', key: 'co-op', label: 'Co-op', sentiment: 'love', confidence: 1, strength: 'moderate', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z' }],
+      prompt: { firstReadyAt: '2026-07-11T00:00:00Z', inferencePausedAt: '2026-07-11T00:00:00Z' },
+    }));
+
+    const reset = resetAllTasteProfile();
+    assert.equal(reset.observed.length, 0);
+    assert.equal(reset.explicit.length, 0);
+    assert.equal(reset.temporary.length, 0);
+    assert.equal(Object.values(reset.prompt).some(Boolean), false);
+    assert.ok(store.has(tasteProfileStorageKey));
+  } finally {
+    restore();
+  }
+});
+
+test('hidden or rejected taste signals do not affect recommendation scoring', () => {
+  const userProfile = buildUserProfile([]);
+  const tasteProfile = normalizeTasteProfile({
+    observed: [],
+    explicit: [
+      { kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, hidden: true, lastUpdatedAt: '2026-07-11T00:00:00Z' },
+      { kind: 'tag', key: 'roguelite', label: 'Roguelite', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, rejectedAt: '2026-07-11T00:00:00Z', lastUpdatedAt: '2026-07-11T00:00:00Z' },
+    ],
+    temporary: [],
+  });
+
+  const hiddenMatch = scorePersonalRecommendationCandidate(rawg({ tags: [{ id: 1, name: 'Deckbuilding', slug: 'deckbuilding' }] }), userProfile, 0, { tasteProfile });
+  const rejectedMatch = scorePersonalRecommendationCandidate(rawg({ tags: [{ id: 2, name: 'Roguelite', slug: 'roguelite' }] }), userProfile, 0, { tasteProfile });
+
+  assert.equal(hiddenMatch.tasteProfileMatch, 0);
+  assert.equal(rejectedMatch.tasteProfileMatch, 0);
 });
 
 test('highly rated finished games raise matching candidate scores', () => {

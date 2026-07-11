@@ -1,7 +1,8 @@
 import type { DiscoveryGame } from './discovery';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import type { Game } from '../types/game';
 
-const STORAGE_KEY = 'questshelf.discoveryInbox.v1';
+export const discoveryInboxStorageKey = 'questshelf.discoveryInbox.v1';
 
 export type DiscoveryInboxSource = 'similar' | 'recommendation' | 'deal' | 'upcoming' | 'manual';
 
@@ -29,6 +30,17 @@ const emptyDiscoveryInboxState: DiscoveryInboxState = {
   nextQueue: [],
 };
 
+let discoveryInboxRequestGeneration = 0;
+
+export function invalidateDiscoveryInboxRequests(): number {
+  discoveryInboxRequestGeneration += 1;
+  return discoveryInboxRequestGeneration;
+}
+
+export function getDiscoveryInboxRequestGeneration(): number {
+  return discoveryInboxRequestGeneration;
+}
+
 function normalizeDiscoveryInboxItems(value: unknown): DiscoveryInboxItem[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is DiscoveryInboxItem =>
@@ -55,11 +67,11 @@ function normalizeDiscoveryInboxState(value: unknown): DiscoveryInboxState {
 }
 
 export function loadDiscoveryInboxState(): DiscoveryInboxState {
-  return loadLocalJson(STORAGE_KEY, emptyDiscoveryInboxState, normalizeDiscoveryInboxState);
+  return loadLocalJson(discoveryInboxStorageKey, emptyDiscoveryInboxState, normalizeDiscoveryInboxState);
 }
 
 export function saveDiscoveryInboxState(state: DiscoveryInboxState): void {
-  savePersistedJson(STORAGE_KEY, normalizeDiscoveryInboxState(state));
+  savePersistedJson(discoveryInboxStorageKey, normalizeDiscoveryInboxState(state));
 }
 
 export function loadDiscoveryInbox(): DiscoveryInboxItem[] {
@@ -160,6 +172,27 @@ export function restoreDeferredDiscoveryInboxItem(state: DiscoveryInboxState, ra
     activeQueue: [...state.activeQueue, deferredItem],
     nextQueue: state.nextQueue.filter((item) => item.rawgId !== rawgId),
   };
+}
+
+export function reconcileDiscoveryInboxState(state: DiscoveryInboxState, games: Game[]): DiscoveryInboxState {
+  const excludedIdentities = new Set(games
+    .filter((game) => game.collectionType === 'library' || game.collectionType === 'wishlist' || game.status === 'Playing' || game.status === 'Finished' || game.status === 'Dropped' || game.status === 'Want to play')
+    .flatMap(getGameDiscoveryIdentities));
+  const keepItem = (item: DiscoveryInboxItem) => !excludedIdentities.has(getDiscoveryInboxItemIdentity(item));
+  return {
+    activeQueue: state.activeQueue.filter(keepItem),
+    nextQueue: state.nextQueue.filter(keepItem),
+  };
+}
+
+function getGameDiscoveryIdentities(game: Game): string[] {
+  const identities: string[] = [];
+  if (typeof game.rawgId === 'number' && Number.isFinite(game.rawgId)) identities.push(`rawg:${game.rawgId}`);
+  const normalizedTitle = normalizeDiscoveryInboxIdentity(game.rawgTitle ?? game.title);
+  const normalizedPlatform = normalizeDiscoveryInboxIdentity(game.platform);
+  if (normalizedPlatform && normalizedTitle) identities.push(`platform-title:${normalizedPlatform}:${normalizedTitle}`);
+  if (normalizedTitle) identities.push(`title:${normalizedTitle}`);
+  return identities;
 }
 
 function upsertDeferredDiscoveryInboxItem(items: DiscoveryInboxItem[], item: DiscoveryInboxItem): DiscoveryInboxItem[] {
