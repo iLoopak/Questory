@@ -66,6 +66,7 @@ These are grouped honestly based on the current codebase. “Available now” me
 - **Platform Plans** — platform-specific queues, active platform selection, per-platform limits, reordering, moving entries between platforms, and “play now” actions.
 - **Home active gameplay dashboard** — focused current-game view, quick notes, daily play logging, Steam playtime refresh hooks, and active gameplay management in one place.
 - **Recommendations** — local “What should I play?” recommendations based on status, playtime, last played date, HLTB/RAWG-style metadata when available, platform, mood, and session length.
+- **Gaming DNA / Taste Profile** — a guided taste-profile wizard that reads your shelf, explains strong likes/dislikes with game evidence, lets you triage taste signals with Quest Queue-style swipes, add current moods, and apply manual corrections that feed recommendations.
 - **Stats dashboard** — local backlog totals, progress, playtime, platform/source breakdowns, metadata coverage, and useful lists.
 - **RAWG metadata enrichment** — user-provided RAWG API key, per-game search, suggested/manual matches, batch enrichment, local cache, and safe writes that avoid overwriting user-owned tracking fields.
 - **Metadata/artwork refresh tools** — artwork audit, missing-artwork buckets, Steam/RAWG/user artwork priority, generated fallback covers, bulk repair actions, and per-game artwork refresh paths.
@@ -110,9 +111,10 @@ Grounded in the current direction of the app:
 2. **Add or import games.** Add games manually, import owned Steam games, import Steam wishlist entries manually, or import retro ROM lists.
 3. **Clean up the shelf.** Use filters, metadata enrichment, artwork repair, details editing, and bulk actions.
 4. **Triage the backlog.** Use Quest Queue / Review Mode to make quick decisions instead of endlessly scrolling.
-5. **Plan by platform.** Send games into Platform Plans, set active platforms, reorder queues, and keep active game limits realistic.
-6. **Play something.** Use Home, Recommendations, Daily Quest, stats, and achievements to keep momentum.
-7. **Back up your data.** Export/import JSON backups or use the sync-folder foundation where supported.
+5. **Shape your Gaming DNA.** Review the taste signals Questory infers from your shelf, correct the ones that feel wrong, and add temporary moods for what you want right now.
+6. **Plan by platform.** Send games into Platform Plans, set active platforms, reorder queues, and keep active game limits realistic.
+7. **Play something.** Use Home, Recommendations, Daily Quest, stats, and achievements to keep momentum.
+8. **Back up your data.** Export/import JSON backups or use the sync-folder foundation where supported.
 
 ## Why not just Playnite / Backloggd / spreadsheets?
 

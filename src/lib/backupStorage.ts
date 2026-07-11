@@ -19,6 +19,7 @@ import { normalizeSteamSettings } from './steamSettingsStorage';
 import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
 import { normalizeAppPersonalizationSettings } from './appPersonalization';
 import { normalizeRecommendationFeedbackRecords, normalizeRecommendationPreferences, recommendationExposureStorageKey } from './recommendationFeedback';
+import { normalizeTasteProfile } from './tasteProfile';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
 import { clearContextualRecommendationCache } from '../services/contextualRecommendationsService';
 import type { Game } from '../types/game';
@@ -435,6 +436,7 @@ function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], va
     case 'questshelf.reviewMode.v1':
     case 'questshelf.appPersonalization.v1':
     case 'questshelf.recommendationPreferences.v1':
+    case 'questshelf.tasteProfile.v1':
     case 'questshelf.shelfIdentity.v1':
       return isPlainObject(value);
     case 'questshelf.recommendationFeedback.v1':
@@ -478,6 +480,8 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
       return normalizeRecommendationFeedbackRecords(value);
     case 'questshelf.recommendationPreferences.v1':
       return normalizeRecommendationPreferences(value);
+    case 'questshelf.tasteProfile.v1':
+      return normalizeTasteProfile(value);
     case 'questshelf.shelfIdentity.v1':
       return normalizeShelfIdentitySettings(value);
     case 'questshelf.libraryFilters.v1':
@@ -513,6 +517,7 @@ function getBackupSectionDisplayName(key: string): string {
     'questshelf.appPersonalization.v1': 'app personalization',
     'questshelf.recommendationFeedback.v1': 'recommendation feedback',
     'questshelf.recommendationPreferences.v1': 'recommendation preferences',
+    'questshelf.tasteProfile.v1': 'taste profile',
     'questshelf.shelfIdentity.v1': 'shelf identity',
   };
 

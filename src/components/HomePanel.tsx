@@ -46,6 +46,7 @@ type HomePanelProps = {
   onOpenReviewMode: (source: ReviewSource) => void;
   onOpenSettings?: () => void;
   onOpenIntegrationsSettings?: () => void;
+  onOpenTasteProfile?: () => void;
   onOpenWishlist: () => void;
   onPlayToday: (game: Game) => void;
   onQuickNote: (gameId: string, note: string) => void;
@@ -85,6 +86,7 @@ export function HomePanel({
   onOpenReviewMode,
   onOpenSettings,
   onOpenIntegrationsSettings,
+  onOpenTasteProfile,
   onOpenWishlist,
   onPlayToday,
   onQuickNote,
@@ -581,6 +583,7 @@ export function HomePanel({
             onSelectGame={onSelectDiscoveryGame}
             onOpenPreview={onOpenDiscoveryPreview}
             onOpenRawgSettings={onOpenIntegrationsSettings ?? onOpenSettings}
+            onOpenTasteProfile={onOpenTasteProfile}
           />
         );
 

@@ -141,9 +141,10 @@ type Props = {
   onRequestRecommendations: () => void;
   isRequestingRecommendations: boolean;
   onSkip: (item: DiscoveryInboxItem) => void;
+  onOpenTasteProfile?: () => void;
 };
 
-export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, onAddToPlans, onIgnore, onRequestRecommendations, isRequestingRecommendations, onSkip }: Props) {
+export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, onAddToPlans, onIgnore, onRequestRecommendations, isRequestingRecommendations, onSkip, onOpenTasteProfile }: Props) {
   const hasGamepad = useGamepadDetection();
   const [sessionStats, setSessionStats] = useState<SessionStats>(emptySessionStats);
   const [sessionReviewedCount, setSessionReviewedCount] = useState(0);
@@ -240,6 +241,15 @@ export function DiscoveryInboxPanel({ items, onAddToLibrary, onAddToWishlist, on
   return (
     <section className="qs-review-shell relative rounded-lg border border-skyglass/15 bg-ink-950/90">
       <div className="qs-review-overlay-controls absolute right-2 top-2 z-30 flex items-start gap-2 sm:right-3 sm:top-3">
+        {onOpenTasteProfile ? (
+          <button
+            className="rounded-full border border-mint/30 bg-ink-950/85 px-3 py-1.5 text-xs font-bold text-mint shadow-panel backdrop-blur-md transition hover:bg-mint/10"
+            onClick={onOpenTasteProfile}
+            type="button"
+          >
+            Gaming DNA
+          </button>
+        ) : null}
         <div
           aria-label={`Discovery Inbox: ${sessionReviewedCount} of ${totalCount} games triaged`}
           className="rounded-full border border-amber-400/30 bg-ink-950/85 px-3 py-1.5 text-center shadow-panel backdrop-blur-md"

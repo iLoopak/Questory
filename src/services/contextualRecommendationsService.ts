@@ -14,6 +14,7 @@ import { mapRawgResult } from './discoveryService';
 import { fetchSuggestedGames, fetchGameSeries, fetchRecommendedGames } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
 import { scorePersonalRecommendationCandidate } from './personalRecommendationsService';
+import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile } from '../lib/tasteProfile';
 
 // ---------------------------------------------------------------------------
 // Scoring weights
@@ -108,11 +109,12 @@ function computeGenreMatchScore(
     .reduce((sum, genre) => sum + 9 * signalInformationValue('genre', genre), 0));
 }
 
-function computeProfileAffinity(result: RawgSearchResult, profile: ReturnType<typeof buildUserProfile>): { affinity: number; penalty: number } {
-  const score = scorePersonalRecommendationCandidate(result, profile, 1, { source: 'affinity-relaxed' });
+function computeProfileAffinity(result: RawgSearchResult, profile: ReturnType<typeof buildUserProfile>, tasteProfile?: TasteProfile): { affinity: number; penalty: number; tasteLabel: string | null } {
+  const score = scorePersonalRecommendationCandidate(result, profile, 1, { source: 'affinity-relaxed', tasteProfile });
   return {
-    affinity: Math.round(Math.min(25, score.genreMatch * 0.25 + score.tagMatch * 0.35 + score.developerMatch * 0.35 + score.franchiseMatch * 0.35 + score.qualityMatch * 0.4)),
+    affinity: Math.round(Math.min(30, score.genreMatch * 0.25 + score.tagMatch * 0.35 + score.developerMatch * 0.35 + score.franchiseMatch * 0.35 + score.qualityMatch * 0.4 + Math.max(0, score.tasteProfileMatch))),
     penalty: score.negativeMatch,
+    tasteLabel: score.tasteProfileMatch >= 8 ? getActiveTasteSignals(tasteProfile ?? { version: 1, observed: [], explicit: [], temporary: [], lastComputedFingerprint: '', lastUpdatedAt: '', prompt: {} }, 'love')[0]?.label ?? null : null,
   };
 }
 
@@ -127,6 +129,7 @@ function generateReason(
   currentGameTitle: string,
   currentTagSlugs: string[],
   profileGenreNames: string[],
+  tasteLabel?: string | null,
 ): string {
   const candidateGenres = (result.genres ?? []).map((g) => g.name);
 
@@ -169,6 +172,9 @@ function generateReason(
   }
   if (sharedWithProfile.length > 0) {
     return `Matches your ${sharedWithProfile[0]} history`;
+  }
+  if (tasteLabel) {
+    return `Because your Taste Profile matches ${tasteLabel}`;
   }
   return `May complement ${currentGameTitle}`;
 }
@@ -243,6 +249,7 @@ export async function fetchContextualRecommendations(
   if (!game.rawgId) return [];
 
   const profile = buildUserProfile(userGames);
+  const tasteProfile = getTasteProfileForGames(userGames);
   const key = cacheKey(game.rawgId, userGames);
 
   const currentGameGenres = game.genres ?? [];
@@ -353,7 +360,7 @@ export async function fetchContextualRecommendations(
       const tagMatchResult = computeTagMatchScore(candidateTagSlugs, currentTagSlugs, tagFrequency);
       const tagMatch = tagMatchResult.score;
       const genreMatch = computeGenreMatchScore(candidateGenres, currentGameGenres);
-      const profileScore = computeProfileAffinity(result, profile);
+      const profileScore = computeProfileAffinity(result, profile, tasteProfile);
       const profileAffinity = profileScore.affinity;
       const profilePenalty = profileScore.penalty;
 
@@ -374,6 +381,7 @@ export async function fetchContextualRecommendations(
         game.title,
         currentTagSlugs,
         profile.topGenres.map((g) => g.name),
+        profileScore.tasteLabel,
       );
 
       // Primary tag for diversity bucketing — first specific non-discriminating

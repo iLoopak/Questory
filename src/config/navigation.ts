@@ -31,7 +31,7 @@ export const navigationVisibilityLabelKeys: Record<ConfigurableNavigationItem, P
   Wishlist: 'nav.wishlist',
 };
 
-export const allNavItems = [...navItems, ...moreNavItems, 'Metadata'] as const;
+export const allNavItems = [...navItems, ...moreNavItems, 'Metadata', 'Taste Profile'] as const;
 export type NavItem = (typeof allNavItems)[number];
 
 export function getNavDescription(activeNavItem: NavItem) {
@@ -45,6 +45,10 @@ export function getNavDescription(activeNavItem: NavItem) {
 
   if (activeNavItem === 'Metadata') {
     return 'Metadata runs only when you start it.';
+  }
+
+  if (activeNavItem === 'Taste Profile') {
+    return 'Your Gaming DNA explains and refines what Questory thinks you enjoy.';
   }
 
   if (activeNavItem === 'Wishlist') {

@@ -699,4 +699,3 @@ function HintsSettingsPanel() {
     />
   );
 }
-

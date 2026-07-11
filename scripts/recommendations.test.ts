@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildUserProfile, isGenericPreferenceTag, toSlug } from '../src/lib/userProfile';
+import { buildTasteProfile, getActiveTasteSignals, normalizeTasteProfile } from '../src/lib/tasteProfile';
+import { getStorageAdapter, setStorageAdapter, type StorageAdapter } from '../src/lib/storageAdapter';
 import { getRecommendationState } from '../src/lib/recommendationState';
 import { recommendationBenchmarkProfiles } from '../src/lib/recommendationBenchmarks';
 import { normalizeRecommendationFeedbackRecords } from '../src/lib/recommendationFeedback';
@@ -187,10 +189,82 @@ test('synthetic recommendation benchmark profiles produce expected profile signa
   }
 });
 
+test('taste profile infers explainable observed loves and bounded dislikes', () => {
+  const profile = buildTasteProfile([
+    game({ id: 'tactics-a', title: 'Tactics A', status: 'Finished', rating: 5, genres: ['RPG', 'Strategy'], rawgTags: ['tactical-rpg', 'turn-based-combat'], playtimeHours: 45 }),
+    game({ id: 'tactics-b', title: 'Tactics B', status: 'Finished', rating: 4, genres: ['RPG'], rawgTags: ['tactical-rpg'], playtimeHours: 30 }),
+    game({ id: 'sports-one', title: 'Sports One', status: 'Dropped', rating: 1, genres: ['Sports'], rawgTags: ['competitive'] }),
+    game({ id: 'sports-two', title: 'Sports Two', status: 'Dropped', genres: ['Sports'], rawgTags: ['competitive'] }),
+  ], normalizeTasteProfile(undefined), new Date('2026-07-11T00:00:00Z'));
+
+  const loved = getActiveTasteSignals(profile, 'love');
+  const avoided = getActiveTasteSignals(profile, 'avoid');
+  assert.ok(loved.some((signal) => signal.label === 'Tactical RPG' && signal.evidence.explanation.includes('Tactical RPG')));
+  assert.ok(avoided.some((signal) => signal.label === 'Sports' && signal.supportingGameCount >= 2));
+  assert.ok(!avoided.some((signal) => signal.supportingGameCount === 1));
+});
+
+test('taste profile normalization preserves explicit and temporary layers', () => {
+  const normalized = normalizeTasteProfile({
+    observed: [],
+    explicit: [{ kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+    temporary: [{ kind: 'tag', key: 'co-op', label: 'Co-op', sentiment: 'love', confidence: 1, evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z' }],
+    lastComputedFingerprint: 'abc',
+    lastUpdatedAt: '2026-07-11T00:00:00Z',
+  });
+
+  assert.equal(normalized.explicit[0].origin, 'explicit');
+  assert.equal(normalized.temporary[0].origin, 'temporary');
+  assert.equal(getActiveTasteSignals(normalized, 'love').length, 2);
+});
+
+test('taste profile consumes repeated recommendation feedback as observed taste evidence', () => {
+  const store = new Map<string, string>();
+  const previousAdapter = getStorageAdapter();
+  const memoryAdapter: StorageAdapter = {
+    readLocal: (key) => store.get(key) ?? null,
+    writeLocal: (key, value) => { store.set(key, value); },
+    removeLocal: (key) => { store.delete(key); },
+    localKeys: () => [...store.keys()],
+    readDurable: async () => null,
+    writeDurable: async () => {},
+    removeDurable: async () => {},
+    hasDurableBackend: async () => false,
+  };
+  setStorageAdapter(memoryAdapter);
+  try {
+    store.set('questshelf.recommendationFeedback.v1', JSON.stringify([
+      { rawgId: 10, normalizedTitle: 'battle one', feedbackType: 'less_like_this', createdAt: 1, surface: 'discover', metadata: { genres: ['sports'], tags: ['competitive'], developers: [], franchise: null } },
+      { rawgId: 11, normalizedTitle: 'battle two', feedbackType: 'not_interested', createdAt: 2, surface: 'home', metadata: { genres: ['sports'], tags: ['competitive'], developers: [], franchise: null } },
+    ]));
+
+    const profile = buildTasteProfile([], normalizeTasteProfile(undefined), new Date('2026-07-11T00:00:00Z'));
+    const avoided = getActiveTasteSignals(profile, 'avoid');
+
+    assert.ok(avoided.some((signal) => signal.label === 'Sports' && signal.supportingGameCount === 2));
+  } finally {
+    setStorageAdapter(previousAdapter);
+  }
+});
+
 test('highly rated finished games raise matching candidate scores', () => {
   const profile = buildUserProfile([game({ id: 'hades', status: 'Finished', rating: 5, genres: ['Action'], rawgTags: ['roguelite'] })]);
   const matching = scorePersonalRecommendationCandidate(rawg({ genres: [{ id: 1, name: 'Action', slug: 'action' }], tags: [{ id: 1, name: 'Roguelite', slug: 'roguelite' }] }), profile);
   const unrelated = scorePersonalRecommendationCandidate(rawg({ genres: [{ id: 2, name: 'Puzzle', slug: 'puzzle' }], tags: [] }), profile);
+  assert.ok(matching.total > unrelated.total);
+});
+
+test('taste profile contributes to recommendation scoring independently of user profile inference', () => {
+  const userProfile = buildUserProfile([]);
+  const tasteProfile = normalizeTasteProfile({
+    explicit: [{ kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+    observed: [],
+    temporary: [],
+  });
+  const matching = scorePersonalRecommendationCandidate(rawg({ tags: [{ id: 1, name: 'Deckbuilding', slug: 'deckbuilding' }] }), userProfile, 0, { tasteProfile });
+  const unrelated = scorePersonalRecommendationCandidate(rawg({ tags: [{ id: 2, name: 'Fishing', slug: 'fishing' }] }), userProfile, 0, { tasteProfile });
+
+  assert.ok(matching.tasteProfileMatch > 0);
   assert.ok(matching.total > unrelated.total);
 });
 
@@ -596,4 +670,20 @@ test('release calendar diversity avoids one genre or franchise taking over', () 
   const ranked = rankReleaseCalendarResults(results, userGames);
   assert.ok(ranked.filter((item) => item.result.name.startsWith('Dragon Quest')).length <= 2);
   assert.ok(new Set(ranked.map((item) => item.result.genres?.[0]?.name)).size > 1);
+});
+
+test('release calendar uses Taste Profile as a ranking signal', () => {
+  const userGames = [game({ id: 'neutral', status: 'Want to play', genres: ['Action'], platform: 'Steam' })];
+  const tasteProfile = normalizeTasteProfile({
+    observed: [],
+    explicit: [{ kind: 'tag', key: 'deckbuilding', label: 'Deckbuilding', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-11T00:00:00Z' }],
+    temporary: [],
+  });
+  const ranked = rankReleaseCalendarResults([
+    rawg({ id: 1, name: 'Deck Future', genres: [{ id: 1, name: 'Strategy', slug: 'strategy' }], tags: [{ id: 1, name: 'Deckbuilding', slug: 'deckbuilding' }] }),
+    rawg({ id: 2, name: 'Generic Future', genres: [{ id: 2, name: 'Action', slug: 'action' }], tags: [] }),
+  ], userGames, tasteProfile);
+
+  assert.equal(ranked[0].result.id, 1);
+  assert.match(ranked[0].reason, /Taste Profile|liked/);
 });
