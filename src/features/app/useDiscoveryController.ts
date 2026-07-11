@@ -12,8 +12,7 @@ import {
   type DiscoveryInboxItem,
 } from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
-import { buildPersonalizedRecommendations } from '../../lib/personalizedRecommendations';
-import { fetchGameSeries, fetchRecommendedGames, fetchSuggestedGames } from '../../services/rawgApi';
+import { fetchPersonalRecommendationsResult } from '../../services/personalRecommendationsService';
 import { trackAnalyticsEvent } from '../../lib/analytics';
 
 type ToastNotification = {
@@ -40,8 +39,8 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
   const isRequestingInboxRecommendationsRef = useRef(false);
 
   const inboxRawgIds = useMemo(
-    () => new Set(inboxItems.map((item) => item.rawgId)),
-    [inboxItems],
+    () => new Set([...inboxState.activeQueue, ...inboxState.nextQueue].map((item) => item.rawgId)),
+    [inboxState.activeQueue, inboxState.nextQueue],
   );
 
   const openPreview = useCallback((candidate: DiscoveryCandidate) => {
@@ -120,14 +119,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
         ...latestState.activeQueue.map((item) => item.rawgId),
         ...latestState.nextQueue.map((item) => item.rawgId),
       ]);
-      const { candidates } = await buildPersonalizedRecommendations(games, {
-        inboxRawgIds: queuedRawgIds,
-        forceRefresh: true,
-        fetchers: {
-          similar: async (rawgId) => [...await fetchSuggestedGames(rawgId), ...await fetchGameSeries(rawgId)],
-          discover: fetchRecommendedGames,
-        },
-      });
+      const { candidates } = await fetchPersonalRecommendationsResult(games, queuedRawgIds, { forceRefresh: true });
       const validCandidates = candidates
         .filter((candidate) => !candidate.excluded && candidate.libraryStatus === null && !candidate.inboxStatus)
         .slice(0, 10);

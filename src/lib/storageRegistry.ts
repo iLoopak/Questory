@@ -4,6 +4,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.rawgMetadataCache.v1'
   | 'questshelf.screenshots.v1'
   | 'questshelf.personalRecommendations.v1'
+  | 'questshelf.personalRecommendations.v2'
   | 'questshelf.releaseCalendar.v2'
   | 'questshelf.rawgSettings.v1'
   | 'questshelf.steamGridDbSettings.v1'
@@ -90,7 +91,7 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
   },
   {
     backup: 'never',
-    key: 'questshelf.personalRecommendations.v1',
+    key: 'questshelf.personalRecommendations.v2',
     purpose: 'Personal discovery recommendation cache. Stored in IndexedDB appCaches; legacy localStorage blobs are migrated and removed.',
     scope: 'core',
     schema: 'Recommendation cache entry keyed by profile fingerprint.',
