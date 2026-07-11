@@ -33,6 +33,7 @@ import {
   recommendationConfig,
 } from '../lib/recommendationConfig';
 import { summarizeRecommendationQuality, type RecommendationQualitySummary } from '../lib/recommendationQuality';
+import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile, type TasteSignal } from '../lib/tasteProfile';
 
 // ---------------------------------------------------------------------------
 // Recommendation waterfall
@@ -274,6 +275,7 @@ export interface RecommendationScore {
   recencyMatch: number;    // 0-4
   negativeMatch: number;   // 0 to -40
   sourceAdjustment: number;
+  tasteProfileMatch: number;
   metacriticMatch: number; // compatibility/debug subset of quality
   ownershipPenalty: number; // 0 or negative: already owned/wishlisted
   positiveGenres: string[];
@@ -298,12 +300,14 @@ const SCORE_CAPS = {
   recency: 4,
   negative: 40,
   sourceAdjustment: 8,
+  tasteProfile: 18,
 } as const;
 
 type ScoreContext = {
   source?: CandidateSource;
   seed?: SelectedRecommendationSeed;
   relaxation?: number;
+  tasteProfile?: TasteProfile;
 };
 
 type FeedbackContext = {
@@ -408,6 +412,38 @@ function scorePreferenceAdjustment(result: RawgSearchResult, source: CandidateSo
   return { adjustment, reasons };
 }
 
+function scoreTasteProfileAdjustment(result: RawgSearchResult, tasteProfile: TasteProfile | undefined): { score: number; positive: string[]; negative: string[] } {
+  if (!tasteProfile) return { score: 0, positive: [], negative: [] };
+  const metadata = getCandidateMetadata(result);
+  const active = getActiveTasteSignals(tasteProfile);
+  const positive: string[] = [];
+  const negative: string[] = [];
+  let score = 0;
+  for (const signal of active.slice(0, 18)) {
+    if (!doesTasteSignalMatch(signal, metadata)) continue;
+    const strength = signal.strength === 'strong' ? 1 : signal.strength === 'moderate' ? 0.7 : 0.45;
+    const origin = signal.origin === 'explicit' ? 1.2 : signal.origin === 'temporary' ? 0.9 : 0.7;
+    const points = Math.max(1, Math.round(signal.confidence * strength * origin * 8));
+    if (signal.sentiment === 'love') {
+      score += points;
+      positive.push(signal.label);
+    } else {
+      score -= points;
+      negative.push(signal.label);
+    }
+  }
+  return { score: clampScore(score, -SCORE_CAPS.tasteProfile, SCORE_CAPS.tasteProfile), positive: [...new Set(positive)].slice(0, 3), negative: [...new Set(negative)].slice(0, 3) };
+}
+
+function doesTasteSignalMatch(signal: TasteSignal, metadata: ReturnType<typeof getCandidateMetadata>): boolean {
+  if (signal.kind === 'genre') return metadata.genres.includes(signal.key) || metadata.genres.includes(toSlug(signal.label));
+  if (signal.kind === 'tag' || signal.kind === 'length' || signal.kind === 'release-era') return metadata.tags.includes(signal.key);
+  if (signal.kind === 'developer') return metadata.developers.includes(signal.key) || metadata.developers.includes(signal.label);
+  if (signal.kind === 'franchise') return metadata.franchise === signal.key;
+  if (signal.kind === 'platform') return false;
+  return false;
+}
+
 function recommendationPreferenceFingerprint(preferences: RecommendationPreferences, feedback: RecommendationFeedbackRecord[]): string {
   const feedbackKey = feedback
     .map((record) => [record.rawgId ?? record.normalizedTitle, record.feedbackType, record.createdAt].join(':'))
@@ -472,6 +508,7 @@ export function scorePersonalRecommendationCandidate(
   const negativeTagOverlap = weightedOverlap(profile.negativeTags, candidateTagSet, 16, (name) => signalInformationValue('tag', name));
   const negativeDeveloperOverlap = weightedOverlap(profile.negativeDevelopers, candidateDeveloperSet, 8);
   const negativeFranchiseOverlap = weightedOverlap(profile.negativeFranchises, candidateFranchiseSet, 8);
+  const tasteProfileAdjustment = scoreTasteProfileAdjustment(result, context.tasteProfile);
   const negativeMatch = -clampScore(
     negativeGenreOverlap.score + negativeTagOverlap.score + negativeDeveloperOverlap.score + negativeFranchiseOverlap.score,
     0,
@@ -507,7 +544,7 @@ export function scorePersonalRecommendationCandidate(
     SCORE_CAPS.sourceAdjustment,
   );
 
-  const total = genreOverlap.score + tagOverlap.score + developerOverlap.score + franchiseMatch + platformMatch + seedSimilarity + qualityMatch + recencyMatch + negativeMatch + sourceAdjustment;
+  const total = genreOverlap.score + tagOverlap.score + developerOverlap.score + franchiseMatch + platformMatch + seedSimilarity + qualityMatch + recencyMatch + negativeMatch + sourceAdjustment + tasteProfileAdjustment.score;
   return {
     genreMatch: genreOverlap.score,
     tagMatch: tagOverlap.score,
@@ -519,14 +556,15 @@ export function scorePersonalRecommendationCandidate(
     recencyMatch,
     negativeMatch,
     sourceAdjustment,
+    tasteProfileMatch: tasteProfileAdjustment.score,
     metacriticMatch,
     ownershipPenalty: 0,
     positiveGenres: genreOverlap.matched,
-    positiveTags: tagOverlap.matched,
+    positiveTags: [...new Set([...tagOverlap.matched, ...tasteProfileAdjustment.positive.map(toSlug)])],
     positiveDevelopers: developerOverlap.matched,
     positiveFranchises,
     negativeGenres: negativeGenreOverlap.matched,
-    negativeTags: negativeTagOverlap.matched,
+    negativeTags: [...new Set([...negativeTagOverlap.matched, ...tasteProfileAdjustment.negative.map(toSlug)])],
     negativeDevelopers: negativeDeveloperOverlap.matched,
     negativeFranchises: negativeFranchiseOverlap.matched,
     total,
@@ -544,6 +582,10 @@ function formatSignalName(slugOrName: string): string {
 export function generateRecommendationReasonForTest(result: RawgSearchResult, score: RecommendationScore, profile: UserProfile, source: CandidateSource, anchorTitle?: string): string {
   void result;
   void profile;
+  if (score.tasteProfileMatch >= 8) {
+    const tasteSignal = [...score.positiveTags, ...score.positiveGenres][0];
+    if (tasteSignal) return `Because your Taste Profile strongly matches ${formatSignalName(tasteSignal)}`;
+  }
   const distinctiveTags = score.positiveTags.filter(isDistinctivePreferenceTag).slice(0, 2).map(formatSignalName);
   if (score.franchiseMatch >= 12 && anchorTitle) return `Continues a series you have enjoyed`;
   if (score.developerMatch >= 10 && score.positiveDevelopers[0]) return `From a developer you rate highly`;
@@ -717,11 +759,11 @@ async function collectFromResults(
   seen: Set<number>,
   events: DebugEvent[],
   feedbackContext: FeedbackContext,
-  options: { minScore: number; relaxation?: number; anchorTitle?: string; seed?: SelectedRecommendationSeed },
+  options: { minScore: number; relaxation?: number; anchorTitle?: string; seed?: SelectedRecommendationSeed; tasteProfile?: TasteProfile },
 ): Promise<ScoredCandidate[]> {
   const output: ScoredCandidate[] = [];
   for (const result of results) {
-    const score = scorePersonalRecommendationCandidate(result, profile, options.relaxation ?? 0, { source, seed: options.seed });
+    const score = scorePersonalRecommendationCandidate(result, profile, options.relaxation ?? 0, { source, seed: options.seed, tasteProfile: options.tasteProfile });
     const feedbackAdjustment = scoreFeedbackAdjustment(result, feedbackContext);
     if (feedbackAdjustment.excluded) {
       events.push({ event: 'candidate_rejected', source, rawgId: result.id, title: result.name, score: score.total, reason: feedbackAdjustment.excluded, feedbackReasons: feedbackAdjustment.reasons });
@@ -1302,13 +1344,14 @@ async function generatePersonalRecommendationsResult(
   const performanceMarks: Record<string, number> = {};
   const profileStartedAt = performance.now();
   const profile = buildUserProfile(userGames);
+  const tasteProfile = getTasteProfileForGames(userGames);
   performanceMarks.profileBuildMs = Math.round(performance.now() - profileStartedAt);
   const feedback = loadRecommendationFeedback();
   const preferences = loadRecommendationPreferences();
   const exposure = loadRecommendationExposure();
   const exposureCounts = new Map(exposure.map((record) => [record.rawgId != null ? `id:${record.rawgId}` : `title:${record.normalizedTitle}`, record.exposureCount]));
   const feedbackContext: FeedbackContext = { feedback, preferences, exposureCounts };
-  const fp = `${profileFingerprint(userGames)}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
+  const fp = `${profileFingerprint(userGames)}::taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
   const events: DebugEvent[] = [];
   let partialFailureCount = 0;
   const counts = {
@@ -1351,7 +1394,7 @@ async function generatePersonalRecommendationsResult(
     try {
       for (const batch of await producer()) {
         events.push({ event: 'provider_batch', source: name, count: batch.results.length, anchorTitle: batch.anchorTitle });
-        collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, feedbackContext, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed }));
+        collected.push(...await collectFromResults(batch.results, name, profile, userGames, seen, events, feedbackContext, { minScore, relaxation, anchorTitle: batch.anchorTitle, seed: batch.seed, tasteProfile }));
       }
     } catch (error) {
       partialFailureCount += 1;
@@ -1447,12 +1490,14 @@ async function generatePersonalRecommendationsResult(
       tags: profile.topTagWeights.slice(0, 8),
       developers: profile.topDeveloperWeights.slice(0, 5),
       franchises: profile.topFranchises.slice(0, 5),
+      tasteProfile: getActiveTasteSignals(tasteProfile, 'love').slice(0, 8).map((signal) => ({ label: signal.label, origin: signal.origin, confidence: signal.confidence, evidence: signal.supportingGameCount })),
     },
     topNegativeSignals: {
       genres: profile.negativeGenres.slice(0, 5),
       tags: profile.negativeTags.slice(0, 8),
       developers: profile.negativeDevelopers.slice(0, 5),
       franchises: profile.negativeFranchises.slice(0, 5),
+      tasteProfile: getActiveTasteSignals(tasteProfile, 'avoid').slice(0, 8).map((signal) => ({ label: signal.label, origin: signal.origin, confidence: signal.confidence, evidence: signal.supportingGameCount })),
     },
     scoreDistribution: scoreDistribution(collected.map((item) => item.score.total)),
     finalSelection: finalSelection.diagnostics,

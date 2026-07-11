@@ -20,6 +20,7 @@ export function DiscoveryRoute({ core, games, discovery }: DiscoveryRouteProps) 
         core.setActiveNavItem('Settings');
         core.setActiveSettingsCategory('Integrations');
       }}
+      onOpenTasteProfile={() => core.setActiveNavItem('Taste Profile')}
     />
   );
 }

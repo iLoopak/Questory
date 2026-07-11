@@ -17,6 +17,7 @@ type DiscoverPanelProps = {
   onAddToWishlist?: (game: DiscoveryGame) => void;
   onAddToPlans?: (game: DiscoveryGame) => void;
   onOpenSettings?: () => void;
+  onOpenTasteProfile?: () => void;
 };
 
 function getDiscoveryContext(candidate: DiscoveryCandidate, t: TFunction): string | undefined {
@@ -51,7 +52,7 @@ function DiscoverGridSkeleton() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings }: DiscoverPanelProps) {
+export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings, onOpenTasteProfile }: DiscoverPanelProps) {
   const { t } = useI18n();
   const { candidates: personalizedCandidates, loading: recommendationsLoading, state: recommendationState, submitFeedback } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
   const candidates = recommendationsLoading && personalizedCandidates.length === 0 ? null : personalizedCandidates.filter((candidate) => candidate.libraryStatus === null);
@@ -80,11 +81,16 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
       />
 
       <section className="rounded-2xl border border-skyglass/15 bg-ink-950/35 p-3 shadow-glow/20 sm:p-4">
-        <DiscoverSectionHeader
-          kicker="Personalized recommendations"
-          title="Recommended for You"
-          subtitle="Personalized picks from your library history."
-        />
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <DiscoverSectionHeader
+            kicker="Personalized recommendations"
+            title="Recommended for You"
+            subtitle="Personalized picks from your Gaming DNA."
+          />
+          {onOpenTasteProfile ? (
+            <button className="rounded-lg border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20" onClick={onOpenTasteProfile} type="button">Open Gaming DNA</button>
+          ) : null}
+        </div>
         {candidates === null ? (
           <DiscoverGridSkeleton />
         ) : candidates.length === 0 ? (

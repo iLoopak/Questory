@@ -7,6 +7,7 @@ export type QuestShelfStorageKey =
   | 'questshelf.personalRecommendations.v2'
   | 'questshelf.recommendationFeedback.v1'
   | 'questshelf.recommendationPreferences.v1'
+  | 'questshelf.tasteProfile.v1'
   | 'questshelf.releaseCalendar.v2'
   | 'questshelf.rawgSettings.v1'
   | 'questshelf.steamGridDbSettings.v1'
@@ -112,6 +113,13 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     purpose: 'Small user-facing recommendation controls such as exploration mode and fatigue/variety preferences.',
     scope: 'core',
     schema: 'RecommendationPreferences normalized by recommendationFeedback.',
+  },
+  {
+    backup: 'default',
+    key: 'questshelf.tasteProfile.v1',
+    purpose: 'Canonical Taste Profile with observed, explicit, and temporary preference layers.',
+    scope: 'core',
+    schema: 'TasteProfile normalized by tasteProfile.',
   },
   {
     backup: 'never',

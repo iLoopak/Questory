@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { DiscoveryInboxPanel } from '../../../components/DiscoveryInboxPanel';
-import type { AppRouterDiscoveryModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterDiscoveryModel } from '../AppSectionRouter';
 
 type DiscoveryInboxRouteProps = {
+  core: Pick<AppRouterCoreModel, 'setActiveNavItem'>;
   discovery: Pick<AppRouterDiscoveryModel, 'discoveryInboxItems' | 'requestDiscoveryInboxRecommendations' | 'isRequestingDiscoveryInboxRecommendations' | 'promoteInboxDiscoveryToLibrary' | 'promoteInboxDiscoveryToWishlist' | 'promoteInboxDiscoveryToPlans' | 'handleInboxIgnore' | 'handleInboxSkip' | 'startDiscoveryInboxRun'>;
 };
 
-export function DiscoveryInboxRoute({ discovery }: DiscoveryInboxRouteProps) {
+export function DiscoveryInboxRoute({ core, discovery }: DiscoveryInboxRouteProps) {
   useEffect(() => {
     discovery.startDiscoveryInboxRun();
   }, [discovery.startDiscoveryInboxRun]);
@@ -21,6 +22,7 @@ export function DiscoveryInboxRoute({ discovery }: DiscoveryInboxRouteProps) {
       isRequestingRecommendations={discovery.isRequestingDiscoveryInboxRecommendations}
       onRequestRecommendations={discovery.requestDiscoveryInboxRecommendations}
       onSkip={discovery.handleInboxSkip}
+      onOpenTasteProfile={() => core.setActiveNavItem('Taste Profile')}
     />
   );
 }

@@ -1,10 +1,11 @@
 import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
-import { buildUserProfile, profileFingerprint } from '../lib/userProfile';
+import { buildUserProfile, profileFingerprint, recommendationFranchiseKey, toSlug } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames, type RecommendedGamesParams } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
 import { readAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
+import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile, type TasteSignal } from '../lib/tasteProfile';
 
 const CACHE_KEY = 'questshelf.releaseCalendar.v2';
 const IGNORE_KEY = 'questshelf.releaseCalendarIgnoredRawgIds.v1';
@@ -50,7 +51,8 @@ export async function fetchPersonalizedReleaseCalendar(
 ): Promise<DiscoveryCandidate[]> {
   const days = options.days ?? DEFAULT_DAYS;
   const dateRange = getUpcomingDateRange(days);
-  const fp = `${profileFingerprint(userGames)}::ignored=${[...getIgnoredReleaseRawgIds()].sort().join(',')}`;
+  const tasteProfile = getTasteProfileForGames(userGames);
+  const fp = `${profileFingerprint(userGames)}::taste=${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::ignored=${[...getIgnoredReleaseRawgIds()].sort().join(',')}`;
   if (!options.forceRefresh) {
     const fresh = await readCache(fp, dateRange);
     if (fresh) return restamp(fresh.candidates.map((c) => c.game), userGames, inboxRawgIds, fresh.candidates.map((c) => c.reason), fresh.candidates.map((c) => c.score));
@@ -67,7 +69,7 @@ export async function fetchPersonalizedReleaseCalendar(
 
   const pages = await Promise.all(requests.map((params) => fetchRecommendedGames(params)));
   const deduped = dedupeRawgResults(pages.flat()).filter((result) => !isExcludedRelease(result, userGames));
-  const scored = rankReleaseCalendarResults(deduped, userGames);
+  const scored = rankReleaseCalendarResults(deduped, userGames, tasteProfile);
 
   const games = scored.map(({ result }) => mapRawgResult(result));
   const candidates = restamp(games, userGames, inboxRawgIds, scored.map((s) => s.reason), scored.map((s) => s.score));
@@ -75,10 +77,10 @@ export async function fetchPersonalizedReleaseCalendar(
   return candidates;
 }
 
-export function rankReleaseCalendarResults(results: RawgSearchResult[], userGames: Game[]): ScoredRelease[] {
+export function rankReleaseCalendarResults(results: RawgSearchResult[], userGames: Game[], tasteProfile = getTasteProfileForGames(userGames)): ScoredRelease[] {
   const profile = buildUserProfile(userGames);
   const scored = results
-    .map((result) => scoreRelease(result, userGames, profile))
+    .map((result) => scoreRelease(result, userGames, profile, tasteProfile))
     .sort((a, b) => b.score - a.score || compareReleaseDates(a.result.released, b.result.released));
 
   const selected: ScoredRelease[] = [];
@@ -100,7 +102,7 @@ export function rankReleaseCalendarResults(results: RawgSearchResult[], userGame
     .slice(0, TARGET_MAX_RECOMMENDATIONS);
 }
 
-function scoreRelease(result: RawgSearchResult, userGames: Game[], profile = buildUserProfile(userGames)): ScoredRelease {
+function scoreRelease(result: RawgSearchResult, userGames: Game[], profile = buildUserProfile(userGames), tasteProfile?: TasteProfile): ScoredRelease {
   const genres = (result.genres ?? []).map((g) => g.name);
   const tags = (result.tags ?? []).map((t) => t.slug ?? t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
   const platforms = (result.platforms ?? []).map((p) => p.platform.name);
@@ -115,6 +117,7 @@ function scoreRelease(result: RawgSearchResult, userGames: Game[], profile = bui
   const negativeGenreHits = profile.negativeGenres.filter((g) => genres.includes(g.name));
   const negativeTagHits = profile.negativeTags.filter((tag) => tags.includes(tag.name));
   const negativeStudioHits = profile.negativeDevelopers.filter((studio) => studios.includes(studio.name));
+  const tasteMatch = scoreReleaseTasteProfile(result, tasteProfile);
 
   let score = 0;
   // Softer release-calendar weights: a few useful matches are enough to enter the pool.
@@ -131,6 +134,7 @@ function scoreRelease(result: RawgSearchResult, userGames: Game[], profile = bui
   score -= Math.min(10, negativeGenreHits.reduce((sum, g) => sum + g.weight * 1.5, 0));
   score -= Math.min(6, negativeTagHits.reduce((sum, t) => sum + t.weight, 0));
   score -= Math.min(6, negativeStudioHits.reduce((sum, t) => sum + t.weight, 0));
+  score += tasteMatch.score;
 
   const roundedScore = Math.round(score);
   const pass: ReleasePass = (genreHits.length > 0 && (tagHits.length > 0 || studioHits.length > 0 || hasHighlyRatedLibraryNeighbor(userGames, genres, tags, studios) || hasWishlistOrPlannedNeighbor(userGames, genres, tags, platforms)))
@@ -142,6 +146,8 @@ function scoreRelease(result: RawgSearchResult, userGames: Game[], profile = bui
     ?? userGames.find((game) => game.status === 'Playing' && game.genres?.some((genre) => genres.includes(genre)));
   const reason = sample
     ? `Because you liked ${sample.title}`
+    : tasteMatch.positive[0]
+      ? `Because your Taste Profile matches ${tasteMatch.positive[0]}`
     : studioHits[0]
       ? `From a creator you follow: ${studioHits[0]}`
       : genreHits[0]
@@ -150,6 +156,35 @@ function scoreRelease(result: RawgSearchResult, userGames: Game[], profile = bui
           ? `General pick for ${platformHits[0]}`
           : 'General upcoming pick';
   return { result, score: roundedScore, reason, pass, generalFallback };
+}
+
+function scoreReleaseTasteProfile(result: RawgSearchResult, tasteProfile: TasteProfile | undefined): { score: number; positive: string[] } {
+  if (!tasteProfile) return { score: 0, positive: [] };
+  const genres = new Set((result.genres ?? []).map((genre) => genre.slug ?? toSlug(genre.name)));
+  const tags = new Set((result.tags ?? []).map((tag) => tag.slug ?? toSlug(tag.name)));
+  const developers = new Set((result as RawgSearchResult & { developers?: Array<{ name: string }> }).developers?.map((developer) => developer.name.trim().replace(/\s+/g, ' ')) ?? []);
+  const franchise = recommendationFranchiseKey(result.slug ?? result.name) ?? franchiseKey(result);
+  let score = 0;
+  const positive: string[] = [];
+  for (const signal of getActiveTasteSignals(tasteProfile).slice(0, 16)) {
+    if (!releaseMatchesTasteSignal(signal, genres, tags, developers, franchise)) continue;
+    const points = Math.round(signal.confidence * (signal.origin === 'explicit' ? 6 : 4));
+    if (signal.sentiment === 'love') {
+      score += points;
+      positive.push(signal.label);
+    } else {
+      score -= points;
+    }
+  }
+  return { score: Math.max(-10, Math.min(12, score)), positive: [...new Set(positive)].slice(0, 2) };
+}
+
+function releaseMatchesTasteSignal(signal: TasteSignal, genres: Set<string>, tags: Set<string>, developers: Set<string>, franchise: string): boolean {
+  if (signal.kind === 'genre') return genres.has(signal.key);
+  if (signal.kind === 'tag' || signal.kind === 'length' || signal.kind === 'release-era') return tags.has(signal.key);
+  if (signal.kind === 'developer') return developers.has(signal.key) || developers.has(signal.label);
+  if (signal.kind === 'franchise') return franchise === signal.key;
+  return false;
 }
 
 function addDiversePass(

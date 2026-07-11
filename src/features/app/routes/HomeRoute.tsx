@@ -40,6 +40,10 @@ export function HomeRoute({ core, games, queue, review, sync, shelf, discovery }
         core.setActiveNavItem('Settings');
         core.setActiveSettingsCategory('Personalization');
       }}
+      onOpenTasteProfile={() => {
+        core.setSelectedGameId(null);
+        core.setActiveNavItem('Taste Profile');
+      }}
       onOpenIntegrationsSettings={() => {
         core.setSelectedGameId(null);
         core.setActiveNavItem('Settings');

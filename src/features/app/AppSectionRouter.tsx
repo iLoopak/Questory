@@ -11,6 +11,7 @@ import { QuestRunnerRoute } from './routes/QuestRunnerRoute';
 import { ReviewModeRoute } from './routes/ReviewModeRoute';
 import { SettingsRoute } from './routes/SettingsRoute';
 import { StatsRoute } from './routes/StatsRoute';
+import { TasteProfileRoute } from './routes/TasteProfileRoute';
 import { WishlistRoute } from './routes/WishlistRoute';
 
 import type { NavItem } from '../../config/navigation';
@@ -355,13 +356,15 @@ export function AppSectionRouter(props: AppSectionRouterProps) {
       ) : activeNavItem === 'Review Mode' ? (
         <ReviewModeRoute core={core} games={games} queue={queue} review={review} metadata={metadata} />
       ) : activeNavItem === 'Discovery Inbox' ? (
-        <DiscoveryInboxRoute discovery={discovery} />
+        <DiscoveryInboxRoute core={core} discovery={discovery} />
       ) : activeNavItem === 'Metadata' ? (
         <MetadataRoute games={games} metadata={metadata} onboarding={onboarding} />
       ) : activeNavItem === 'Artwork' ? (
         <ArtworkRoute core={core} games={games} metadata={metadata} />
       ) : activeNavItem === 'Discover' ? (
         <DiscoveryRoute core={core} games={games} discovery={discovery} />
+      ) : activeNavItem === 'Taste Profile' ? (
+        <TasteProfileRoute core={core} games={games} />
       ) : activeNavItem === 'Stats' ? (
         <StatsRoute core={core} games={games} queue={queue} />
       ) : activeNavItem === 'Quest Runner' ? (
