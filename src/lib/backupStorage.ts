@@ -19,6 +19,7 @@ import { normalizeSteamSettings } from './steamSettingsStorage';
 import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
 import { normalizeAppPersonalizationSettings } from './appPersonalization';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
+import { clearContextualRecommendationCache } from '../services/contextualRecommendationsService';
 import type { Game } from '../types/game';
 
 export const questShelfBackupVersion = 1;
@@ -186,6 +187,7 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
     void playActivityRepository.clear();
   }
 
+  clearContextualRecommendationCache();
   void clearPersonalRecommendationCaches();
 
   return {
@@ -231,6 +233,7 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
     playActivityRepository.replaceAll(normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']));
   }
 
+  clearContextualRecommendationCache();
   void clearPersonalRecommendationCaches();
 
   return {
@@ -246,6 +249,7 @@ export async function resetQuestShelfLocalData() {
   await rawgMetadataCacheRepository.clear();
   await playActivityRepository.clear();
   await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys]);
+  clearContextualRecommendationCache();
   await clearPersonalRecommendationCaches();
 }
 

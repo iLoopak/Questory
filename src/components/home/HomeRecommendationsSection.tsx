@@ -3,6 +3,7 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from '../discovery/DiscoveryGameCard';
 import { usePersonalizedRecommendations } from '../../hooks/usePersonalizedRecommendations';
 import { Icon } from '../Icon';
+import { RECOMMENDATION_COPY } from '../../lib/recommendationState';
 
 type HomeRecommendationsSectionProps = {
   games: Game[];
@@ -20,7 +21,7 @@ export function HomeRecommendationsSection({
   onSelectGame,
   onOpenPreview,
 }: HomeRecommendationsSectionProps) {
-  const { candidates, loading, error, diagnostics, refresh, isRefreshing } = usePersonalizedRecommendations(games, inboxRawgIds, libraryGameCount > 0);
+  const { candidates, loading, error, diagnostics, state, refresh, isRefreshing } = usePersonalizedRecommendations(games, inboxRawgIds, libraryGameCount > 0);
   const dev = import.meta.env.DEV;
 
   if (!onSelectGame) return null;
@@ -44,7 +45,7 @@ export function HomeRecommendationsSection({
             Refresh
           </button>
         </div>
-        {error ? <p className="text-xs text-amber-300">Couldn’t refresh recommendations. Showing the latest available picks.</p> : null}
+        {error || state.status === 'partial' || state.status === 'stale' ? <p className="text-xs text-amber-300">{RECOMMENDATION_COPY[state.status === 'stale' ? 'stale' : state.status === 'partial' ? 'partial' : 'error'].body}</p> : null}
         <div className="min-w-0 touch-pan-x scroll-px-1 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
           <div className="flex w-max gap-3 px-0.5">
             {loading ? (
@@ -58,7 +59,7 @@ export function HomeRecommendationsSection({
               ))
             ) : (
               <div className="w-72 rounded-xl border border-dashed border-skyglass/15 bg-ink-950/50 p-4 text-sm text-slate-400">
-                Rate, finish or plan a few games to improve your recommendations.
+                {state.status === 'notConfigured' ? RECOMMENDATION_COPY.notConfigured.body : state.status === 'coldStart' ? RECOMMENDATION_COPY.coldStart.body : RECOMMENDATION_COPY.empty.body}
               </div>
             )}
           </div>

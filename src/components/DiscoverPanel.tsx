@@ -7,6 +7,7 @@ import { useI18n, type TFunction } from '../i18n';
 import { fetchPersonalizedReleaseCalendar, ignoreReleaseCalendarGame } from '../services/releaseCalendarService';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 import { usePersonalizedRecommendations } from '../hooks/usePersonalizedRecommendations';
+import { RECOMMENDATION_COPY } from '../lib/recommendationState';
 
 type DiscoverPanelProps = {
   games: Game[];
@@ -52,7 +53,7 @@ function DiscoverGridSkeleton() {
 
 export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings }: DiscoverPanelProps) {
   const { t } = useI18n();
-  const { candidates: personalizedCandidates, loading: recommendationsLoading } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
+  const { candidates: personalizedCandidates, loading: recommendationsLoading, state: recommendationState } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
   const candidates = recommendationsLoading && personalizedCandidates.length === 0 ? null : personalizedCandidates.filter((candidate) => candidate.libraryStatus === null);
   const [upcoming, setUpcoming] = useState<DiscoveryCandidate[] | null>(null);
   const [releaseRefreshToken, setReleaseRefreshToken] = useState(0);
@@ -90,8 +91,8 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
           <div className="mx-auto max-w-md py-16">
             <EmptyState
               icon="compass"
-              title={DEV_RECOMMENDATION_EMPTY_STATE ? 'No personalized recommendations produced' : t('discover.empty.title')}
-              text={DEV_RECOMMENDATION_EMPTY_STATE ? 'Trending fallback is disabled for debugging; check the recommendation diagnostic report for pipeline counts and exclusions.' : t('discover.empty.text')}
+              title={DEV_RECOMMENDATION_EMPTY_STATE ? 'No personalized recommendations produced' : recommendationState.status === 'notConfigured' ? RECOMMENDATION_COPY.notConfigured.title : recommendationState.status === 'coldStart' ? RECOMMENDATION_COPY.coldStart.title : t('discover.empty.title')}
+              text={DEV_RECOMMENDATION_EMPTY_STATE ? 'Trending fallback is disabled for debugging; check the recommendation diagnostic report for pipeline counts and exclusions.' : recommendationState.status === 'notConfigured' ? RECOMMENDATION_COPY.notConfigured.body : recommendationState.status === 'coldStart' ? RECOMMENDATION_COPY.coldStart.body : t('discover.empty.text')}
             />
           </div>
         ) : (
