@@ -5,6 +5,7 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
 import {
   appendDiscoveryInboxRecommendations,
   deferDiscoveryInboxItemForFutureSession,
+  getDiscoveryInboxRequestGeneration,
   loadDiscoveryInboxState,
   restoreDeferredDiscoveryInboxItem,
   saveDiscoveryInboxState,
@@ -113,6 +114,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
     if (isRequestingInboxRecommendationsRef.current) return 0;
     isRequestingInboxRecommendationsRef.current = true;
     setIsRequestingInboxRecommendations(true);
+    const requestGeneration = getDiscoveryInboxRequestGeneration();
     try {
       const latestState = loadDiscoveryInboxState();
       const queuedRawgIds = new Set([
@@ -120,6 +122,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
         ...latestState.nextQueue.map((item) => item.rawgId),
       ]);
       const { candidates } = await fetchPersonalRecommendationsResult(games, queuedRawgIds, { forceRefresh: true });
+      if (getDiscoveryInboxRequestGeneration() !== requestGeneration) return 0;
       const validCandidates = candidates
         .filter((candidate) => !candidate.excluded && candidate.libraryStatus === null && !candidate.inboxStatus)
         .slice(0, 10);

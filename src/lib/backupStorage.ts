@@ -13,16 +13,27 @@ import {
   coreBackupStorageKeys,
   deviceOnlyStorageKeys,
   integrationBackupStorageKeys,
+  storageKeyRegistry,
 } from './storageRegistry';
 import { normalizeSteamGridDbSettings } from './steamGridDbSettingsStorage';
 import { normalizeSteamSettings } from './steamSettingsStorage';
 import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
 import { normalizeAppPersonalizationSettings } from './appPersonalization';
 import { normalizeRecommendationFeedbackRecords, normalizeRecommendationPreferences, recommendationExposureStorageKey } from './recommendationFeedback';
-import { normalizeTasteProfile } from './tasteProfile';
+import type { RecommendationFeedbackRecord } from './recommendationFeedback';
+import { buildTasteProfile, normalizeTasteProfile } from './tasteProfile';
+import type { TasteProfile, TasteSignal } from './tasteProfile';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
 import { clearContextualRecommendationCache } from '../services/contextualRecommendationsService';
+import { clearReleaseCalendarCache } from '../services/releaseCalendarService';
 import type { Game } from '../types/game';
+import { discoveryInboxStorageKey, invalidateDiscoveryInboxRequests } from './discoveryInboxStorage';
+
+const generatedStateStorageKeys = [
+  discoveryInboxStorageKey,
+  recommendationExposureStorageKey,
+  'questshelf.releaseCalendarIgnoredRawgIds.v1',
+] as const;
 
 export const questShelfBackupVersion = 1;
 export const questShelfAppVersion = '0.1.0';
@@ -189,8 +200,7 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
     void playActivityRepository.clear();
   }
 
-  clearContextualRecommendationCache();
-  void clearPersonalRecommendationCaches();
+  clearGeneratedRecommendationState();
 
   return {
     games: loadGames(),
@@ -203,6 +213,9 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
   // storage in a partially-written state.
   const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
   const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
+  const backupTasteProfile = Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.tasteProfile.v1')
+    ? normalizeTasteProfile(backup.data['questshelf.tasteProfile.v1'])
+    : null;
 
   allBackupStorageKeys.forEach((key) => {
     if (
@@ -210,6 +223,10 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
       key === 'questshelf.rawgMetadataCache.v1' ||
       key === 'questshelf.playActivity.v1'
     ) {
+      return;
+    }
+
+    if (key === 'questshelf.tasteProfile.v1' || key === 'questshelf.recommendationFeedback.v1') {
       return;
     }
 
@@ -235,8 +252,22 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
     playActivityRepository.replaceAll(normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']));
   }
 
-  clearContextualRecommendationCache();
-  void clearPersonalRecommendationCaches();
+  if (backupTasteProfile) {
+    const localTasteProfile = normalizeTasteProfile(readStorageJson('questshelf.tasteProfile.v1'));
+    const mergedTasteProfile = mergeTasteProfiles(localTasteProfile, backupTasteProfile, mergedGames);
+    savePersistedJson('questshelf.tasteProfile.v1', mergedTasteProfile);
+  } else {
+    savePersistedJson('questshelf.tasteProfile.v1', buildTasteProfile(mergedGames, normalizeTasteProfile(undefined)));
+  }
+
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.recommendationFeedback.v1')) {
+    savePersistedJson('questshelf.recommendationFeedback.v1', mergeRecommendationFeedback(
+      normalizeRecommendationFeedbackRecords(readStorageJson('questshelf.recommendationFeedback.v1')),
+      normalizeRecommendationFeedbackRecords(backup.data['questshelf.recommendationFeedback.v1']),
+    ));
+  }
+
+  clearGeneratedRecommendationState();
 
   return {
     games: loadGames(),
@@ -245,14 +276,24 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
 }
 
 export async function resetQuestShelfLocalData() {
+  invalidateDiscoveryInboxRequests();
   // Clear the IndexedDB collection stores + snapshots first so reset does not leave
   // orphaned records in IndexedDB after the legacy blobs are removed.
   await gameRepository.clear();
   await rawgMetadataCacheRepository.clear();
   await playActivityRepository.clear();
-  await removePersistedKeys([...allBackupStorageKeys, ...deviceOnlyStorageKeys, recommendationExposureStorageKey]);
+  await removePersistedKeys([...new Set([...storageKeyRegistry.map((entry) => entry.key), ...generatedStateStorageKeys])]);
   clearContextualRecommendationCache();
+  clearReleaseCalendarCache();
   await clearPersonalRecommendationCaches();
+}
+
+function clearGeneratedRecommendationState(): void {
+  invalidateDiscoveryInboxRequests();
+  void removePersistedKeys([...generatedStateStorageKeys]);
+  clearContextualRecommendationCache();
+  clearReleaseCalendarCache();
+  void clearPersonalRecommendationCaches();
 }
 
 function validateQuestShelfBackup(value: unknown): BackupParseResult {
@@ -372,6 +413,43 @@ function mergeGames(localGames: Game[], backupGames: Game[]) {
   });
 
   return mergedGames;
+}
+
+function mergeTasteProfiles(localProfile: TasteProfile, backupProfile: TasteProfile, mergedGames: Game[]): TasteProfile {
+  const now = new Date();
+  const explicit = mergeTasteSignals(localProfile.explicit, backupProfile.explicit);
+  const temporary = mergeTasteSignals(localProfile.temporary, backupProfile.temporary)
+    .filter((signal) => !signal.expiresAt || new Date(signal.expiresAt).getTime() > now.getTime());
+  return buildTasteProfile(mergedGames, {
+    ...normalizeTasteProfile(undefined),
+    explicit,
+    temporary,
+    prompt: { ...localProfile.prompt, ...backupProfile.prompt, inferencePausedAt: undefined },
+  }, now);
+}
+
+function mergeTasteSignals(localSignals: TasteSignal[], backupSignals: TasteSignal[]): TasteSignal[] {
+  const byIdentity = new Map<string, TasteSignal>();
+  for (const signal of [...localSignals, ...backupSignals]) {
+    const key = `${signal.kind}:${signal.key}:${signal.sentiment}`;
+    const existing = byIdentity.get(key);
+    if (!existing || Date.parse(signal.lastUpdatedAt || '') >= Date.parse(existing.lastUpdatedAt || '')) {
+      byIdentity.set(key, signal);
+    }
+  }
+  return [...byIdentity.values()];
+}
+
+function mergeRecommendationFeedback(localRecords: RecommendationFeedbackRecord[], backupRecords: RecommendationFeedbackRecord[]): RecommendationFeedbackRecord[] {
+  const byIdentity = new Map<string, RecommendationFeedbackRecord>();
+  for (const record of [...localRecords, ...backupRecords]) {
+    const key = `${record.rawgId ?? record.normalizedTitle}:${record.feedbackType}`;
+    const existing = byIdentity.get(key);
+    if (!existing || record.createdAt >= existing.createdAt) {
+      byIdentity.set(key, record);
+    }
+  }
+  return [...byIdentity.values()].sort((a, b) => a.createdAt - b.createdAt);
 }
 
 function areGamesMatching(firstGame: Game, secondGame: Game) {

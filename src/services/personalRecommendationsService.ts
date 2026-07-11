@@ -1134,6 +1134,7 @@ export const PERSONAL_RECOMMENDATIONS_CACHE_KEY = CACHE_STORAGE_KEY;
 const OBSOLETE_CACHE_KEYS = ['questshelf.personalizedRecommendations.v1', 'questshelf.personalRecommendations.v1'];
 const CACHE_TTL_MS = recommendationConfig.cacheTtlMs;
 const inFlightRequests = new Map<string, Promise<PersonalRecommendationsResult>>();
+let recommendationRequestGeneration = 0;
 
 type PersistedCacheEntry = Partial<CacheEntry> & { version?: number; expiresAt?: number };
 
@@ -1178,6 +1179,7 @@ function writeStoredCache(entry: CacheEntry): void {
   void writeAppCacheValue(CACHE_STORAGE_KEY, { ...entry, version: CACHE_SCHEMA_VERSION, expiresAt: entry.fetchedAt + CACHE_TTL_MS });
 }
 export async function clearPersonalRecommendationCaches(): Promise<void> {
+  recommendationRequestGeneration += 1;
   cache = null;
   inFlightRequests.clear();
   await Promise.all([CACHE_STORAGE_KEY, ...OBSOLETE_CACHE_KEYS].map((key) => removeAppCacheValue(key)));
@@ -1368,6 +1370,7 @@ async function generatePersonalRecommendationsResult(
   } else {
     void clearObsoleteRecommendationCaches();
   }
+  const activeRecommendationGeneration = recommendationRequestGeneration;
 
   const cacheStartedAt = performance.now();
   const freshCache = options.forceRefresh ? null : await getFreshCacheEntry(fp);
@@ -1375,6 +1378,9 @@ async function generatePersonalRecommendationsResult(
   if (freshCache) {
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
     const cached = applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
+    if (recommendationRequestGeneration !== activeRecommendationGeneration) {
+      return { candidates: [], diagnostics: getDiagnosticsReport() };
+    }
     recordRecommendationExposures(cached, fp);
     debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp, cacheStatus: 'hit', performance: performanceMarks, feedbackSignalCount: feedback.length, exposureSignalCount: exposure.filter((record) => record.exposureCount > recommendationConfig.exposure.fatigueAfter).length, qualitySummary: summarizeRecommendationQuality(cached) });
     trackRecommendationGenerationCompleted({ cacheStatus: 'hit', durationMs: performanceMarks.cacheReadMs ?? 0, partialFailureCount: 0, resultCount: cached.length });
@@ -1510,6 +1516,9 @@ async function generatePersonalRecommendationsResult(
   });
 
   const cacheWriteStartedAt = performance.now();
+  if (recommendationRequestGeneration !== activeRecommendationGeneration) {
+    return { candidates: [], diagnostics: getDiagnosticsReport() };
+  }
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
   performanceMarks.cacheWriteMs = Math.round(performance.now() - cacheWriteStartedAt);
   recordRecommendationExposures(pool, fp);

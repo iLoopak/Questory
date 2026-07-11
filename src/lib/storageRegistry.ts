@@ -5,7 +5,9 @@ export type QuestShelfStorageKey =
   | 'questshelf.screenshots.v1'
   | 'questshelf.personalRecommendations.v1'
   | 'questshelf.personalRecommendations.v2'
+  | 'questshelf.discoveryInbox.v1'
   | 'questshelf.recommendationFeedback.v1'
+  | 'questshelf.recommendationExposure.v1'
   | 'questshelf.recommendationPreferences.v1'
   | 'questshelf.tasteProfile.v1'
   | 'questshelf.releaseCalendar.v2'
@@ -101,11 +103,25 @@ export const storageKeyRegistry: StorageKeyDescriptor[] = [
     store: 'collection',
   },
   {
+    backup: 'never',
+    key: 'questshelf.discoveryInbox.v1',
+    purpose: 'Generated Discovery Inbox active and deferred candidate queues. Disposable generated state; not exported in backups.',
+    scope: 'core',
+    schema: 'DiscoveryInboxState normalized by discoveryInboxStorage.',
+  },
+  {
     backup: 'default',
     key: 'questshelf.recommendationFeedback.v1',
     purpose: 'User recommendation feedback such as exact hides, already played, and bounded preference signals.',
     scope: 'core',
     schema: 'RecommendationFeedbackRecord[] normalized by recommendationFeedback.',
+  },
+  {
+    backup: 'never',
+    key: 'questshelf.recommendationExposure.v1',
+    purpose: 'Disposable recommendation exposure/fatigue counters.',
+    scope: 'core',
+    schema: 'RecommendationExposureRecord[] normalized by recommendationFeedback.',
   },
   {
     backup: 'default',

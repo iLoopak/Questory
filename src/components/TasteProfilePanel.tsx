@@ -6,6 +6,7 @@ import {
   addExplicitTasteSignal,
   addTemporaryTasteSignal,
   confirmObservedTasteSignal,
+  createOppositeTasteSignal,
   exportTasteProfile,
   getActiveTasteSignals,
   getTasteProfileForGames,
@@ -14,6 +15,7 @@ import {
   recomputeAndSaveTasteProfile,
   rejectTasteSignal,
   removeTasteSignal,
+  resetAllTasteProfile,
   resetExplicitTasteProfile,
   resetObservedTasteProfile,
   resetTemporaryTasteProfile,
@@ -41,7 +43,7 @@ const steps: Array<{ id: WizardStep; label: string; eyebrow: string }> = [
   { id: 'tune', label: 'Fine tune', eyebrow: '6' },
 ];
 
-type TasteTriageAction = 'reject' | 'hide' | 'confirm' | 'pin';
+type TasteTriageAction = 'reject' | 'opposite' | 'confirm' | 'pin';
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'exiting';
 type SwipeHorizontalDirection = 'left' | 'right';
 type SwipeVerticalDirection = 'up' | 'down';
@@ -57,15 +59,15 @@ const dragStartScale = 0.85;
 const minDragScale = 0.74;
 
 const tasteTriageActions: Array<{ action: TasteTriageAction; icon: IconName; label: string; tone: 'negative' | 'positive' | 'neutral' }> = [
-  { action: 'reject', icon: 'x', label: 'Not quite', tone: 'neutral' },
-  { action: 'hide', icon: 'eye-off', label: 'Hide', tone: 'negative' },
+  { action: 'reject', icon: 'x', label: 'Not accurate', tone: 'neutral' },
+  { action: 'opposite', icon: 'eye-off', label: 'Dislike this', tone: 'negative' },
   { action: 'confirm', icon: 'check', label: 'Yes', tone: 'positive' },
   { action: 'pin', icon: 'bookmark-pen', label: 'Pin', tone: 'positive' },
 ];
 
 const tasteSwipeZones: Record<SwipeHorizontalDirection, ReadonlyArray<{ action: TasteTriageAction; quadrant: SwipeQuadrant }>> = {
   left: [
-    { action: 'hide', quadrant: 'left-up' },
+    { action: 'opposite', quadrant: 'left-up' },
     { action: 'reject', quadrant: 'left-down' },
   ],
   right: [
@@ -147,6 +149,11 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
 
   function removeExplicitTasteSignal(signalId: string) {
     applyTasteProfileUpdate(removeTasteSignal(signalId));
+    setLastAppliedCorrection('');
+  }
+
+  function resetEverythingTasteProfile() {
+    applyTasteProfileUpdate(resetAllTasteProfile());
     setLastAppliedCorrection('');
   }
 
@@ -240,6 +247,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
                 title="What you seem to love"
                 onConfirm={(signal) => applyTasteProfileUpdate(confirmObservedTasteSignal(signal.id))}
                 onHide={(signal) => applyTasteProfileUpdate(hideTasteSignal(signal.id))}
+                onOpposite={(signal) => applyTasteProfileUpdate(createOppositeTasteSignal(signal.id))}
                 onPin={(signal) => applyTasteProfileUpdate(pinTasteSignal(signal.id, !signal.pinned))}
                 onReject={(signal) => applyTasteProfileUpdate(rejectTasteSignal(signal.id))}
               />
@@ -252,6 +260,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
                 title="What may be less your thing"
                 onConfirm={(signal) => applyTasteProfileUpdate(confirmObservedTasteSignal(signal.id))}
                 onHide={(signal) => applyTasteProfileUpdate(hideTasteSignal(signal.id))}
+                onOpposite={(signal) => applyTasteProfileUpdate(createOppositeTasteSignal(signal.id))}
                 onPin={(signal) => applyTasteProfileUpdate(pinTasteSignal(signal.id, !signal.pinned))}
                 onReject={(signal) => applyTasteProfileUpdate(rejectTasteSignal(signal.id))}
               />
@@ -279,6 +288,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
                 onResetExplicit={() => applyTasteProfileUpdate(resetExplicitTasteProfile())}
                 onResetInferred={() => applyTasteProfileUpdate(resetObservedTasteProfile())}
                 onResetTemporary={() => applyTasteProfileUpdate(resetTemporaryTasteProfile())}
+                onResetAll={resetEverythingTasteProfile}
               />
             )}
 
@@ -497,6 +507,7 @@ function CompactSignalReviewStep({
   title,
   onConfirm,
   onHide,
+  onOpposite,
   onPin,
   onReject,
 }: {
@@ -507,6 +518,7 @@ function CompactSignalReviewStep({
   title: string;
   onConfirm: (signal: TasteSignal) => void;
   onHide: (signal: TasteSignal) => void;
+  onOpposite: (signal: TasteSignal) => void;
   onPin: (signal: TasteSignal) => void;
   onReject: (signal: TasteSignal) => void;
 }) {
@@ -533,6 +545,7 @@ function CompactSignalReviewStep({
               signal={signal}
               onConfirm={signal.origin === 'observed' ? () => onConfirm(signal) : undefined}
               onHide={() => onHide(signal)}
+              onOpposite={() => onOpposite(signal)}
               onPin={() => onPin(signal)}
               onReject={() => onReject(signal)}
             />
@@ -548,6 +561,7 @@ function CompactSignalCard({
   signal,
   onConfirm,
   onHide,
+  onOpposite,
   onPin,
   onReject,
 }: {
@@ -555,6 +569,7 @@ function CompactSignalCard({
   signal: TasteSignal;
   onConfirm?: () => void;
   onHide: () => void;
+  onOpposite: () => void;
   onPin: () => void;
   onReject: () => void;
 }) {
@@ -581,7 +596,8 @@ function CompactSignalCard({
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{signal.evidence.explanation || 'Added by you.'}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {onConfirm ? <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-2 text-xs font-semibold text-mint transition hover:bg-mint/20" onClick={onConfirm} type="button">Keep</button> : null}
-            <button className="h-8 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onReject} type="button">Correct</button>
+            <button className="h-8 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onReject} type="button">Not accurate</button>
+            <button className="h-8 rounded-md border border-red-400/30 px-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/10" onClick={onOpposite} type="button">Actually like this</button>
             <button className="h-8 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onPin} type="button">{signal.pinned ? 'Unpin' : 'Pin'}</button>
             <button className="h-8 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-400 transition hover:text-white" onClick={onHide} type="button">Hide</button>
           </div>
@@ -599,6 +615,7 @@ function TasteTriageStep({
   title,
   onConfirm,
   onHide,
+  onOpposite,
   onPin,
   onReject,
 }: {
@@ -609,6 +626,7 @@ function TasteTriageStep({
   title: string;
   onConfirm: (signal: TasteSignal) => void;
   onHide: (signal: TasteSignal) => void;
+  onOpposite: (signal: TasteSignal) => void;
   onPin: (signal: TasteSignal) => void;
   onReject: (signal: TasteSignal) => void;
 }) {
@@ -619,7 +637,7 @@ function TasteTriageStep({
   const activeSignal = pendingSignals[0] ?? null;
   const reviewedCount = signals.length - pendingSignals.length;
   const totalCount = signals.length;
-  const negativeActions = tasteTriageActions.filter((action) => action.action === 'hide' || action.action === 'reject');
+  const negativeActions = tasteTriageActions.filter((action) => action.action === 'opposite' || action.action === 'reject');
   const positiveActions = tasteTriageActions.filter((action) => action.action === 'confirm' || action.action === 'pin');
   const swipeTarget = getTasteSwipeTarget(swipeState.offsetX, swipeState.offsetY);
   const swipeDirection = swipeTarget?.horizontal ?? getSwipeHorizontalDirection(swipeState.offsetX);
@@ -652,7 +670,7 @@ function TasteTriageStep({
   function handleAction(action: TasteTriageAction) {
     const handlers: Record<TasteTriageAction, (signal: TasteSignal) => void> = {
       confirm: onConfirm,
-      hide: onHide,
+      opposite: onOpposite,
       pin: onPin,
       reject: onReject,
     };
@@ -735,7 +753,7 @@ function TasteTriageStep({
             aria-label="Correct this taste"
           >
             <div className="qs-review-zone-label">Correct</div>
-            <TasteActionButtons actions={negativeActions} activeAction={swipeTarget?.action.action ?? null} onAction={handleAction} />
+            <TasteActionButtons actions={negativeActions.map((action) => action.action === 'opposite' ? { ...action, label: 'Dislike this' } : action)} activeAction={swipeTarget?.action.action ?? null} onAction={handleAction} />
           </section>
 
           <section className="qs-review-hero flex flex-col items-center" aria-label={`${activeSignal.label} taste signal. Drag left to correct, left and up to hide, right to confirm, or right and down to pin.`}>
@@ -986,6 +1004,7 @@ function FineTuneStep({
   onResetExplicit,
   onResetInferred,
   onResetTemporary,
+  onResetAll,
 }: {
   explicitTasteSignals: TasteSignal[];
   lastAppliedCorrection: string;
@@ -1002,6 +1021,7 @@ function FineTuneStep({
   onResetExplicit: () => void;
   onResetInferred: () => void;
   onResetTemporary: () => void;
+  onResetAll: () => void;
 }) {
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,1.05fr)]">
@@ -1057,11 +1077,12 @@ function FineTuneStep({
         <details className="mt-4 rounded-md border border-skyglass/15 bg-ink-900/60 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-slate-300">Profile maintenance</summary>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:text-white" onClick={onRecompute} type="button">Re-read shelf</button>
+            <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:text-white" onClick={onRecompute} type="button">Recompute inferred taste</button>
             <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-200 transition hover:border-mint/35 hover:text-white" onClick={onExport} type="button">Export</button>
             <button className="h-10 rounded-md border border-skyglass/15 px-3 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onResetTemporary} type="button">Clear current mood</button>
-            <button className="h-10 rounded-md border border-red-400/30 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10" onClick={onResetInferred} type="button">Reset inferred</button>
+            <button className="h-10 rounded-md border border-red-400/30 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10" onClick={onResetInferred} type="button">Clear inferred taste</button>
             <button className="h-10 rounded-md border border-red-400/30 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 sm:col-span-2" onClick={onResetExplicit} type="button">Reset corrections</button>
+            <button className="h-10 rounded-md border border-red-400/30 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 sm:col-span-2" onClick={onResetAll} type="button">Reset all Taste Profile data</button>
           </div>
         </details>
       </div>
