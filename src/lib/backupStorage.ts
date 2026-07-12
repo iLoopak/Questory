@@ -1,6 +1,7 @@
 import { normalizeAchievementCounters } from './achievementCounters';
 import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
-import { gameRepository, loadGames, normalizeLoadedGames } from './gameStorage';
+import { findGameRecordIndex } from './gameIdentity';
+import { gameRepository, loadGames, normalizeLoadedGames, parseLoadedGameRows, type GameRowRejection } from './gameStorage';
 import { removePersistedKeys, savePersistedJson } from './localPersistence';
 import { normalizeOnboardingState } from './onboardingStorage';
 import { normalizePlatformQueuePersistedState } from './platformQueueStorage';
@@ -67,6 +68,37 @@ export type RestoredQuestShelfData = {
   games: Game[];
   ignoredSteamGames: ReturnType<typeof loadIgnoredSteamGames>;
 };
+
+/** Per-row outcome for the backup's games section. */
+export type BackupGamesReport = {
+  /** Rows present in the backup's games array. */
+  rowCount: number;
+  /** Rows that parsed into a usable Game. */
+  acceptedCount: number;
+  rejectedCount: number;
+  rejected: GameRowRejection[];
+  /** False when the backup had no games section at all (restore then clears the collection). */
+  present: boolean;
+};
+
+/**
+ * Result of restoring/merging a backup.
+ *
+ * `ok: false` means nothing was written. Today the only such case is a games section that has
+ * rows but no usable ones, which would otherwise wipe a populated collection (AS-02). Restore
+ * stays synchronous here; making the writes awaitable is AS-01's separate change.
+ */
+export type QuestShelfBackupImportResult =
+  | {
+      ok: true;
+      data: RestoredQuestShelfData;
+      games: BackupGamesReport;
+    }
+  | {
+      ok: false;
+      reason: 'games-section-unusable';
+      games: BackupGamesReport;
+    };
 
 type BackupParseResult =
   | {
@@ -150,7 +182,15 @@ export function getQuestShelfBackupSummary(backup: QuestShelfBackup): QuestShelf
   };
 }
 
-export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
+export function restoreQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBackupImportResult {
+  const gamesReport = getBackupGamesReport(backup);
+
+  // Refuse a replace that would swap a populated collection for nothing because every row in a
+  // non-empty games section was corrupt. An intentionally empty section (rowCount 0) still clears.
+  if (wouldWipeGamesCollection(gamesReport)) {
+    return { ok: false, reason: 'games-section-unusable', games: gamesReport };
+  }
+
   // Pre-normalize all sections before touching storage so an unexpected normalize error
   // cannot leave storage in a partially-written state.
   const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
@@ -203,12 +243,18 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): RestoredQuest
   clearGeneratedRecommendationState();
 
   return {
-    games: loadGames(),
-    ignoredSteamGames: loadIgnoredSteamGames(),
+    ok: true,
+    games: gamesReport,
+    data: {
+      games: loadGames(),
+      ignoredSteamGames: loadIgnoredSteamGames(),
+    },
   };
 }
 
-export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestShelfData {
+export function mergeQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBackupImportResult {
+  const gamesReport = getBackupGamesReport(backup);
+
   // Pre-normalize before touching storage so an unexpected normalize error cannot leave
   // storage in a partially-written state.
   const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
@@ -270,8 +316,12 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): RestoredQuestSh
   clearGeneratedRecommendationState();
 
   return {
-    games: loadGames(),
-    ignoredSteamGames: loadIgnoredSteamGames(),
+    ok: true,
+    games: gamesReport,
+    data: {
+      games: loadGames(),
+      ignoredSteamGames: loadIgnoredSteamGames(),
+    },
   };
 }
 
@@ -393,11 +443,31 @@ function getBackupGames(backup: QuestShelfBackup): Game[] {
   return normalizeLoadedGames(backup.data['questshelf.games.v1']);
 }
 
+function getBackupGamesReport(backup: QuestShelfBackup): BackupGamesReport {
+  const present = Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.games.v1');
+  const parsed = parseLoadedGameRows(backup.data['questshelf.games.v1']);
+
+  return {
+    present,
+    rowCount: parsed.rowCount,
+    acceptedCount: parsed.acceptedCount,
+    rejectedCount: parsed.rejected.length,
+    rejected: parsed.rejected,
+  };
+}
+
+/** A games section that has rows but yielded none, against a collection that has games to lose. */
+function wouldWipeGamesCollection(report: BackupGamesReport): boolean {
+  return report.present && report.rowCount > 0 && report.acceptedCount === 0 && loadGames().length > 0;
+}
+
 function mergeGames(localGames: Game[], backupGames: Game[]) {
   const mergedGames = [...localGames];
 
   backupGames.forEach((backupGame) => {
-    const existingIndex = mergedGames.findIndex((localGame) => areGamesMatching(localGame, backupGame));
+    // Collection-aware: a Wishlist copy never resolves to its Library original (and vice
+    // versa), so the pair survives the merge as two records regardless of input order.
+    const existingIndex = findGameRecordIndex(mergedGames, backupGame);
 
     if (existingIndex === -1) {
       mergedGames.push(backupGame);
@@ -408,6 +478,10 @@ function mergeGames(localGames: Game[], backupGames: Game[]) {
       mergedGames[existingIndex] = {
         ...mergedGames[existingIndex],
         ...backupGame,
+        // Keep the local record's primary key. Matching by a provider id/title means the two
+        // rows are the same record under different ids, and rewriting the id here would orphan
+        // everything that references it (Platform Plan entries, selection, undo snapshots).
+        id: mergedGames[existingIndex].id,
       };
     }
   });
@@ -450,29 +524,6 @@ function mergeRecommendationFeedback(localRecords: RecommendationFeedbackRecord[
     }
   }
   return [...byIdentity.values()].sort((a, b) => a.createdAt - b.createdAt);
-}
-
-function areGamesMatching(firstGame: Game, secondGame: Game) {
-  if (firstGame.id === secondGame.id) {
-    return true;
-  }
-
-  if (typeof firstGame.steamAppId === 'number' && firstGame.steamAppId === secondGame.steamAppId) {
-    return true;
-  }
-
-  if (typeof firstGame.rawgId === 'number' && firstGame.rawgId === secondGame.rawgId) {
-    return true;
-  }
-
-  const firstRomPath = (firstGame.romPath ?? firstGame.romUri ?? '').trim().toLowerCase();
-  const secondRomPath = (secondGame.romPath ?? secondGame.romUri ?? '').trim().toLowerCase();
-
-  if (firstRomPath && secondRomPath && firstRomPath === secondRomPath) {
-    return true;
-  }
-
-  return getTitlePlatformKey(firstGame) === getTitlePlatformKey(secondGame);
 }
 
 function isBackupGameNewer(backupGame: Game, localGame: Game) {
@@ -566,10 +617,6 @@ function normalizeBackupDataSection(key: (typeof allBackupStorageKeys)[number], 
     case 'questshelf.wishlistFilters.v1':
       return isPlainObject(value) ? value : {};
   }
-}
-
-function getTitlePlatformKey(game: Game) {
-  return `${game.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ')}|${String(game.platform).trim().toLowerCase()}`;
 }
 
 function isPlainObject(value: unknown) {

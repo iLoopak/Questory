@@ -21,7 +21,7 @@ import { assertTestEnvironment, resetWebStorage } from './testUtils/testEnvironm
 import { createControllableStorageAdapter, type ControllableStorageAdapter } from './testUtils/controllableStorageAdapter';
 import { clearQuestoryTables, installIdbTransactionControl, type IdbTransactionControl } from './testUtils/indexedDbControl';
 import { makeLibraryGame, makePlayActivityRecord } from './testUtils/gameFixtures';
-import type { QuestShelfBackup } from '../src/lib/backupStorage';
+import type { QuestShelfBackup, QuestShelfBackupImportResult } from '../src/lib/backupStorage';
 
 assertTestEnvironment();
 
@@ -75,6 +75,12 @@ async function setupStores(): Promise<{ storage: ControllableStorageAdapter; idb
   return { storage, idb };
 }
 
+/** Unwrap a successful import result, failing loudly if the facade refused the backup. */
+function expectImported(result: QuestShelfBackupImportResult) {
+  assert.equal(result.ok, true, 'expected the backup to be imported');
+  return (result as Extract<QuestShelfBackupImportResult, { ok: true }>).data;
+}
+
 /** Gated writes that belong to the three backup-restored collection stores. */
 function collectionTransactions(idb: IdbTransactionControl) {
   return idb.transactions.filter((entry) => entry.tables.some((table) => collectionTables.has(table)));
@@ -93,7 +99,7 @@ test('AS-01: restore returns synchronously while IndexedDB writes are still pend
   assert.ok(!(result instanceof Promise), 'restoreQuestShelfBackup is synchronous');
 
   // Documents unsafe current behavior: it has already returned a "restored" result...
-  assert.deepEqual(result.games.map((game) => game.id), ['g1']);
+  assert.deepEqual(expectImported(result).games.map((game) => game.id), ['g1']);
   // ...while the IndexedDB transaction that would make that durable has not run.
   const pending = collectionTransactions(idb).filter((entry) => entry.outcome === 'pending');
   assert.ok(pending.length > 0, 'expected at least one un-awaited IndexedDB transaction');
@@ -151,7 +157,7 @@ test('AS-01: a failed Preferences/KV write is swallowed and never reaches the ca
   // neither threw nor reported anything — on the next native launch the OLD Plans win.
   const planWrites = storage.operationsForKey('questshelf.platformQueues.v1');
   assert.ok(planWrites.some((operation) => operation.outcome === 'failed'), 'the durable write failed');
-  assert.deepEqual(result.games.map((game) => game.id), ['g1'], 'restore still reported success');
+  assert.deepEqual(expectImported(result).games.map((game) => game.id), ['g1'], 'restore still reported success');
   assert.ok(
     storage.local.has('questshelf.platformQueues.v1'),
     'the local tier kept the value, so the two tiers now disagree',
@@ -211,7 +217,7 @@ test('AS-01: merge also returns synchronously with IndexedDB writes outstanding'
 
   // Documents unsafe current behavior: the merged set is reported (and rendered) while
   // the durable write is still gated.
-  assert.deepEqual(result.games.map((game) => game.id).sort(), ['backup-1', 'local-1']);
+  assert.deepEqual(expectImported(result).games.map((game) => game.id).sort(), ['backup-1', 'local-1']);
   assert.equal(await database.games.count(), 1, 'IndexedDB still only holds the pre-merge row');
 
   await idb.commitAll();
@@ -247,11 +253,15 @@ test('AS-01: DataManagementPanel reports success and reloads without awaiting an
   );
 
   assert.ok(confirmRestore.length > 0, 'located confirmRestore');
-  // Documents unsafe current behavior: neither restore nor merge is awaited (they cannot be),
-  // success is announced unconditionally, and the reload is on a fixed 600 ms timer.
+  // Documents unsafe current behavior: neither restore nor merge is awaited (they still cannot
+  // be — they are synchronous facades over detached writes), and the reload is on a fixed
+  // 600 ms timer. AS-02 added a structured result, so the panel now refuses to claim success
+  // when the import was rejected — but a SUCCESSFUL import is still announced before the writes
+  // it reported on have settled. Making that awaitable is AS-01's own change.
   assert.ok(/(?<!await\s)restoreQuestShelfBackup\(selectedBackup\)/.test(confirmRestore), 'restore is not awaited');
   assert.ok(/(?<!await\s)mergeQuestShelfBackup\(selectedBackup\)/.test(confirmRestore), 'merge is not awaited');
-  assert.ok(confirmRestore.includes("showMessage(t('data.backupImported'), 'success')"), 'success is reported inline');
+  assert.ok(confirmRestore.includes('if (!result.ok)'), 'a refused import is handled');
+  assert.ok(confirmRestore.includes("t('data.backupImported')"), 'a successful import still reports success inline');
   assert.ok(/setTimeout\(\(\) => window\.location\.reload\(\), 600\)/.test(confirmRestore), 'reload fires 600 ms later');
   assert.ok(!confirmRestore.includes('function confirmRestore(mode: \'merge\' | \'replace\'): Promise'), 'confirmRestore is not async');
 });

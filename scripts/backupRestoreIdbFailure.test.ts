@@ -60,7 +60,12 @@ test('AS-01: a rejected IndexedDB write is only handled AFTER restore reported s
   // Documents unsafe current behavior: restore has already returned a success-shaped result
   // and DataManagementPanel has already shown "backup imported" — while the write that will
   // FAIL has not even been attempted yet.
-  assert.deepEqual(result.games.map((game) => game.id), ['g1'], 'success is reported up front');
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    (result as Extract<typeof result, { ok: true }>).data.games.map((game) => game.id),
+    ['g1'],
+    'success is reported up front',
+  );
   assert.equal(gameRepository.getStatus().backend, 'indexeddb', 'still believed healthy at that point');
 
   const gamesWrite = idb.pendingTransactions().find((entry) => entry.tables.includes('games'));

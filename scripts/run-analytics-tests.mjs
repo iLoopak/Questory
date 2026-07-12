@@ -50,6 +50,7 @@ const testFiles = [
   { entry: 'scripts/titleMatching.test.ts', out: 'titleMatching.test.mjs' },
   { entry: 'scripts/tasteProfileUi.test.ts', out: 'tasteProfileUi.test.mjs' },
   // Characterization tests for the destructive/cross-store boundaries (ARCHITECTURE_STABILITY_AUDIT).
+  { entry: 'scripts/gameIdentity.test.ts', out: 'gameIdentity.test.mjs' },
   { entry: 'scripts/backupRestoreDurability.test.ts', out: 'backupRestoreDurability.test.mjs' },
   { entry: 'scripts/backupRestoreIdbFailure.test.ts', out: 'backupRestoreIdbFailure.test.mjs' },
   { entry: 'scripts/backupGameContracts.test.ts', out: 'backupGameContracts.test.mjs' },
