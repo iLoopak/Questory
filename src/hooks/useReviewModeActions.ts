@@ -3,6 +3,7 @@ import type { ReviewModeAction, ReviewModeActionContext } from '../components/Re
 import { createTranslator } from '../i18n';
 import { formatGameToastMessage } from '../lib/notifications';
 import { removeGameFromPlatformQueue, type PlatformQueueState } from '../lib/platformQueueStorage';
+import { derivePlanUndoOperations, type UndoOperation } from '../lib/undoOperations';
 import { reorderSkippedGameToPendingQueueEnd } from '../lib/reviewQueueOrder';
 import {
   saveReviewModeState,
@@ -20,9 +21,9 @@ type ReviewUndoPayload = {
 };
 
 type UseReviewModeActionsParams = {
-  addGameToQueue: (game: Game, platform: GamePlatform) => void;
-  addToWishlist: (game: Game) => void;
-  addUndoAction: (message: string, payload: ReviewUndoPayload) => void;
+  addGameToQueue: (game: Game, platform: GamePlatform, extraOperations?: UndoOperation[]) => void;
+  addToWishlist: (game: Game, extraOperations?: UndoOperation[]) => void;
+  addUndoAction: (message: string, payload: ReviewUndoPayload, operations: UndoOperation[]) => void;
   refreshGameMetadataFromActions: (game: Game, mode?: 'metadata' | 'artwork') => Promise<unknown>;
   reviewModeState: ReviewModeState;
   setActiveNavItem: (navItem: 'Library' | 'Wishlist' | 'Review Mode') => void;
@@ -31,9 +32,10 @@ type UseReviewModeActionsParams = {
   setPlatformQueueState: Dispatch<SetStateAction<PlatformQueueState>>;
   setReviewModeState: Dispatch<SetStateAction<ReviewModeState>>;
   setSelectedGameId: Dispatch<SetStateAction<string | null>>;
+  platformQueueState: PlatformQueueState;
   startMetadataWorkflow: (gameIds: string[]) => void;
   t: ReturnType<typeof createTranslator>;
-  updateGameReviewFields: (gameId: string, changes: Partial<Game>) => void;
+  updateGameReviewFields: (gameId: string, changes: Partial<Game>, extraOperations?: UndoOperation[]) => void;
 };
 
 function formatMessageTemplate(template: string, values: Record<string, string | number>) {
@@ -51,6 +53,7 @@ export function useReviewModeActions({
   addGameToQueue,
   addToWishlist,
   addUndoAction,
+  platformQueueState,
   refreshGameMetadataFromActions,
   reviewModeState,
   setActiveNavItem,
@@ -118,14 +121,36 @@ export function useReviewModeActions({
     }));
   }
 
+  /**
+   * The review-slice half of a review decision's inverse (AS-04).
+   *
+   * A review action changes the game (or the Plan) AND the review slice: the game leaves the
+   * queue, gains a `reviewedGames` entry, and bumps some counters. The game-level action owns the
+   * first half of the inverse, so these operations are handed to it as extras — one action, one
+   * toast, one complete inverse.
+   */
+  function reviewDecisionUndoOperations(gameId: string, decisions: ReviewDecision[]): UndoOperation[] {
+    const queueIndex = reviewModeState.queueOrder.indexOf(gameId);
+
+    return [
+      { kind: 'review-unreview', gameId, index: queueIndex < 0 ? reviewModeState.queueOrder.length : queueIndex },
+      { kind: 'review-stats-decrement', decisions },
+    ];
+  }
+
   function handleReviewAction(game: Game, action: ReviewModeAction, note?: string, targetPlatform?: GamePlatform, context?: ReviewModeActionContext) {
     if (action === 'skip') {
       const message = formatGameToastMessage(t('toast.skipped'), game);
+      const queueIndex = reviewModeState.queueOrder.indexOf(game.id);
       addUndoAction(message, {
         actionType: 'skip-game',
         affectedGameIds: [game.id],
         description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
-      });
+      }, [
+        // Skipping only moves the game inside the queue order, so its inverse only moves it back.
+        { kind: 'review-queue-reinsert', gameId: game.id, index: queueIndex < 0 ? 0 : queueIndex },
+        { kind: 'review-stats-decrement', decisions: ['skipped'] },
+      ]);
       recordReviewDecision('skipped');
       moveQuestQueueGameToEnd(game.id, context);
       return;
@@ -148,7 +173,7 @@ export function useReviewModeActions({
     }
 
     if (action === 'wishlist') {
-      addToWishlist(game);
+      addToWishlist(game, reviewDecisionUndoOperations(game.id, ['wishlisted', 'reviewed']));
       recordReviewDecision('wishlisted');
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);
@@ -160,7 +185,13 @@ export function useReviewModeActions({
         actionType: 'ignore-game',
         affectedGameIds: [game.id],
         description: formatMessageTemplate(t('app.restoreToReviewQueue'), { game: game.title }),
-      });
+      }, [
+        { kind: 'review-unignore', gameId: game.id },
+        ...reviewDecisionUndoOperations(game.id, ['ignored', 'reviewed']),
+        ...(typeof game.steamAppId === 'number'
+          ? [{ kind: 'ignored-steam-remove', steamAppId: game.steamAppId } as UndoOperation]
+          : []),
+      ]);
 
       setReviewModeState((currentState) => ({
         ...currentState,
@@ -186,7 +217,7 @@ export function useReviewModeActions({
 
     if (action === 'queue') {
       if (targetPlatform) {
-        addGameToQueue(game, targetPlatform);
+        addGameToQueue(game, targetPlatform, reviewDecisionUndoOperations(game.id, ['queueCandidates', 'reviewed']));
         recordReviewDecision('queueCandidates');
       }
       recordReviewDecision('reviewed');
@@ -195,11 +226,16 @@ export function useReviewModeActions({
     }
 
     if (action === 'playing') {
-      updateGameReviewFields(game.id, {
-        platform: targetPlatform ?? game.platform,
-        status: 'Playing',
-      });
-      setPlatformQueueState((currentState) => removeGameFromPlatformQueue(currentState, game.id, targetPlatform ?? game.platform));
+      const platform = targetPlatform ?? game.platform;
+      // The game leaves its Plan as well as changing status, so the Plan half of the inverse is
+      // derived the same way the queue actions derive theirs.
+      const nextQueueState = removeGameFromPlatformQueue(platformQueueState, game.id, platform);
+
+      updateGameReviewFields(game.id, { platform, status: 'Playing' }, [
+        ...derivePlanUndoOperations(platformQueueState, nextQueueState),
+        ...reviewDecisionUndoOperations(game.id, ['playing', 'reviewed']),
+      ]);
+      setPlatformQueueState(nextQueueState);
       recordReviewDecision('playing');
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);
@@ -207,20 +243,22 @@ export function useReviewModeActions({
     }
 
     if (action === 'finished') {
-      updateGameReviewFields(game.id, {
-        finishedAt: new Date().toISOString(),
-        status: 'Finished',
-      });
+      updateGameReviewFields(
+        game.id,
+        { finishedAt: new Date().toISOString(), status: 'Finished' },
+        reviewDecisionUndoOperations(game.id, ['reviewed']),
+      );
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);
       return;
     }
 
     if (action === 'dropped') {
-      updateGameReviewFields(game.id, {
-        droppedAt: new Date().toISOString(),
-        status: 'Dropped',
-      });
+      updateGameReviewFields(
+        game.id,
+        { droppedAt: new Date().toISOString(), status: 'Dropped' },
+        reviewDecisionUndoOperations(game.id, ['dropped', 'reviewed']),
+      );
       recordReviewDecision('dropped');
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);

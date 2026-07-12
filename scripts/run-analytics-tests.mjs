@@ -57,7 +57,7 @@ const testFiles = [
   { entry: 'scripts/backupRestoreIdbRejection.test.ts', out: 'backupRestoreIdbRejection.test.mjs' },
   { entry: 'scripts/backupGameContracts.test.ts', out: 'backupGameContracts.test.mjs' },
   { entry: 'scripts/recoveryStateOwnership.test.ts', out: 'recoveryStateOwnership.test.mjs' },
-  { entry: 'scripts/undoWholeState.test.ts', out: 'undoWholeState.test.mjs' },
+  { entry: 'scripts/undoScopedOperations.test.ts', out: 'undoScopedOperations.test.mjs' },
   { entry: 'scripts/statusPlanInvariants.test.ts', out: 'statusPlanInvariants.test.mjs' },
   { entry: 'scripts/gameDetailDraft.test.ts', out: 'gameDetailDraft.test.mjs' },
 ];

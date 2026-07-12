@@ -272,18 +272,17 @@ export function AppController() {
   // owner, instead of the owner's next save silently overwriting it. Exposes exactly two
   // replacement commands — no raw setGames is threaded through the component tree.
   useCanonicalCollectionOwner({ games, playActivity, setGames, setPlayActivity });
-  const { addToastNotification, addUndoAction, createUndoSnapshot, dismissToast, pendingUndoActions, undoAction } = useToastState({
+  const { addToastNotification, addUndoAction, dismissToast, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,
     ignoredSteamGames,
     platformQueueState,
     reviewModeState,
-    selectedGameId,
+    staleUndoMessage: t('toast.undoUnavailable'),
     setGames,
     setIgnoredSteamGames,
     setPlatformQueueState,
     setReviewModeState,
-    setSelectedGameId,
   });
   addToastRef.current = addToastNotification;
   const {
@@ -818,6 +817,7 @@ export function AppController() {
     addGameToQueue,
     addToWishlist,
     addUndoAction,
+    platformQueueState,
     refreshGameMetadataFromActions,
     reviewModeState,
     setActiveNavItem,
@@ -849,7 +849,7 @@ export function AppController() {
         actionType: 'restore-ignored-steam-game',
         affectedGameIds: [String(steamAppId)],
         description: formatMessageTemplate(t('app.reignoreSteamApp'), { game: ignoredGame.title || `Steam app ${steamAppId}` }),
-      }, undefined, { dedupeKey: `restore-ignored-steam-game:${steamAppId}` });
+      }, [{ kind: 'ignored-steam-add', entry: ignoredGame }], { dedupeKey: `restore-ignored-steam-game:${steamAppId}` });
     }
 
     setIgnoredSteamGames((currentIgnoredGames) => removeIgnoredSteamGame(currentIgnoredGames, steamAppId));
