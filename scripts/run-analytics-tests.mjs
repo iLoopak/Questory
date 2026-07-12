@@ -33,6 +33,7 @@ const testFiles = [
   { entry: 'scripts/recommendations.test.ts', out: 'recommendations.test.mjs' },
   { entry: 'scripts/discoveryPreviewArtwork.test.ts', out: 'discoveryPreviewArtwork.test.mjs' },
   { entry: 'scripts/titleMatching.test.ts', out: 'titleMatching.test.mjs' },
+  { entry: 'scripts/tasteProfileUi.test.ts', out: 'tasteProfileUi.test.mjs' },
 ];
 
 await Promise.all(

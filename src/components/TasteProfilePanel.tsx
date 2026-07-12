@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon, type IconName } from './Icon';
 import type { Game } from '../types/game';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
@@ -25,6 +25,20 @@ import {
   type TasteSignalKind,
   type TasteSignalSentiment,
 } from '../lib/tasteProfile';
+import {
+  buildTasteIdentitySummary,
+  buildTasteSuggestions,
+  getTasteBehaviorCopy,
+  getTasteConfidenceLabel,
+  getTasteConsistencyLabel,
+  getTasteEvidenceSummary,
+  getTasteSignalKindLabel,
+  getTasteSignalOriginLabel,
+  getTasteTriageKeyboardAction,
+  shouldShowTasteDragHint,
+  tasteDragHintStorageKey,
+  type TasteSuggestion,
+} from '../lib/tasteProfilePresentation';
 
 type TasteProfilePanelProps = {
   games: Game[];
@@ -62,7 +76,7 @@ const tasteTriageActions: Array<{ action: TasteTriageAction; icon: IconName; lab
   { action: 'reject', icon: 'x', label: 'Not accurate', tone: 'neutral' },
   { action: 'opposite', icon: 'eye-off', label: 'Dislike this', tone: 'negative' },
   { action: 'confirm', icon: 'check', label: 'Yes', tone: 'positive' },
-  { action: 'pin', icon: 'bookmark-pen', label: 'Pin', tone: 'positive' },
+  { action: 'pin', icon: 'bookmark-pen', label: 'Pin', tone: 'neutral' },
 ];
 
 const tasteSwipeZones: Record<SwipeHorizontalDirection, ReadonlyArray<{ action: TasteTriageAction; quadrant: SwipeQuadrant }>> = {
@@ -114,11 +128,16 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
   const [newTasteSentiment, setNewTasteSentiment] = useState<TasteSignalSentiment>('love');
   const [temporaryTasteLabel, setTemporaryTasteLabel] = useState('');
   const [lastAppliedCorrection, setLastAppliedCorrection] = useState('');
+  const [editingTasteSignalId, setEditingTasteSignalId] = useState<string | null>(null);
 
   const lovedTasteSignals = useMemo(() => getActiveTasteSignals(tasteProfile, 'love').slice(0, 10), [tasteProfile]);
   const avoidedTasteSignals = useMemo(() => getActiveTasteSignals(tasteProfile, 'avoid').slice(0, 8), [tasteProfile]);
   const temporaryTasteSignals = useMemo(() => tasteProfile.temporary.filter((signal) => !signal.hidden).slice(0, 6), [tasteProfile]);
   const explicitTasteSignals = useMemo(() => tasteProfile.explicit.filter((signal) => !signal.hidden).slice(-8).reverse(), [tasteProfile]);
+  const tasteSuggestions = useMemo(
+    () => buildTasteSuggestions(games, [...tasteProfile.observed, ...tasteProfile.explicit]),
+    [games, tasteProfile.explicit, tasteProfile.observed],
+  );
   const featuredSignals = lovedTasteSignals.slice(0, 3);
   const strongestSignal = lovedTasteSignals[0] ?? null;
   const shouldShowTasteConfirmation = Boolean(tasteProfile.prompt.firstReadyAt && !tasteProfile.prompt.confirmedAt && !tasteProfile.prompt.dismissedAt && lovedTasteSignals.length >= 3);
@@ -136,9 +155,11 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
   function addManualTasteSignal() {
     const label = newTasteLabel.trim();
     if (!label) return;
+    if (editingTasteSignalId) removeTasteSignal(editingTasteSignalId);
     applyTasteProfileUpdate(addExplicitTasteSignal(label, newTasteSentiment, newTasteKind));
     setLastAppliedCorrection(label);
     setNewTasteLabel('');
+    setEditingTasteSignalId(null);
   }
 
   function addTemporaryInterest() {
@@ -150,6 +171,20 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
   function removeExplicitTasteSignal(signalId: string) {
     applyTasteProfileUpdate(removeTasteSignal(signalId));
     setLastAppliedCorrection('');
+    if (editingTasteSignalId === signalId) cancelEditingTasteSignal();
+  }
+
+  function editExplicitTasteSignal(signal: TasteSignal) {
+    setEditingTasteSignalId(signal.id);
+    setNewTasteKind(signal.kind);
+    setNewTasteLabel(signal.label);
+    setNewTasteSentiment(signal.sentiment);
+    setLastAppliedCorrection('');
+  }
+
+  function cancelEditingTasteSignal() {
+    setEditingTasteSignalId(null);
+    setNewTasteLabel('');
   }
 
   function resetEverythingTasteProfile() {
@@ -205,7 +240,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
       <WizardProgress activeStep={activeStep} activeStepIndex={activeStepIndex} steps={steps} onStepChange={setActiveStep} />
 
       <div className={`overflow-hidden rounded-lg border border-mint/20 bg-ink-950 shadow-panel ${isWelcomeStep ? '' : 'min-h-[calc(100dvh-9rem)]'}`}>
-        {shouldShowTasteConfirmation && !isWelcomeStep ? (
+        {shouldShowTasteConfirmation && activeStep === 'overview' ? (
           <div className="border-b border-mint/15 bg-mint/10 p-3 sm:p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -232,6 +267,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
               />
             ) : activeStep === 'overview' ? (
               <OverviewStep
+                avoidedTasteSignals={avoidedTasteSignals}
                 featuredSignals={featuredSignals}
                 games={games}
                 lovedTasteSignals={lovedTasteSignals}
@@ -242,7 +278,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
               <TasteTriageStep
                 emptyLabel="Questory needs a few more strong signals before it can name what you love."
                 games={games}
-                intro="These are the patterns Questory sees most strongly."
+                intro="Does each signal feel like part of your gaming taste?"
                 signals={lovedTasteSignals}
                 title="What you seem to love"
                 onConfirm={(signal) => applyTasteProfileUpdate(confirmObservedTasteSignal(signal.id))}
@@ -250,14 +286,19 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
                 onOpposite={(signal) => applyTasteProfileUpdate(createOppositeTasteSignal(signal.id))}
                 onPin={(signal) => applyTasteProfileUpdate(pinTasteSignal(signal.id, !signal.pinned))}
                 onReject={(signal) => applyTasteProfileUpdate(rejectTasteSignal(signal.id))}
+                completionAvoids={avoidedTasteSignals}
+                completionCurrent={temporaryTasteSignals}
+                completionLoves={getActiveTasteSignals(tasteProfile, 'love').slice(0, 3)}
+                onContinue={() => setActiveStep('less')}
+                onOpenRecommendations={onDone}
               />
             ) : activeStep === 'less' ? (
               <CompactSignalReviewStep
                 emptyLabel="No strong dislikes yet. Questory only calls these after repeated evidence."
                 games={games}
-                intro="These are gentle avoid signals, not hard rules."
+                intro="Questory is less confident here. These are gentle avoid signals, not hard rules."
                 signals={avoidedTasteSignals}
-                title="What may be less your thing"
+                title="Usually not your thing"
                 onConfirm={(signal) => applyTasteProfileUpdate(confirmObservedTasteSignal(signal.id))}
                 onHide={(signal) => applyTasteProfileUpdate(hideTasteSignal(signal.id))}
                 onOpposite={(signal) => applyTasteProfileUpdate(createOppositeTasteSignal(signal.id))}
@@ -270,15 +311,19 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
                 temporaryTasteLabel={temporaryTasteLabel}
                 temporaryTasteSignals={temporaryTasteSignals}
                 onTemporaryTasteLabelChange={setTemporaryTasteLabel}
+                onRemoveTemporaryInterest={(signalId) => applyTasteProfileUpdate(removeTasteSignal(signalId))}
               />
             ) : (
               <FineTuneStep
+                editingTasteSignalId={editingTasteSignalId}
                 explicitTasteSignals={explicitTasteSignals}
                 lastAppliedCorrection={lastAppliedCorrection}
                 newTasteKind={newTasteKind}
                 newTasteLabel={newTasteLabel}
                 newTasteSentiment={newTasteSentiment}
                 onAddManualTasteSignal={addManualTasteSignal}
+                onCancelEditingTasteSignal={cancelEditingTasteSignal}
+                onEditExplicitTasteSignal={editExplicitTasteSignal}
                 onExport={exportCurrentTasteProfile}
                 onNewTasteKindChange={setNewTasteKind}
                 onNewTasteLabelChange={setNewTasteLabel}
@@ -289,6 +334,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
                 onResetInferred={() => applyTasteProfileUpdate(resetObservedTasteProfile())}
                 onResetTemporary={() => applyTasteProfileUpdate(resetTemporaryTasteProfile())}
                 onResetAll={resetEverythingTasteProfile}
+                tasteSuggestions={tasteSuggestions}
               />
             )}
 
@@ -330,7 +376,8 @@ function WizardProgress({
           const isPast = index < activeStepIndex;
           return (
             <button
-              className={`group flex min-w-fit items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
+              aria-current={isActive ? 'step' : undefined}
+              className={`group flex min-w-fit flex-none items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
                 isActive
                   ? 'bg-mint/12 text-white'
                   : 'text-slate-300 hover:bg-ink-900 hover:text-white'
@@ -403,39 +450,54 @@ function WelcomeStep({
 }
 
 function OverviewStep({
+  avoidedTasteSignals,
   featuredSignals,
   games,
   lovedTasteSignals,
   onNext,
   strongestSignal,
 }: {
+  avoidedTasteSignals: TasteSignal[];
   featuredSignals: TasteSignal[];
   games: Game[];
   lovedTasteSignals: TasteSignal[];
   onNext: () => void;
   strongestSignal: TasteSignal | null;
 }) {
+  const identitySummary = buildTasteIdentitySummary(lovedTasteSignals, avoidedTasteSignals);
   return (
-    <div className="grid items-center gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)]">
-      <div>
+    <div className="grid gap-5">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(420px,1.12fr)]">
+        <div>
         <div className="qs-label-caps text-mint">Snapshot</div>
-        <h3 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Here is the shape of your shelf.</h3>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          This is not a filter list. It is Questory's current best read of why certain games keep catching your attention.
+        <h3 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Your shelf has a point of view.</h3>
+        <p className="mt-3 max-w-2xl text-lg font-semibold leading-7 text-slate-200 sm:text-xl">
+          {identitySummary}
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <StatTile label="Signals found" value={String(lovedTasteSignals.length)} />
-          <StatTile label="Library games" value={String(games.filter((game) => game.collectionType === 'library').length)} />
-          <StatTile label="Finished" value={String(games.filter((game) => game.status === 'Finished').length)} />
+        <div className="mt-5 grid gap-3 border-y border-skyglass/10 py-4 sm:grid-cols-2">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-mint">Keeps drawing you back</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {lovedTasteSignals.slice(0, 5).map((signal) => <TasteChip key={signal.id} signal={signal} />)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-red-200">Usually less your thing</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {avoidedTasteSignals.length > 0
+                ? avoidedTasteSignals.slice(0, 3).map((signal) => <TasteChip key={signal.id} signal={signal} />)
+                : <span className="text-sm text-slate-500">No recurring avoid pattern yet.</span>}
+            </div>
+          </div>
         </div>
         <button className="mt-5 h-10 rounded-md border border-mint/35 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20" onClick={onNext} type="button">
-          Show me why
+          Review these signals
         </button>
-      </div>
-      <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
+        </div>
+        <div className="border-l-0 border-skyglass/10 xl:border-l xl:pl-5">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-white">Strongest reads</div>
-          {strongestSignal ? <span className="rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-2xs font-bold uppercase tracking-[0.14em] text-mint">{strongestSignal.label}</span> : null}
+          {strongestSignal ? <span className="max-w-[14rem] text-right text-xs font-semibold leading-5 text-mint">Strongest: {strongestSignal.label}</span> : null}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {featuredSignals.length > 0 ? featuredSignals.map((signal) => (
@@ -446,6 +508,13 @@ function OverviewStep({
             </div>
           )}
         </div>
+      </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-skyglass/10 pt-4" aria-label="Library context for this profile">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Built from your activity</div>
+        <StatTile label="Taste signals" value={String(lovedTasteSignals.length)} />
+        <StatTile label="Library games" value={String(games.filter((game) => game.collectionType === 'library').length)} />
+        <StatTile label="Finished games" value={String(games.filter((game) => game.status === 'Finished').length)} />
       </div>
     </div>
   );
@@ -579,23 +648,25 @@ function CompactSignalCard({
       <div className="flex gap-3">
         <div className="flex shrink-0 -space-x-3">
           {evidenceGames.length > 0 ? evidenceGames.map((game) => (
-            <div className="h-16 w-11 overflow-hidden rounded-md border border-ink-950 bg-ink-900" key={game.id}>
+            <div className="h-14 w-10 overflow-hidden rounded-md border border-ink-950 bg-ink-900" key={game.id}>
               <img alt={game.title} className="h-full w-full object-cover" loading="lazy" src={getGameArtwork(game)} />
             </div>
           )) : (
-            <div className="grid h-16 w-11 place-items-center rounded-md border border-skyglass/15 bg-ink-900 text-slate-700">
+            <div className="grid h-14 w-10 place-items-center rounded-md border border-skyglass/15 bg-ink-900 text-slate-700">
               <Icon name="sparkles" size={18} />
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="truncate text-base font-bold text-white">{signal.label}</h4>
-            <span className="rounded-full border border-red-300/25 bg-red-500/10 px-2 py-0.5 text-2xs font-bold uppercase tracking-[0.14em] text-red-200">{Math.round(signal.confidence * 100)}%</span>
+            <h4 className="min-w-0 break-words text-base font-bold leading-5 text-white">{signal.label}</h4>
+            <span className="rounded-full border border-skyglass/15 px-2 py-0.5 text-2xs font-bold uppercase text-slate-400">{getTasteSignalKindLabel(signal.kind)}</span>
+            <span className="rounded-full border border-red-300/25 bg-red-500/10 px-2 py-0.5 text-2xs font-bold uppercase text-red-200" title={`${Math.round(signal.confidence * 100)}% confidence`}>{getTasteConfidenceLabel(signal)}</span>
           </div>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{signal.evidence.explanation || 'Added by you.'}</p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{getTasteBehaviorCopy(signal)}</p>
+          <p className="mt-1 text-xs text-slate-500">{getTasteEvidenceSummary(signal)}. {getTasteConsistencyLabel(signal)}.</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {onConfirm ? <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-2 text-xs font-semibold text-mint transition hover:bg-mint/20" onClick={onConfirm} type="button">Keep</button> : null}
+            {onConfirm ? <button className="h-8 rounded-md border border-mint/30 bg-mint/10 px-2 text-xs font-semibold text-mint transition hover:bg-mint/20" onClick={onConfirm} type="button">Accurate</button> : null}
             <button className="h-8 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onReject} type="button">Not accurate</button>
             <button className="h-8 rounded-md border border-red-400/30 px-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/10" onClick={onOpposite} type="button">Actually like this</button>
             <button className="h-8 rounded-md border border-skyglass/15 px-2 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onPin} type="button">{signal.pinned ? 'Unpin' : 'Pin'}</button>
@@ -608,35 +679,55 @@ function CompactSignalCard({
 }
 
 function TasteTriageStep({
+  completionAvoids,
+  completionCurrent,
+  completionLoves,
   emptyLabel,
   games,
   intro,
   signals,
   title,
   onConfirm,
+  onContinue,
   onHide,
+  onOpenRecommendations,
   onOpposite,
   onPin,
   onReject,
 }: {
+  completionAvoids: TasteSignal[];
+  completionCurrent: TasteSignal[];
+  completionLoves: TasteSignal[];
   emptyLabel: string;
   games: Game[];
   intro: string;
   signals: TasteSignal[];
   title: string;
   onConfirm: (signal: TasteSignal) => void;
+  onContinue: () => void;
   onHide: (signal: TasteSignal) => void;
+  onOpenRecommendations?: () => void;
   onOpposite: (signal: TasteSignal) => void;
   onPin: (signal: TasteSignal) => void;
   onReject: (signal: TasteSignal) => void;
 }) {
-  const [reviewedSignalIds, setReviewedSignalIds] = useState<Set<string>>(() => new Set());
+  const [reviewedSignalKeys, setReviewedSignalKeys] = useState<Set<string>>(() => new Set());
+  const [appliedActionCount, setAppliedActionCount] = useState(0);
+  const [showDragHint, setShowDragHint] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      return shouldShowTasteDragHint(window.localStorage.getItem(tasteDragHintStorageKey));
+    } catch {
+      return true;
+    }
+  });
   const [swipeState, setSwipeState] = useState<SwipeState>(emptySwipeState);
   const swipeStartRef = useRef<SwipeStart | null>(null);
-  const pendingSignals = signals.filter((signal) => !reviewedSignalIds.has(signal.id));
+  const initialSignalCountRef = useRef(signals.length);
+  const pendingSignals = signals.filter((signal) => !reviewedSignalKeys.has(getTasteSignalReviewKey(signal)));
   const activeSignal = pendingSignals[0] ?? null;
-  const reviewedCount = signals.length - pendingSignals.length;
-  const totalCount = signals.length;
+  const totalCount = Math.max(initialSignalCountRef.current, signals.length);
+  const reviewedCount = Math.min(reviewedSignalKeys.size, totalCount);
   const negativeActions = tasteTriageActions.filter((action) => action.action === 'opposite' || action.action === 'reject');
   const positiveActions = tasteTriageActions.filter((action) => action.action === 'confirm' || action.action === 'pin');
   const swipeTarget = getTasteSwipeTarget(swipeState.offsetX, swipeState.offsetY);
@@ -658,13 +749,23 @@ function TasteTriageStep({
 
   function completeActive(action: (signal: TasteSignal) => void) {
     if (!activeSignal) return;
-    setReviewedSignalIds((current) => new Set([...current, activeSignal.id]));
+    setReviewedSignalKeys((current) => new Set([...current, getTasteSignalReviewKey(activeSignal)]));
     action(activeSignal);
   }
 
   function skipActive() {
     if (!activeSignal) return;
-    setReviewedSignalIds((current) => new Set([...current, activeSignal.id]));
+    setReviewedSignalKeys((current) => new Set([...current, getTasteSignalReviewKey(activeSignal)]));
+  }
+
+  function acknowledgeDragHint() {
+    if (!showDragHint) return;
+    try {
+      window.localStorage.setItem(tasteDragHintStorageKey, 'seen');
+    } catch {
+      // The hint can still dismiss for this session when storage is unavailable.
+    }
+    setShowDragHint(false);
   }
 
   function handleAction(action: TasteTriageAction) {
@@ -674,7 +775,21 @@ function TasteTriageStep({
       pin: onPin,
       reject: onReject,
     };
+    acknowledgeDragHint();
+    setAppliedActionCount((count) => count + 1);
     completeActive(handlers[action]);
+  }
+
+  function restartTriage() {
+    setReviewedSignalKeys(new Set());
+    setAppliedActionCount(0);
+  }
+
+  function handleCardKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    const action = getTasteTriageKeyboardAction(event.key, event.shiftKey);
+    if (!action) return;
+    event.preventDefault();
+    handleAction(action);
   }
 
   function beginSwipe(event: ReactPointerEvent<HTMLElement>) {
@@ -693,6 +808,7 @@ function TasteTriageStep({
     const nextOffsetX = event.clientX - swipeStart.x;
     const nextOffsetY = event.clientY - swipeStart.y;
     if (Math.abs(nextOffsetX) > 8) event.preventDefault();
+    if (Math.abs(nextOffsetX) > 24) acknowledgeDragHint();
     setSwipeState({ offsetX: nextOffsetX, offsetY: nextOffsetY, phase: 'dragging' });
   }
 
@@ -743,7 +859,7 @@ function TasteTriageStep({
         <div className="mt-4 rounded-lg border border-dashed border-skyglass/15 bg-ink-950/60 p-5 text-sm leading-6 text-slate-500">{emptyLabel}</div>
       ) : activeSignal ? (
         <article
-          className={`qs-review-stage mt-4 min-h-[480px] ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
+          className={`qs-review-stage qs-taste-triage-stage mt-4 min-h-[460px] ${isSwipeEngaged ? 'is-swipe-engaged' : ''}`}
           data-swipe-active={isSwipeEngaged ? (swipeTarget?.quadrant ?? swipeDirection ?? 'none') : 'none'}
           data-swipe-left="negative"
           data-swipe-right="positive"
@@ -756,12 +872,21 @@ function TasteTriageStep({
             <TasteActionButtons actions={negativeActions.map((action) => action.action === 'opposite' ? { ...action, label: 'Dislike this' } : action)} activeAction={swipeTarget?.action.action ?? null} onAction={handleAction} />
           </section>
 
-          <section className="qs-review-hero flex flex-col items-center" aria-label={`${activeSignal.label} taste signal. Drag left to correct, left and up to hide, right to confirm, or right and down to pin.`}>
+          <section className="qs-review-hero flex flex-col items-center" aria-label={`${activeSignal.label} taste signal. Drag left to correct or right to confirm. Use the visible buttons for every action.`}>
             <div className="w-full">
+              {showDragHint ? (
+                <div className="mb-2 flex items-start gap-2 rounded-md border border-mint/25 bg-mint/10 px-3 py-2 text-xs leading-5 text-slate-300" data-testid="taste-drag-first-use-hint" role="status">
+                  <Icon className="mt-0.5 shrink-0 text-mint" name="sliders-horizontal" size={15} />
+                  <span className="min-w-0 flex-1"><strong className="text-white">Make it yours.</strong> Drag left to correct, right to confirm. Angle up or down for the secondary action.</span>
+                  <button aria-label="Dismiss drag hint" className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white" onClick={acknowledgeDragHint} title="Dismiss hint" type="button"><Icon name="x" size={13} /></button>
+                </div>
+              ) : null}
               <TriageSignalCard
                 activeSwipeLabel={activeSwipeAction?.label ?? null}
                 games={games}
                 isSwipeEngaged={isSwipeEngaged}
+                isShowingDragHint={showDragHint}
+                onKeyDown={handleCardKeyDown}
                 onPointerCancel={cancelSwipe}
                 onPointerDown={beginSwipe}
                 onPointerMove={updateSwipe}
@@ -781,7 +906,7 @@ function TasteTriageStep({
                 </button>
                 <button
                   className="min-h-10 rounded-md border border-skyglass/15 bg-ink-950/70 px-3 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white"
-                  onClick={() => setReviewedSignalIds(new Set())}
+                  onClick={restartTriage}
                   type="button"
                 >
                   Restart queue
@@ -799,13 +924,22 @@ function TasteTriageStep({
           </section>
         </article>
       ) : (
-        <div className="mt-4 rounded-lg border border-mint/20 bg-mint/10 p-5 text-center">
+        <div className="mx-auto mt-4 w-full max-w-4xl rounded-lg border border-mint/25 bg-mint/10 p-5 sm:p-6">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-mint/30 bg-mint/10 text-mint">
             <Icon name="check-circle" size={24} />
           </div>
-          <h4 className="mt-3 text-lg font-bold text-white">Taste triage complete</h4>
-          <p className="mt-1 text-sm leading-6 text-slate-400">You reviewed the love signals Questory found. Recommendations will use those corrections right away.</p>
-          <button className="mt-4 h-10 rounded-md border border-mint/35 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20" onClick={() => setReviewedSignalIds(new Set())} type="button">Review again</button>
+          <h4 className="mt-3 text-center text-2xl font-bold text-white">Your Gaming DNA is ready</h4>
+          <p className="mt-1 text-center text-sm leading-6 text-slate-300">{appliedActionCount > 0 ? 'Recommendations updated. Your choices are already shaping what Questory shows next.' : 'Review complete. Your existing recommendations stay unchanged.'}</p>
+          <div className="mt-5 grid gap-3 border-y border-mint/15 py-4 sm:grid-cols-3">
+            <CompletionSummaryItem label="Strongest signals" signals={completionLoves} fallback="Still taking shape" />
+            <CompletionSummaryItem label="Less your thing" signals={completionAvoids} fallback="No clear avoid pattern" />
+            <CompletionSummaryItem label="Current mood" signals={completionCurrent} fallback="Nothing temporary yet" />
+          </div>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button className="h-10 rounded-md border border-mint/35 bg-mint/15 px-4 text-sm font-semibold text-mint transition hover:bg-mint/25" onClick={onContinue} type="button">Continue</button>
+            <button className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={restartTriage} type="button">Review again</button>
+            {onOpenRecommendations ? <button className="h-10 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:text-white" onClick={onOpenRecommendations} type="button">Open recommendations</button> : null}
+          </div>
         </div>
       )}
     </div>
@@ -863,6 +997,8 @@ function TriageSignalCard({
   activeSwipeLabel,
   games,
   isSwipeEngaged,
+  isShowingDragHint,
+  onKeyDown,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
@@ -875,6 +1011,8 @@ function TriageSignalCard({
   activeSwipeLabel: string | null;
   games: Game[];
   isSwipeEngaged: boolean;
+  isShowingDragHint: boolean;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -887,12 +1025,17 @@ function TriageSignalCard({
   const evidenceGames = getEvidenceGames(signal, games);
   return (
     <article
-      className={`qs-review-swipe-card overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/80 shadow-panel ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
+      aria-label={`${signal.label}. ${getTasteBehaviorCopy(signal)} Press Left Arrow to mark not accurate, Shift Left Arrow to dislike, Right Arrow to confirm, or Shift Right Arrow to pin.`}
+      className={`qs-review-swipe-card overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/80 shadow-panel ${isShowingDragHint ? 'qs-taste-card-nudge' : ''} ${swipeState.phase === 'dragging' ? 'is-dragging' : ''} ${swipeState.phase === 'exiting' ? 'is-exiting' : ''} ${swipeState.phase === 'settling' ? 'is-settling' : ''}`}
+      data-testid="taste-triage-card"
+      onKeyDown={onKeyDown}
       onPointerCancel={onPointerCancel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      role="group"
       style={style}
+      tabIndex={0}
     >
       {isSwipeEngaged && activeSwipeLabel && swipeDirection ? (
         <div className={`qs-review-swipe-label qs-review-swipe-label-${swipeDirection}`} aria-hidden="true">
@@ -902,22 +1045,27 @@ function TriageSignalCard({
       <div className="p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-2xs font-bold uppercase tracking-[0.14em] text-slate-400">{getSignalOriginLabel(signal)}</span>
-            <span className="rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-2xs font-bold uppercase tracking-[0.14em] text-mint">{Math.round(signal.confidence * 100)}%</span>
-            {signal.pinned ? <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-2xs font-bold uppercase tracking-[0.14em] text-amber-300">Pinned</span> : null}
+            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-2xs font-bold uppercase text-slate-300">{getTasteSignalOriginLabel(signal)}</span>
+            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-2xs font-bold uppercase text-slate-400">{getTasteSignalKindLabel(signal.kind)}</span>
+            <span className="rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-2xs font-bold uppercase text-mint" title={`${Math.round(signal.confidence * 100)}% confidence`}>{getTasteConfidenceLabel(signal)}</span>
+            {signal.pinned ? <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-2xs font-bold uppercase text-amber-300">Pinned for quick access</span> : null}
           </div>
-          <span className="flex items-center gap-1 rounded-full border border-skyglass/15 bg-ink-900/80 px-2 py-1 text-2xs font-bold uppercase tracking-[0.14em] text-slate-500">
+          <span className="flex items-center gap-1.5 rounded-md border border-mint/25 bg-mint/10 px-2.5 py-1.5 text-xs font-bold text-mint">
             <Icon name="sliders-horizontal" size={13} />
-            Drag
+            Drag card
           </span>
         </div>
-        <h4 className="mt-3 text-2xl font-bold leading-tight text-white">{signal.label}</h4>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{signal.evidence.explanation || 'Added by you.'}</p>
+        <p className="mt-3 text-xs font-bold uppercase text-mint">Does this feel like you?</p>
+        <h4 className="mt-1 break-words text-2xl font-bold leading-tight text-white">{signal.label}</h4>
+        <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-300">{getTasteBehaviorCopy(signal)}</p>
         <MiniEvidenceCovers evidenceGames={evidenceGames} signal={signal} />
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{signal.supportingGameCount} supporting</span>
-          <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{signal.strength}</span>
-          {signal.contradictoryGameCount > 0 ? <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{signal.contradictoryGameCount} mixed</span> : null}
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
+          <span className="rounded-full bg-ink-900 px-2 py-1">{getTasteEvidenceSummary(signal)}</span>
+          <span className="rounded-full bg-ink-900 px-2 py-1">{getTasteConsistencyLabel(signal)}</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between border-t border-skyglass/10 pt-3 text-xs font-bold text-slate-400" aria-hidden="true">
+          <span>← Correct</span>
+          <span>Confirm →</span>
         </div>
       </div>
     </article>
@@ -937,12 +1085,12 @@ function MiniEvidenceCovers({ evidenceGames, signal }: { evidenceGames: Game[]; 
   return (
     <div className="mt-3 flex gap-2 overflow-hidden">
       {shownGames.map((game) => (
-        <div className="h-16 w-12 shrink-0 overflow-hidden rounded-md border border-skyglass/10 bg-ink-900" key={game.id}>
+        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md border border-skyglass/10 bg-ink-900" key={game.id}>
           <img alt={game.title} className="h-full w-full object-cover" loading="lazy" src={getGameArtwork(game)} />
         </div>
       ))}
       {fallbackTitles.map((title) => (
-        <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-skyglass/15 bg-ink-900/70 p-1 text-center text-[9px] font-semibold leading-tight text-slate-500" key={title}>
+        <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded-md border border-dashed border-skyglass/15 bg-ink-900/70 p-1 text-center text-[9px] font-semibold leading-tight text-slate-500" key={title}>
           {title}
         </div>
       ))}
@@ -952,36 +1100,51 @@ function MiniEvidenceCovers({ evidenceGames, signal }: { evidenceGames: Game[]; 
 
 function CurrentInterestsStep({
   onAddTemporaryInterest,
+  onRemoveTemporaryInterest,
   onTemporaryTasteLabelChange,
   temporaryTasteLabel,
   temporaryTasteSignals,
 }: {
   onAddTemporaryInterest: () => void;
+  onRemoveTemporaryInterest: (signalId: string) => void;
   onTemporaryTasteLabelChange: (value: string) => void;
   temporaryTasteLabel: string;
   temporaryTasteSignals: TasteSignal[];
 }) {
-  const prompts = ['Steam Deck picks', 'short games', 'co-op night', 'something cozy'];
+  const prompts = ['Steam Deck picks', 'Short games', 'Co-op night', 'Something cozy'];
+  function submitTemporaryInterest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onAddTemporaryInterest();
+  }
   return (
     <div className="mx-auto w-full max-w-4xl">
       <div className="qs-label-caps text-mint">Current mood</div>
       <h3 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Tell Questory what you are looking for right now.</h3>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Temporary interests help recommendations bend toward the moment, then expire naturally.</p>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Temporary interests steer recommendations for 30 days. Remove one whenever the mood passes.</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {prompts.map((prompt) => (
-          <button className="rounded-full border border-skyglass/15 bg-ink-950/70 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-mint/35 hover:text-mint" key={prompt} onClick={() => onTemporaryTasteLabelChange(prompt)} type="button">
-            {prompt}
-          </button>
-        ))}
+        {prompts.map((prompt) => {
+          const isSelected = temporaryTasteLabel.trim().toLocaleLowerCase() === prompt.toLocaleLowerCase();
+          return (
+            <button aria-pressed={isSelected} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-semibold transition ${isSelected ? 'border-mint/50 bg-mint/15 text-mint' : 'border-skyglass/15 bg-ink-950/70 text-slate-300 hover:border-mint/35 hover:text-mint'}`} key={prompt} onClick={() => onTemporaryTasteLabelChange(isSelected ? '' : prompt)} type="button">
+              {isSelected ? <Icon name="check" size={14} /> : null}{prompt}
+            </button>
+          );
+        })}
       </div>
-      <div className="mt-3 flex gap-2">
-        <input className="h-11 min-w-0 flex-1 rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint" onChange={(event) => onTemporaryTasteLabelChange(event.target.value)} placeholder="Games under 15 hours, couch co-op..." value={temporaryTasteLabel} />
-        <button className="h-11 rounded-md border border-mint/35 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={!temporaryTasteLabel.trim()} onClick={onAddTemporaryInterest} type="button">Add</button>
-      </div>
-      <div className="mt-3 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-        <div className="text-sm font-semibold text-white">Active right now</div>
+      <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={submitTemporaryInterest}>
+        <label className="sr-only" htmlFor="temporary-taste-interest">Add a temporary interest</label>
+        <input className="h-11 min-w-0 flex-1 rounded-md border border-white/10 bg-ink-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint" id="temporary-taste-interest" onChange={(event) => onTemporaryTasteLabelChange(event.target.value)} placeholder="Games under 15 hours, couch co-op..." value={temporaryTasteLabel} />
+        <button className="h-11 rounded-md border border-mint/35 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={!temporaryTasteLabel.trim()} type="submit"><Icon className="mr-1 inline" name="plus" size={14} />Add mood</button>
+      </form>
+      <div className="mt-5 border-t border-skyglass/10 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-white">Active right now</div>
+          <span className="text-xs text-slate-500">Each one expires automatically</span>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {temporaryTasteSignals.length > 0 ? temporaryTasteSignals.map((signal) => <TasteChip key={signal.id} signal={signal} />) : <span className="text-sm text-slate-500">No temporary interests yet.</span>}
+          {temporaryTasteSignals.length > 0
+            ? temporaryTasteSignals.map((signal) => <TemporaryTasteChip key={signal.id} onRemove={() => onRemoveTemporaryInterest(signal.id)} signal={signal} />)
+            : <span className="text-sm text-slate-500">Nothing active. Your long-term taste still guides recommendations.</span>}
         </div>
       </div>
     </div>
@@ -989,12 +1152,15 @@ function CurrentInterestsStep({
 }
 
 function FineTuneStep({
+  editingTasteSignalId,
   explicitTasteSignals,
   lastAppliedCorrection,
   newTasteKind,
   newTasteLabel,
   newTasteSentiment,
   onAddManualTasteSignal,
+  onCancelEditingTasteSignal,
+  onEditExplicitTasteSignal,
   onExport,
   onNewTasteKindChange,
   onNewTasteLabelChange,
@@ -1005,13 +1171,17 @@ function FineTuneStep({
   onResetInferred,
   onResetTemporary,
   onResetAll,
+  tasteSuggestions,
 }: {
+  editingTasteSignalId: string | null;
   explicitTasteSignals: TasteSignal[];
   lastAppliedCorrection: string;
   newTasteKind: TasteSignalKind;
   newTasteLabel: string;
   newTasteSentiment: TasteSignalSentiment;
   onAddManualTasteSignal: () => void;
+  onCancelEditingTasteSignal: () => void;
+  onEditExplicitTasteSignal: (signal: TasteSignal) => void;
   onExport: () => void;
   onNewTasteKindChange: (kind: TasteSignalKind) => void;
   onNewTasteLabelChange: (value: string) => void;
@@ -1022,57 +1192,108 @@ function FineTuneStep({
   onResetInferred: () => void;
   onResetTemporary: () => void;
   onResetAll: () => void;
+  tasteSuggestions: TasteSuggestion[];
 }) {
+  const kindOptions: TasteSignalKind[] = ['tag', 'genre', 'developer', 'franchise', 'platform', 'length'];
+  const matchingSuggestions = tasteSuggestions
+    .filter((suggestion) => suggestion.kind === newTasteKind)
+    .filter((suggestion) => !newTasteLabel.trim() || suggestion.label.toLocaleLowerCase().includes(newTasteLabel.trim().toLocaleLowerCase()))
+    .slice(0, 6);
+  const moreSignals = explicitTasteSignals.filter((signal) => signal.sentiment === 'love');
+  const lessSignals = explicitTasteSignals.filter((signal) => signal.sentiment === 'avoid');
+
+  function submitCorrection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onAddManualTasteSignal();
+  }
+
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,1.05fr)]">
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
       <div>
         <div className="qs-label-caps text-mint">Fine tune</div>
-        <h3 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Add a correction Questory should remember.</h3>
+        <h3 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Tell Questory what it missed.</h3>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          Use this for one clear taste that the triage did not capture.
+          Pick a kind, choose a suggestion or name one clear preference, then preview what recommendations will remember.
         </p>
 
-        <div className="mt-5 rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-          <div className="grid gap-2">
+        <form className="mt-5 grid gap-4 border-y border-skyglass/10 py-4" onSubmit={submitCorrection}>
+          <fieldset>
+            <legend className="text-xs font-bold uppercase text-slate-500">What kind of preference is it?</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {kindOptions.map((kind) => (
+                <button aria-pressed={newTasteKind === kind} className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${newTasteKind === kind ? 'border-mint/45 bg-mint/15 text-mint' : 'border-skyglass/15 text-slate-300 hover:border-mint/30 hover:text-white'}`} key={kind} onClick={() => onNewTasteKindChange(kind)} type="button">
+                  {getTasteSignalKindLabel(kind)}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
+            <label className="text-xs font-bold uppercase text-slate-500" htmlFor="taste-correction-label">The preference</label>
             <input
-              className="h-11 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+              autoComplete="off"
+              className="mt-2 h-11 w-full rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-mint"
+              id="taste-correction-label"
+              list="taste-correction-suggestions"
               onChange={(event) => onNewTasteLabelChange(event.target.value)}
               placeholder="Deckbuilders, tactical RPGs, FromSoftware..."
               value={newTasteLabel}
             />
-            <div className="grid gap-2 sm:grid-cols-2">
-              <select className="h-11 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" onChange={(event) => onNewTasteKindChange(event.target.value as TasteSignalKind)} value={newTasteKind}>
-                <option value="tag">Style or mechanic</option>
-                <option value="genre">Genre</option>
-                <option value="developer">Developer</option>
-                <option value="platform">Platform</option>
-                <option value="length">Length</option>
-              </select>
-              <select className="h-11 rounded-md border border-white/10 bg-ink-900 px-3 text-sm text-white outline-none focus:border-mint" onChange={(event) => onNewTasteSentimentChange(event.target.value as TasteSignalSentiment)} value={newTasteSentiment}>
-                <option value="love">More of this</option>
-                <option value="avoid">Less of this</option>
-              </select>
-            </div>
-            <button className="h-11 rounded-md border border-mint/35 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={!newTasteLabel.trim()} onClick={onAddManualTasteSignal} type="button">Apply correction</button>
+            <datalist id="taste-correction-suggestions">
+              {tasteSuggestions.filter((suggestion) => suggestion.kind === newTasteKind).slice(0, 80).map((suggestion) => <option key={`${suggestion.kind}:${suggestion.label}`} value={suggestion.label} />)}
+            </datalist>
+            {matchingSuggestions.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2" aria-label={`${getTasteSignalKindLabel(newTasteKind)} suggestions`}>
+                {matchingSuggestions.map((suggestion) => (
+                  <button className="rounded-full border border-skyglass/15 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-mint/35 hover:text-mint" key={`${suggestion.kind}:${suggestion.label}`} onClick={() => onNewTasteLabelChange(suggestion.label)} type="button">{suggestion.label}</button>
+                ))}
+              </div>
+            ) : null}
           </div>
-        </div>
+
+          <fieldset>
+            <legend className="text-xs font-bold uppercase text-slate-500">How should this shape recommendations?</legend>
+            <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-ink-900/70 p-1" role="group" aria-label="Preference direction">
+              <button aria-pressed={newTasteSentiment === 'love'} className={`min-h-10 rounded-md px-3 text-sm font-semibold transition ${newTasteSentiment === 'love' ? 'bg-mint/15 text-mint shadow-panel' : 'text-slate-400 hover:text-white'}`} onClick={() => onNewTasteSentimentChange('love')} type="button"><Icon className="mr-1 inline" name="plus" size={14} />More of this</button>
+              <button aria-pressed={newTasteSentiment === 'avoid'} className={`min-h-10 rounded-md px-3 text-sm font-semibold transition ${newTasteSentiment === 'avoid' ? 'bg-red-500/15 text-red-200 shadow-panel' : 'text-slate-400 hover:text-white'}`} onClick={() => onNewTasteSentimentChange('avoid')} type="button"><Icon className="mr-1 inline" name="eye-off" size={14} />Less of this</button>
+            </div>
+          </fieldset>
+
+          {newTasteLabel.trim() ? (
+            <div className={`rounded-md border px-3 py-3 ${newTasteSentiment === 'love' ? 'border-mint/25 bg-mint/10' : 'border-red-300/25 bg-red-500/10'}`} aria-live="polite">
+              <div className="text-xs font-bold uppercase text-slate-400">Preview</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <strong className="break-words text-white">{newTasteLabel.trim()}</strong>
+                <span className="text-xs text-slate-400">{getTasteSignalKindLabel(newTasteKind)}</span>
+              </div>
+              <p className="mt-1 text-sm text-slate-300">Questory will look for {newTasteSentiment === 'love' ? 'more' : 'less'} of this in personalized recommendations.</p>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <button className="h-11 rounded-md border border-mint/35 bg-mint/10 px-4 text-sm font-semibold text-mint transition hover:bg-mint/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={!newTasteLabel.trim()} type="submit">{editingTasteSignalId ? 'Update preference' : 'Remember this preference'}</button>
+            {editingTasteSignalId ? <button className="h-11 rounded-md border border-skyglass/15 px-4 text-sm font-semibold text-slate-300 transition hover:text-white" onClick={onCancelEditingTasteSignal} type="button">Cancel edit</button> : null}
+          </div>
+        </form>
 
         {lastAppliedCorrection ? (
-          <div className="mt-3 rounded-md border border-mint/25 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint">
-            Applied: {lastAppliedCorrection}
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-mint/25 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint" role="status">
+            <Icon name="check-circle" size={16} />Recommendations now remember {lastAppliedCorrection}.
           </div>
         ) : null}
       </div>
 
-      <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-        <div className="text-sm font-semibold text-white">Applied corrections</div>
-        <div className="mt-3 flex min-h-20 flex-wrap content-start gap-2">
-          {explicitTasteSignals.length > 0 ? explicitTasteSignals.map((signal) => (
-            <RemovableTasteChip key={signal.id} signal={signal} onRemove={() => onRemoveExplicitTasteSignal(signal.id)} />
-          )) : (
-            <span className="text-sm leading-6 text-slate-500">No manual corrections yet. Add one and it will appear here immediately.</span>
-          )}
+      <div className="border-l-0 border-skyglass/10 lg:border-l lg:pl-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-white">Preferences you set</div>
+          <span className="text-xs text-slate-500">Explicitly added</span>
         </div>
+        {explicitTasteSignals.length > 0 ? (
+          <div className="mt-3 grid gap-4">
+            <AppliedCorrectionGroup label="More of this" onEdit={onEditExplicitTasteSignal} onRemove={onRemoveExplicitTasteSignal} signals={moreSignals} tone="positive" />
+            <AppliedCorrectionGroup label="Less of this" onEdit={onEditExplicitTasteSignal} onRemove={onRemoveExplicitTasteSignal} signals={lessSignals} tone="negative" />
+          </div>
+        ) : <p className="mt-3 text-sm leading-6 text-slate-500">No manual preferences yet. Add one and it will appear here immediately.</p>}
 
         <details className="mt-4 rounded-md border border-skyglass/15 bg-ink-900/60 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-slate-300">Profile maintenance</summary>
@@ -1116,18 +1337,15 @@ function SignalEvidenceCard({
         <div className="p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-2">
             {rank ? <span className="rounded-full border border-mint/30 bg-mint/10 px-2 py-1 text-xs font-bold text-mint">#{rank}</span> : null}
-            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-xs font-semibold text-slate-400">{getSignalOriginLabel(signal)}</span>
-            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-xs font-semibold text-slate-400">{Math.round(signal.confidence * 100)}% confidence</span>
+            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-xs font-semibold text-slate-400">{getTasteSignalOriginLabel(signal)}</span>
+            <span className="rounded-full border border-skyglass/15 px-2 py-1 text-xs font-semibold text-slate-400">{getTasteSignalKindLabel(signal.kind)}</span>
+            <span className="rounded-full border border-mint/25 bg-mint/10 px-2 py-1 text-xs font-semibold text-mint" title={`${Math.round(signal.confidence * 100)}% confidence`}>{getTasteConfidenceLabel(signal)}</span>
           </div>
-          <h4 className="mt-3 text-xl font-bold text-white">{signal.label}</h4>
-          <p className="mt-2 text-sm leading-6 text-slate-400">{signal.evidence.explanation || 'Added by you.'}</p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-ink-800">
-            <div className={signal.sentiment === 'love' ? 'h-full rounded-full bg-mint' : 'h-full rounded-full bg-red-300'} style={{ width: `${Math.round(signal.confidence * 100)}%` }} />
-          </div>
+          <h4 className="mt-3 break-words text-xl font-bold leading-6 text-white">{signal.label}</h4>
+          <p className="mt-2 text-sm leading-6 text-slate-400">{getTasteBehaviorCopy(signal)}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{signal.supportingGameCount} supporting</span>
-            <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{signal.contradictoryGameCount} contradictory</span>
-            <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{signal.strength} signal</span>
+            <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{getTasteEvidenceSummary(signal)}</span>
+            <span className="rounded-full bg-ink-900 px-2 py-1 text-slate-400">{getTasteConsistencyLabel(signal)}</span>
           </div>
           {onConfirm || onReject || onPin || onHide ? (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -1175,14 +1393,18 @@ function TasteSnapshotCard({ games, signal }: { games: Game[]; signal: TasteSign
   const evidenceGame = getEvidenceGames(signal, games)[0];
   return (
     <div className="overflow-hidden rounded-lg border border-skyglass/15 bg-ink-950/70">
-      <div className="flex min-h-28 gap-3 p-3">
+      <div className="flex min-h-32 gap-3 p-3">
         <div className="h-24 w-16 shrink-0 overflow-hidden rounded-md bg-ink-900">
           {evidenceGame ? <img alt={evidenceGame.title} className="h-full w-full object-cover" src={getGameArtwork(evidenceGame)} /> : <div className="flex h-full items-center justify-center text-slate-700"><Icon name="sparkles" size={22} /></div>}
         </div>
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-mint">{signal.strength}</div>
-          <div className="mt-1 truncate text-base font-bold text-white">{signal.label}</div>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{signal.evidence.explanation || 'Added by you.'}</p>
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-xs font-semibold uppercase text-mint">{getTasteConfidenceLabel(signal)}</span>
+            <span className="text-xs text-slate-500">{getTasteSignalKindLabel(signal.kind)}</span>
+          </div>
+          <div className="mt-1 line-clamp-2 break-words text-base font-bold leading-5 text-white" title={signal.label}>{signal.label}</div>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{getTasteBehaviorCopy(signal)}</p>
+          <p className="mt-1 text-[11px] text-slate-500">{getTasteEvidenceSummary(signal)}</p>
         </div>
       </div>
     </div>
@@ -1191,9 +1413,9 @@ function TasteSnapshotCard({ games, signal }: { games: Game[]; signal: TasteSign
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-skyglass/15 bg-ink-950/70 p-3">
-      <div className="text-2xl font-bold text-white">{value}</div>
-      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+    <div className="flex items-baseline gap-2">
+      <div className="text-lg font-bold text-white">{value}</div>
+      <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
     </div>
   );
 }
@@ -1206,19 +1428,66 @@ function TasteChip({ signal }: { signal: TasteSignal }) {
   );
 }
 
-function RemovableTasteChip({ signal, onRemove }: { signal: TasteSignal; onRemove: () => void }) {
+function TemporaryTasteChip({ signal, onRemove }: { signal: TasteSignal; onRemove: () => void }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border py-1 pl-2.5 pr-1 text-xs font-semibold ${signal.sentiment === 'love' ? 'border-mint/30 bg-mint/10 text-mint' : 'border-red-300/30 bg-red-500/10 text-red-200'}`}>
-      {signal.label}
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-mint/30 bg-mint/10 py-1 pl-2.5 pr-1 text-xs font-semibold text-mint">
+      <span className="min-w-0 break-words">{signal.label}</span>
+      {signal.expiresAt ? <span className="hidden font-normal text-slate-400 sm:inline">until {new Date(signal.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span> : null}
       <button
-        aria-label={`Remove ${signal.label}`}
-        className="grid h-5 w-5 place-items-center rounded-full text-current opacity-70 transition hover:bg-white/10 hover:opacity-100"
+        aria-label={`Remove current mood ${signal.label}`}
+        className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-current opacity-70 transition hover:bg-white/10 hover:opacity-100"
         onClick={onRemove}
+        title={`Remove ${signal.label}`}
         type="button"
       >
         <Icon name="x" size={12} />
       </button>
     </span>
+  );
+}
+
+function AppliedCorrectionGroup({
+  label,
+  onEdit,
+  onRemove,
+  signals,
+  tone,
+}: {
+  label: string;
+  onEdit: (signal: TasteSignal) => void;
+  onRemove: (signalId: string) => void;
+  signals: TasteSignal[];
+  tone: 'negative' | 'positive';
+}) {
+  if (signals.length === 0) return null;
+  return (
+    <section>
+      <div className={`text-xs font-bold uppercase ${tone === 'positive' ? 'text-mint' : 'text-red-200'}`}>{label}</div>
+      <div className="mt-2 divide-y divide-skyglass/10 border-y border-skyglass/10">
+        {signals.map((signal) => (
+          <div className="flex items-center gap-3 py-2.5" key={signal.id}>
+            <span className={`h-2 w-2 shrink-0 rounded-full ${tone === 'positive' ? 'bg-mint' : 'bg-red-300'}`} aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <div className="break-words text-sm font-semibold text-white">{signal.label}</div>
+              <div className="mt-0.5 text-xs text-slate-500">{getTasteSignalKindLabel(signal.kind)} · Explicitly added</div>
+            </div>
+            <button aria-label={`Edit ${signal.label}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-skyglass/15 text-slate-400 transition hover:border-mint/35 hover:text-white" onClick={() => onEdit(signal)} title="Edit preference" type="button"><Icon name="pencil" size={14} /></button>
+            <button aria-label={`Remove ${signal.label}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-skyglass/15 text-slate-400 transition hover:border-red-300/35 hover:text-red-200" onClick={() => onRemove(signal.id)} title="Remove preference" type="button"><Icon name="x" size={14} /></button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CompletionSummaryItem({ label, signals, fallback }: { label: string; signals: TasteSignal[]; fallback: string }) {
+  return (
+    <div className="text-center sm:text-left">
+      <div className="text-xs font-bold uppercase text-slate-500">{label}</div>
+      <div className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-white">
+        {signals.length > 0 ? signals.slice(0, 3).map((signal) => signal.label).join(', ') : fallback}
+      </div>
+    </div>
   );
 }
 
@@ -1245,10 +1514,8 @@ function getGameArtwork(game: Game): string {
   return game.coverImage || game.backgroundImage || game.wideCoverImage || game.heroImage || '';
 }
 
-function getSignalOriginLabel(signal: TasteSignal): string {
-  if (signal.origin === 'explicit') return 'Confirmed by you';
-  if (signal.origin === 'temporary') return 'Current mood';
-  return 'Observed by Questory';
+function getTasteSignalReviewKey(signal: TasteSignal): string {
+  return `${signal.kind}:${signal.key}:${signal.sentiment}`;
 }
 
 function normalizeTitle(title: string): string {
