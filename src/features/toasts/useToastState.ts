@@ -12,12 +12,12 @@ type UseToastStateOptions = {
   ignoredSteamGames: IgnoredSteamGame[];
   platformQueueState: PlatformQueueState;
   reviewModeState: ReviewModeState;
-  selectedGameId: string | null;
+  /** Shown when an undo is too stale to apply (AS-04). */
+  staleUndoMessage: string;
   setGames: Dispatch<SetStateAction<Game[]>>;
   setIgnoredSteamGames: Dispatch<SetStateAction<IgnoredSteamGame[]>>;
   setPlatformQueueState: Dispatch<SetStateAction<PlatformQueueState>>;
   setReviewModeState: Dispatch<SetStateAction<ReviewModeState>>;
-  setSelectedGameId: Dispatch<SetStateAction<string | null>>;
 };
 
 export function useToastState(options: UseToastStateOptions) {

@@ -414,6 +414,29 @@ export function addGameToPlatformQueueTop(
   });
 }
 
+/**
+ * Put a previously removed entry back, keeping the position it held (AS-04 undo).
+ *
+ * Unlike `addGameToPlatformQueue` this does not mint a new entry: the before-image is reinserted
+ * as it was, notes, priority and `queuedAt` included, and the surrounding entries renumber around
+ * its old position.
+ */
+export function restorePlatformQueueEntry(state: PlatformQueueState, entry: PlatformQueueEntry): PlatformQueueState {
+  const otherEntries = state.entries.filter(
+    (currentEntry) => !isSamePlatformPlanEntry(currentEntry, entry.gameId, entry.targetPlatform),
+  );
+
+  // The restored entry goes first so that when it ties with the entry that took its place (the
+  // rest shifted up when it was removed), it sorts back into its old slot rather than behind it.
+  return normalizeQueuePositions({
+    ...state,
+    activePlatforms: state.activePlatforms.includes(entry.targetPlatform)
+      ? state.activePlatforms
+      : [...state.activePlatforms, entry.targetPlatform],
+    entries: [entry, ...otherEntries],
+  });
+}
+
 export function removeGameFromPlatformQueue(state: PlatformQueueState, gameId: string, targetPlatform?: GamePlatform): PlatformQueueState {
   return normalizeQueuePositions({
     ...state,

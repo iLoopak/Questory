@@ -18,8 +18,8 @@ import {
   undoActionTimeoutMs,
   type PendingUndoAction,
   type UndoActionHistoryEntry,
-  type UndoActionSnapshot,
 } from '../lib/undoHistoryStorage';
+import { applyUndoOperations, type UndoOperation, type UndoableState } from '../lib/undoOperations';
 import type { Game } from '../types/game';
 
 type UseQuestShelfNotificationsOptions = {
@@ -28,12 +28,12 @@ type UseQuestShelfNotificationsOptions = {
   ignoredSteamGames: IgnoredSteamGame[];
   platformQueueState: PlatformQueueState;
   reviewModeState: ReviewModeState;
-  selectedGameId: string | null;
+  /** Shown when an undo is too stale to apply. Injected so this hook stays free of i18n. */
+  staleUndoMessage: string;
   setGames: Dispatch<SetStateAction<Game[]>>;
   setIgnoredSteamGames: Dispatch<SetStateAction<IgnoredSteamGame[]>>;
   setPlatformQueueState: Dispatch<SetStateAction<PlatformQueueState>>;
   setReviewModeState: Dispatch<SetStateAction<ReviewModeState>>;
-  setSelectedGameId: Dispatch<SetStateAction<string | null>>;
 };
 
 export function useQuestShelfNotifications({
@@ -42,30 +42,33 @@ export function useQuestShelfNotifications({
   ignoredSteamGames,
   platformQueueState,
   reviewModeState,
-  selectedGameId,
+  staleUndoMessage,
   setGames,
   setIgnoredSteamGames,
   setPlatformQueueState,
   setReviewModeState,
-  setSelectedGameId,
 }: UseQuestShelfNotificationsOptions) {
   const [pendingUndoActions, setPendingUndoActions] = useState<PendingUndoAction[]>(() => loadPendingUndoActions());
   const pendingUndoActionsRef = useRef<PendingUndoAction[]>(pendingUndoActions);
 
-  function createUndoSnapshot(): UndoActionSnapshot {
-    return {
-      games,
-      ignoredSteamGames,
-      platformQueueState,
-      reviewModeState,
-      selectedGameId,
-    };
-  }
+  // AS-04: undo reads the state as it is NOW and applies a scoped inverse to it, rather than
+  // restoring a snapshot of how it was when the action happened. Kept in a ref (refreshed on
+  // every render) because undoAction runs from an event handler, outside the render it was
+  // created in.
+  const undoableStateRef = useRef<UndoableState>({ games, ignoredSteamGames, platformQueueState, reviewModeState });
+  undoableStateRef.current = { games, ignoredSteamGames, platformQueueState, reviewModeState };
 
+  /**
+   * Register an undoable action.
+   *
+   * `operations` is the inverse of what the action just did — only the entities it touched. An
+   * empty list means the toast is shown without a working Undo, which is a bug at the call site
+   * rather than something to paper over here.
+   */
   function addUndoAction(
     message: string,
     historyEntry: Omit<UndoActionHistoryEntry, 'createdAt'>,
-    snapshot = createUndoSnapshot(),
+    operations: UndoOperation[],
     notification: Partial<NotificationDraft> = {},
   ) {
     const createdAt = Date.now();
@@ -82,7 +85,7 @@ export function useQuestShelfNotifications({
       },
       id: createUndoActionId(),
       message: notification.message ?? message,
-      snapshot,
+      operations,
     };
 
     setPendingUndoActions((currentActions) => {
@@ -110,7 +113,7 @@ export function useQuestShelfNotifications({
       },
       id: createUndoActionId(),
       message: notification.message,
-      snapshot: createUndoSnapshot(),
+      operations: [],
     };
 
     setPendingUndoActions((currentActions) => {
@@ -122,15 +125,37 @@ export function useQuestShelfNotifications({
 
   function undoAction(actionId: string) {
     const action = pendingUndoActionsRef.current.find((currentAction) => currentAction.id === actionId);
-    if (!action) {
+    if (!action || action.operations.length === 0) {
       return;
     }
 
-    setGames(action.snapshot.games);
-    setIgnoredSteamGames(action.snapshot.ignoredSteamGames);
-    setPlatformQueueState(action.snapshot.platformQueueState);
-    setReviewModeState(action.snapshot.reviewModeState);
-    setSelectedGameId(action.snapshot.selectedGameId);
+    const current = undoableStateRef.current;
+    const result = applyUndoOperations(current, action.operations);
+
+    if (result.status === 'stale') {
+      // The entity this action touched has been changed or removed since. Overwriting it would
+      // destroy that newer work, which is exactly the whole-state rollback this replaced — so
+      // say so and change nothing.
+      dismissToast(actionId);
+      addToastNotification({ category: 'info', message: staleUndoMessage });
+      return;
+    }
+
+    // Only the slices the inverse actually changed are written back, so an undo of a status
+    // change cannot disturb Plans or review state just by being applied.
+    if (result.state.games !== current.games) {
+      setGames(result.state.games);
+    }
+    if (result.state.ignoredSteamGames !== current.ignoredSteamGames) {
+      setIgnoredSteamGames(result.state.ignoredSteamGames);
+    }
+    if (result.state.platformQueueState !== current.platformQueueState) {
+      setPlatformQueueState(result.state.platformQueueState);
+    }
+    if (result.state.reviewModeState !== current.reviewModeState) {
+      setReviewModeState(result.state.reviewModeState);
+    }
+
     dismissToast(actionId);
   }
 
@@ -181,7 +206,6 @@ export function useQuestShelfNotifications({
   return {
     addToastNotification,
     addUndoAction,
-    createUndoSnapshot,
     dismissAllToasts,
     dismissToast,
     dismissUndoAction: dismissToast,
