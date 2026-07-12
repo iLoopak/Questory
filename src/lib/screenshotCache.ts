@@ -91,6 +91,12 @@ export function setCachedScreenshots(game: Game, urls: string[], provider: strin
 }
 
 /** Removes the cache entry for a game so the next load triggers a fresh fetch. */
+/** AS-18: Reset Local Data owns this cache too — it used to survive a reset in IndexedDB. */
+export function clearAllCachedScreenshots(): Promise<void> {
+  storeSnapshot = {};
+  return removeAppCacheValue(STORAGE_KEY);
+}
+
 export function clearCachedScreenshots(game: Game): void {
   const store = readStore();
   delete store[entryKey(game)];
