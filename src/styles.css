@@ -4948,3 +4948,69 @@ body.qs-controller-active .qs-compact-card:focus-within {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* AS-11: root/chunk recovery screen. Rendered only when the app cannot render itself. */
+.root-error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--color-app-background, #030612);
+  color: var(--color-text-primary, #e8ecf8);
+}
+
+.root-error-boundary__panel {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+
+.root-error-boundary__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.root-error-boundary__message {
+  margin: 0;
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
+.root-error-boundary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.root-error-boundary__button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--color-accent, #6ea8fe);
+  background: var(--color-accent, #6ea8fe);
+  color: #04070f;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.root-error-boundary__button--secondary {
+  background: transparent;
+  color: inherit;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.root-error-boundary__button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.root-error-boundary__detail {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  opacity: 0.5;
+  word-break: break-word;
+}
