@@ -42,10 +42,6 @@ export function loadGames(): Game[] {
   return gameRepository.getAllSync();
 }
 
-export function loadGamesFromPersistentStorage(): Promise<Game[]> {
-  return gameRepository.loadDurable();
-}
-
 export function saveGames(games: Game[]) {
   gameRepository.replaceAll(games);
 }

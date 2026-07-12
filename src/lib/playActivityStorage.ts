@@ -86,10 +86,6 @@ export function loadPlayActivity(): PlayActivityRecord[] {
   return playActivityRepository.getAllSync();
 }
 
-export function loadPlayActivityFromPersistentStorage(): Promise<PlayActivityRecord[]> {
-  return playActivityRepository.loadDurable();
-}
-
 export function savePlayActivity(records: PlayActivityRecord[]) {
   playActivityRepository.replaceAll(normalizePlayActivityRecords(records));
 }
