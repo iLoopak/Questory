@@ -39,6 +39,7 @@ type QueueEntry = {
 };
 
 const queues = new Map<string, QueueEntry>();
+const latestOutcomes = new Map<string, DurableKvOutcome>();
 
 function getQueue(key: string): QueueEntry {
   const existing = queues.get(key);
@@ -64,6 +65,7 @@ export function enqueueDurableKv(key: string, operation: DurableKvOperation): Pr
     // transaction. The failure was already reported by the operation that caused it.
     () => runDurableOperation(key, operation),
   );
+  void result.then((outcome) => latestOutcomes.set(key, outcome));
 
   // The chain itself must never reject, or every later operation for this key would be skipped.
   queue.chain = result.catch(() => undefined);
@@ -110,7 +112,13 @@ export async function whenDurableKvSettled(key?: string): Promise<void> {
   await Promise.all(chains.map((chain) => (chain as Promise<unknown>).catch(() => undefined)));
 }
 
+/** Latest durable failures, cleared for a key by its next successful operation. */
+export function getDurableKvFailures(): DurableKvOutcome[] {
+  return [...latestOutcomes.values()].filter((outcome) => !outcome.ok);
+}
+
 /** Test seam: forget every queue. */
 export function resetDurableKvQueues(): void {
   queues.clear();
+  latestOutcomes.clear();
 }

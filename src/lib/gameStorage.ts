@@ -12,6 +12,7 @@ import {
 } from './indexedDbGameRepository';
 import { isGameExternalSource } from './gameIdentity';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
+import { markBackupRelevantChange } from './backupRevision';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
@@ -43,7 +44,9 @@ export function loadGames(): Game[] {
 }
 
 export function saveGames(games: Game[]) {
+  const changed = JSON.stringify(gameRepository.getAllSync()) !== JSON.stringify(normalizeLoadedGames(games));
   gameRepository.replaceAll(games);
+  if (changed) markBackupRelevantChange(STORAGE_KEY);
 }
 
 // Wave 5: storage verification / repair / recovery (games). See indexedDbGameRepository.

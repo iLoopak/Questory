@@ -22,7 +22,6 @@ export function SettingsRoute({ core, games, collections, queue, review, sync, s
   const model = { ...core, ...games, ...collections, ...queue, ...review, ...sync, ...shelf, ...onboarding, ...settings, ...imports };
   const {
     activeSettingsCategory,
-    autoBackupSignal,
     setupTasks,
     setIsAddGameOpen,
     games: gameList,
@@ -105,7 +104,6 @@ export function SettingsRoute({ core, games, collections, queue, review, sync, s
     <Suspense fallback={<PanelLoadingFallback />}>
       <SettingsView
           activeCategory={activeSettingsCategory}
-          autoBackupSignal={autoBackupSignal}
           setupTasks={setupTasks}
           onAddGame={() => setIsAddGameOpen(true)}
           onSyncAchievements={() => {

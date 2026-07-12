@@ -119,7 +119,7 @@ export async function openBackupFileWithPicker() {
   return readBackupFromHandle(handle);
 }
 
-export async function saveBackupToSelectedFile(includeIntegrationSettings: boolean) {
+export async function saveBackupToSelectedFile(includeIntegrationSettings: boolean, preparedBackup?: QuestShelfBackup) {
   const handle = await loadBackupFileHandle();
 
   if (!handle) {
@@ -140,7 +140,7 @@ export async function saveBackupToSelectedFile(includeIntegrationSettings: boole
     };
   }
 
-  const backup = createQuestShelfBackup(includeIntegrationSettings);
+  const backup = preparedBackup ?? createQuestShelfBackup(includeIntegrationSettings);
   await writeBackupToHandle(handle, backup);
 
   return {

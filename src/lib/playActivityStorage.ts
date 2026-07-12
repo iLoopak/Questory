@@ -9,6 +9,7 @@ import {
   type PlayActivityStoreStatus,
   type PlayActivityVerification,
 } from './indexedDbPlayActivityRepository';
+import { markBackupRelevantChange } from './backupRevision';
 
 const STORAGE_KEY = 'questshelf.playActivity.v1';
 export const PLAY_ACTIVITY_SOURCES = ['manual', 'steam'] as const;
@@ -87,7 +88,10 @@ export function loadPlayActivity(): PlayActivityRecord[] {
 }
 
 export function savePlayActivity(records: PlayActivityRecord[]) {
-  playActivityRepository.replaceAll(normalizePlayActivityRecords(records));
+  const normalized = normalizePlayActivityRecords(records);
+  const changed = JSON.stringify(playActivityRepository.getAllSync()) !== JSON.stringify(normalized);
+  playActivityRepository.replaceAll(normalized);
+  if (changed) markBackupRelevantChange(STORAGE_KEY);
 }
 
 export function createPlayedTodayRecord(gameId: string, now = new Date()): PlayActivityRecord {
