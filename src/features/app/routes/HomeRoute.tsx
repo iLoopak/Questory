@@ -1,6 +1,6 @@
 import { HomePanel } from '../../../components/HomePanel';
 import { ShelfAvatar } from '../../../components/ShelfIdentity';
-import type { AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterShelfModel, AppRouterSyncModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterShelfModel, AppRouterSyncModel } from './routeModels';
 
 type HomeRouteProps = {
   core: Pick<AppRouterCoreModel, 'openGameFromHome' | 'setSelectedGameId' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 'setIsAchievementTimelineOpen' | 'addToastNotification'>;

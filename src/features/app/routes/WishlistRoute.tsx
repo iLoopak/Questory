@@ -1,5 +1,5 @@
 import { CollectionPanel } from '../../collection/CollectionPanel';
-import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSyncModel } from '../AppSectionRouter';
+import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSyncModel } from './routeModels';
 
 type WishlistRouteProps = {
   core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setIsAddGameOpen'>;

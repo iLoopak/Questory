@@ -1,5 +1,5 @@
 import { DiscoverPanel } from '../../../components/DiscoverPanel';
-import type { AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel } from './routeModels';
 
 type DiscoveryRouteProps = {
   core: Pick<AppRouterCoreModel, 'setActiveNavItem' | 'setActiveSettingsCategory'>;

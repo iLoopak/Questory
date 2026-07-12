@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { PanelLoadingFallback } from '../../../components/PanelLoadingFallback';
-import type { AppRouterGameModel } from '../AppSectionRouter';
+import type { AppRouterGameModel } from './routeModels';
 
 const QuestRunnerGame = lazy(() => import('../../../components/QuestRunnerGame').then((m) => ({ default: m.QuestRunnerGame })));
 

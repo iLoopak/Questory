@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { PanelLoadingFallback } from '../../../components/PanelLoadingFallback';
-import type { AppRouterGameModel, AppRouterMetadataModel, AppRouterOnboardingModel } from '../AppSectionRouter';
+import type { AppRouterGameModel, AppRouterMetadataModel, AppRouterOnboardingModel } from './routeModels';
 
 const MetadataEnrichmentPanel = lazy(() => import('../../../components/MetadataEnrichmentPanel').then((m) => ({ default: m.MetadataEnrichmentPanel })));
 

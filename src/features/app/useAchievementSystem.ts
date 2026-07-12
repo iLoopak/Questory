@@ -6,7 +6,7 @@ import {
   type QuestShelfAchievementProgress,
 } from '../../lib/questShelfAchievements';
 import { getSeenAchievementGhostIds, setSeenAchievementGhostIds } from '../../lib/achievementGhostStorage';
-import type { QueueGhostAchievement } from '../../components/QueueGhost';
+import type { QueueGhostAchievement } from '../../types/achievements';
 import type { Game } from '../../types/game';
 import type { PlatformQueueState } from '../../lib/platformQueueStorage';
 import type { ReviewModeState } from '../../lib/reviewModeStorage';

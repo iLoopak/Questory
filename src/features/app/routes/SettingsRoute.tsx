@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { initialCollectionFilters } from '../../../config/collection';
 import { PanelLoadingFallback } from '../../../components/PanelLoadingFallback';
-import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterOnboardingModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSettingsModel, AppRouterShelfModel, AppRouterSyncModel } from '../AppSectionRouter';
+import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterOnboardingModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSettingsModel, AppRouterShelfModel, AppRouterSyncModel } from './routeModels';
 
 const SettingsView = lazy(() => import('../../settings/SettingsView').then((m) => ({ default: m.SettingsView })));
 

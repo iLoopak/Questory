@@ -1,5 +1,5 @@
 import { QueuePanel } from '../../../components/QueuePanel';
-import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel } from './routeModels';
 
 type QuestQueueRouteProps = {
   core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setSelectedGameId'>;

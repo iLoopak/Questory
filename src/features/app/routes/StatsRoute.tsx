@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { PanelLoadingFallback } from '../../../components/PanelLoadingFallback';
-import type { AppRouterCoreModel, AppRouterGameModel, AppRouterQueueModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel, AppRouterQueueModel } from './routeModels';
 
 const StatsPanel = lazy(() => import('../../../components/StatsPanel').then((m) => ({ default: m.StatsPanel })));
 
