@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { DiscoveryInboxPanel } from '../../../components/DiscoveryInboxPanel';
-import type { AppRouterCoreModel, AppRouterDiscoveryModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterDiscoveryModel } from './routeModels';
 
 type DiscoveryInboxRouteProps = {
   core: Pick<AppRouterCoreModel, 'setActiveNavItem'>;

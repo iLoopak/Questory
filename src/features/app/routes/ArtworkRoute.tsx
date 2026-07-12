@@ -1,5 +1,5 @@
 import { ArtworkBrowserView } from '../../artwork/ArtworkBrowserView';
-import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel } from './routeModels';
 
 type ArtworkRouteProps = {
   core: Pick<AppRouterCoreModel, 'setSelectedGameId'>;

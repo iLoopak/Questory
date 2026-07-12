@@ -1,5 +1,5 @@
 import type { PlatformQueueState } from './platformQueueStorage';
-import type { IconName } from '../components/Icon';
+import type { IconName } from '../types/icons';
 import type { Game } from '../types/game';
 import type { AchievementCounters } from './achievementCounters';
 import type { ReviewStats } from './reviewModeStorage';

@@ -1,6 +1,6 @@
 import { CollectionPanel } from '../../collection/CollectionPanel';
 import { formatMessageTemplate, formatSteamAchievementSyncSummary } from '../../../utils/summaryFormatters';
-import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSyncModel } from '../AppSectionRouter';
+import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSyncModel } from './routeModels';
 
 type LibraryRouteProps = {
   core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setIsAddGameOpen' | 'openOnboarding' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 't'>;

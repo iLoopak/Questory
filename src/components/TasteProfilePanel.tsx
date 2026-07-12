@@ -520,54 +520,6 @@ function OverviewStep({
   );
 }
 
-function SignalWizardStep({
-  emptyLabel,
-  games,
-  intro,
-  signals,
-  title,
-  onConfirm,
-  onHide,
-  onPin,
-  onReject,
-}: {
-  emptyLabel: string;
-  games: Game[];
-  intro: string;
-  signals: TasteSignal[];
-  title: string;
-  onConfirm: (signal: TasteSignal) => void;
-  onHide: (signal: TasteSignal) => void;
-  onPin: (signal: TasteSignal) => void;
-  onReject: (signal: TasteSignal) => void;
-}) {
-  return (
-    <div>
-      <div className="qs-label-caps text-mint">Taste read</div>
-      <h3 className="mt-2 text-2xl font-bold text-white">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{intro}</p>
-      {signals.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-skyglass/15 bg-ink-950/60 p-5 text-sm leading-6 text-slate-500">{emptyLabel}</div>
-      ) : (
-        <div className="mt-4 grid gap-3">
-          {signals.map((signal, index) => (
-            <SignalEvidenceCard
-              games={games}
-              key={signal.id}
-              rank={index + 1}
-              signal={signal}
-              onConfirm={signal.origin === 'observed' ? () => onConfirm(signal) : undefined}
-              onHide={() => onHide(signal)}
-              onPin={() => onPin(signal)}
-              onReject={() => onReject(signal)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CompactSignalReviewStep({
   emptyLabel,
   games,

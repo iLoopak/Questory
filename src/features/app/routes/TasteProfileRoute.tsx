@@ -1,5 +1,5 @@
 import { TasteProfilePanel } from '../../../components/TasteProfilePanel';
-import type { AppRouterCoreModel, AppRouterGameModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel } from './routeModels';
 
 type TasteProfileRouteProps = {
   core: Pick<AppRouterCoreModel, 'setActiveNavItem' | 'setSelectedGameId'>;

@@ -1,5 +1,5 @@
 import { ReviewModePanel } from '../../../components/ReviewModePanel';
-import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel } from '../AppSectionRouter';
+import type { AppRouterCoreModel, AppRouterGameModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel } from './routeModels';
 
 type ReviewModeRouteProps = {
   core: Pick<AppRouterCoreModel, 'setActiveNavItem'>;

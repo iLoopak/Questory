@@ -271,12 +271,6 @@ export function getMetadataSummary(source: MetadataSourceModel): MetadataSummary
   };
 }
 
-/** @deprecated Use getRawgMetadataSnapshot. */
-export const getRawgMetadata = getRawgMetadataSnapshot;
-
-/** @deprecated Use getMetadataSummary. */
-export const getGameMetadataSummary = getMetadataSummary;
-
 export function getProviderLinks(game: Game): ProviderGameLink[] {
   const links: ProviderGameLink[] = [];
 

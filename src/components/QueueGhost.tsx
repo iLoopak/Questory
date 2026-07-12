@@ -159,10 +159,8 @@ export type QueueGhostCover = {
   imageUrl: string;
 };
 
-export type QueueGhostAchievement = {
-  title: string;
-  icon: IconName;
-};
+export type { QueueGhostAchievement } from '../types/achievements';
+import type { QueueGhostAchievement } from '../types/achievements';
 
 type QueueGhostVariantContext = {
   achievement?: QueueGhostAchievement | null;
