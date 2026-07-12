@@ -10,10 +10,12 @@ import type { ProviderStatusSummary } from '../lib/providerResult';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 import { usePersonalizedRecommendations } from '../hooks/usePersonalizedRecommendations';
 import { RECOMMENDATION_COPY } from '../lib/recommendationState';
+import type { PlannedGameIds } from '../lib/plannedGames';
 
 type DiscoverPanelProps = {
   games: Game[];
   discoveryInboxRawgIds: Set<number>;
+  plannedGameIds: PlannedGameIds;
   onAddToInbox: (game: DiscoveryGame, reason: string) => void;
   onOpenGame: (candidate: DiscoveryCandidate) => void;
   onAddToWishlist?: (game: DiscoveryGame) => void;
@@ -54,9 +56,9 @@ function DiscoverGridSkeleton() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings, onOpenTasteProfile }: DiscoverPanelProps) {
+export function DiscoverPanel({ games, discoveryInboxRawgIds, plannedGameIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings, onOpenTasteProfile }: DiscoverPanelProps) {
   const { t } = useI18n();
-  const { candidates: personalizedCandidates, loading: recommendationsLoading, provider: recommendationProvider, state: recommendationState, refresh: refreshRecommendations, isRefreshing: isRefreshingRecommendations, submitFeedback } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
+  const { candidates: personalizedCandidates, loading: recommendationsLoading, provider: recommendationProvider, state: recommendationState, refresh: refreshRecommendations, isRefreshing: isRefreshingRecommendations, submitFeedback } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0, plannedGameIds);
   const candidates = recommendationsLoading && personalizedCandidates.length === 0 ? null : personalizedCandidates.filter((candidate) => candidate.libraryStatus === null);
   const [upcoming, setUpcoming] = useState<DiscoveryCandidate[] | null>(null);
   // AS-10: the calendar now reports whether it is empty because RAWG said so, or because RAWG never

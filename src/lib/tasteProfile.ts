@@ -2,6 +2,7 @@ import type { Game } from '../types/game';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 import { loadRecommendationFeedback } from './recommendationFeedback';
 import { isGenericPreferenceTag, profileFingerprint, recommendationFranchiseKey, signalInformationValue, toSlug } from './userProfile';
+import { noPlannedGameIds, type PlannedGameIds } from './plannedGames';
 
 export const tasteProfileStorageKey = 'questshelf.tasteProfile.v1';
 export const TASTE_PROFILE_VERSION = 1;
@@ -104,9 +105,14 @@ export function saveTasteProfile(profile: TasteProfile): TasteProfile {
   return normalized;
 }
 
-export function buildTasteProfile(games: Game[], previous: TasteProfile = loadTasteProfile(), now = new Date()): TasteProfile {
-  const observed = inferObservedTasteSignals(games, previous.observed, now);
-  const fingerprint = tasteInputFingerprint(games);
+export function buildTasteProfile(
+  games: Game[],
+  previous: TasteProfile = loadTasteProfile(),
+  now = new Date(),
+  plannedGameIds: PlannedGameIds = noPlannedGameIds,
+): TasteProfile {
+  const observed = inferObservedTasteSignals(games, previous.observed, now, plannedGameIds);
+  const fingerprint = tasteInputFingerprint(games, plannedGameIds);
   const lastUpdatedAt = now.toISOString();
   const prompt = {
     ...previous.prompt,
@@ -127,17 +133,17 @@ export function buildTasteProfile(games: Game[], previous: TasteProfile = loadTa
   });
 }
 
-export function recomputeAndSaveTasteProfile(games: Game[], now = new Date()): TasteProfile {
+export function recomputeAndSaveTasteProfile(games: Game[], now = new Date(), plannedGameIds: PlannedGameIds = noPlannedGameIds): TasteProfile {
   const current = loadTasteProfile();
-  return saveTasteProfile(buildTasteProfile(games, { ...current, prompt: { ...current.prompt, inferencePausedAt: undefined } }, now));
+  return saveTasteProfile(buildTasteProfile(games, { ...current, prompt: { ...current.prompt, inferencePausedAt: undefined } }, now, plannedGameIds));
 }
 
-export function getTasteProfileForGames(games: Game[]): TasteProfile {
+export function getTasteProfileForGames(games: Game[], plannedGameIds: PlannedGameIds = noPlannedGameIds): TasteProfile {
   const current = loadTasteProfile();
   if (current.prompt.inferencePausedAt) return current;
-  const fingerprint = tasteInputFingerprint(games);
+  const fingerprint = tasteInputFingerprint(games, plannedGameIds);
   if (current.lastComputedFingerprint === fingerprint && current.observed.length > 0) return current;
-  return recomputeAndSaveTasteProfile(games);
+  return recomputeAndSaveTasteProfile(games, new Date(), plannedGameIds);
 }
 
 export function resetObservedTasteProfile(): TasteProfile {
@@ -287,20 +293,20 @@ export function exportTasteProfile(profile: TasteProfile = loadTasteProfile()): 
   return JSON.stringify(normalizeTasteProfile(profile), null, 2);
 }
 
-function tasteInputFingerprint(games: Game[]): string {
+function tasteInputFingerprint(games: Game[], plannedGameIds: PlannedGameIds): string {
   const feedbackKey = loadRecommendationFeedback()
     .map((record) => [record.rawgId ?? record.normalizedTitle, record.feedbackType, record.createdAt].join(':'))
     .sort()
     .join('|');
-  return `${profileFingerprint(games)}::feedback:${feedbackKey}`;
+  return `${profileFingerprint(games, plannedGameIds)}::feedback:${feedbackKey}`;
 }
 
-function inferObservedTasteSignals(games: Game[], previousObserved: TasteSignal[], now: Date): TasteSignal[] {
+function inferObservedTasteSignals(games: Game[], previousObserved: TasteSignal[], now: Date, plannedGameIds: PlannedGameIds): TasteSignal[] {
   const positive = new Map<string, SignalAccumulator>();
   const negative = new Map<string, SignalAccumulator>();
 
   for (const game of games) {
-    const behavior = getTasteBehavior(game);
+    const behavior = getTasteBehavior(game, plannedGameIds);
     if (behavior.weight === 0) continue;
     const target = behavior.weight > 0 ? positive : negative;
     const contradictionTarget = behavior.weight > 0 ? negative : positive;
@@ -367,7 +373,7 @@ function buildObservedSignal(accumulator: SignalAccumulator, previous: TasteSign
   };
 }
 
-function getTasteBehavior(game: Game): { weight: number; reason: string } {
+function getTasteBehavior(game: Game, plannedGameIds: PlannedGameIds): { weight: number; reason: string } {
   const rating = typeof game.rating === 'number' ? game.rating : null;
   if (game.status === 'Dropped') return { weight: rating != null && rating <= 2 ? -4 : -3, reason: 'dropped' };
   if (rating != null && rating <= 2 && (game.status === 'Finished' || game.playtimeHours >= 2)) return { weight: -3.2, reason: 'rated low' };
@@ -378,7 +384,15 @@ function getTasteBehavior(game: Game): { weight: number; reason: string } {
   if (game.status === 'Playing') { weight += 2.5; reasons.push('kept playing'); }
   if (game.playtimeHours >= 60) { weight += 2.5; reasons.push('spent a lot of time with'); }
   else if (game.playtimeHours >= 20) { weight += 1.5; reasons.push('spent time with'); }
-  if (game.collectionType === 'wishlist' || game.status === 'Want to play') { weight += game.priority === 'high' ? 1.4 : 0.8; reasons.push('planned'); }
+  // AS-15: two different intents, only one of which the user actually stated. Wishlisting is a
+  // deliberate act and keeps its weight; a Platform Plan entry is the explicit plan. `Want to play`
+  // is neither — an import stamps it on the whole backlog — so it no longer counts as intent here.
+  const wishlistSignal = game.collectionType === 'wishlist';
+  const explicitPlanSignal = plannedGameIds.has(game.id);
+  if (wishlistSignal || explicitPlanSignal) {
+    weight += game.priority === 'high' ? 1.4 : 0.8;
+    reasons.push(wishlistSignal ? 'wishlisted' : 'added to a platform plan');
+  }
   return { weight: Math.min(8, weight), reason: reasons[0] ?? 'owned' };
 }
 

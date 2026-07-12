@@ -12,6 +12,7 @@ import {
   signalInformationValue,
   toSlug,
 } from '../lib/userProfile';
+import { noPlannedGameIds, type PlannedGameIds } from '../lib/plannedGames';
 import { mapRawgResult } from './discoveryService';
 import {
   fetchGameSeries as fetchGameSeriesResult,
@@ -663,10 +664,10 @@ function compareSeeds(a: SelectedRecommendationSeed, b: SelectedRecommendationSe
     || a.stableKey.localeCompare(b.stableKey);
 }
 
-export function selectRecommendationSeeds(userGames: Game[], maxSeeds = 8): { seeds: SelectedRecommendationSeed[]; diagnostics: SeedDiagnostics[] } {
+export function selectRecommendationSeeds(userGames: Game[], maxSeeds = 8, plannedGameIds: PlannedGameIds = noPlannedGameIds): { seeds: SelectedRecommendationSeed[]; diagnostics: SeedDiagnostics[] } {
   const ranked = userGames
     .map((game): SelectedRecommendationSeed | null => {
-      const signal = getRecommendationSignalWeight(game);
+      const signal = getRecommendationSignalWeight(game, plannedGameIds);
       if (!game.rawgId || signal.weight <= 0) return null;
       const tags = (game.rawgTags ?? []).map(toSlug);
       const genres = game.genres ?? [];
@@ -720,10 +721,15 @@ export function selectRecommendationSeeds(userGames: Game[], maxSeeds = 8): { se
   };
 }
 
-function getPlanAndWishlistGames(userGames: Game[]): Game[] {
+/**
+ * Seeds drawn from what the user says they want next. AS-15: that is a wishlist entry or a Platform
+ * Plan entry — not `status === 'Want to play'`, which is what an import calls a backlog it has never
+ * been told anything about.
+ */
+function getPlanAndWishlistGames(userGames: Game[], plannedGameIds: PlannedGameIds): Game[] {
   return userGames
-    .filter((game) => game.rawgId && (game.collectionType === 'wishlist' || game.status === 'Want to play'))
-    .sort((a, b) => getRecommendationSignalWeight(b).weight - getRecommendationSignalWeight(a).weight)
+    .filter((game) => game.rawgId && (game.collectionType === 'wishlist' || plannedGameIds.has(game.id)))
+    .sort((a, b) => getRecommendationSignalWeight(b, plannedGameIds).weight - getRecommendationSignalWeight(a, plannedGameIds).weight)
     .slice(0, 6);
 }
 
@@ -1258,6 +1264,12 @@ export type FetchPersonalRecommendationsOptions = {
   forceRefresh?: boolean;
   hydrationReady?: boolean;
   previous?: DiscoveryCandidate[];
+  /**
+   * AS-15: the games the user actually put in a Platform Plan, projected by the caller (which owns
+   * Plan state) and passed in. This service does not read Plan storage — it is given the one thing
+   * about Plans that scoring depends on. Omitted means "no Plans", which is also the cold start.
+   */
+  plannedGameIds?: PlannedGameIds;
 };
 
 export type PersonalRecommendationsResult = {
@@ -1409,18 +1421,19 @@ async function generatePersonalRecommendationsResult(
       provider: providerOk,
     };
   }
+  const plannedGameIds = options.plannedGameIds ?? noPlannedGameIds;
   const generationStartedAt = performance.now();
   const performanceMarks: Record<string, number> = {};
   const profileStartedAt = performance.now();
-  const profile = buildUserProfile(userGames);
-  const tasteProfile = getTasteProfileForGames(userGames);
+  const profile = buildUserProfile(userGames, plannedGameIds);
+  const tasteProfile = getTasteProfileForGames(userGames, plannedGameIds);
   performanceMarks.profileBuildMs = Math.round(performance.now() - profileStartedAt);
   const feedback = loadRecommendationFeedback();
   const preferences = loadRecommendationPreferences();
   const exposure = loadRecommendationExposure();
   const exposureCounts = new Map(exposure.map((record) => [record.rawgId != null ? `id:${record.rawgId}` : `title:${record.normalizedTitle}`, record.exposureCount]));
   const feedbackContext: FeedbackContext = { feedback, preferences, exposureCounts };
-  const fp = `${profileFingerprint(userGames)}::taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
+  const fp = `${profileFingerprint(userGames, plannedGameIds)}::taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
   const events: DebugEvent[] = [];
   let partialFailureCount = 0;
   const counts = {
@@ -1428,7 +1441,8 @@ async function generatePersonalRecommendationsResult(
     finishedCount: userGames.filter((game) => game.status === 'Finished').length,
     ratedCount: userGames.filter((game) => typeof game.rating === 'number' && game.rating > 0).length,
     playingCount: userGames.filter((game) => game.status === 'Playing').length,
-    platformPlanCount: userGames.filter((game) => game.status === 'Want to play').length,
+    // AS-15: how many games are in a Platform Plan — the diagnostic used to report the backlog.
+    platformPlanCount: userGames.filter((game) => plannedGameIds.has(game.id)).length,
     wishlistCount: userGames.filter((game) => game.collectionType === 'wishlist').length,
   };
 
@@ -1456,9 +1470,9 @@ async function generatePersonalRecommendationsResult(
     return { candidates: cached, diagnostics: getDiagnosticsReport(), provider: providerOk };
   }
 
-  const { seeds: selectedSeeds, diagnostics: seedDiagnostics } = selectRecommendationSeeds(userGames, 8);
+  const { seeds: selectedSeeds, diagnostics: seedDiagnostics } = selectRecommendationSeeds(userGames, 8, plannedGameIds);
   const likedSeeds = selectedSeeds.slice(0, 6);
-  const planWishlistSeeds = getPlanAndWishlistGames(userGames);
+  const planWishlistSeeds = getPlanAndWishlistGames(userGames, plannedGameIds);
   const recentSeeds = getRecentlyInteractedGames(userGames);
   const seedTitles = [...likedSeeds.map((seed) => seed.game), ...planWishlistSeeds, ...recentSeeds].map((game) => game.title);
   const seen = new Set<number>();
@@ -1665,14 +1679,15 @@ export function getRecommendationInputKey(
   userGames: Game[],
   inboxRawgIds: Set<number> = new Set(),
   hydrationReady = true,
+  plannedGameIds: PlannedGameIds = noPlannedGameIds,
 ): string {
-  const tasteProfile = getTasteProfileForGames(userGames);
+  const tasteProfile = getTasteProfileForGames(userGames, plannedGameIds);
   const preferences = loadRecommendationPreferences();
   const feedback = loadRecommendationFeedback();
   const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
 
   return [
-    profileFingerprint(userGames),
+    profileFingerprint(userGames, plannedGameIds),
     `taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}`,
     `recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}`,
     `inbox:${inboxFingerprint}`,
@@ -1686,7 +1701,8 @@ export async function fetchPersonalRecommendationsResult(
   inboxRawgIds: Set<number> = new Set(),
   options: FetchPersonalRecommendationsOptions = {},
 ): Promise<PersonalRecommendationsResult> {
-  const fp = profileFingerprint(userGames);
+  const plannedGameIds = options.plannedGameIds ?? noPlannedGameIds;
+  const fp = profileFingerprint(userGames, plannedGameIds);
   const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
   const requestKey = options.forceRefresh ? `force:${crypto.randomUUID()}` : `${fp}:${inboxFingerprint}:${options.hydrationReady !== false}`;
   const existing = inFlightRequests.get(requestKey);

@@ -50,6 +50,7 @@ const testFiles = [
   { entry: 'scripts/discoveryInboxStorage.test.ts', out: 'discoveryInboxStorage.test.mjs' },
   { entry: 'scripts/multiGameImport.test.ts', out: 'multiGameImport.test.mjs' },
   { entry: 'scripts/recommendations.test.ts', out: 'recommendations.test.mjs' },
+  { entry: 'scripts/plannedIntent.test.ts', out: 'plannedIntent.test.mjs' },
   { entry: 'scripts/discoveryPreviewArtwork.test.ts', out: 'discoveryPreviewArtwork.test.mjs' },
   { entry: 'scripts/titleMatching.test.ts', out: 'titleMatching.test.mjs' },
   { entry: 'scripts/tasteProfileUi.test.ts', out: 'tasteProfileUi.test.mjs' },

@@ -1,4 +1,5 @@
 import type { Game } from '../types/game';
+import { noPlannedGameIds, plannedGameFingerprint, type PlannedGameIds } from './plannedGames';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -198,7 +199,13 @@ export interface PreferenceProfileDebug {
   negativeGames: WeightedGame[];
 }
 
-export function getRecommendationSignalWeight(game: Game): { weight: number; reason: string } {
+/**
+ * AS-15: `plannedGameIds` is the set of games the user actually put in a Platform Plan. It used to be
+ * inferred from `status === 'Want to play'`, which an import stamps on a whole backlog — so an
+ * imported library was read as 800 deliberate plans. The weights below are unchanged; only what
+ * qualifies as "planned" is.
+ */
+export function getRecommendationSignalWeight(game: Game, plannedGameIds: PlannedGameIds = noPlannedGameIds): { weight: number; reason: string } {
   const rating = typeof game.rating === 'number' ? game.rating : null;
   if (game.status === 'Dropped') return { weight: rating != null && rating <= 2 ? -7 : -5, reason: 'dropped' };
 
@@ -223,7 +230,8 @@ export function getRecommendationSignalWeight(game: Game): { weight: number; rea
     else if (game.playtimeHours >= 20) { weight += 2; reasons.push('meaningful playtime'); }
   }
   if (game.collectionType === 'wishlist') { weight += game.priority === 'high' ? 2.2 : 1.6; reasons.push('wishlist'); }
-  if (game.status === 'Want to play') { weight += 1.4; reasons.push('planned'); }
+  // The explicit plan signal: an entry the user made in a Platform Plan, not a default import status.
+  if (plannedGameIds.has(game.id)) { weight += 1.4; reasons.push('in a platform plan'); }
   if (game.status === 'Paused') return { weight: -0.5, reason: 'paused/later' };
   if (weight > 0) return { weight: Math.min(12, weight), reason: reasons.join(' + ') };
   if (game.collectionType === 'library' && ((game.genres?.length ?? 0) > 0 || (game.rawgTags?.length ?? 0) > 0)) return { weight: 0.12, reason: 'owned' };
@@ -283,12 +291,12 @@ function topN<K>(map: Map<K, number>, n: number): K[] {
     .map(([key]) => key);
 }
 
-export function buildUserProfile(games: Game[]): UserProfile {
+export function buildUserProfile(games: Game[], plannedGameIds: PlannedGameIds = noPlannedGameIds): UserProfile {
   const positive: WeightedGame[] = [];
   const negative: WeightedGame[] = [];
 
   for (const game of games) {
-    const signal = getRecommendationSignalWeight(game);
+    const signal = getRecommendationSignalWeight(game, plannedGameIds);
     if (signal.weight > 0) positive.push({ game, weight: signal.weight, reason: signal.reason });
     if (signal.weight < 0) negative.push({ game, weight: Math.abs(signal.weight), reason: signal.reason });
   }
@@ -358,7 +366,7 @@ export function buildUserProfile(games: Game[]): UserProfile {
       : null;
 
   const sampleTitles = games
-    .filter((g) => getRecommendationSignalWeight(g).weight > 0)
+    .filter((g) => getRecommendationSignalWeight(g, plannedGameIds).weight > 0)
     .slice(0, 3)
     .map((g) => g.title);
 
@@ -392,9 +400,14 @@ export function buildUserProfile(games: Game[]): UserProfile {
  * imports, collection changes, status changes, metadata enrichment, playtime/rating
  * edits, and queue-tag decisions should all move this fingerprint without tying
  * recommendation refreshes to React render identity.
+ *
+ * AS-15: Platform Plan membership is an input too, so adding or removing a Plan entry moves the
+ * fingerprint — but only membership. Reordering a Plan, moving an entry to another platform or
+ * editing a Plan note changes nothing the profile reads, and must not force a refresh.
  */
-export function profileFingerprint(games: Game[]): string {
-  return games
+export function profileFingerprint(games: Game[], plannedGameIds: PlannedGameIds = noPlannedGameIds): string {
+  const planned = plannedGameFingerprint(plannedGameIds);
+  const gamesPart = games
     .map((game) => {
       const genres = [...(game.genres ?? [])].sort().join(',');
       const rawgTags = [...(game.rawgTags ?? [])].sort().join(',');
@@ -419,4 +432,6 @@ export function profileFingerprint(games: Game[]): string {
     })
     .sort()
     .join('||');
+
+  return `${gamesPart}##plans:${planned}`;
 }

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon, type IconName } from './Icon';
 import type { Game } from '../types/game';
+import { noPlannedGameIds, type PlannedGameIds } from '../lib/plannedGames';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
 import {
   addExplicitTasteSignal,
@@ -42,6 +43,7 @@ import {
 
 type TasteProfilePanelProps = {
   games: Game[];
+  plannedGameIds?: PlannedGameIds;
   onDone?: () => void;
   variant?: 'page' | 'embedded';
 };
@@ -120,8 +122,8 @@ function getTasteSwipeTarget(offsetX: number, offsetY: number) {
   };
 }
 
-export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProfilePanelProps) {
-  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => getTasteProfileForGames(games));
+export function TasteProfilePanel({ games, plannedGameIds = noPlannedGameIds, onDone, variant = 'page' }: TasteProfilePanelProps) {
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => getTasteProfileForGames(games, plannedGameIds));
   const [activeStep, setActiveStep] = useState<WizardStep>('welcome');
   const [newTasteLabel, setNewTasteLabel] = useState('');
   const [newTasteKind, setNewTasteKind] = useState<TasteSignalKind>('tag');
@@ -149,7 +151,7 @@ export function TasteProfilePanel({ games, onDone, variant = 'page' }: TasteProf
   }
 
   function recomputeTasteProfile() {
-    applyTasteProfileUpdate(recomputeAndSaveTasteProfile(games));
+    applyTasteProfileUpdate(recomputeAndSaveTasteProfile(games, new Date(), plannedGameIds));
   }
 
   function addManualTasteSignal() {
