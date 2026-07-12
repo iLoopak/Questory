@@ -79,6 +79,7 @@ const testFiles = [
   { entry: 'scripts/discoveryPromotionCommand.test.ts', out: 'discoveryPromotionCommand.test.mjs' },
   { entry: 'scripts/gameDetailDraft.test.ts', out: 'gameDetailDraft.test.mjs' },
   { entry: 'scripts/storageRegistryCoverage.test.ts', out: 'storageRegistryCoverage.test.mjs' },
+  { entry: 'scripts/serviceWorkerOffline.test.ts', out: 'serviceWorkerOffline.test.mjs' },
 ];
 
 await Promise.all(

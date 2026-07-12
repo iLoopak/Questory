@@ -22,6 +22,7 @@ import {
 } from './lib/themePreferences';
 import { installTelemetryDebugSelfTest } from './lib/analytics';
 import { registerServiceWorker } from './lib/serviceWorkerRegistration';
+import { RootErrorBoundary } from './components/RootErrorBoundary';
 import './styles.css';
 
 registerServiceWorker();
@@ -112,7 +113,10 @@ async function startApp() {
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      {/* AS-11: a lazy route whose chunk no longer exists must offer a way out, not a dead screen. */}
+      <RootErrorBoundary>
+        <App />
+      </RootErrorBoundary>
     </React.StrictMode>,
   );
 }
