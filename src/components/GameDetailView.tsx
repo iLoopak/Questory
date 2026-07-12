@@ -535,7 +535,26 @@ export function GameDetailView({
 
 function GameDetailScreenshotsSection({ game }: { game: Game }) {
   const { t } = useI18n();
-  const { screenshots, loading } = useGameScreenshots(game);
+  const { screenshots, loading, error, errorDetail, refetch } = useGameScreenshots(game);
+
+  // AS-13: a failure used to be indistinguishable from "this game has no screenshots" — the section
+  // simply vanished, and the empty result was cached for a week. Now it says so, and offers Retry.
+  if (error && screenshots.length === 0) {
+    return (
+      <DetailSection title={t('preview.screenshots')}>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-ink-950/55 p-3 text-sm text-slate-400">
+          <span>{errorDetail?.safeMessage ?? 'Screenshots could not be loaded.'}</span>
+          <button
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:border-mint/40 hover:text-mint"
+            onClick={refetch}
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
+      </DetailSection>
+    );
+  }
 
   if (!loading && screenshots.length === 0) return null;
 
