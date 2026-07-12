@@ -16,6 +16,7 @@ import {
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
 import { fetchPersonalRecommendationsResult } from '../../services/personalRecommendationsService';
 import { bucketSmallGroup, trackAnalyticsEvent } from '../../lib/analytics';
+import { noPlannedGameIds, type PlannedGameIds } from '../../lib/plannedGames';
 
 type ToastNotification = {
   category: 'success' | 'info';
@@ -27,12 +28,13 @@ type UseDiscoveryControllerOptions = {
   games: Game[];
   t: TFunction;
   addToastNotification: (notification: ToastNotification) => void;
+  plannedGameIds?: PlannedGameIds;
 };
 
 /** How many Inbox recommendations one request asks for. Bucketed, never sent as an exact count. */
 const DISCOVERY_RECOMMENDATION_REQUEST_SIZE = 10;
 
-export function useDiscoveryController({ games, t, addToastNotification }: UseDiscoveryControllerOptions) {
+export function useDiscoveryController({ games, t, addToastNotification, plannedGameIds = noPlannedGameIds }: UseDiscoveryControllerOptions) {
   const [inboxState, setInboxState] = useState(() => {
     const state = startDiscoveryInboxRun(loadDiscoveryInboxState());
     saveDiscoveryInboxState(state);
@@ -141,7 +143,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
         ...latestState.activeQueue.map((item) => item.rawgId),
         ...latestState.nextQueue.map((item) => item.rawgId),
       ]);
-      const { candidates } = await fetchPersonalRecommendationsResult(games, queuedRawgIds, { forceRefresh: true });
+      const { candidates } = await fetchPersonalRecommendationsResult(games, queuedRawgIds, { forceRefresh: true, plannedGameIds });
       if (getDiscoveryInboxRequestGeneration() !== requestGeneration) return 0;
       const validCandidates = candidates
         .filter((candidate) => !candidate.excluded && candidate.libraryStatus === null && !candidate.inboxStatus)
@@ -185,7 +187,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
       isRequestingInboxRecommendationsRef.current = false;
       setIsRequestingInboxRecommendations(false);
     }
-  }, [addToastNotification, games, t]);
+  }, [addToastNotification, games, plannedGameIds, t]);
 
   const skipInboxItem = useCallback((id: string) => {
     setInboxState((currentState) => {

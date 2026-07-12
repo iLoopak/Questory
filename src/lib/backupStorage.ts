@@ -10,7 +10,8 @@ import {
 } from './localPersistence';
 import { saveRecoverySnapshot, type RecoverySnapshot } from './recoverySnapshotStorage';
 import { normalizeOnboardingState } from './onboardingStorage';
-import { normalizePlatformQueuePersistedState } from './platformQueueStorage';
+import { loadPlatformQueueState, normalizePlatformQueuePersistedState, normalizePlatformQueueState } from './platformQueueStorage';
+import { getPlannedGameIds, type PlannedGameIds } from './plannedGames';
 import { loadPlayActivity, normalizePlayActivityRecords, playActivityRepository } from './playActivityStorage';
 import { loadRawgMetadataCache, normalizeRawgMetadataCache, rawgMetadataCacheRepository } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
@@ -358,6 +359,10 @@ export async function mergeQuestShelfBackup(
   const backupTasteProfile = Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.tasteProfile.v1')
     ? normalizeTasteProfile(backup.data['questshelf.tasteProfile.v1'])
     : null;
+  // AS-15: the taste profile is rebuilt from the library, and Platform Plans are part of that input.
+  // A backup that carries Plans overwrites the local ones, so the profile must be rebuilt against
+  // the Plans the user will actually have when the restore finishes.
+  const restoredPlannedGameIds = getRestoredPlannedGameIds(backup, mergedGames);
 
   allBackupStorageKeys.forEach((key) => {
     if (isCollectionBackedKey(key)) {
@@ -375,11 +380,11 @@ export async function mergeQuestShelfBackup(
 
   if (backupTasteProfile) {
     const localTasteProfile = normalizeTasteProfile(readStorageJson('questshelf.tasteProfile.v1'));
-    writes.push(['questshelf.tasteProfile.v1', mergeTasteProfiles(localTasteProfile, backupTasteProfile, mergedGames)]);
+    writes.push(['questshelf.tasteProfile.v1', mergeTasteProfiles(localTasteProfile, backupTasteProfile, mergedGames, restoredPlannedGameIds)]);
   } else {
     writes.push([
       'questshelf.tasteProfile.v1',
-      buildTasteProfile(mergedGames, normalizeTasteProfile(undefined)),
+      buildTasteProfile(mergedGames, normalizeTasteProfile(undefined), new Date(), restoredPlannedGameIds),
     ]);
   }
 
@@ -784,7 +789,15 @@ function mergeGames(localGames: Game[], backupGames: Game[]) {
   return mergedGames;
 }
 
-function mergeTasteProfiles(localProfile: TasteProfile, backupProfile: TasteProfile, mergedGames: Game[]): TasteProfile {
+/** The Plans that will be in effect once this restore is written: the backup's if it carries any, else the local ones. */
+function getRestoredPlannedGameIds(backup: QuestShelfBackup, mergedGames: Game[]): PlannedGameIds {
+  const state = Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.platformQueues.v1')
+    ? normalizePlatformQueueState(backup.data['questshelf.platformQueues.v1'])
+    : loadPlatformQueueState();
+  return getPlannedGameIds(state, mergedGames);
+}
+
+function mergeTasteProfiles(localProfile: TasteProfile, backupProfile: TasteProfile, mergedGames: Game[], plannedGameIds: PlannedGameIds): TasteProfile {
   const now = new Date();
   const explicit = mergeTasteSignals(localProfile.explicit, backupProfile.explicit);
   const temporary = mergeTasteSignals(localProfile.temporary, backupProfile.temporary)
@@ -794,7 +807,7 @@ function mergeTasteProfiles(localProfile: TasteProfile, backupProfile: TasteProf
     explicit,
     temporary,
     prompt: { ...localProfile.prompt, ...backupProfile.prompt, inferencePausedAt: undefined },
-  }, now);
+  }, now, plannedGameIds);
 }
 
 function mergeTasteSignals(localSignals: TasteSignal[], backupSignals: TasteSignal[]): TasteSignal[] {

@@ -13,6 +13,7 @@ import { trackAnalyticsEvent } from '../lib/analytics';
 import { isProviderSetupErrorKind, type ProviderStatusSummary } from '../lib/providerResult';
 import { LatestRequestScheduler } from '../lib/latestRequest';
 import { RECOMMENDATION_ENGINE_VERSION, RECOMMENDATION_SCORING_VERSION } from '../lib/recommendationConfig';
+import { noPlannedGameIds, type PlannedGameIds } from '../lib/plannedGames';
 
 /**
  * AS-12: recommendations belong to the library they were generated from.
@@ -40,7 +41,12 @@ export function getRecommendationFeedbackRankBucket(
   return 'lower';
 }
 
-export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<number>, hydrationReady = true) {
+export function usePersonalizedRecommendations(
+  games: Game[],
+  inboxRawgIds: Set<number>,
+  hydrationReady = true,
+  plannedGameIds: PlannedGameIds = noPlannedGameIds,
+) {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -58,8 +64,8 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
   candidatesRef.current = candidates;
 
   const inputKey = useMemo(
-    () => getRecommendationInputKey(games, inboxRawgIds, hydrationReady),
-    [games, inboxRawgIds, hydrationReady],
+    () => getRecommendationInputKey(games, inboxRawgIds, hydrationReady, plannedGameIds),
+    [games, inboxRawgIds, hydrationReady, plannedGameIds],
   );
 
   // The inputs the run must be judged against. Written during render, so the scheduler's guards
@@ -73,6 +79,8 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
   inboxRef.current = inboxRawgIds;
   const hydrationReadyRef = useRef(hydrationReady);
   hydrationReadyRef.current = hydrationReady;
+  const plannedGameIdsRef = useRef(plannedGameIds);
+  plannedGameIdsRef.current = plannedGameIds;
 
   const schedulerRef = useRef<LatestRequestScheduler<string> | null>(null);
   if (!schedulerRef.current) {
@@ -86,6 +94,7 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
     const currentGames = gamesRef.current;
     const currentInbox = inboxRef.current;
     const currentHydrationReady = hydrationReadyRef.current;
+    const currentPlannedGameIds = plannedGameIdsRef.current;
 
     const preflight = getRecommendationState({
       games: currentGames,
@@ -112,6 +121,7 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
         hydrationReady: currentHydrationReady,
         forceRefresh: force,
         previous: previous.current,
+        plannedGameIds: currentPlannedGameIds,
       });
 
       // The guard covers a cache hit exactly as it covers a network result: a result for inputs the

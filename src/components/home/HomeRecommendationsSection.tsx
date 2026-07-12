@@ -4,11 +4,13 @@ import { DiscoveryCompactCard, DiscoveryCompactCardSkeleton } from '../discovery
 import { usePersonalizedRecommendations } from '../../hooks/usePersonalizedRecommendations';
 import { Icon } from '../Icon';
 import { RECOMMENDATION_COPY } from '../../lib/recommendationState';
+import type { PlannedGameIds } from '../../lib/plannedGames';
 
 type HomeRecommendationsSectionProps = {
   games: Game[];
   libraryGameCount: number;
   inboxRawgIds: Set<number>;
+  plannedGameIds: PlannedGameIds;
   onSelectGame?: (game: DiscoveryGame) => void;
   onOpenPreview?: (candidate: DiscoveryCandidate) => void;
   onOpenRawgSettings?: () => void;
@@ -19,11 +21,12 @@ export function HomeRecommendationsSection({
   games,
   libraryGameCount,
   inboxRawgIds,
+  plannedGameIds,
   onSelectGame,
   onOpenPreview,
   onOpenTasteProfile,
 }: HomeRecommendationsSectionProps) {
-  const { candidates, loading, error, state, refresh, isRefreshing } = usePersonalizedRecommendations(games, inboxRawgIds, libraryGameCount > 0);
+  const { candidates, loading, error, state, refresh, isRefreshing } = usePersonalizedRecommendations(games, inboxRawgIds, libraryGameCount > 0, plannedGameIds);
 
   if (!onSelectGame) return null;
 

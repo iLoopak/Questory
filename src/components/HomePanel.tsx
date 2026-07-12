@@ -26,6 +26,7 @@ import { WishlistDealCard, WishlistDealActionSheet } from './home/WishlistDealCa
 import { useHomeWidgetPreferences } from '../hooks/useHomeWidgetPreferences';
 import { homeWidgetRegistry, orderedWidgetIdsForColumn, type HomeWidgetId } from '../lib/homeWidgetPreferences';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
+import { getPlannedGameIds } from '../lib/plannedGames';
 
 type HomePanelProps = {
   appTitle?: string;
@@ -102,6 +103,7 @@ export function HomePanel({
   discoveryInboxRawgIds = new Set(),
 }: HomePanelProps) {
   const { t } = useI18n();
+  const plannedGameIds = useMemo(() => getPlannedGameIds(queueState, games), [games, queueState]);
   const { preferences: homeWidgets } = useHomeWidgetPreferences();
   const [actionSheetGame, setActionSheetGame] = useState<Game | null>(null);
   const [dealSheetGame, setDealSheetGame] = useState<Game | null>(null);
@@ -580,6 +582,7 @@ export function HomePanel({
             games={games}
             libraryGameCount={libraryGames.length}
             inboxRawgIds={discoveryInboxRawgIds}
+            plannedGameIds={plannedGameIds}
             onSelectGame={onSelectDiscoveryGame}
             onOpenPreview={onOpenDiscoveryPreview}
             onOpenRawgSettings={onOpenIntegrationsSettings ?? onOpenSettings}

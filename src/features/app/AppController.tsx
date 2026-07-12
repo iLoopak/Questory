@@ -29,6 +29,7 @@ import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
 import { addGameToPlatformQueue, removeGameFromPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
+import { getPlannedGameIds } from '../../lib/plannedGames';
 import type { StatusTransitionEffects } from '../../lib/gameStatusTransitions';
 import { derivePlanUndoOperations, type UndoOperation } from '../../lib/undoOperations';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
@@ -295,6 +296,7 @@ export function AppController() {
     setReviewModeState,
   });
   addToastRef.current = addToastNotification;
+  const plannedGameIds = useMemo(() => getPlannedGameIds(platformQueueState, games), [games, platformQueueState]);
   const {
     inboxItems: discoveryInboxItems,
     inboxRawgIds: discoveryInboxRawgIds,
@@ -307,7 +309,7 @@ export function AppController() {
     isRequestingInboxRecommendations: isRequestingDiscoveryInboxRecommendations,
     skipInboxItem: skipDiscoveryInboxItem,
     startInboxRun: startDiscoveryInboxRun,
-  } = useDiscoveryController({ games, t, addToastNotification });
+  } = useDiscoveryController({ games, t, addToastNotification, plannedGameIds });
 
   // AS-07: a status transition says WHAT must happen to the Plans; the controller owns Plan state,
   // so it applies that here and hands the undo operations back, keeping the whole change one
@@ -1397,4 +1399,3 @@ export function AppController() {
     </I18nProvider>
   );
 }
-

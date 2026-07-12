@@ -112,9 +112,9 @@ export function AppSectionRouter(props: AppSectionRouterProps) {
       ) : activeNavItem === 'Artwork' ? (
         <ArtworkRoute core={core} games={games} metadata={metadata} />
       ) : activeNavItem === 'Discover' ? (
-        <DiscoveryRoute core={core} games={games} discovery={discovery} />
+        <DiscoveryRoute core={core} games={games} discovery={discovery} queue={queue} />
       ) : activeNavItem === 'Taste Profile' ? (
-        <TasteProfileRoute core={core} games={games} />
+        <TasteProfileRoute core={core} games={games} queue={queue} />
       ) : activeNavItem === 'Stats' ? (
         <StatsRoute core={core} games={games} queue={queue} />
       ) : activeNavItem === 'Quest Runner' ? (
