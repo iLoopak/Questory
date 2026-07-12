@@ -806,6 +806,23 @@ function StorageRecoveryPanel({
           <div key={`${issue.key}-${issue.recordedAt}`} className="rounded-md border border-amber-200/20 bg-ink-950/70 px-3 py-2 text-sm">
             <div className="font-semibold">{issue.key}</div>
             <div className="mt-1 text-amber-100/80">{issue.message}</div>
+            {/* AS-05: which tier failed, and whether the value is actually at risk. Metadata only —
+                several of these keys hold API keys, so the payload is never shown. */}
+            {(issue.operation || issue.tier) && (
+              <div className="mt-1 text-xs text-amber-100/60">
+                {[
+                  issue.operation && issue.tier ? `${issue.tier} ${issue.operation}` : issue.operation ?? issue.tier,
+                  issue.category,
+                  issue.localValuePresent === undefined
+                    ? null
+                    : issue.localValuePresent
+                      ? 'value still stored on this device'
+                      : 'no local copy of this value',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            )}
           </div>
         ))}
       </div>
