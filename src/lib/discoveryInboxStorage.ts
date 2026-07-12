@@ -174,15 +174,32 @@ export function restoreDeferredDiscoveryInboxItem(state: DiscoveryInboxState, ra
   };
 }
 
+/**
+ * AS-09: drop the Inbox items the user has since resolved elsewhere.
+ *
+ * This existed but had no caller, so a game imported from Steam (or promoted from the preview) sat
+ * in the Inbox forever and could be promoted a second time into a duplicate. It now runs whenever
+ * canonical games change.
+ *
+ * It removes an item only on an identity a game genuinely carries — a RAWG id, or a normalized
+ * title AND platform. A title-only coincidence is not enough to delete somebody's candidate, so
+ * weak/ambiguous items stay in the Inbox rather than vanishing. Both queues are filtered in place,
+ * so the active order and the Skip/defer queue are preserved, and an unchanged state is returned by
+ * reference so callers can skip a write.
+ */
 export function reconcileDiscoveryInboxState(state: DiscoveryInboxState, games: Game[]): DiscoveryInboxState {
-  const excludedIdentities = new Set(games
-    .filter((game) => game.collectionType === 'library' || game.collectionType === 'wishlist' || game.status === 'Playing' || game.status === 'Finished' || game.status === 'Dropped' || game.status === 'Want to play')
-    .flatMap(getGameDiscoveryIdentities));
+  const excludedIdentities = new Set(games.flatMap(getGameDiscoveryIdentities));
+  if (excludedIdentities.size === 0) return state;
+
   const keepItem = (item: DiscoveryInboxItem) => !excludedIdentities.has(getDiscoveryInboxItemIdentity(item));
-  return {
-    activeQueue: state.activeQueue.filter(keepItem),
-    nextQueue: state.nextQueue.filter(keepItem),
-  };
+  const activeQueue = state.activeQueue.filter(keepItem);
+  const nextQueue = state.nextQueue.filter(keepItem);
+
+  if (activeQueue.length === state.activeQueue.length && nextQueue.length === state.nextQueue.length) {
+    return state;
+  }
+
+  return { activeQueue, nextQueue };
 }
 
 function getGameDiscoveryIdentities(game: Game): string[] {
@@ -191,7 +208,6 @@ function getGameDiscoveryIdentities(game: Game): string[] {
   const normalizedTitle = normalizeDiscoveryInboxIdentity(game.rawgTitle ?? game.title);
   const normalizedPlatform = normalizeDiscoveryInboxIdentity(game.platform);
   if (normalizedPlatform && normalizedTitle) identities.push(`platform-title:${normalizedPlatform}:${normalizedTitle}`);
-  if (normalizedTitle) identities.push(`title:${normalizedTitle}`);
   return identities;
 }
 

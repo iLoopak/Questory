@@ -62,6 +62,8 @@ const testFiles = [
   { entry: 'scripts/undoScopedOperations.test.ts', out: 'undoScopedOperations.test.mjs' },
   { entry: 'scripts/statusPlanInvariants.test.ts', out: 'statusPlanInvariants.test.mjs' },
   { entry: 'scripts/gameEditPatch.test.ts', out: 'gameEditPatch.test.mjs' },
+  { entry: 'scripts/discoveryPromotion.test.ts', out: 'discoveryPromotion.test.mjs' },
+  { entry: 'scripts/discoveryPromotionCommand.test.ts', out: 'discoveryPromotionCommand.test.mjs' },
   { entry: 'scripts/gameDetailDraft.test.ts', out: 'gameDetailDraft.test.mjs' },
 ];
 
