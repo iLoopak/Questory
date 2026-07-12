@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { areCanonicalCollectionWritesSuspended } from '../../lib/canonicalCollections';
 import { saveGames } from '../../lib/gameStorage';
 import { saveIgnoredSteamGames } from '../../lib/steamIgnoredGamesStorage';
 import { savePlayActivity, type PlayActivityRecord } from '../../lib/playActivityStorage';
@@ -31,6 +32,20 @@ export function useAppPersistence({
   const onboardingStateSnapshotRef = useRef(JSON.stringify(onboardingState));
   const platformQueueStateSnapshotRef = useRef(JSON.stringify(platformQueueState));
 
+  /**
+   * AS-03. Every owner-driven save goes through here. While a destructive restore/recovery is in
+   * flight (or an owner replacement has not yet re-rendered), the owner's array is stale by
+   * definition — writing it would delete the data that was just recovered. Suspension is an
+   * explicit contract from `canonicalCollections`, not a timing assumption, so it holds equally
+   * for the debounce, the unmount flush and the visibility/unload flush.
+   */
+  function saveGamesUnlessSuspended() {
+    if (areCanonicalCollectionWritesSuspended()) {
+      return;
+    }
+    saveGames(gamesRef.current);
+  }
+
   // Flush on unmount
   useEffect(() => {
     return () => {
@@ -38,7 +53,7 @@ export function useAppPersistence({
         clearTimeout(saveGamesTimerRef.current);
         saveGamesTimerRef.current = null;
       }
-      saveGames(gamesRef.current);
+      saveGamesUnlessSuspended();
     };
   }, []);
 
@@ -49,7 +64,7 @@ export function useAppPersistence({
     }
     saveGamesTimerRef.current = setTimeout(() => {
       saveGamesTimerRef.current = null;
-      saveGames(gamesRef.current);
+      saveGamesUnlessSuspended();
     }, 400);
   }, [games]);
 
@@ -62,7 +77,7 @@ export function useAppPersistence({
       if (saveGamesTimerRef.current !== null) {
         clearTimeout(saveGamesTimerRef.current);
         saveGamesTimerRef.current = null;
-        saveGames(gamesRef.current);
+        saveGamesUnlessSuspended();
       }
     }
 
@@ -81,7 +96,7 @@ export function useAppPersistence({
   }, []);
 
   useEffect(() => {
-    if (!hasPersistedValueChanged(ignoredSteamGamesSnapshotRef, ignoredSteamGames)) {
+    if (areCanonicalCollectionWritesSuspended() || !hasPersistedValueChanged(ignoredSteamGamesSnapshotRef, ignoredSteamGames)) {
       return;
     }
 
@@ -89,7 +104,7 @@ export function useAppPersistence({
   }, [ignoredSteamGames]);
 
   useEffect(() => {
-    if (!hasPersistedValueChanged(playActivitySnapshotRef, playActivity)) {
+    if (areCanonicalCollectionWritesSuspended() || !hasPersistedValueChanged(playActivitySnapshotRef, playActivity)) {
       return;
     }
 
@@ -97,7 +112,7 @@ export function useAppPersistence({
   }, [playActivity]);
 
   useEffect(() => {
-    if (!hasPersistedValueChanged(onboardingStateSnapshotRef, onboardingState)) {
+    if (areCanonicalCollectionWritesSuspended() || !hasPersistedValueChanged(onboardingStateSnapshotRef, onboardingState)) {
       return;
     }
 
@@ -105,7 +120,7 @@ export function useAppPersistence({
   }, [onboardingState]);
 
   useEffect(() => {
-    if (!hasPersistedValueChanged(platformQueueStateSnapshotRef, platformQueueState)) {
+    if (areCanonicalCollectionWritesSuspended() || !hasPersistedValueChanged(platformQueueStateSnapshotRef, platformQueueState)) {
       return;
     }
 

@@ -10,9 +10,11 @@ import {
   type CollectionLegacyRecoveryMode,
   type CollectionLegacyRecoveryPreview,
   type CollectionLegacyRecoveryResult,
+  type CollectionRepairResult,
   type CollectionSnapshotRepairResult,
   type CollectionStoreStatus,
   type CollectionVerification,
+  type CollectionWriteResult,
 } from './indexedDbCollectionRepository';
 
 const PLAY_ACTIVITY_KEY = 'questshelf.playActivity.v1';
@@ -32,6 +34,8 @@ export type PlayActivityRepairResult = CollectionSnapshotRepairResult;
 export type PlayActivityRecoveryPreview = CollectionLegacyRecoveryPreview;
 export type PlayActivityRecoveryMode = CollectionLegacyRecoveryMode;
 export type PlayActivityRecoveryResult = CollectionLegacyRecoveryResult;
+export type PlayActivityWriteResult = CollectionWriteResult;
+export type PlayActivityRepairDurableResult = CollectionRepairResult;
 
 export interface PlayActivityRepository {
   ready(): Promise<void>;
@@ -39,6 +43,13 @@ export interface PlayActivityRepository {
   loadDurable(): Promise<PlayActivityRecord[]>;
   replaceAll(records: PlayActivityRecord[]): void;
   clear(): Promise<void>;
+  /** Awaitable destructive mutations (backup restore/merge, recovery). See AS-01. */
+  replaceAllDurable(records: PlayActivityRecord[]): Promise<PlayActivityWriteResult>;
+  upsertManyDurable(records: PlayActivityRecord[]): Promise<PlayActivityWriteResult>;
+  removeManyDurable(ids: string[]): Promise<PlayActivityWriteResult>;
+  clearDurable(): Promise<PlayActivityWriteResult>;
+  /** Durable repair: rewrites the valid rows and deletes invalid/duplicate ones in IndexedDB. */
+  repairDurable(): Promise<PlayActivityRepairDurableResult>;
   getStatus(): PlayActivityStoreStatus;
   verify(): Promise<PlayActivityVerification>;
   repairSnapshot(): Promise<PlayActivityRepairResult>;

@@ -59,9 +59,10 @@ function makeBackup(games: unknown, overrides: Partial<QuestShelfBackup> = {}): 
   };
 }
 
-/** Unwrap a successful import, failing loudly if the facade refused the backup. */
-function expectImported(result: QuestShelfBackupImportResult) {
-  assert.equal(result.ok, true, 'expected the backup to be imported');
+/** Await an import and unwrap it, failing loudly if the facade refused the backup. */
+async function expectImported(pending: Promise<QuestShelfBackupImportResult>) {
+  const result = await pending;
+  assert.equal(result.ok, true, `expected the backup to be imported, got: ${JSON.stringify(result)}`);
   return result as Extract<QuestShelfBackupImportResult, { ok: true }>;
 }
 
@@ -77,7 +78,7 @@ async function setupWithLocalGames(localGames: Game[]): Promise<void> {
   await gameRepository.clear();
   await clearQuestoryTables(database);
 
-  gameRepository.replaceAll(localGames);
+  await gameRepository.replaceAllDurable(localGames);
 }
 
 const byId = (games: Game[]) => games.map((game) => game.id).sort();
@@ -91,7 +92,7 @@ for (const identity of ['steam', 'rawg', 'title-platform'] as const) {
 
     // The backup holds BOTH legitimate records; the local device only has the Library one.
     const newer = '2026-07-01T00:00:00.000Z';
-    const result = expectImported(
+    const result = await expectImported(
       mergeQuestShelfBackup(
         makeBackup([
           { ...library, updatedAt: newer },
@@ -119,7 +120,7 @@ for (const identity of ['steam', 'rawg', 'title-platform'] as const) {
     await setupWithLocalGames([wishlist]);
 
     const newer = '2026-07-01T00:00:00.000Z';
-    const result = expectImported(
+    const result = await expectImported(
       mergeQuestShelfBackup(
         makeBackup([
           { ...library, updatedAt: newer },
@@ -142,7 +143,7 @@ test('AS-02: merging both twins into an empty library keeps both', async () => {
   const { library, wishlist } = makeCollectionTwins('steam');
   await setupWithLocalGames([]);
 
-  const result = expectImported(mergeQuestShelfBackup(makeBackup([library, wishlist])));
+  const result = await expectImported(mergeQuestShelfBackup(makeBackup([library, wishlist])));
 
   assert.deepEqual(byId(result.data.games), [library.id, wishlist.id].sort());
   assert.deepEqual(
@@ -155,7 +156,7 @@ test('AS-02: restore (replace) also preserves both twins', async () => {
   const { library, wishlist } = makeCollectionTwins('steam');
   await setupWithLocalGames([]);
 
-  const result = expectImported(restoreQuestShelfBackup(makeBackup([library, wishlist])));
+  const result = await expectImported(restoreQuestShelfBackup(makeBackup([library, wishlist])));
 
   assert.equal(result.data.games.length, 2, 'replace keeps both records');
   assert.deepEqual(
@@ -180,7 +181,7 @@ for (const identity of ['steam', 'rawg', 'title-platform'] as const) {
       notes: 'newer notes',
     };
 
-    const result = expectImported(mergeQuestShelfBackup(makeBackup([backupCopy])));
+    const result = await expectImported(mergeQuestShelfBackup(makeBackup([backupCopy])));
 
     assert.equal(result.data.games.length, 1, 'no duplicate was created inside the collection');
     assert.equal(result.data.games[0].notes, 'newer notes', 'the newer backup row won');
@@ -202,7 +203,7 @@ test('AS-02: an id match still wins across collections — a record that moved c
     updatedAt: '2026-07-01T00:00:00.000Z',
   };
 
-  const result = expectImported(mergeQuestShelfBackup(makeBackup([movedToLibrary])));
+  const result = await expectImported(mergeQuestShelfBackup(makeBackup([movedToLibrary])));
 
   assert.equal(result.data.games.length, 1, 'the moved record did not fork into a twin');
   assert.equal(result.data.games[0].id, 'game-1');
@@ -214,8 +215,8 @@ test('AS-02: merge is idempotent — re-merging the same backup adds nothing', a
   await setupWithLocalGames([library, wishlist]);
 
   const backup = makeBackup([library, wishlist]);
-  expectImported(mergeQuestShelfBackup(backup));
-  const second = expectImported(mergeQuestShelfBackup(backup));
+  await expectImported(mergeQuestShelfBackup(backup));
+  const second = await expectImported(mergeQuestShelfBackup(backup));
 
   assert.deepEqual(byId(second.data.games), [library.id, wishlist.id].sort());
 });
@@ -225,7 +226,7 @@ test('AS-02: merge is idempotent — re-merging the same backup adds nothing', a
 test('AS-02: a games section mixing valid and invalid rows reports the rejected ones', async () => {
   await setupWithLocalGames([]);
 
-  const result = expectImported(
+  const result = await expectImported(
     restoreQuestShelfBackup(
       makeBackup([
         makeLibraryGame({ id: 'good-1', title: 'Valid Game' }),
@@ -262,7 +263,7 @@ test('AS-02: a non-empty games section where EVERY row is invalid does not wipe 
   // The backup still parses as structurally valid (the section is an array), as before.
   assert.equal(parseQuestShelfBackupText(JSON.stringify(backup)).ok, true);
 
-  const result = restoreQuestShelfBackup(backup);
+  const result = await restoreQuestShelfBackup(backup);
 
   // Restore now refuses rather than replacing a populated library with zero games.
   assert.equal(result.ok, false);
@@ -277,7 +278,7 @@ test('AS-02: a non-empty games section where EVERY row is invalid does not wipe 
 test('AS-02: an all-invalid games section IS accepted when there is nothing to lose', async () => {
   await setupWithLocalGames([]);
 
-  const result = expectImported(restoreQuestShelfBackup(makeBackup(invalidGameRows)));
+  const result = await expectImported(restoreQuestShelfBackup(makeBackup(invalidGameRows)));
 
   assert.deepEqual(result.data.games, [], 'an empty collection stays empty');
   assert.equal(result.games.rejectedCount, invalidGameRows.length, 'the rejected rows are still reported');
@@ -288,7 +289,7 @@ test('AS-02: a genuinely empty games section still clears the collection', async
 
   // An intentionally empty array is a real user intent ("restore this empty library"), and is
   // not the same as "every row was corrupt".
-  const result = expectImported(restoreQuestShelfBackup(makeBackup([])));
+  const result = await expectImported(restoreQuestShelfBackup(makeBackup([])));
 
   assert.deepEqual(result.data.games, [], 'the collection was cleared as asked');
   assert.equal(result.games.rowCount, 0);
@@ -299,7 +300,7 @@ test('AS-02: a genuinely empty games section still clears the collection', async
 test('AS-02: merge never wipes games, so an all-invalid section only reports rejections', async () => {
   await setupWithLocalGames([makeLibraryGame({ id: 'existing-1', title: 'Existing Game' })]);
 
-  const result = expectImported(mergeQuestShelfBackup(makeBackup(invalidGameRows)));
+  const result = await expectImported(mergeQuestShelfBackup(makeBackup(invalidGameRows)));
 
   assert.deepEqual(byId(result.data.games), ['existing-1'], 'merge is additive, nothing was lost');
   assert.equal(result.games.rejectedCount, invalidGameRows.length);
@@ -313,7 +314,7 @@ for (const externalSource of supportedExternalSources) {
 
     // Export normalizes every game and restore normalizes again — two chances to drop it.
     const exported = createQuestShelfBackup(false);
-    const restored = expectImported(restoreQuestShelfBackup(exported));
+    const restored = await expectImported(restoreQuestShelfBackup(exported));
 
     // `playstation-library` and `nintendo-virtual-game-cards` used to be erased here, because
     // the normalizer hard-coded four of the six valid values.
@@ -324,7 +325,7 @@ for (const externalSource of supportedExternalSources) {
 test('AS-02: an externalSource that is NOT in the type contract is still rejected', async () => {
   await setupWithLocalGames([]);
 
-  const result = expectImported(
+  const result = await expectImported(
     restoreQuestShelfBackup(
       makeBackup([{ ...makeLibraryGame({ id: 'g1', title: 'Bogus Source' }), externalSource: 'not-a-real-source' }]),
     ),
@@ -349,7 +350,7 @@ test('AS-02: the Nintendo provenance payload and its externalSource both survive
     }),
   ]);
 
-  const restored = expectImported(restoreQuestShelfBackup(createQuestShelfBackup(false)));
+  const restored = await expectImported(restoreQuestShelfBackup(createQuestShelfBackup(false)));
 
   // Previously the detail payload survived while the `externalSource` identifying it did not,
   // leaving the record internally inconsistent.
@@ -369,7 +370,7 @@ test('AS-02: unknown/future game fields survive an export/restore round-trip', a
 
   await setupWithLocalGames([gameWithFutureFields]);
 
-  const restored = expectImported(restoreQuestShelfBackup(createQuestShelfBackup(false)));
+  const restored = await expectImported(restoreQuestShelfBackup(createQuestShelfBackup(false)));
   const round = restored.data.games[0] as unknown as Record<string, unknown>;
 
   assert.deepEqual(round.futureRatingSystem, { score: 9.5, source: 'some-new-provider' });
@@ -396,7 +397,7 @@ test('AS-02: an older QuestShelf-branded backup still restores', async () => {
   const parsed = parseQuestShelfBackupText(legacyText);
   assert.equal(parsed.ok, true, 'a QuestShelf-branded backup is still accepted');
 
-  const restored = expectImported(restoreQuestShelfBackup((parsed as Extract<typeof parsed, { ok: true }>).backup));
+  const restored = await expectImported(restoreQuestShelfBackup((parsed as Extract<typeof parsed, { ok: true }>).backup));
 
   assert.deepEqual(byId(restored.data.games), ['legacy-1', 'legacy-2']);
   // Legacy status names still migrate to the current vocabulary.

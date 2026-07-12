@@ -12,9 +12,11 @@ import {
   type CollectionLegacyRecoveryMode,
   type CollectionLegacyRecoveryPreview,
   type CollectionLegacyRecoveryResult,
+  type CollectionRepairResult,
   type CollectionSnapshotRepairResult,
   type CollectionStoreBackend,
   type CollectionVerification,
+  type CollectionWriteResult,
 } from './indexedDbCollectionRepository';
 
 const GAMES_KEY = 'questshelf.games.v1';
@@ -51,12 +53,21 @@ export type GameRepositoryStatus = {
 // Wave 5 result types (now shared with the other collection stores via the generic repo).
 export type GameStorageVerification = CollectionVerification;
 export type GameSnapshotRepairResult = CollectionSnapshotRepairResult;
+export type GameRepairResult = CollectionRepairResult;
+export type GameWriteResult = CollectionWriteResult;
 export type LegacyRecoveryPreview = CollectionLegacyRecoveryPreview;
 export type LegacyRecoveryMode = CollectionLegacyRecoveryMode;
 export type LegacyRecoveryResult = CollectionLegacyRecoveryResult;
 
 export interface IndexedDbGameRepository extends GameRepository {
   getStatus(): GameRepositoryStatus;
+  /** Awaitable destructive mutations (backup restore/merge, recovery). See AS-01. */
+  replaceAllDurable(games: Game[]): Promise<GameWriteResult>;
+  upsertManyDurable(games: Game[]): Promise<GameWriteResult>;
+  removeManyDurable(ids: string[]): Promise<GameWriteResult>;
+  clearDurable(): Promise<GameWriteResult>;
+  /** Durable repair: rewrites the valid rows and deletes invalid/duplicate ones in IndexedDB. */
+  repairDurable(): Promise<GameRepairResult>;
   /** Read-only integrity check of the IndexedDB game store. Never mutates data. */
   verify(): Promise<GameStorageVerification>;
   /** Rebuild the in-memory snapshot from IndexedDB (normalized, deduped). Non-destructive:

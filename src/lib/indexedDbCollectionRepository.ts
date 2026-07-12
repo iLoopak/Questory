@@ -55,6 +55,34 @@ export type CollectionSnapshotRepairResult = {
   removedInvalid: number;
 };
 
+/**
+ * Outcome of a mutation that was awaited to durable completion.
+ *
+ * `ok: false` still means the data is not lost: the repository degrades to the legacy blob
+ * (`persistedToLegacy`) exactly as the fire-and-forget path always has. What is new is that
+ * the caller now learns about it and can report which store failed.
+ */
+export type CollectionWriteResult = {
+  ok: boolean;
+  backend: CollectionStoreBackend;
+  /** Present when the IndexedDB write failed. */
+  error?: string;
+  /** True when the failed write was rescued into the legacy blob. */
+  persistedToLegacy?: boolean;
+};
+
+/** Durable repair: rows are rewritten/removed in IndexedDB, not just in the snapshot. */
+export type CollectionRepairResult = CollectionSnapshotRepairResult & {
+  /** False when the store is in legacy fallback, so only the snapshot could be rebuilt. */
+  durable: boolean;
+  /**
+   * The raw rows that were removed. Returned rather than silently dropped, so the UI can
+   * offer them for download before they are gone.
+   */
+  removedRows: unknown[];
+  error?: string;
+};
+
 export type CollectionLegacyRecoveryPreview = {
   legacyBlobPresent: boolean;
   idbAvailable: boolean;
@@ -95,14 +123,34 @@ export interface IndexedDbCollectionRepository<T extends { id: string }> {
   ready(): Promise<void>;
   getAllSync(): T[];
   loadDurable(): Promise<T[]>;
+  /**
+   * Optimistic whole-collection replace: updates the snapshot and detaches the IndexedDB
+   * write. Kept for ordinary feature saves (the debounced games save), where blocking the UI
+   * on a durable write would be a regression. Destructive callers must use `replaceAllDurable`.
+   */
   replaceAll(items: T[]): void;
   getById(id: string): T | undefined;
   upsert(item: T): void;
   remove(id: string): void;
   clear(): Promise<void>;
+
+  // ── Awaitable mutations. Used by backup restore/merge and the recovery tools, which must
+  //    not report success before the data is durable (AS-01).
+  /** Replace the whole collection and await IndexedDB. */
+  replaceAllDurable(items: T[]): Promise<CollectionWriteResult>;
+  /** Insert-or-update a batch and await IndexedDB. */
+  upsertManyDurable(items: T[]): Promise<CollectionWriteResult>;
+  /** Remove a batch by id and await IndexedDB. */
+  removeManyDurable(ids: string[]): Promise<CollectionWriteResult>;
+  /** Empty the collection and await IndexedDB (clear() already awaits; this reports failure). */
+  clearDurable(): Promise<CollectionWriteResult>;
+
   getStatus(): CollectionStoreStatus;
   verify(): Promise<CollectionVerification>;
+  /** Rebuild the in-memory snapshot only. Does NOT repair the rows in IndexedDB. */
   repairSnapshot(): Promise<CollectionSnapshotRepairResult>;
+  /** Durable repair: rewrite the valid rows and delete the invalid/duplicate ones, awaited. */
+  repairDurable(): Promise<CollectionRepairResult>;
   previewLegacyRecovery(): Promise<CollectionLegacyRecoveryPreview>;
   recoverFromLegacyBlob(mode: CollectionLegacyRecoveryMode): Promise<CollectionLegacyRecoveryResult>;
 }
@@ -172,14 +220,18 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
     }
   }
 
-  function persistToIdb(previous: T[], next: T[]) {
+  /**
+   * The single write path. It always returns a promise for the durable outcome; the optimistic
+   * callers simply do not await it, so their behavior is byte-for-byte what it was.
+   */
+  function persistToIdb(previous: T[], next: T[]): Promise<CollectionWriteResult> {
     const db = getGameDatabase();
     if (!db || backend === 'legacy-fallback') {
       // IndexedDB is unavailable (or already failed this session): persist durably to the
       // legacy blob so the write is not lost. This is the pre-IndexedDB behavior, used only
       // in the degraded path — normal operation never writes the legacy blob.
       io.legacySaveAll(next);
-      return;
+      return Promise.resolve({ ok: true, backend, persistedToLegacy: true });
     }
 
     const table = getTable(db);
@@ -189,10 +241,10 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
     const removed = [...previousById.keys()].filter((id) => !nextIds.has(id));
 
     if (changed.length === 0 && removed.length === 0) {
-      return;
+      return Promise.resolve({ ok: true, backend });
     }
 
-    void db
+    return db
       .transaction('rw', table, async () => {
         if (changed.length > 0) {
           await table.bulkPut(changed);
@@ -201,18 +253,57 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
           await table.bulkDelete(removed);
         }
       })
-      .catch((error: unknown) => {
-        fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB write failed.');
+      .then((): CollectionWriteResult => ({ ok: true, backend }))
+      .catch((error: unknown): CollectionWriteResult => {
+        const message = error instanceof Error ? error.message : 'IndexedDB write failed.';
+        fallbackToLegacy(message);
         // Persist the write that just failed to the legacy blob so it is not lost.
         io.legacySaveAll(next);
+        return { ok: false, backend, error: message, persistedToLegacy: true };
       });
   }
 
   function commit(next: T[]) {
+    // IndexedDB + snapshot only — no legacy blob dual-write.
+    void commitDurable(next);
+  }
+
+  function commitDurable(next: T[]): Promise<CollectionWriteResult> {
     const previous = snapshot;
     snapshot = next;
-    // IndexedDB + snapshot only — no legacy blob dual-write.
-    persistToIdb(previous, next);
+    return persistToIdb(previous, next);
+  }
+
+  async function clearDurable(): Promise<CollectionWriteResult> {
+    snapshot = [];
+    // Neutralize the legacy blob across every tier so a reset can't re-import records.
+    await io.legacyClear();
+    const db = getGameDatabase();
+    if (!db || backend === 'legacy-fallback') {
+      return { ok: true, backend };
+    }
+
+    try {
+      await getTable(db).clear();
+      return { ok: true, backend };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'IndexedDB clear failed.';
+      fallbackToLegacy(message);
+      return { ok: false, backend, error: message };
+    }
+  }
+
+  function mergeById(items: T[]): T[] {
+    const next = snapshot.slice();
+    items.forEach((item) => {
+      const index = next.findIndex((existing) => existing.id === item.id);
+      if (index === -1) {
+        next.push(item);
+      } else {
+        next[index] = item;
+      }
+    });
+    return next;
   }
 
   return {
@@ -246,18 +337,19 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
       }
     },
     async clear() {
-      snapshot = [];
-      // Neutralize the legacy blob across every tier so a reset can't re-import records.
-      await io.legacyClear();
-      const db = getGameDatabase();
-      if (db && backend !== 'legacy-fallback') {
-        try {
-          await getTable(db).clear();
-        } catch (error) {
-          fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB clear failed.');
-        }
-      }
+      await clearDurable();
     },
+    replaceAllDurable(items) {
+      return commitDurable(items);
+    },
+    upsertManyDurable(items) {
+      return commitDurable(mergeById(items));
+    },
+    removeManyDurable(ids) {
+      const removing = new Set(ids);
+      return commitDurable(snapshot.filter((item) => !removing.has(item.id)));
+    },
+    clearDurable,
     getStatus() {
       return {
         backend,
@@ -315,6 +407,73 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
       } catch (error) {
         fallbackToLegacy(error instanceof Error ? error.message : 'IndexedDB read failed.');
         return { ...base, idbAvailable: true, idbRowCount: 0, validCount: 0, invalidCount: 0, duplicateIds: [] };
+      }
+    },
+    async repairDurable(): Promise<CollectionRepairResult> {
+      const before = snapshot.length;
+      const db = getGameDatabase();
+
+      if (!db || backend === 'legacy-fallback') {
+        // Nothing to repair in IndexedDB — rebuild the snapshot from the legacy blob and say
+        // plainly that the repair was not durable.
+        const rebuilt = io.legacyLoadSync();
+        snapshot = rebuilt;
+        return { backend, before, after: rebuilt.length, removedInvalid: 0, durable: false, removedRows: [] };
+      }
+
+      const table = getTable(db);
+
+      try {
+        const rows = await table.toArray();
+        const keptById = new Map<string, T>();
+        const removedRows: unknown[] = [];
+
+        for (const row of rows) {
+          const normalized = io.normalize([row]);
+          // Invalid rows, and duplicates of an id already kept, are the rows to drop.
+          if (normalized.length === 0 || keptById.has(normalized[0].id)) {
+            removedRows.push(row);
+            continue;
+          }
+          keptById.set(normalized[0].id, normalized[0]);
+        }
+
+        const rebuilt = [...keptById.values()];
+
+        if (removedRows.length > 0 || rebuilt.length > 0) {
+          // Rewrite the store from the repaired rows: put the normalized keepers back and
+          // delete everything else. Previously this only rebuilt memory, so the invalid rows
+          // returned on the next restart and the "repair" silently undid itself.
+          await db.transaction('rw', table, async () => {
+            await table.clear();
+            if (rebuilt.length > 0) {
+              await table.bulkPut(rebuilt);
+            }
+          });
+        }
+
+        snapshot = rebuilt;
+        return {
+          backend,
+          before,
+          after: rebuilt.length,
+          removedInvalid: removedRows.length,
+          durable: true,
+          removedRows,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'IndexedDB repair failed.';
+        fallbackToLegacy(message);
+        snapshot = io.legacyLoadSync();
+        return {
+          backend,
+          before,
+          after: snapshot.length,
+          removedInvalid: 0,
+          durable: false,
+          removedRows: [],
+          error: message,
+        };
       }
     },
     async repairSnapshot() {

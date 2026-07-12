@@ -7,31 +7,27 @@ import {
   resetQuestShelfLocalData,
   restoreQuestShelfBackup,
   type QuestShelfBackup,
+  type QuestShelfBackupImportResult,
   type QuestShelfBackupSummary,
 } from '../lib/backupStorage';
+import { suspendCanonicalCollectionWrites } from '../lib/canonicalCollections';
+import { previewLegacyGameRecovery, verifyGameStorage } from '../lib/gameStorage';
+import { previewLegacyRawgMetadataCacheRecovery, verifyRawgMetadataCache } from '../lib/rawgMetadataCache';
+import { previewLegacyPlayActivityRecovery, verifyPlayActivityStorage } from '../lib/playActivityStorage';
 import {
-  previewLegacyGameRecovery,
-  recoverGamesFromLegacyBlob,
-  repairGameSnapshot,
-  verifyGameStorage,
-} from '../lib/gameStorage';
-import {
-  previewLegacyRawgMetadataCacheRecovery,
-  recoverRawgMetadataCacheFromLegacyBlob,
-  repairRawgMetadataCacheSnapshot,
-  verifyRawgMetadataCache,
-} from '../lib/rawgMetadataCache';
-import {
-  previewLegacyPlayActivityRecovery,
-  recoverPlayActivityFromLegacyBlob,
-  repairPlayActivitySnapshot,
-  verifyPlayActivityStorage,
-} from '../lib/playActivityStorage';
+  runGameRecovery,
+  runGameRepair,
+  runPlayActivityRecovery,
+  runPlayActivityRepair,
+  runRawgCacheRecovery,
+  runRawgCacheRepair,
+  type StorageCommandResult,
+} from '../features/storage/storageRecoveryCommands';
 import type {
   CollectionLegacyRecoveryMode,
   CollectionLegacyRecoveryPreview,
   CollectionLegacyRecoveryResult,
-  CollectionSnapshotRepairResult,
+  CollectionRepairResult,
   CollectionVerification,
 } from '../lib/indexedDbCollectionRepository';
 import {
@@ -63,6 +59,33 @@ import { SettingsSection, SettingsStatusBlock } from './settings/SettingsSection
 import { ViewportModal } from './ViewportModal';
 import { downloadRawQuestShelfLocalData, exportQuestShelfBackupFile } from '../lib/backupExport';
 
+/**
+ * Turn a failed import into something the user can act on. Only store ids, keys and error
+ * strings are surfaced — never a stored value, so no secret can leak into the message.
+ */
+function describeFailedImport(
+  result: Extract<QuestShelfBackupImportResult, { ok: false }>,
+  t: ReturnType<typeof useI18n>['t'],
+): string {
+  if (result.status === 'validation-failed') {
+    // Nothing was written, so the existing library is intact.
+    return formatMessageTemplate(t('data.backupGamesUnusable'), { rows: result.games.rowCount });
+  }
+
+  if (result.status === 'recovery-export-failed') {
+    const reason = result.stores.find((store) => store.store === 'recovery-snapshot')?.error ?? '';
+    return formatMessageTemplate(t('data.backupSnapshotFailed'), { detail: reason });
+  }
+
+  // Partial: some stores settled, at least one required store did not. Name them.
+  const failed = result.failedStores
+    .map((store) => (store.key ? `${store.store} (${store.key})` : store.store))
+    .join(', ');
+  const detail = result.failedStores.map((store) => store.error).filter(Boolean).join(' · ');
+
+  return formatMessageTemplate(t('data.backupImportPartial'), { stores: failed, detail });
+}
+
 function formatMessageTemplate(template: string, values: Record<string, string | number>) {
   return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, String(value)), template);
 }
@@ -91,6 +114,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   );
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [diagnostics, setDiagnostics] = useState<StorageDiagnostics | null>(null);
   const autoBackupTimeoutRef = useRef<number | null>(null);
   const autoBackupSignalRef = useRef(autoBackupSignal);
@@ -335,36 +359,62 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
     setIsRestoreModalOpen(true);
   }
 
-  function confirmRestore(mode: 'merge' | 'replace') {
+  async function confirmRestore(mode: 'merge' | 'replace') {
     setIsRestoreModalOpen(false);
-    if (!selectedBackup) return;
+    if (!selectedBackup || isRestoring) return;
 
-    const result = mode === 'merge'
-      ? mergeQuestShelfBackup(selectedBackup)
-      : restoreQuestShelfBackup(selectedBackup);
+    // Freeze the mounted owner's saves for the whole operation. Without this, a games debounce
+    // already in flight (or the unmount flush triggered by the reload below) could write the
+    // PRE-restore array straight back over what we just restored (AS-03).
+    const releaseWrites = suspendCanonicalCollectionWrites();
+    setIsRestoring(true);
+    showMessage(t('data.backupImporting'), 'info');
 
-    if (!result.ok) {
-      // Every row in the backup's games section was corrupt. Nothing was written, so the
-      // existing library is intact — say so instead of reporting success and reloading.
-      showMessage(formatMessageTemplate(t('data.backupGamesUnusable'), { rows: result.games.rowCount }), 'error');
-      return;
+    try {
+      const result = mode === 'merge'
+        ? await mergeQuestShelfBackup(selectedBackup)
+        : await restoreQuestShelfBackup(selectedBackup);
+
+      if (!result.ok) {
+        showMessage(describeFailedImport(result, t), 'error');
+        return;
+      }
+
+      showMessage(
+        result.games.rejectedCount > 0
+          ? formatMessageTemplate(t('data.backupImportedWithSkippedRows'), {
+              imported: result.games.acceptedCount,
+              skipped: result.games.rejectedCount,
+            })
+          : t('data.backupImported'),
+        result.games.rejectedCount > 0 ? 'info' : 'success',
+      );
+      onBackupImported?.();
+
+      // Every required store has settled. Reload now — not on a 600 ms guess that used to race
+      // the writes it was supposed to be waiting for. Saves stay suspended through the reload so
+      // the unmount flush cannot resurrect the old array.
+      window.location.reload();
+    } catch (error) {
+      showMessage(
+        formatMessageTemplate(t('data.backupImportFailed'), {
+          detail: error instanceof Error ? error.message : 'Unknown error.',
+        }),
+        'error',
+      );
+    } finally {
+      // On the success path the page is reloading, so this never runs. On every failure path the
+      // owner is still mounted and must be allowed to save again.
+      releaseWrites();
+      setIsRestoring(false);
     }
-
-    showMessage(
-      result.games.rejectedCount > 0
-        ? formatMessageTemplate(t('data.backupImportedWithSkippedRows'), {
-            imported: result.games.acceptedCount,
-            skipped: result.games.rejectedCount,
-          })
-        : t('data.backupImported'),
-      result.games.rejectedCount > 0 ? 'info' : 'success',
-    );
-    onBackupImported?.();
-    window.setTimeout(() => window.location.reload(), 600);
   }
 
   async function confirmReset() {
     setIsResetModalOpen(false);
+    // Reset is destructive too: freeze owner saves so a pending games debounce cannot write the
+    // library straight back into the store we are clearing.
+    suspendCanonicalCollectionWrites();
     await resetQuestShelfLocalData();
     if (supportsFileSystemAccess) {
       await clearBackupFileHandle();
@@ -375,7 +425,8 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       fileInputRef.current.value = '';
     }
     showMessage('Local Questory data was reset on this device. Questory will reload.', 'success');
-    window.setTimeout(() => window.location.reload(), 600);
+    // Reset awaits every durable clear, so the reload no longer races the writes it was waiting for.
+    window.location.reload();
   }
 
   return (
@@ -900,9 +951,14 @@ type ToolResult = { tone: 'ok' | 'warn' | 'error'; text: string };
 
 type StoreToolsActions = {
   verify: () => Promise<CollectionVerification>;
-  repair: () => Promise<CollectionSnapshotRepairResult>;
+  /**
+   * Repair and recover both go through the storage recovery COMMANDS, which freeze the mounted
+   * owner's saves for the duration and hand it the new snapshot afterwards (AS-03). `ownerSynced`
+   * is false when no owner was mounted to receive it, so the UI can ask for a reload.
+   */
+  repair: () => Promise<StorageCommandResult<CollectionRepairResult>>;
   previewRecovery: () => Promise<CollectionLegacyRecoveryPreview>;
-  recover: (mode: CollectionLegacyRecoveryMode) => Promise<CollectionLegacyRecoveryResult>;
+  recover: (mode: CollectionLegacyRecoveryMode) => Promise<StorageCommandResult<CollectionLegacyRecoveryResult>>;
 };
 
 const toolButtonClass =
@@ -924,6 +980,7 @@ function StoreToolsRow({
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<ToolResult | null>(null);
   const [preview, setPreview] = useState<CollectionLegacyRecoveryPreview | null>(null);
+  const [removedRows, setRemovedRows] = useState<unknown[]>([]);
 
   const resultTone =
     result?.tone === 'error' ? 'text-rose-200' : result?.tone === 'warn' ? 'text-amber-200' : 'text-emerald-200';
@@ -952,10 +1009,21 @@ function StoreToolsRow({
     setBusy('repair');
     setResult(null);
     try {
-      const r = await actions.repair();
+      const { result: r, ownerSynced: synced } = await actions.repair();
+      const removed = r.removedInvalid > 0
+        ? ` Removed ${r.removedInvalid} invalid/duplicate row${r.removedInvalid === 1 ? '' : 's'}.`
+        : '';
+      // Never silently drop the rows: hand them back so they can be downloaded before they go.
+      if (r.removedRows.length > 0) {
+        setRemovedRows(r.removedRows);
+      }
       setResult({
-        tone: 'ok',
-        text: `Rebuilt snapshot from IndexedDB: ${r.after} records${r.removedInvalid > 0 ? ` (excluded ${r.removedInvalid} invalid row${r.removedInvalid === 1 ? '' : 's'})` : ''}.`,
+        tone: r.durable ? 'ok' : 'warn',
+        text: r.durable
+          ? `Repaired ${noun} in IndexedDB: ${r.after} records kept.${removed}` +
+            `${synced ? '' : ' Reload Questory to pick up the repaired data.'}`
+          : `Rebuilt the in-memory snapshot only (${r.after} records) — the rows on disk were NOT changed.` +
+            `${r.error ? ` ${r.error}` : ''}`,
       });
       onChanged();
     } catch (error) {
@@ -994,12 +1062,13 @@ function StoreToolsRow({
     }
     setBusy(mode);
     try {
-      const res = await actions.recover(mode);
+      const { result: res, ownerSynced: synced } = await actions.recover(mode);
       setResult({
         tone: 'ok',
         text:
           `${mode === 'merge' ? 'Merged' : 'Replaced'}: imported ${res.importedCount}, total ${res.totalCount}` +
-          `${res.skippedExistingCount > 0 ? `, kept ${res.skippedExistingCount} existing` : ''}.`,
+          `${res.skippedExistingCount > 0 ? `, kept ${res.skippedExistingCount} existing` : ''}.` +
+          `${synced ? '' : ' Reload Questory to pick up the recovered data.'}`,
       });
       setPreview(null);
       onChanged();
@@ -1018,8 +1087,23 @@ function StoreToolsRow({
           {busy === 'verify' ? 'Verifying…' : 'Verify'}
         </button>
         <button className={toolButtonClass} disabled={busy !== null} onClick={() => void runRepair()} type="button">
-          {busy === 'repair' ? 'Repairing…' : 'Repair snapshot'}
+          {busy === 'repair' ? 'Repairing…' : 'Repair store'}
         </button>
+        {removedRows.length > 0 ? (
+          <button
+            className={toolButtonClass}
+            onClick={() => {
+              // Repair removed these rows from IndexedDB. Offer them before they are gone for good.
+              downloadRawQuestShelfLocalData({
+                [`removed-${noun}-rows`]: JSON.stringify(removedRows, null, 2),
+              });
+              setRemovedRows([]);
+            }}
+            type="button"
+          >
+            Download {removedRows.length} removed row{removedRows.length === 1 ? '' : 's'}
+          </button>
+        ) : null}
         <button
           className={toolButtonClass}
           disabled={busy !== null || !legacyBlobPresent}
@@ -1083,9 +1167,9 @@ function StorageToolsPanel({
         legacyBlobPresent={diagnostics?.gameStore.legacyBlobPresent ?? false}
         actions={{
           verify: verifyGameStorage,
-          repair: repairGameSnapshot,
+          repair: runGameRepair,
           previewRecovery: previewLegacyGameRecovery,
-          recover: recoverGamesFromLegacyBlob,
+          recover: runGameRecovery,
         }}
         onChanged={onChanged}
       />
@@ -1096,9 +1180,9 @@ function StorageToolsPanel({
         legacyBlobPresent={diagnostics?.rawgCacheStore.legacyBlobPresent ?? false}
         actions={{
           verify: verifyRawgMetadataCache,
-          repair: repairRawgMetadataCacheSnapshot,
+          repair: runRawgCacheRepair,
           previewRecovery: previewLegacyRawgMetadataCacheRecovery,
-          recover: recoverRawgMetadataCacheFromLegacyBlob,
+          recover: runRawgCacheRecovery,
         }}
         onChanged={onChanged}
       />
@@ -1109,9 +1193,9 @@ function StorageToolsPanel({
         legacyBlobPresent={diagnostics?.playActivityStore.legacyBlobPresent ?? false}
         actions={{
           verify: verifyPlayActivityStorage,
-          repair: repairPlayActivitySnapshot,
+          repair: runPlayActivityRepair,
           previewRecovery: previewLegacyPlayActivityRecovery,
-          recover: recoverPlayActivityFromLegacyBlob,
+          recover: runPlayActivityRecovery,
         }}
         onChanged={onChanged}
       />

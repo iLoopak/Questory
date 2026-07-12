@@ -2,7 +2,13 @@ import { normalizeAchievementCounters } from './achievementCounters';
 import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
 import { findGameRecordIndex } from './gameIdentity';
 import { gameRepository, loadGames, normalizeLoadedGames, parseLoadedGameRows, type GameRowRejection } from './gameStorage';
-import { removePersistedKeys, savePersistedJson } from './localPersistence';
+import {
+  removePersistedKeys,
+  removePersistedKeysDurable,
+  savePersistedJsonDurable,
+  type KvWriteResult,
+} from './localPersistence';
+import { saveRecoverySnapshot, type RecoverySnapshot } from './recoverySnapshotStorage';
 import { normalizeOnboardingState } from './onboardingStorage';
 import { normalizePlatformQueuePersistedState } from './platformQueueStorage';
 import { loadPlayActivity, normalizePlayActivityRecords, playActivityRepository } from './playActivityStorage';
@@ -81,23 +87,68 @@ export type BackupGamesReport = {
   present: boolean;
 };
 
+/** Which store an outcome refers to. Never carries a value — only the key and an error string. */
+export type BackupStoreId = 'games' | 'playActivity' | 'rawgMetadataCache' | 'kv' | 'recommendation-caches' | 'recovery-snapshot';
+
+export type BackupStoreOutcome = {
+  store: BackupStoreId;
+  /** Storage key, for the KV tier and the collection blobs. Never a value, so never a secret. */
+  key?: string;
+  ok: boolean;
+  /** Whether a failure here fails the whole import (cache cleanup does not). */
+  required: boolean;
+  error?: string;
+  /** True when a failed IndexedDB write was rescued into the legacy blob. */
+  persistedToLegacy?: boolean;
+};
+
+export type BackupImportOptions = {
+  /** Skip the pre-restore safety snapshot. Used by tests and by the snapshot-restore path itself. */
+  skipRecoverySnapshot?: boolean;
+};
+
 /**
- * Result of restoring/merging a backup.
+ * Result of restoring/merging a backup (AS-01).
  *
- * `ok: false` means nothing was written. Today the only such case is a games section that has
- * rows but no usable ones, which would otherwise wipe a populated collection (AS-02). Restore
- * stays synchronous here; making the writes awaitable is AS-01's separate change.
+ * Success means every REQUIRED store settled successfully — restore only resolves once every
+ * IndexedDB transaction and every durable KV write it issued has completed. The four failure
+ * shapes are distinguishable so the UI can say what actually happened:
+ *
+ *   - `validation-failed`    nothing was written; the backup itself is unusable.
+ *   - `recovery-export-failed` nothing was written; the pre-restore safety snapshot could not
+ *                              be created, so a destructive replace was not attempted.
+ *   - `partial`              some stores settled and at least one required store did not. The
+ *                            data is not lost (failed IndexedDB writes fall back to the legacy
+ *                            blob), but the app must not claim a clean restore.
+ *   - (success with a failed optional store) reported in `stores`, does not fail the import.
  */
 export type QuestShelfBackupImportResult =
   | {
       ok: true;
+      status: 'restored';
       data: RestoredQuestShelfData;
       games: BackupGamesReport;
+      stores: BackupStoreOutcome[];
     }
   | {
       ok: false;
+      status: 'validation-failed';
       reason: 'games-section-unusable';
       games: BackupGamesReport;
+      stores: BackupStoreOutcome[];
+    }
+  | {
+      ok: false;
+      status: 'recovery-export-failed';
+      games: BackupGamesReport;
+      stores: BackupStoreOutcome[];
+    }
+  | {
+      ok: false;
+      status: 'partial';
+      games: BackupGamesReport;
+      stores: BackupStoreOutcome[];
+      failedStores: BackupStoreOutcome[];
     };
 
 type BackupParseResult =
@@ -182,13 +233,36 @@ export function getQuestShelfBackupSummary(backup: QuestShelfBackup): QuestShelf
   };
 }
 
-export function restoreQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBackupImportResult {
+/**
+ * Replace-restore. Awaits every required store, so success is only reported once the data is
+ * durable (AS-01).
+ *
+ * Ordering is deliberate:
+ *   1. validate the games section (refuse a wipe),
+ *   2. take a pre-restore safety snapshot and refuse to continue without one,
+ *   3. write every store, awaiting each,
+ *   4. only then report success.
+ */
+export async function restoreQuestShelfBackup(
+  backup: QuestShelfBackup,
+  options: BackupImportOptions = {},
+): Promise<QuestShelfBackupImportResult> {
   const gamesReport = getBackupGamesReport(backup);
 
   // Refuse a replace that would swap a populated collection for nothing because every row in a
   // non-empty games section was corrupt. An intentionally empty section (rowCount 0) still clears.
   if (wouldWipeGamesCollection(gamesReport)) {
-    return { ok: false, reason: 'games-section-unusable', games: gamesReport };
+    return { ok: false, status: 'validation-failed', reason: 'games-section-unusable', games: gamesReport, stores: [] };
+  }
+
+  const snapshotOutcome = await createPreRestoreSnapshot('replace-restore', options);
+  if (snapshotOutcome && !snapshotOutcome.ok) {
+    return {
+      ok: false,
+      status: 'recovery-export-failed',
+      games: gamesReport,
+      stores: [snapshotOutcome],
+    };
   }
 
   // Pre-normalize all sections before touching storage so an unexpected normalize error
@@ -199,11 +273,7 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBac
   allBackupStorageKeys.forEach((key) => {
     // Collection-backed keys (games, RAWG cache, play activity) are written through their
     // IndexedDB repositories below; everything else uses the localStorage + Preferences path.
-    if (
-      key === 'questshelf.games.v1' ||
-      key === 'questshelf.rawgMetadataCache.v1' ||
-      key === 'questshelf.playActivity.v1'
-    ) {
+    if (isCollectionBackedKey(key)) {
       return;
     }
     if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
@@ -213,47 +283,66 @@ export function restoreQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBac
     }
   });
 
-  writes.forEach(([key, value]) => savePersistedJson(key, value));
-  void removePersistedKeys(removes);
+  const stores: BackupStoreOutcome[] = snapshotOutcome ? [snapshotOutcome] : [];
+
+  stores.push(...(await writeKvSections(writes)));
+  stores.push(...toKvOutcomes(await removePersistedKeysDurable(removes)));
 
   // Replace the game collection through the repository (IndexedDB + in-memory snapshot).
   // A backup without a games section clears it.
-  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.games.v1')) {
-    gameRepository.replaceAll(normalizeLoadedGames(backup.data['questshelf.games.v1']));
-  } else {
-    void gameRepository.clear();
-  }
+  stores.push(
+    await runStore('games', 'questshelf.games.v1', () =>
+      Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.games.v1')
+        ? gameRepository.replaceAllDurable(normalizeLoadedGames(backup.data['questshelf.games.v1']))
+        : gameRepository.clearDurable(),
+    ),
+  );
 
   // Replace the RAWG metadata cache through its repository. A backup without the section
   // clears the cache (restore has replace semantics); it will simply repopulate on demand.
-  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
-    rawgMetadataCacheRepository.replaceAll(normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']));
-  } else {
-    void rawgMetadataCacheRepository.clear();
-  }
+  stores.push(
+    await runStore('rawgMetadataCache', 'questshelf.rawgMetadataCache.v1', () =>
+      Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')
+        ? rawgMetadataCacheRepository.replaceAllDurable(
+            normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']),
+          )
+        : rawgMetadataCacheRepository.clearDurable(),
+    ),
+  );
 
   // Replace play activity through its repository. A backup without the section clears it
   // (restore has replace semantics).
-  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.playActivity.v1')) {
-    playActivityRepository.replaceAll(normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']));
-  } else {
-    void playActivityRepository.clear();
-  }
+  stores.push(
+    await runStore('playActivity', 'questshelf.playActivity.v1', () =>
+      Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.playActivity.v1')
+        ? playActivityRepository.replaceAllDurable(
+            normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']),
+          )
+        : playActivityRepository.clearDurable(),
+    ),
+  );
 
-  clearGeneratedRecommendationState();
+  stores.push(await clearGeneratedRecommendationState());
 
-  return {
-    ok: true,
-    games: gamesReport,
-    data: {
-      games: loadGames(),
-      ignoredSteamGames: loadIgnoredSteamGames(),
-    },
-  };
+  return finishImport(gamesReport, stores);
 }
 
-export function mergeQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBackupImportResult {
+/** Merge-restore. Additive, but awaited and reported exactly like replace. */
+export async function mergeQuestShelfBackup(
+  backup: QuestShelfBackup,
+  options: BackupImportOptions = {},
+): Promise<QuestShelfBackupImportResult> {
   const gamesReport = getBackupGamesReport(backup);
+
+  const snapshotOutcome = await createPreRestoreSnapshot('merge-restore', options);
+  if (snapshotOutcome && !snapshotOutcome.ok) {
+    return {
+      ok: false,
+      status: 'recovery-export-failed',
+      games: gamesReport,
+      stores: [snapshotOutcome],
+    };
+  }
 
   // Pre-normalize before touching storage so an unexpected normalize error cannot leave
   // storage in a partially-written state.
@@ -264,11 +353,7 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBacku
     : null;
 
   allBackupStorageKeys.forEach((key) => {
-    if (
-      key === 'questshelf.games.v1' ||
-      key === 'questshelf.rawgMetadataCache.v1' ||
-      key === 'questshelf.playActivity.v1'
-    ) {
+    if (isCollectionBackedKey(key)) {
       return;
     }
 
@@ -281,43 +366,91 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBacku
     }
   });
 
-  writes.forEach(([key, value]) => savePersistedJson(key, value));
+  if (backupTasteProfile) {
+    const localTasteProfile = normalizeTasteProfile(readStorageJson('questshelf.tasteProfile.v1'));
+    writes.push(['questshelf.tasteProfile.v1', mergeTasteProfiles(localTasteProfile, backupTasteProfile, mergedGames)]);
+  } else {
+    writes.push([
+      'questshelf.tasteProfile.v1',
+      buildTasteProfile(mergedGames, normalizeTasteProfile(undefined)),
+    ]);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.recommendationFeedback.v1')) {
+    writes.push([
+      'questshelf.recommendationFeedback.v1',
+      mergeRecommendationFeedback(
+        normalizeRecommendationFeedbackRecords(readStorageJson('questshelf.recommendationFeedback.v1')),
+        normalizeRecommendationFeedbackRecords(backup.data['questshelf.recommendationFeedback.v1']),
+      ),
+    ]);
+  }
+
+  const stores: BackupStoreOutcome[] = snapshotOutcome ? [snapshotOutcome] : [];
+
+  stores.push(...(await writeKvSections(writes)));
 
   // Merged games go through the repository (IndexedDB + snapshot).
-  gameRepository.replaceAll(mergedGames);
+  stores.push(await runStore('games', 'questshelf.games.v1', () => gameRepository.replaceAllDurable(mergedGames)));
 
   // A present RAWG cache section overwrites the cache through its repository (merge only
   // adds/overwrites present sections; an absent section leaves the existing cache intact).
   if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
-    rawgMetadataCacheRepository.replaceAll(normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']));
+    stores.push(
+      await runStore('rawgMetadataCache', 'questshelf.rawgMetadataCache.v1', () =>
+        rawgMetadataCacheRepository.replaceAllDurable(
+          normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']),
+        ),
+      ),
+    );
   }
 
   // A present play activity section overwrites the store through its repository (merge only
   // adds/overwrites present sections; an absent section leaves the existing records intact).
   if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.playActivity.v1')) {
-    playActivityRepository.replaceAll(normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']));
+    stores.push(
+      await runStore('playActivity', 'questshelf.playActivity.v1', () =>
+        playActivityRepository.replaceAllDurable(
+          normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']),
+        ),
+      ),
+    );
   }
 
-  if (backupTasteProfile) {
-    const localTasteProfile = normalizeTasteProfile(readStorageJson('questshelf.tasteProfile.v1'));
-    const mergedTasteProfile = mergeTasteProfiles(localTasteProfile, backupTasteProfile, mergedGames);
-    savePersistedJson('questshelf.tasteProfile.v1', mergedTasteProfile);
-  } else {
-    savePersistedJson('questshelf.tasteProfile.v1', buildTasteProfile(mergedGames, normalizeTasteProfile(undefined)));
-  }
+  stores.push(await clearGeneratedRecommendationState());
 
-  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.recommendationFeedback.v1')) {
-    savePersistedJson('questshelf.recommendationFeedback.v1', mergeRecommendationFeedback(
-      normalizeRecommendationFeedbackRecords(readStorageJson('questshelf.recommendationFeedback.v1')),
-      normalizeRecommendationFeedbackRecords(backup.data['questshelf.recommendationFeedback.v1']),
-    ));
-  }
+  return finishImport(gamesReport, stores);
+}
 
-  clearGeneratedRecommendationState();
+function isCollectionBackedKey(key: (typeof allBackupStorageKeys)[number]): boolean {
+  return (
+    key === 'questshelf.games.v1' ||
+    key === 'questshelf.rawgMetadataCache.v1' ||
+    key === 'questshelf.playActivity.v1'
+  );
+}
+
+/**
+ * Success means: every REQUIRED store settled successfully.
+ *
+ * The recommendation caches are best-effort cleanup, not user data — a failure there is reported
+ * but does not fail the restore. Anything else failing makes the import `partial`: the data is
+ * not lost (a failed IndexedDB write still falls back to the legacy blob, and a failed durable KV
+ * write still has the localStorage tier), but the user is told which store did not settle rather
+ * than being shown a success message.
+ */
+function finishImport(games: BackupGamesReport, stores: BackupStoreOutcome[]): QuestShelfBackupImportResult {
+  const failed = stores.filter((store) => !store.ok && store.required);
+
+  if (failed.length > 0) {
+    return { ok: false, status: 'partial', games, stores, failedStores: failed };
+  }
 
   return {
     ok: true,
-    games: gamesReport,
+    status: 'restored',
+    games,
+    stores,
     data: {
       games: loadGames(),
       ignoredSteamGames: loadIgnoredSteamGames(),
@@ -325,25 +458,117 @@ export function mergeQuestShelfBackup(backup: QuestShelfBackup): QuestShelfBacku
   };
 }
 
+/** Take the pre-restore safety snapshot, unless the caller explicitly opted out. */
+async function createPreRestoreSnapshot(
+  reason: RecoverySnapshot['reason'],
+  options: BackupImportOptions,
+): Promise<BackupStoreOutcome | null> {
+  if (options.skipRecoverySnapshot) {
+    return null;
+  }
+
+  // Include integration settings: the snapshot never leaves the device (it goes into the same
+  // IndexedDB the settings already live in), and one without them would not actually restore the
+  // user's state. It is not part of the restore RESULT, so no secret is exposed to the UI.
+  const result = await saveRecoverySnapshot({
+    backup: createQuestShelfBackup(true),
+    createdAt: new Date().toISOString(),
+    reason,
+  });
+
+  return {
+    store: 'recovery-snapshot',
+    ok: result.ok,
+    required: true,
+    error: result.ok ? undefined : result.error,
+  };
+}
+
+async function writeKvSections(
+  writes: Array<[(typeof allBackupStorageKeys)[number], unknown]>,
+): Promise<BackupStoreOutcome[]> {
+  const results = await Promise.all(writes.map(([key, value]) => savePersistedJsonDurable(key, value)));
+  return toKvOutcomes(results);
+}
+
+function toKvOutcomes(results: KvWriteResult[]): BackupStoreOutcome[] {
+  return results.map((result) => ({
+    store: 'kv',
+    key: result.key,
+    ok: result.ok,
+    // `localOnly` means localStorage took the value but the durable mirror rejected it. That can
+    // only happen where a durable backend exists — i.e. native, where localStorage is the tier
+    // that does NOT survive — so it is real loss and fails the restore. It is reported separately
+    // from a total write failure because the distinction matters when reading the error.
+    required: true,
+    error: result.error,
+  }));
+}
+
+/** Run one store's mutation and translate its write result into a reportable outcome. */
+async function runStore(
+  store: BackupStoreId,
+  key: string,
+  mutate: () => Promise<{ ok: boolean; error?: string; persistedToLegacy?: boolean }>,
+): Promise<BackupStoreOutcome> {
+  try {
+    const result = await mutate();
+    return {
+      store,
+      key,
+      ok: result.ok,
+      required: true,
+      error: result.error,
+      persistedToLegacy: result.persistedToLegacy,
+    };
+  } catch (error) {
+    return {
+      store,
+      key,
+      ok: false,
+      required: true,
+      error: error instanceof Error ? error.message : 'Store write failed.',
+    };
+  }
+}
+
 export async function resetQuestShelfLocalData() {
   invalidateDiscoveryInboxRequests();
   // Clear the IndexedDB collection stores + snapshots first so reset does not leave
-  // orphaned records in IndexedDB after the legacy blobs are removed.
-  await gameRepository.clear();
-  await rawgMetadataCacheRepository.clear();
-  await playActivityRepository.clear();
-  await removePersistedKeys([...new Set([...storageKeyRegistry.map((entry) => entry.key), ...generatedStateStorageKeys])]);
+  // orphaned records in IndexedDB after the legacy blobs are removed. Reset is destructive and
+  // ends in a reload, so every clear is awaited to durable completion.
+  await gameRepository.clearDurable();
+  await rawgMetadataCacheRepository.clearDurable();
+  await playActivityRepository.clearDurable();
+  await removePersistedKeysDurable([
+    ...new Set([...storageKeyRegistry.map((entry) => entry.key), ...generatedStateStorageKeys]),
+  ]);
   clearContextualRecommendationCache();
   clearReleaseCalendarCache();
   await clearPersonalRecommendationCaches();
 }
 
-function clearGeneratedRecommendationState(): void {
-  invalidateDiscoveryInboxRequests();
-  void removePersistedKeys([...generatedStateStorageKeys]);
-  clearContextualRecommendationCache();
-  clearReleaseCalendarCache();
-  void clearPersonalRecommendationCaches();
+/**
+ * Best-effort cleanup of generated recommendation state. Awaited so a failure can be REPORTED,
+ * but marked optional: a stale recommendation cache is a nuisance, not data loss, and must not
+ * turn a good restore into a failed one.
+ */
+async function clearGeneratedRecommendationState(): Promise<BackupStoreOutcome> {
+  try {
+    invalidateDiscoveryInboxRequests();
+    await removePersistedKeys([...generatedStateStorageKeys]);
+    clearContextualRecommendationCache();
+    clearReleaseCalendarCache();
+    await clearPersonalRecommendationCaches();
+    return { store: 'recommendation-caches', ok: true, required: false };
+  } catch (error) {
+    return {
+      store: 'recommendation-caches',
+      ok: false,
+      required: false,
+      error: error instanceof Error ? error.message : 'Recommendation cache cleanup failed.',
+    };
+  }
 }
 
 function validateQuestShelfBackup(value: unknown): BackupParseResult {

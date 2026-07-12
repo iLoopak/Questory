@@ -25,11 +25,11 @@ export type DurableOperation = {
   /** Order in which the operation COMPLETED, or null while still pending. */
   completionIndex: number | null;
   /**
-   * `failed` means the underlying native write threw. The promise still RESOLVES, because the
-   * real adapter catches the error (`localStoragePreferencesAdapter.writeDurable` has an empty
-   * catch): a failed durable write is invisible to every caller — the value simply never
-   * becomes durable. That is the behavior these tests need to reproduce, so there is
-   * deliberately no "rejecting" mode here.
+   * `failed` means the native write threw and the operation's promise REJECTED.
+   *
+   * The real adapter used to swallow that, which is what made a lost Preferences write invisible
+   * (AS-01). It now rejects, so the optimistic callers log it and the awaited restore/recovery
+   * path reports which key failed — and this adapter mirrors that.
    */
   outcome: 'pending' | 'resolved' | 'failed';
   deferred: Deferred<void>;
@@ -101,10 +101,9 @@ export function createControllableStorageAdapter(
     completionCounter += 1;
 
     if (failDurableKeys.has(operation.key) && operation.kind !== 'read') {
-      // The native write threw. Production catches this and resolves anyway, so the durable
-      // tier is left untouched while the caller sees a perfectly successful write.
+      // The native write threw: reject, and leave the durable tier untouched.
       operation.outcome = 'failed';
-      operation.deferred.resolve();
+      operation.deferred.reject(new Error(`Durable write failed for ${operation.key}.`));
     } else {
       if (operation.kind === 'write' && typeof operation.value === 'string') {
         durable.set(operation.key, operation.value);

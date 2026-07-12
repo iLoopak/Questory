@@ -1,5 +1,6 @@
 import type { RawgMetadata } from '../types/rawg';
 import { loadLocalJson, loadPersistedJson, removePersistedKeys } from './localPersistence';
+import type { CollectionRepairResult } from './indexedDbCollectionRepository';
 import {
   createRawgMetadataCacheRepository,
   type RawgMetadataCacheStatus,
@@ -59,6 +60,16 @@ export function verifyRawgMetadataCache(): Promise<RawgVerification> {
 
 export function repairRawgMetadataCacheSnapshot(): Promise<RawgRepairResult> {
   return rawgMetadataCacheRepository.repairSnapshot();
+}
+
+/**
+ * The RAWG cache's repair rebuilds the in-memory snapshot only. That is fine here — this store
+ * is a regenerable provider cache, not user data — but it reports `durable: false` so the UI
+ * cannot claim it repaired the rows on disk.
+ */
+export async function repairRawgMetadataCacheStorage(): Promise<CollectionRepairResult> {
+  const result = await rawgMetadataCacheRepository.repairSnapshot();
+  return { ...result, durable: false, removedRows: [] };
 }
 
 export function previewLegacyRawgMetadataCacheRecovery(): Promise<RawgRecoveryPreview> {
