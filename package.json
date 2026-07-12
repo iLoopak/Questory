@@ -10,6 +10,7 @@
     "android:prepare": "npm run build && npx cap sync android && npm run android:sync-icons",
     "preview": "vite preview",
     "test": "node --test scripts/run-analytics-tests.mjs",
+    "generate:telemetry-schema": "node scripts/generate-telemetry-schema.mjs",
     "audit:architecture": "node scripts/audit-architecture.mjs"
   },
   "dependencies": {

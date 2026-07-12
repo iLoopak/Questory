@@ -1,9 +1,11 @@
-import { analyticsSchemaVersion, telemetryEventRegistry } from './telemetry-schema.js';
+import { analyticsSchemaVersion, telemetryEnvelopeFields, telemetryEventRegistry, telemetryRuntimes, telemetrySensitiveFields } from './telemetry-schema.js';
 const telemetryProvider = 'telemetry';
 const MAX_BODY_BYTES = 8192;
 const UPSTREAM_TIMEOUT_MS = 5000;
-const allowedEnvelopeFields = new Set(['schemaVersion','eventName','eventId','timestamp','appVersion','runtime','sessionId']);
-const sensitiveFields = new Set(['gameTitle','title','gameId','rawgId','steamId','steamAccountId','email','userName','platformName','collectionName','text','notes','artworkUrl','screenshotUrl','apiKey','webhookUrl','backup','library','achievementName','stack','message','errorMessage']);
+// AS-17: the envelope, the privacy denylist and the runtimes come from the generated contract too —
+// there is no hand-kept copy of any of them left in this file.
+const allowedEnvelopeFields = new Set(telemetryEnvelopeFields);
+const sensitiveFields = new Set(telemetrySensitiveFields);
 function sendJson(res, status, body) { res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.setHeader('Cache-Control', 'no-store'); res.status(status).json(body); }
 function fail(status, code, error) { const err = new Error(error); err.status = status; err.code = code; return err; }
 function normalizeWebhookUrl(value) { return String(value || '').trim().replace(/^[ '"`]+|[ '"`]+$/g, ''); }
@@ -13,7 +15,7 @@ export function validateEvent(body) { if (!body || typeof body !== 'object' || A
   for (const key of schema.required || []) if (!(key in body) || !isAllowedValue(schema, key, body[key])) throw fail(400, `INVALID_${key.toUpperCase()}`, 'Telemetry payload contains invalid event properties.');
   for (const key of schema.optional || []) if (key in body && !isAllowedValue(schema, key, body[key])) throw fail(400, `INVALID_${key.toUpperCase()}`, 'Telemetry payload contains invalid event properties.');
   for (const key of ['eventId','timestamp','appVersion']) if (typeof body[key] !== 'string' || body[key].length < 1 || body[key].length > 128) throw fail(400, `INVALID_${key.toUpperCase()}`, 'Telemetry payload contains invalid string fields.');
-  if (!['pwa','browser','capacitor_android','unknown'].includes(body.runtime)) throw fail(400, 'INVALID_RUNTIME', 'Unsupported telemetry runtime.');
+  if (!telemetryRuntimes.includes(body.runtime)) throw fail(400, 'INVALID_RUNTIME', 'Unsupported telemetry runtime.');
   if (body.sessionId !== undefined && (typeof body.sessionId !== 'string' || body.sessionId.length > 128)) throw fail(400, 'INVALID_SESSION_ID', 'Telemetry payload contains invalid string fields.');
   return body; }
 async function forwardToMake(event, webhookUrl) { const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS); try { const response = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event), signal: controller.signal }); if (!response.ok) return { accepted: false, upstreamStatus: response.status }; return { accepted: true, upstreamStatus: response.status }; } finally { clearTimeout(timeout); } }

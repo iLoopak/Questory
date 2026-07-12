@@ -15,7 +15,7 @@ import {
 } from '../../lib/discoveryInboxStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
 import { fetchPersonalRecommendationsResult } from '../../services/personalRecommendationsService';
-import { trackAnalyticsEvent } from '../../lib/analytics';
+import { bucketSmallGroup, trackAnalyticsEvent } from '../../lib/analytics';
 
 type ToastNotification = {
   category: 'success' | 'info';
@@ -28,6 +28,9 @@ type UseDiscoveryControllerOptions = {
   t: TFunction;
   addToastNotification: (notification: ToastNotification) => void;
 };
+
+/** How many Inbox recommendations one request asks for. Bucketed, never sent as an exact count. */
+const DISCOVERY_RECOMMENDATION_REQUEST_SIZE = 10;
 
 export function useDiscoveryController({ games, t, addToastNotification }: UseDiscoveryControllerOptions) {
   const [inboxState, setInboxState] = useState(() => {
@@ -142,7 +145,7 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
       if (getDiscoveryInboxRequestGeneration() !== requestGeneration) return 0;
       const validCandidates = candidates
         .filter((candidate) => !candidate.excluded && candidate.libraryStatus === null && !candidate.inboxStatus)
-        .slice(0, 10);
+        .slice(0, DISCOVERY_RECOMMENDATION_REQUEST_SIZE);
       const { state: updatedState, addedItems } = appendDiscoveryInboxRecommendations(
         latestState,
         validCandidates.map((candidate) => ({ game: candidate.game, reason: candidate.reason })),
@@ -153,10 +156,13 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
         setInboxState(updatedState);
       }
 
+      // AS-17: the exact counts this used to send were rejected by the server's own validator and
+      // violate the bucketing policy. How many were asked for and how many came back is still the
+      // question being answered — at the resolution the policy allows.
       trackAnalyticsEvent('discovery_recommendations_requested', {
-        requested_count: 10,
-        returned_count: addedItems.length,
         source: 'discovery_inbox',
+        requested_count_bucket: bucketSmallGroup(DISCOVERY_RECOMMENDATION_REQUEST_SIZE),
+        returned_count_bucket: bucketSmallGroup(addedItems.length),
       });
 
       addToastNotification({
