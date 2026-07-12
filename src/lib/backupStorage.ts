@@ -20,8 +20,15 @@ import {
   coreBackupStorageKeys,
   deviceOnlyStorageKeys,
   integrationBackupStorageKeys,
+  preservedStorageKeys,
+  resettableKvStorageKeys,
+  resettableLocalStorageKeys,
+  resettableSessionStorageKeys,
+  resettableStorageKeyPrefixes,
   storageKeyRegistry,
 } from './storageRegistry';
+import { getStorageAdapter } from './storageAdapter';
+import { clearAllCachedScreenshots } from './screenshotCache';
 import { normalizeSteamGridDbSettings } from './steamGridDbSettingsStorage';
 import { normalizeSteamSettings } from './steamSettingsStorage';
 import { normalizeShelfIdentitySettings, shelfIdentityStorageKey } from './shelfIdentity';
@@ -532,20 +539,83 @@ async function runStore(
   }
 }
 
-export async function resetQuestShelfLocalData() {
+/** What a reset actually did, so the UI (and the tests) can state it rather than assume it. */
+export type ResetLocalDataSummary = {
+  removedKeys: string[];
+  /** Generated keys swept through a registered family prefix. */
+  removedGeneratedKeys: string[];
+  removedCollections: string[];
+  preservedKeys: string[];
+};
+
+/**
+ * AS-18: Reset Local Data follows the registry.
+ *
+ * It used to remove the registry's keys plus a short hand-written list of generated ones, which left
+ * every product-owned key that had never been registered behind: the controller settings, the Neon
+ * button style, the collection view modes, the HLTB cache, the Daily Quest and Achievement Quiz
+ * history, the Quest Runner high score, the dismissed hints. Each of those now carries an explicit
+ * policy, and this function reads it.
+ *
+ * It still deletes nothing it was not told about: generated keys are swept by REGISTERED prefixes
+ * only, never by a blanket `questshelf.*` match, so another app's keys — and Questory's own recovery
+ * snapshot — are safe.
+ */
+export async function resetQuestShelfLocalData(): Promise<ResetLocalDataSummary> {
   invalidateDiscoveryInboxRequests();
-  // Clear the IndexedDB collection stores + snapshots first so reset does not leave
-  // orphaned records in IndexedDB after the legacy blobs are removed. Reset is destructive and
-  // ends in a reload, so every clear is awaited to durable completion.
+
+  // Clear the IndexedDB collection stores + snapshots first so reset does not leave orphaned records
+  // in IndexedDB after the legacy blobs are removed. Reset is destructive and ends in a reload, so
+  // every clear is awaited to durable completion.
   await gameRepository.clearDurable();
   await rawgMetadataCacheRepository.clearDurable();
   await playActivityRepository.clearDurable();
-  await removePersistedKeysDurable([
-    ...new Set([...storageKeyRegistry.map((entry) => entry.key), ...generatedStateStorageKeys]),
-  ]);
+  await clearAllCachedScreenshots();
+
+  const kvKeys = [...new Set([...resettableKvStorageKeys, ...generatedStateStorageKeys])];
+  await removePersistedKeysDurable(kvKeys);
+
+  const removedGeneratedKeys = removeRegisteredGeneratedKeys();
+  removeLocalOnlyKeys(resettableLocalStorageKeys);
+  removeSessionKeys(resettableSessionStorageKeys);
+
   clearContextualRecommendationCache();
   clearReleaseCalendarCache();
   await clearPersonalRecommendationCaches();
+
+  return {
+    removedKeys: [...kvKeys, ...resettableLocalStorageKeys, ...resettableSessionStorageKeys],
+    removedGeneratedKeys,
+    removedCollections: ['games', 'rawgMetadataCache', 'playActivity', 'appCaches'],
+    preservedKeys: [...preservedStorageKeys],
+  };
+}
+
+/** Sweep the registered generated families — and only those. */
+function removeRegisteredGeneratedKeys(): string[] {
+  const adapter = getStorageAdapter();
+  const removed = adapter
+    .localKeys()
+    .filter((key) => resettableStorageKeyPrefixes.some((prefix) => key.startsWith(prefix)));
+
+  removed.forEach((key) => adapter.removeLocal(key));
+  return removed;
+}
+
+function removeLocalOnlyKeys(keys: readonly string[]): void {
+  const adapter = getStorageAdapter();
+  keys.forEach((key) => adapter.removeLocal(key));
+}
+
+function removeSessionKeys(keys: readonly string[]): void {
+  if (typeof window === 'undefined') return;
+  keys.forEach((key) => {
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // Session storage can be unavailable (private mode); a reset must not fail on it.
+    }
+  });
 }
 
 /**
