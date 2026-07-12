@@ -22,6 +22,7 @@ import type {
   CollectionSnapshotRepairResult,
   CollectionStoreStatus,
   CollectionVerification,
+  CollectionWriteResult,
 } from './indexedDbCollectionRepository';
 
 const RAWG_CACHE_KEY = 'questshelf.rawgMetadataCache.v1';
@@ -42,6 +43,7 @@ export type RawgRepairResult = CollectionSnapshotRepairResult;
 export type RawgRecoveryPreview = CollectionLegacyRecoveryPreview;
 export type RawgRecoveryMode = CollectionLegacyRecoveryMode;
 export type RawgRecoveryResult = CollectionLegacyRecoveryResult;
+export type RawgWriteResult = CollectionWriteResult;
 
 export interface RawgMetadataCacheRepository {
   ready(): Promise<void>;
@@ -49,7 +51,10 @@ export interface RawgMetadataCacheRepository {
   get(key: string): RawgMetadataCacheEntry | null;
   put(key: string, entry: RawgMetadataCacheEntry): void;
   replaceAll(cache: RawgMetadataCache): void;
+  /** Awaitable whole-cache replace, used by backup restore/merge (AS-01). */
+  replaceAllDurable(cache: RawgMetadataCache): Promise<RawgWriteResult>;
   clear(): Promise<void>;
+  clearDurable(): Promise<RawgWriteResult>;
   getStatus(): RawgMetadataCacheStatus;
   verify(): Promise<RawgVerification>;
   repairSnapshot(): Promise<RawgRepairResult>;
@@ -131,6 +136,45 @@ export function createRawgMetadataCacheRepository(io: RawgMetadataCacheRepositor
     }
   }
 
+  /** The awaitable whole-cache replace. `replaceAll` is the optimistic, non-awaited view of it. */
+  async function replaceAllDurable(cache: RawgMetadataCache): Promise<RawgWriteResult> {
+    snapshot = cache;
+    const db = getGameDatabase();
+    if (!db || backend === 'legacy-fallback') {
+      return { ok: true, backend };
+    }
+
+    try {
+      await db.transaction('rw', db.rawgMetadataCache, async () => {
+        await db.rawgMetadataCache.clear();
+        await db.rawgMetadataCache.bulkPut(toRows(cache));
+      });
+      return { ok: true, backend };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'RAWG cache write failed.';
+      fallbackToLegacy(message);
+      return { ok: false, backend, error: message };
+    }
+  }
+
+  async function clearDurable(): Promise<RawgWriteResult> {
+    snapshot = {};
+    await io.legacyClear();
+    const db = getGameDatabase();
+    if (!db || backend === 'legacy-fallback') {
+      return { ok: true, backend };
+    }
+
+    try {
+      await db.rawgMetadataCache.clear();
+      return { ok: true, backend };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'RAWG cache clear failed.';
+      fallbackToLegacy(message);
+      return { ok: false, backend, error: message };
+    }
+  }
+
   return {
     ready,
     getAllSync() {
@@ -150,31 +194,12 @@ export function createRawgMetadataCacheRepository(io: RawgMetadataCacheRepositor
       });
     },
     replaceAll(cache) {
-      snapshot = cache;
-      const db = getGameDatabase();
-      if (!db || backend === 'legacy-fallback') {
-        return;
-      }
-      void db
-        .transaction('rw', db.rawgMetadataCache, async () => {
-          await db.rawgMetadataCache.clear();
-          await db.rawgMetadataCache.bulkPut(toRows(cache));
-        })
-        .catch((error: unknown) => {
-          fallbackToLegacy(error instanceof Error ? error.message : 'RAWG cache write failed.');
-        });
+      void replaceAllDurable(cache);
     },
+    replaceAllDurable,
+    clearDurable,
     async clear() {
-      snapshot = {};
-      await io.legacyClear();
-      const db = getGameDatabase();
-      if (db && backend !== 'legacy-fallback') {
-        try {
-          await db.rawgMetadataCache.clear();
-        } catch (error) {
-          fallbackToLegacy(error instanceof Error ? error.message : 'RAWG cache clear failed.');
-        }
-      }
+      await clearDurable();
     },
     getStatus() {
       return {

@@ -110,7 +110,7 @@ test('a freshly exported backup with achievement counters validates for import',
   assert.equal(result.ok, true, result.ok ? '' : result.error);
 });
 
-test('export -> restore roundtrip preserves achievement counters', () => {
+test('export -> restore roundtrip preserves achievement counters', async () => {
   installMemoryStorage();
   saveAchievementCounters(makeCounters({ questRunnerRuns: 9, justBrowsingOpens: 4 }));
 
@@ -122,12 +122,11 @@ test('export -> restore roundtrip preserves achievement counters', () => {
   );
 
   const parsed = parseOrThrow(exported);
-  restoreQuestShelfBackup(parsed);
+  await restoreQuestShelfBackup(parsed);
 
   const restored = loadAchievementCounters();
   assert.equal(restored.questRunnerRuns, 9);
-  assert.equal(restored.justBrowsingOpens, 4);
-});
+  assert.equal(restored.justBrowsingOpens, 4);});
 
 test('export without integration secrets excludes locally stored API keys', () => {
   const { store } = installMemoryStorage();
@@ -164,7 +163,7 @@ test('export with integration secrets includes locally stored API keys explicitl
   assert.deepEqual(exported.data[STEAM_SETTINGS_KEY], { apiKey: 'steam-secret', steamId64: '76561198000000000' });
 });
 
-test('restore with integration secrets restores locally stored API keys', () => {
+test('restore with integration secrets restores locally stored API keys', async () => {
   const { store } = installMemoryStorage();
   const backup = parseOrThrow(makeFreshBackup({
     [RAWG_SETTINGS_KEY]: { apiKey: 'rawg-secret' },
@@ -173,26 +172,24 @@ test('restore with integration secrets restores locally stored API keys', () => 
     [STEAM_SETTINGS_KEY]: { apiKey: 'steam-secret', steamId64: '76561198000000000' },
   }));
 
-  restoreQuestShelfBackup(backup);
+  await restoreQuestShelfBackup(backup);
 
   assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'rawg-secret' });
   assert.deepEqual(JSON.parse(store.get(STEAM_GRID_DB_SETTINGS_KEY)!), { apiKey: 'sgdb-secret' });
   assert.deepEqual(JSON.parse(store.get(ITAD_SETTINGS_KEY)!), { apiKey: 'itad-secret' });
-  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'steam-secret', steamId64: '76561198000000000', wishlistUrl: '' });
-});
+  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'steam-secret', steamId64: '76561198000000000', wishlistUrl: '' });});
 
-test('replace restore from backup without integration secrets preserves existing API keys', () => {
+test('replace restore from backup without integration secrets preserves existing API keys', async () => {
   const { store } = installMemoryStorage();
   store.set(RAWG_SETTINGS_KEY, JSON.stringify({ apiKey: 'existing-rawg' }));
   store.set(STEAM_SETTINGS_KEY, JSON.stringify({ apiKey: 'existing-steam', steamId64: '76561198000000000' }));
 
-  restoreQuestShelfBackup(parseOrThrow(makeFreshBackup()));
+  await restoreQuestShelfBackup(parseOrThrow(makeFreshBackup()));
 
   assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'existing-rawg' });
-  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'existing-steam', steamId64: '76561198000000000' });
-});
+  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'existing-steam', steamId64: '76561198000000000' });});
 
-test('export -> merge roundtrip applies the backup achievement counters', () => {
+test('export -> merge roundtrip applies the backup achievement counters', async () => {
   installMemoryStorage();
   // Local state differs from the backup; a present section overwrites on merge.
   saveAchievementCounters(makeCounters({ questRunnerRuns: 1 }));
@@ -200,12 +197,11 @@ test('export -> merge roundtrip applies the backup achievement counters', () => 
   const backup = parseOrThrow(makeFreshBackup({
     [ACHIEVEMENT_COUNTERS_KEY]: makeCounters({ questRunnerRuns: 42 }),
   }));
-  mergeQuestShelfBackup(backup);
+  await mergeQuestShelfBackup(backup);
 
-  assert.equal(loadAchievementCounters().questRunnerRuns, 42);
-});
+  assert.equal(loadAchievementCounters().questRunnerRuns, 42);});
 
-test('backup missing the achievement counters section still imports', () => {
+test('backup missing the achievement counters section still imports', async () => {
   installMemoryStorage();
   const backup = makeFreshBackup();
   delete (backup.data as Record<string, unknown>)[ACHIEVEMENT_COUNTERS_KEY];
@@ -214,36 +210,33 @@ test('backup missing the achievement counters section still imports', () => {
   assert.equal(result.ok, true, result.ok ? '' : result.error);
 
   // Restore has replace semantics: an absent section resets counters to safe defaults.
-  restoreQuestShelfBackup(parseOrThrow(backup));
-  assert.deepEqual(loadAchievementCounters(), normalizeAchievementCounters(undefined));
-});
+  await restoreQuestShelfBackup(parseOrThrow(backup));
+  assert.deepEqual(loadAchievementCounters(), normalizeAchievementCounters(undefined));});
 
-test('partial achievement counters are normalized to safe defaults on import', () => {
+test('partial achievement counters are normalized to safe defaults on import', async () => {
   installMemoryStorage();
   const backup = makeFreshBackup({ [ACHIEVEMENT_COUNTERS_KEY]: { questRunnerRuns: 7 } });
 
   const result = parseQuestShelfBackupText(JSON.stringify(backup));
   assert.equal(result.ok, true, result.ok ? '' : result.error);
 
-  restoreQuestShelfBackup(parseOrThrow(backup));
+  await restoreQuestShelfBackup(parseOrThrow(backup));
   const restored = loadAchievementCounters();
   assert.equal(restored.questRunnerRuns, 7);
   assert.equal(restored.justBrowsingOpens, 0);
   assert.equal(restored.playingStreak, null);
-  assert.deepEqual(restored.activeDays, []);
-});
+  assert.deepEqual(restored.activeDays, []);});
 
-test('invalid achievement counters do not block import and normalize safely', () => {
+test('invalid achievement counters do not block import and normalize safely', async () => {
   installMemoryStorage();
   for (const corrupt of ['definitely-not-counters', 42, [], null]) {
     const backup = makeFreshBackup({ [ACHIEVEMENT_COUNTERS_KEY]: corrupt });
     const result = parseQuestShelfBackupText(JSON.stringify(backup));
     assert.equal(result.ok, true, `corrupt counters (${JSON.stringify(corrupt)}) must not block import`);
 
-    restoreQuestShelfBackup(parseOrThrow(backup));
+    await restoreQuestShelfBackup(parseOrThrow(backup));
     assert.deepEqual(loadAchievementCounters(), normalizeAchievementCounters(undefined));
-  }
-});
+  }});
 
 test('a truly malformed critical section still blocks import (validation not over-weakened)', () => {
   installMemoryStorage();
@@ -295,7 +288,7 @@ test('export includes custom empty platform plans', () => {
 });
 
 
-test('export -> restore roundtrip preserves platform identity Data URL artwork', () => {
+test('export -> restore roundtrip preserves platform identity Data URL artwork', async () => {
   const { store } = installMemoryStorage();
   const persistentArtwork = 'data:image/png;base64,cGxhdGZvcm0tYXJ0d29yaw==';
   const platformQueueState = {
@@ -310,15 +303,14 @@ test('export -> restore roundtrip preserves platform identity Data URL artwork',
   assert.deepEqual(exported.data['questshelf.platformQueues.v1'], platformQueueState);
 
   store.delete('questshelf.platformQueues.v1');
-  restoreQuestShelfBackup(parseOrThrow(exported));
+  await restoreQuestShelfBackup(parseOrThrow(exported));
 
   const restored = JSON.parse(store.get('questshelf.platformQueues.v1')!);
   assert.equal(restored.settings[0].artworkUrl, persistentArtwork);
   assert.equal(restored.settings[0].platformTag, 'fpga');
-  assert.deepEqual(restored.activePlatforms, ['Analogue Pocket']);
-});
+  assert.deepEqual(restored.activePlatforms, ['Analogue Pocket']);});
 
-test('backup import hydrates legacy platform identity settings without maxActiveGames', () => {
+test('backup import hydrates legacy platform identity settings without maxActiveGames', async () => {
   const { store } = installMemoryStorage();
   const persistentArtwork = 'data:image/png;base64,bGVnYWN5LWFydA==';
   const backup = parseOrThrow(makeFreshBackup({
@@ -330,12 +322,11 @@ test('backup import hydrates legacy platform identity settings without maxActive
     },
   }));
 
-  restoreQuestShelfBackup(backup);
+  await restoreQuestShelfBackup(backup);
 
   const restored = JSON.parse(store.get('questshelf.platformQueues.v1')!);
   assert.equal(restored.settings[0].artworkUrl, persistentArtwork);
-  assert.equal(restored.settings[0].maxActiveGames, 3);
-});
+  assert.equal(restored.settings[0].maxActiveGames, 3);});
 
 test('reset local data clears generated recommendation and Taste Profile state', async () => {
   const { store } = installMemoryStorage();
@@ -356,20 +347,19 @@ test('reset local data clears generated recommendation and Taste Profile state',
   assert.equal(store.has('questshelf.releaseCalendarIgnoredRawgIds.v1'), false);
 });
 
-test('replace restore clears disposable generated recommendation state', () => {
+test('replace restore clears disposable generated recommendation state', async () => {
   const { store } = installMemoryStorage();
   store.set(DISCOVERY_INBOX_KEY, JSON.stringify({ schemaVersion: 1, active: [{ rawgId: 1, title: 'Old Inbox' }], nextQueue: [] }));
   store.set(RECOMMENDATION_EXPOSURE_KEY, JSON.stringify([{ rawgId: 1, normalizedTitle: 'old', surface: 'home', shownAt: 1 }]));
   store.set('questshelf.releaseCalendarIgnoredRawgIds.v1', JSON.stringify([99]));
 
-  restoreQuestShelfBackup(parseOrThrow(makeFreshBackup()));
+  await restoreQuestShelfBackup(parseOrThrow(makeFreshBackup()));
 
   assert.equal(store.has(DISCOVERY_INBOX_KEY), false);
   assert.equal(store.has(RECOMMENDATION_EXPOSURE_KEY), false);
-  assert.equal(store.has('questshelf.releaseCalendarIgnoredRawgIds.v1'), false);
-});
+  assert.equal(store.has('questshelf.releaseCalendarIgnoredRawgIds.v1'), false);});
 
-test('merge restore preserves explicit taste corrections, recomputes observed taste, and skips generated state', () => {
+test('merge restore preserves explicit taste corrections, recomputes observed taste, and skips generated state', async () => {
   const { store } = installMemoryStorage();
   store.set(TASTE_PROFILE_KEY, JSON.stringify({
     observed: [{ kind: 'tag', key: 'old-observed', label: 'Old Observed', sentiment: 'love', confidence: 1, strength: 'strong', evidence: {}, lastUpdatedAt: '2026-07-10T00:00:00Z' }],
@@ -398,7 +388,7 @@ test('merge restore preserves explicit taste corrections, recomputes observed ta
     ],
   }));
 
-  mergeQuestShelfBackup(backup);
+  await mergeQuestShelfBackup(backup);
 
   const tasteProfile = JSON.parse(store.get(TASTE_PROFILE_KEY)!);
   assert.ok(tasteProfile.explicit.some((signal: { key: string }) => signal.key === 'deckbuilding'));
@@ -412,5 +402,4 @@ test('merge restore preserves explicit taste corrections, recomputes observed ta
   assert.equal(feedback.length, 2);
   assert.equal(feedback.find((record: { rawgId: number }) => record.rawgId === 7)?.createdAt, 5);
   assert.equal(store.has(DISCOVERY_INBOX_KEY), false);
-  assert.equal(store.has(RECOMMENDATION_EXPOSURE_KEY), false);
-});
+  assert.equal(store.has(RECOMMENDATION_EXPOSURE_KEY), false);});

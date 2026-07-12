@@ -2,6 +2,7 @@ import { mockGameIds, mockGames } from '../data/mockGames';
 import { loadLocalJson, loadPersistedJson, removePersistedKeys, savePersistedJson } from './localPersistence';
 import {
   createIndexedDbGameRepository,
+  type GameRepairResult,
   type GameRepositoryStatus,
   type GameSnapshotRepairResult,
   type GameStorageVerification,
@@ -56,6 +57,11 @@ export function verifyGameStorage(): Promise<GameStorageVerification> {
 
 export function repairGameSnapshot(): Promise<GameSnapshotRepairResult> {
   return gameRepository.repairSnapshot();
+}
+
+/** Durable repair: rewrites the valid rows and deletes invalid/duplicate ones in IndexedDB. */
+export function repairGameStorage(): Promise<GameRepairResult> {
+  return gameRepository.repairDurable();
 }
 
 export function previewLegacyGameRecovery(): Promise<LegacyRecoveryPreview> {

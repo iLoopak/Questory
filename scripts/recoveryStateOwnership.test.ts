@@ -1,21 +1,24 @@
 /**
- * AS-03 — Storage recovery bypasses React state ownership.
+ * AS-03 — Storage recovery and the mounted React owner.
  *
- * `AppController` owns `games` in React and `useAppPersistence` writes that array back to the
- * repository on a 400 ms debounce, on unmount, and on visibilitychange→hidden. The Data
- * Management recovery/repair tools call the repository directly and never tell the mounted
- * owner, so the React array is still the PRE-recovery snapshot. The next ordinary save then
- * replaces the recovered data with it.
+ * `AppController` owns `games`/`playActivity` in React, and `useAppPersistence` writes those
+ * arrays back to the repository on a 400 ms debounce, on unmount, and on visibilitychange→hidden.
+ * Recovery used to call the repository directly and never tell the owner, so the React array was
+ * still the PRE-recovery snapshot and the next ordinary save replaced the recovered data with it.
  *
- * These tests CHARACTERIZE that data loss. They are expected to be inverted by the fix.
+ * These tests started as characterization tests for that loss (PR #650) and now assert the fix:
+ * every Data Management command goes through `storageRecoveryCommands`, which suspends owner
+ * writes for the duration and hands the recovered snapshot back to the owner once it is durable.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { useState } from 'react';
 import { assertTestEnvironment, resetWebStorage } from './testUtils/testEnvironment';
 import { createControllableStorageAdapter } from './testUtils/controllableStorageAdapter';
 import { clearQuestoryTables } from './testUtils/indexedDbControl';
 import { makeLibraryGame, makePlayActivityRecord } from './testUtils/gameFixtures';
-import { actAsync, renderHook } from './testUtils/reactHarness';
+import { actAsync, renderComponent } from './testUtils/reactHarness';
+import type { PlayActivityRecord } from '../src/lib/playActivityStorage';
 import type { Game } from '../src/types/game';
 
 assertTestEnvironment();
@@ -23,13 +26,16 @@ assertTestEnvironment();
 const { setStorageAdapter } = await import('../src/lib/storageAdapter');
 const { getGameDatabase } = await import('../src/lib/gameDatabase');
 const { savePersistedJson } = await import('../src/lib/localPersistence');
-const { gameRepository, loadGames, recoverGamesFromLegacyBlob } = await import('../src/lib/gameStorage');
-const { playActivityRepository, loadPlayActivity, recoverPlayActivityFromLegacyBlob } =
-  await import('../src/lib/playActivityStorage');
+const { gameRepository, loadGames } = await import('../src/lib/gameStorage');
+const { playActivityRepository, loadPlayActivity } = await import('../src/lib/playActivityStorage');
 const { rawgMetadataCacheRepository } = await import('../src/lib/rawgMetadataCache');
 const { normalizeOnboardingState } = await import('../src/lib/onboardingStorage');
 const { normalizePlatformQueueState } = await import('../src/lib/platformQueueStorage');
 const { useAppPersistence } = await import('../src/features/app/useAppPersistence');
+const { useCanonicalCollectionOwner } = await import('../src/features/app/useCanonicalCollectionOwner');
+const { resetCanonicalCollectionOwner } = await import('../src/lib/canonicalCollections');
+const { runGameRecovery, runGameRepair, runPlayActivityRecovery } =
+  await import('../src/features/storage/storageRecoveryCommands');
 
 const database = getGameDatabase()!;
 const onboardingState = normalizeOnboardingState(undefined);
@@ -43,16 +49,37 @@ const snapshotB: Game[] = [
   makeLibraryGame({ id: 'b2', title: 'Recovered Game Two' }),
 ];
 
-type PersistenceProps = Parameters<typeof useAppPersistence>[0];
+/** A handle on the mounted owner: what it is holding, and how an ordinary edit would change it. */
+type OwnerControl = {
+  games: Game[];
+  playActivity: PlayActivityRecord[];
+  setGames: (games: Game[]) => void;
+  setPlayActivity: (records: PlayActivityRecord[]) => void;
+};
 
-function persistenceProps(games: Game[], playActivity: ReturnType<typeof loadPlayActivity> = []): PersistenceProps {
-  return { games, ignoredSteamGames: [], onboardingState, platformQueueState, playActivity };
+/** AppController's collection ownership, reduced to the two hooks under test. */
+function TestOwner({ control, initialGames }: { control: OwnerControl; initialGames: Game[] }) {
+  const [games, setGames] = useState<Game[]>(initialGames);
+  const [playActivity, setPlayActivity] = useState<PlayActivityRecord[]>([]);
+
+  useAppPersistence({ games, ignoredSteamGames: [], onboardingState, platformQueueState, playActivity });
+  useCanonicalCollectionOwner({ games, playActivity, setGames, setPlayActivity });
+
+  control.games = games;
+  control.playActivity = playActivity;
+  control.setGames = setGames;
+  control.setPlayActivity = setPlayActivity;
+  return null;
 }
 
-async function setupMountedWithSnapshotA() {
+/** Let the repository's detached Dexie transactions finish. */
+const settleWrites = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+/** Fresh stores holding snapshot A, with the owner mounted and holding the same array. */
+async function mountOwnerWithSnapshotA() {
   resetWebStorage();
-  const storage = createControllableStorageAdapter({ durableMode: 'auto' });
-  setStorageAdapter(storage.adapter);
+  resetCanonicalCollectionOwner();
+  setStorageAdapter(createControllableStorageAdapter({ durableMode: 'auto' }).adapter);
 
   await gameRepository.ready();
   await playActivityRepository.ready();
@@ -61,82 +88,87 @@ async function setupMountedWithSnapshotA() {
   await playActivityRepository.clear();
   await clearQuestoryTables(database);
 
-  // The mounted app owns snapshot A, and storage agrees with it.
-  gameRepository.replaceAll(snapshotA);
-  await settleWrites();
+  const seed = await gameRepository.replaceAllDurable(snapshotA);
+  assert.equal(seed.ok, true, 'the mounted app and storage start in agreement');
 
-  return storage;
+  const control = {} as OwnerControl;
+  const handle = await renderComponent(TestOwner, { control, initialGames: snapshotA });
+  return { control, handle };
 }
 
-/** Let the repository's detached Dexie transactions finish. */
-async function settleWrites(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-}
-
-/** Put snapshot B in the legacy blob, then recover it into IndexedDB (as the panel does). */
-async function recoverSnapshotBIntoStorage(): Promise<void> {
+/** Put snapshot B in the legacy blob and recover it, exactly as the Data Management panel does. */
+async function recoverSnapshotB() {
   savePersistedJson('questshelf.games.v1', snapshotB);
-  const result = await recoverGamesFromLegacyBlob('replace');
-  assert.equal(result.importedCount, 2, 'recovery imported the legacy-only games');
-  assert.deepEqual(loadGames().map((game) => game.id), ['b1', 'b2'], 'storage now holds snapshot B');
-}
 
-test('AS-03: unmounting after a recovery overwrites the recovered games with stale React state', async () => {
-  await setupMountedWithSnapshotA();
-
-  // 1. The owner is mounted holding snapshot A.
-  const handle = await renderHook(useAppPersistence, persistenceProps(snapshotA));
-
-  // 2. Recovery replaces storage with snapshot B, behind the mounted owner's back.
-  await recoverSnapshotBIntoStorage();
-
-  // 3. The user navigates away / the app unmounts. useAppPersistence flushes gamesRef.
-  await handle.unmount();
-  await settleWrites();
-
-  // 4. Documents unsafe current behavior: the unmount flush wrote the PRE-recovery array,
-  //    so both recovered games are gone — from the snapshot and from IndexedDB.
-  assert.deepEqual(loadGames().map((game) => game.id), ['a1'], 'snapshot B was overwritten by stale snapshot A');
-  const durableIds = (await database.games.toArray()).map((game) => game.id);
-  assert.deepEqual(durableIds, ['a1'], 'the recovered rows were deleted from IndexedDB');
-});
-
-test('AS-03: an ordinary game edit after a recovery erases it on the 400 ms debounce', async () => {
-  await setupMountedWithSnapshotA();
-
-  const handle = await renderHook(useAppPersistence, persistenceProps(snapshotA));
-  await recoverSnapshotBIntoStorage();
-
-  // The user makes an unrelated edit to the game they can still see (a note change).
-  const editedA: Game[] = [{ ...snapshotA[0], notes: 'a new note' }];
-  await actAsync(() => {
-    handle.rerender(persistenceProps(editedA));
+  let command!: Awaited<ReturnType<typeof runGameRecovery>>;
+  await actAsync(async () => {
+    command = await runGameRecovery('replace');
   });
 
-  // Wait out the debounce (400 ms).
+  assert.equal(command.result.importedCount, 2, 'recovery imported the legacy-only games');
+  assert.equal(command.ownerSynced, true, 'the mounted owner accepted the recovered snapshot');
+  assert.deepEqual(loadGames().map((game) => game.id), ['b1', 'b2'], 'storage holds snapshot B');
+  return command;
+}
+
+const idsIn = (games: Game[]) => games.map((game) => game.id).sort();
+/** Play-activity ids are re-derived by the normalizer, so identify those records by their game. */
+const gameIdsIn = (records: PlayActivityRecord[]) => records.map((record) => record.gameId).sort();
+
+test('AS-03: recovery replaces the mounted owner state, so it is no longer stale', async () => {
+  const { control, handle } = await mountOwnerWithSnapshotA();
+
+  await recoverSnapshotB();
+
+  // The owner used to still be holding snapshot A here, which is what made every later save
+  // destructive. It now holds exactly what is in storage.
+  assert.deepEqual(idsIn(control.games), ['b1', 'b2'], 'React state IS the recovered snapshot');
+
+  await handle.unmount();
+});
+
+test('AS-03: an ordinary game edit after a recovery no longer erases it', async () => {
+  const { control, handle } = await mountOwnerWithSnapshotA();
+
+  await recoverSnapshotB();
+
+  // The user edits one of the games they can now see (a note change) — an ordinary debounced save.
+  await actAsync(() => {
+    control.setGames(control.games.map((game) => (game.id === 'b1' ? { ...game, notes: 'a new note' } : game)));
+  });
   await new Promise((resolve) => setTimeout(resolve, 450));
   await settleWrites();
 
-  // Documents unsafe current behavior: saving one edited game replaced the whole collection.
-  assert.deepEqual(loadGames().map((game) => game.id), ['a1'], 'the recovered games were deleted');
-  assert.equal(loadGames()[0].notes, 'a new note', 'only the edited stale record survives');
+  assert.deepEqual(idsIn(loadGames()), ['b1', 'b2'], 'the recovered games survive the edit');
+  assert.equal(loadGames().find((game) => game.id === 'b1')?.notes, 'a new note', 'and the edit applied');
+  assert.deepEqual(idsIn(await database.games.toArray()), ['b1', 'b2'], 'IndexedDB agrees');
 
   await handle.unmount();
 });
 
-test('AS-03: a visibilitychange flush after a recovery erases it too', async () => {
-  await setupMountedWithSnapshotA();
+test('AS-03: the unmount flush after a recovery writes the recovered games, not the stale ones', async () => {
+  const { handle } = await mountOwnerWithSnapshotA();
 
-  const handle = await renderHook(useAppPersistence, persistenceProps(snapshotA));
+  await recoverSnapshotB();
 
-  // Queue a pending debounced save by changing games...
-  const editedA: Game[] = [{ ...snapshotA[0], notes: 'edited' }];
+  // The user navigates away / the app unmounts; useAppPersistence flushes its games ref.
+  await handle.unmount();
+  await settleWrites();
+
+  assert.deepEqual(idsIn(loadGames()), ['b1', 'b2'], 'the flush did not resurrect snapshot A');
+  assert.deepEqual(idsIn(await database.games.toArray()), ['b1', 'b2'], 'and IndexedDB kept the rows');
+});
+
+test('AS-03: a debounced save pending from BEFORE the recovery cannot overwrite it', async () => {
+  const { control, handle } = await mountOwnerWithSnapshotA();
+
+  // Queue a pending debounced save of the pre-recovery array...
   await actAsync(() => {
-    handle.rerender(persistenceProps(editedA));
+    control.setGames([{ ...snapshotA[0], notes: 'edited before the recovery' }]);
   });
 
-  // ...then recover B while that save is still pending...
-  await recoverSnapshotBIntoStorage();
+  // ...recover while that save is still in flight...
+  await recoverSnapshotB();
 
   // ...and background the app, which flushes the pending save immediately.
   Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
@@ -145,68 +177,82 @@ test('AS-03: a visibilitychange flush after a recovery erases it too', async () 
   });
   await settleWrites();
 
-  // Documents unsafe current behavior: the flush wrote the stale array over the recovery.
-  assert.deepEqual(loadGames().map((game) => game.id), ['a1']);
+  // The suspension covered the recovery, and by the time it lifted the owner was holding B, so
+  // the flush had nothing stale left to write.
+  assert.deepEqual(idsIn(loadGames()), ['b1', 'b2'], 'the stale in-flight save was not applied');
 
   await handle.unmount();
 });
 
-test('AS-03: play-activity recovery is overwritten by the mounted play-activity array', async () => {
-  await setupMountedWithSnapshotA();
+test('AS-03: play-activity recovery survives the next ordinary play-activity save', async () => {
+  const { control, handle } = await mountOwnerWithSnapshotA();
 
+  // The owner is holding its own activity for the game it can see.
   const mountedActivity = [makePlayActivityRecord({ id: 'react-1', gameId: 'a1', date: '2026-07-02' })];
-  const handle = await renderHook(useAppPersistence, persistenceProps(snapshotA, mountedActivity));
-
-  // Recover legacy-only play activity straight into the repository.
-  const recoveredActivity = [
-    makePlayActivityRecord({ id: 'legacy-1', gameId: 'b1', date: '2026-06-01' }),
-    makePlayActivityRecord({ id: 'legacy-2', gameId: 'b2', date: '2026-06-02' }),
-  ];
-  savePersistedJson('questshelf.playActivity.v1', recoveredActivity);
-  const recovery = await recoverPlayActivityFromLegacyBlob('replace');
-  assert.equal(recovery.importedCount, 2);
-  assert.equal(loadPlayActivity().length, 2, 'storage holds the recovered activity');
-
-  // Any later change to the mounted array triggers savePlayActivity(reactArray), which is a
-  // whole-collection replace.
-  const nextActivity = [...mountedActivity, makePlayActivityRecord({ id: 'react-2', gameId: 'a1', date: '2026-07-03' })];
   await actAsync(() => {
-    handle.rerender(persistenceProps(snapshotA, nextActivity));
+    control.setPlayActivity(mountedActivity);
   });
   await settleWrites();
 
-  // Documents unsafe current behavior: the same split-ownership bug exists for play activity.
-  // (Ids are re-derived by the normalizer, so identify the records by the game they belong to:
-  // the recovered rows were for b1/b2, the mounted ones for a1.)
-  const remaining = loadPlayActivity();
+  savePersistedJson('questshelf.playActivity.v1', [
+    makePlayActivityRecord({ id: 'legacy-1', gameId: 'b1', date: '2026-06-01' }),
+    makePlayActivityRecord({ id: 'legacy-2', gameId: 'b2', date: '2026-06-02' }),
+  ]);
+
+  let command!: Awaited<ReturnType<typeof runPlayActivityRecovery>>;
+  await actAsync(async () => {
+    command = await runPlayActivityRecovery('replace');
+  });
+
+  assert.equal(command.result.importedCount, 2);
+  assert.equal(command.ownerSynced, true);
+  assert.deepEqual(gameIdsIn(control.playActivity), ['b1', 'b2'], 'the owner took the recovered activity');
+
+  // Any later change to the mounted array is a whole-collection replace — previously that is
+  // exactly where the recovered rows disappeared.
+  await actAsync(() => {
+    control.setPlayActivity([
+      ...control.playActivity,
+      makePlayActivityRecord({ id: 'react-2', gameId: 'b1', date: '2026-07-03' }),
+    ]);
+  });
+  await settleWrites();
+
   assert.deepEqual(
-    remaining.map((record) => record.gameId).sort(),
-    ['a1', 'a1'],
-    'only the mounted array survived',
-  );
-  assert.equal(
-    remaining.filter((record) => record.gameId === 'b1' || record.gameId === 'b2').length,
-    0,
-    'the recovered play activity was erased',
+    loadPlayActivity().map((record) => record.gameId).sort(),
+    ['b1', 'b1', 'b2'],
+    'the recovered activity is still there, with the new record on top',
   );
 
   await handle.unmount();
 });
 
-test('AS-03: repairSnapshot only rebuilds memory — it does not repair the rows in IndexedDB', async () => {
-  await setupMountedWithSnapshotA();
+// ── Repair is durable, and reports what it removed ──────────────────────────────────
 
-  // Write an invalid row (no title) directly into IndexedDB, as a corrupted store would have.
+test('AS-03: repair rewrites IndexedDB and reports the rows it removed', async () => {
+  const { control, handle } = await mountOwnerWithSnapshotA();
+
+  // An invalid row (no title), as a corrupted store would hold.
   await database.games.put({ id: 'broken', platform: 'PC' } as unknown as Game);
   assert.equal(await database.games.count(), 2, 'IndexedDB holds the good row and the broken one');
 
-  const repair = await gameRepository.repairSnapshot();
+  let command!: Awaited<ReturnType<typeof runGameRepair>>;
+  await actAsync(async () => {
+    command = await runGameRepair();
+  });
 
-  // The in-memory snapshot drops the invalid row...
-  assert.equal(repair.removedInvalid, 1);
-  assert.deepEqual(loadGames().map((game) => game.id), ['a1']);
+  assert.equal(command.result.removedInvalid, 1);
+  assert.equal(command.result.durable, true, 'the repair claims durability only because it IS durable');
 
-  // Documents unsafe current behavior: ...but the broken row is still in IndexedDB, so the
-  // "repair" is undone by the next restart. The label promises more than it delivers.
-  assert.equal(await database.games.count(), 2, 'the invalid row was never removed from IndexedDB');
+  // The broken row is gone from IndexedDB, not just from the in-memory snapshot — the old
+  // repairSnapshot left it behind, so the next restart undid the "repair".
+  assert.deepEqual(idsIn(await database.games.toArray()), ['a1'], 'the invalid row was removed from IndexedDB');
+  assert.deepEqual(idsIn(loadGames()), ['a1']);
+  assert.deepEqual(idsIn(control.games), ['a1'], 'and the owner was told');
+
+  // Nothing is deleted silently: the removed row is handed back so the user can download it.
+  assert.equal(command.result.removedRows.length, 1);
+  assert.equal((command.result.removedRows[0] as { id: string }).id, 'broken');
+
+  await handle.unmount();
 });

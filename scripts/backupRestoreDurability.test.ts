@@ -1,18 +1,13 @@
 /**
- * AS-01 — Backup restore/merge report success before durable writes settle.
+ * AS-01 — Backup restore/merge are observably durable.
  *
- * These tests CHARACTERIZE current behavior; several of them assert unsafe outcomes on
- * purpose (each is marked "documents unsafe current behavior"). They are the guard rail
- * for the follow-up PR that makes restore/merge await durable completion: when that lands,
- * the assertions marked below must be inverted.
+ * These began as characterization tests for the old behavior (restore was a synchronous facade
+ * over detached writes, and DataManagementPanel announced success and reloaded on a 600 ms
+ * timer). They now assert the contract:
  *
- * The facts under test:
- *  - `restoreQuestShelfBackup` / `mergeQuestShelfBackup` are SYNCHRONOUS (they return
- *    `RestoredQuestShelfData`, not a Promise), while every store they write is async:
- *    `IndexedDbCollectionRepository.replaceAll` returns void and detaches a Dexie
- *    transaction, and `savePersistedJson` fires `void adapter.writeDurable(...)`.
- *  - `DataManagementPanel.confirmRestore` therefore shows "backup imported" and schedules
- *    `window.location.reload()` 600 ms later while those writes are still in flight.
+ *   - restore/merge return a promise that only resolves once every REQUIRED store has settled,
+ *   - a store that fails is named in the result rather than silently swallowed,
+ *   - success is reported only for a complete restore.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -75,44 +70,86 @@ async function setupStores(): Promise<{ storage: ControllableStorageAdapter; idb
   return { storage, idb };
 }
 
-/** Unwrap a successful import result, failing loudly if the facade refused the backup. */
-function expectImported(result: QuestShelfBackupImportResult) {
-  assert.equal(result.ok, true, 'expected the backup to be imported');
-  return (result as Extract<QuestShelfBackupImportResult, { ok: true }>).data;
-}
-
 /** Gated writes that belong to the three backup-restored collection stores. */
 function collectionTransactions(idb: IdbTransactionControl) {
   return idb.transactions.filter((entry) => entry.tables.some((table) => collectionTables.has(table)));
 }
 
-test('AS-01: restore returns synchronously while IndexedDB writes are still pending', async () => {
+/** Track whether a promise has settled, without awaiting it. */
+function watch<T>(promise: Promise<T>) {
+  const state = { settled: false, value: undefined as T | undefined };
+  void promise.then((value) => {
+    state.settled = true;
+    state.value = value;
+  });
+  return state;
+}
+
+/** Let any already-queued microtasks run, so "still pending" means genuinely pending. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/**
+ * Let a gated import run to completion.
+ *
+ * An import writes its stores in sequence, so releasing the one it is blocked on lets it open the
+ * next. Both seams go back to `auto` so those later writes are not gated, and then the already-held
+ * ones are drained until the import settles.
+ */
+async function releaseAll(
+  storage: ControllableStorageAdapter,
+  idb: IdbTransactionControl,
+  pending?: { settled: boolean },
+) {
+  idb.setMode('auto');
+  storage.setDurableMode('auto');
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await idb.commitAll();
+    await storage.settleAll();
+    await flush();
+    if (!pending || pending.settled) return;
+  }
+
+  throw new Error('the import never settled after its stores were released');
+}
+
+/** Seed a store durably, before any gating is switched on. */
+async function seedGames(games: Parameters<typeof gameRepository.replaceAllDurable>[0]) {
+  const written = await gameRepository.replaceAllDurable(games);
+  assert.equal(written.ok, true, 'the seed itself must be durable');
+}
+
+function expectOk(result: QuestShelfBackupImportResult) {
+  assert.equal(result.ok, true, `expected a complete restore, got: ${JSON.stringify(result)}`);
+  return result as Extract<QuestShelfBackupImportResult, { ok: true }>;
+}
+
+// The safety snapshot has its own tests below; the rest opt out to stay focused.
+const noSnapshot = { skipRecoverySnapshot: true };
+
+test('AS-01: restore does not resolve until the IndexedDB write has settled', async () => {
   const { storage, idb } = await setupStores();
   const backup = makeBackup({ 'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })] });
 
   idb.setMode('manual');
-  storage.setDurableMode('manual');
 
-  const result = restoreQuestShelfBackup(backup);
+  const pending = watch(restoreQuestShelfBackup(backup, noSnapshot));
+  await flush();
 
-  // The facade is not async at all: there is nothing a caller COULD await.
-  assert.ok(!(result instanceof Promise), 'restoreQuestShelfBackup is synchronous');
+  // The write is still gated, so restore has NOT reported anything yet. Previously it had
+  // already returned a success-shaped result at this point, and the UI had already reloaded.
+  assert.equal(pending.settled, false, 'restore is still awaiting the store');
+  assert.equal(await database.games.count(), 0, 'nothing is durable yet');
 
-  // Documents unsafe current behavior: it has already returned a "restored" result...
-  assert.deepEqual(expectImported(result).games.map((game) => game.id), ['g1']);
-  // ...while the IndexedDB transaction that would make that durable has not run.
-  const pending = collectionTransactions(idb).filter((entry) => entry.outcome === 'pending');
-  assert.ok(pending.length > 0, 'expected at least one un-awaited IndexedDB transaction');
-  assert.equal(await database.games.count(), 0, 'nothing is durable in IndexedDB yet');
+  await releaseAll(storage, idb, pending);
 
-  // Only once the gate opens does the write actually land.
-  await idb.commitAll();
-  await storage.settleAll();
-  assert.equal(await database.games.count(), 1);
+  assert.equal(pending.settled, true, 'restore resolves once the store settles');
+  assert.equal(await database.games.count(), 1, 'and the data really is durable');
+  expectOk(pending.value!);
   idb.restore();
 });
 
-test('AS-01: restore returns before delayed Preferences/KV writes settle', async () => {
+test('AS-01: restore does not resolve until delayed Preferences/KV writes have settled', async () => {
   const { storage, idb } = await setupStores();
   const backup = makeBackup({
     'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })],
@@ -121,51 +158,52 @@ test('AS-01: restore returns before delayed Preferences/KV writes settle', async
 
   storage.setDurableMode('manual');
 
-  restoreQuestShelfBackup(backup);
+  const pending = watch(restoreQuestShelfBackup(backup, noSnapshot));
+  await flush();
 
-  // Documents unsafe current behavior: savePersistedJson wrote the synchronous local tier
-  // but only *fired* the durable write, so restore reports success with it still pending.
-  const pendingWrites = storage.pendingOperations().filter((operation) => operation.kind === 'write');
-  assert.ok(pendingWrites.length > 0, 'expected un-awaited durable KV writes');
   assert.ok(
-    storage.local.has('questshelf.platformQueues.v1'),
-    'the local tier is written synchronously',
+    storage.pendingOperations().some((operation) => operation.kind === 'write'),
+    'the durable KV write is in flight',
   );
+  assert.equal(pending.settled, false, 'restore waits for the durable mirror, it no longer fires and forgets');
 
-  await storage.settleAll();
-  await idb.commitAll();
+  await releaseAll(storage, idb, pending);
+
+  assert.equal(pending.settled, true);
+  expectOk(pending.value!);
   idb.restore();
 });
 
-test('AS-01: a failed Preferences/KV write is swallowed and never reaches the caller', async () => {
+test('AS-01: a failed Preferences write is reported as a partial restore naming the key', async () => {
   const { storage, idb } = await setupStores();
   const backup = makeBackup({
     'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })],
     'questshelf.platformQueues.v1': { entries: [], settings: [] },
   });
 
-  storage.setDurableMode('manual');
-  // The native Preferences write throws. Production's adapter catches that and resolves
-  // anyway (localStoragePreferencesAdapter.writeDurable), which is what this reproduces.
+  // The device has a durable backend and its native write throws.
   storage.failDurableKeys.add('questshelf.platformQueues.v1');
 
-  const result = restoreQuestShelfBackup(backup);
-  await storage.settleAll();
-  await idb.commitAll();
+  const result = await restoreQuestShelfBackup(backup, noSnapshot);
+  await releaseAll(storage, idb);
 
-  // Documents unsafe current behavior: the Plans section never became durable, yet restore
-  // neither threw nor reported anything — on the next native launch the OLD Plans win.
-  const planWrites = storage.operationsForKey('questshelf.platformQueues.v1');
-  assert.ok(planWrites.some((operation) => operation.outcome === 'failed'), 'the durable write failed');
-  assert.deepEqual(expectImported(result).games.map((game) => game.id), ['g1'], 'restore still reported success');
-  assert.ok(
-    storage.local.has('questshelf.platformQueues.v1'),
-    'the local tier kept the value, so the two tiers now disagree',
-  );
+  // The write used to be swallowed: restore reported a clean success and reloaded, and the old
+  // Plans quietly won on the next native launch. Now the loss is surfaced.
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 'partial');
+
+  const failed = (result as Extract<QuestShelfBackupImportResult, { status: 'partial' }>).failedStores;
+  assert.equal(failed.length, 1);
+  assert.equal(failed[0].store, 'kv');
+  assert.equal(failed[0].key, 'questshelf.platformQueues.v1', 'the result names the store that failed');
+  assert.ok(failed[0].error, 'and carries the error');
+
+  // The failure names a key, never a value — nothing that could be a secret.
+  assert.equal('value' in failed[0], false);
   idb.restore();
 });
 
-test('AS-01: stores settling in a different order does not change the reported outcome', async () => {
+test('AS-01: stores settling in a different order still produce a complete restore', async () => {
   const { storage, idb } = await setupStores();
   const backup = makeBackup({
     'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })],
@@ -177,91 +215,140 @@ test('AS-01: stores settling in a different order does not change the reported o
   idb.setMode('manual');
   storage.setDurableMode('manual');
 
-  restoreQuestShelfBackup(backup);
+  const pending = watch(restoreQuestShelfBackup(backup, noSnapshot));
+  await flush();
 
-  // Settle the LAST-started stores first: restore has no cross-store completion contract,
-  // so ordering is unobservable to it either way.
-  const gated = collectionTransactions(idb).filter((entry) => entry.outcome === 'pending');
-  for (const entry of [...gated].reverse()) {
+  // Settle the KV tier first and the collection stores in reverse order — the completion order
+  // is genuinely interleaved, and the restore still waits for all of them.
+  await storage.settleAll();
+  await flush();
+  assert.equal(pending.settled, false, 'still waiting on the collection stores');
+
+  for (const entry of [...collectionTransactions(idb).filter((tx) => tx.outcome === 'pending')].reverse()) {
     await idb.commit(entry);
   }
-  await storage.settleKey('questshelf.platformQueues.v1');
-  await storage.settleKey('questshelf.reviewMode.v1');
-  await storage.settleAll();
+  await releaseAll(storage, idb, pending);
 
+  assert.equal(pending.settled, true);
+  expectOk(pending.value!);
   assert.equal(await database.games.count(), 1);
   assert.equal(await database.playActivity.count(), 1);
-
-  // The completion order is genuinely interleaved, and nothing in the restore path observed it.
-  const completed = storage.durableCompletionOrder();
-  assert.ok(completed.includes('questshelf.platformQueues.v1'));
   idb.restore();
 });
 
-test('AS-01: merge also returns synchronously with IndexedDB writes outstanding', async () => {
+test('AS-01: merge is awaited the same way', async () => {
   const { storage, idb } = await setupStores();
 
-  // Gate from the start so the pre-merge row is provably durable before the merge runs
-  // (replaceAll detaches its transaction, so it cannot simply be awaited).
+  await seedGames([makeLibraryGame({ id: 'local-1', title: 'Local Game' })]);
   idb.setMode('manual');
-  gameRepository.replaceAll([makeLibraryGame({ id: 'local-1', title: 'Local Game' })]);
-  await idb.commitAll();
-  assert.equal(await database.games.count(), 1, 'pre-merge row is durable');
 
   const backup = makeBackup({ 'questshelf.games.v1': [makeLibraryGame({ id: 'backup-1', title: 'Backup Game' })] });
 
-  storage.setDurableMode('manual');
+  const pending = watch(mergeQuestShelfBackup(backup, noSnapshot));
+  await flush();
 
-  const result = mergeQuestShelfBackup(backup);
-  assert.ok(!(result instanceof Promise), 'mergeQuestShelfBackup is synchronous');
-
-  // Documents unsafe current behavior: the merged set is reported (and rendered) while
-  // the durable write is still gated.
-  assert.deepEqual(expectImported(result).games.map((game) => game.id).sort(), ['backup-1', 'local-1']);
+  assert.equal(pending.settled, false, 'merge waits for the store too');
   assert.equal(await database.games.count(), 1, 'IndexedDB still only holds the pre-merge row');
 
-  await idb.commitAll();
-  await storage.settleAll();
-  assert.equal(await database.games.count(), 2);
+  await releaseAll(storage, idb, pending);
+
+  const result = expectOk(pending.value!);
+  assert.deepEqual(result.data.games.map((game) => game.id).sort(), ['backup-1', 'local-1']);
+  assert.equal(await database.games.count(), 2, 'both rows are durable before success is reported');
   idb.restore();
 });
 
-test('AS-01: the in-memory snapshot is updated before anything is durable', async () => {
+test('AS-01: a failed recommendation-cache cleanup is reported but does not fail the restore', async () => {
   const { storage, idb } = await setupStores();
   const backup = makeBackup({ 'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })] });
 
-  idb.setMode('manual');
-  storage.setDurableMode('manual');
+  const result = expectOk(await restoreQuestShelfBackup(backup, noSnapshot));
+  await releaseAll(storage, idb);
 
-  restoreQuestShelfBackup(backup);
-
-  // Documents unsafe current behavior: this is exactly what the UI reads after restore.
-  // It looks complete, so a reload triggered now can race the pending durable writes.
-  assert.deepEqual(loadGames().map((game) => game.id), ['g1'], 'snapshot (what the UI sees) is already restored');
-  assert.equal(await database.games.count(), 0, 'but IndexedDB has nothing');
-
-  await idb.commitAll();
-  await storage.settleAll();
+  // Cache cleanup is tracked as an optional store: a stale recommendation cache is a nuisance,
+  // not data loss, and must not turn a good restore into a failed one.
+  const caches = result.stores.find((store) => store.store === 'recommendation-caches')!;
+  assert.equal(caches.required, false, 'cache cleanup is not a required store');
   idb.restore();
 });
 
-test('AS-01: DataManagementPanel reports success and reloads without awaiting any store', () => {
+// ── Pre-restore safety snapshot ─────────────────────────────────────────────────────
+
+test('AS-01: a replace restore takes a pre-restore safety snapshot first', async () => {
+  const { storage, idb } = await setupStores();
+  const { loadRecoverySnapshot } = await import('../src/lib/recoverySnapshotStorage');
+
+  await seedGames([makeLibraryGame({ id: 'existing-1', title: 'The Game I Had' })]);
+
+  const backup = makeBackup({ 'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })] });
+  expectOk(await restoreQuestShelfBackup(backup));
+  await storage.settleAll();
+
+  // The state that the restore replaced is recoverable.
+  const snapshot = await loadRecoverySnapshot();
+  assert.ok(snapshot, 'a snapshot was stored');
+  assert.equal(snapshot!.reason, 'replace-restore');
+  assert.deepEqual(
+    (snapshot!.backup.data['questshelf.games.v1'] as Array<{ id: string }>).map((game) => game.id),
+    ['existing-1'],
+    'and it holds the PRE-restore library',
+  );
+  idb.restore();
+});
+
+test('AS-01: a restore does not proceed when the safety snapshot cannot be written', async () => {
+  const { storage, idb } = await setupStores();
+
+  await seedGames([makeLibraryGame({ id: 'existing-1', title: 'The Game I Had' })]);
+
+  // Break the appCaches write the snapshot depends on.
+  const originalPut = database.appCaches.put.bind(database.appCaches);
+  database.appCaches.put = (() => Promise.reject(new Error('appCaches is full.'))) as typeof database.appCaches.put;
+
+  try {
+    const backup = makeBackup({ 'questshelf.games.v1': [makeLibraryGame({ id: 'g1', title: 'Restored Game' })] });
+    const result = await restoreQuestShelfBackup(backup);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 'recovery-export-failed');
+    assert.match(String(result.stores[0].error), /appCaches is full/);
+
+    // Nothing was written: a destructive replace with no way back is exactly what must not happen.
+    assert.deepEqual(loadGames().map((game) => game.id), ['existing-1'], 'the existing library is untouched');
+    assert.equal(await database.games.count(), 1);
+  } finally {
+    database.appCaches.put = originalPut;
+    idb.restore();
+  }
+  await storage.settleAll();
+});
+
+// ── The UI contract ─────────────────────────────────────────────────────────────────
+
+test('AS-01: DataManagementPanel awaits the restore and reloads only on success', () => {
   const panelSource = readFileSync('src/components/DataManagementPanel.tsx', 'utf8');
   const confirmRestore = panelSource.slice(
-    panelSource.indexOf('function confirmRestore'),
+    panelSource.indexOf('async function confirmRestore'),
     panelSource.indexOf('async function confirmReset'),
   );
 
   assert.ok(confirmRestore.length > 0, 'located confirmRestore');
-  // Documents unsafe current behavior: neither restore nor merge is awaited (they still cannot
-  // be — they are synchronous facades over detached writes), and the reload is on a fixed
-  // 600 ms timer. AS-02 added a structured result, so the panel now refuses to claim success
-  // when the import was rejected — but a SUCCESSFUL import is still announced before the writes
-  // it reported on have settled. Making that awaitable is AS-01's own change.
-  assert.ok(/(?<!await\s)restoreQuestShelfBackup\(selectedBackup\)/.test(confirmRestore), 'restore is not awaited');
-  assert.ok(/(?<!await\s)mergeQuestShelfBackup\(selectedBackup\)/.test(confirmRestore), 'merge is not awaited');
-  assert.ok(confirmRestore.includes('if (!result.ok)'), 'a refused import is handled');
-  assert.ok(confirmRestore.includes("t('data.backupImported')"), 'a successful import still reports success inline');
-  assert.ok(/setTimeout\(\(\) => window\.location\.reload\(\), 600\)/.test(confirmRestore), 'reload fires 600 ms later');
-  assert.ok(!confirmRestore.includes('function confirmRestore(mode: \'merge\' | \'replace\'): Promise'), 'confirmRestore is not async');
+
+  // Both facades are awaited, so nothing is announced before the stores settle.
+  assert.match(confirmRestore, /await mergeQuestShelfBackup\(selectedBackup\)/);
+  assert.match(confirmRestore, /await restoreQuestShelfBackup\(selectedBackup\)/);
+
+  // A failed or partial restore stays on screen with a reason, and does NOT reload.
+  assert.match(confirmRestore, /if \(!result\.ok\)/);
+  assert.match(confirmRestore, /describeFailedImport\(result, t\)/);
+
+  // The reload happens after success, not on a fixed timer. The old code scheduled
+  // `setTimeout(() => window.location.reload(), 600)` while the writes were still in flight.
+  assert.match(confirmRestore, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(confirmRestore, /setTimeout/, 'no timed reload');
+  assert.doesNotMatch(panelSource, /window\.location\.reload\(\), 600/);
+
+  // Owner saves are frozen across the whole operation, so the unmount flush that the reload
+  // triggers cannot write the pre-restore array back (AS-03).
+  assert.match(confirmRestore, /suspendCanonicalCollectionWrites\(\)/);
 });

@@ -47,6 +47,7 @@ import type { Game, GamePlatform } from '../../types/game';
 import type { RawgSearchResult } from '../../types/rawg';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState, SteamWishlistSyncState } from '../../types/steam';
 import { useAppPersistence } from './useAppPersistence';
+import { useCanonicalCollectionOwner } from './useCanonicalCollectionOwner';
 import { useAppSyncActions } from './useAppSyncActions';
 import { useNavigationState } from '../navigation/useNavigationState';
 import { useCollectionFilters } from '../collection/useCollectionFilters';
@@ -266,6 +267,11 @@ export function AppController() {
   const isAppMountedRef = useRef(true);
 
   const { gamesRef } = useAppPersistence({ games, ignoredSteamGames, onboardingState, platformQueueState, playActivity });
+
+  // AS-03: lets Data Management's recovery/repair tools hand a recovered snapshot back to this
+  // owner, instead of the owner's next save silently overwriting it. Exposes exactly two
+  // replacement commands — no raw setGames is threaded through the component tree.
+  useCanonicalCollectionOwner({ games, playActivity, setGames, setPlayActivity });
   const { addToastNotification, addUndoAction, createUndoSnapshot, dismissToast, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,

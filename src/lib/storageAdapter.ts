@@ -100,27 +100,23 @@ export const localStoragePreferencesAdapter: StorageAdapter = {
       return null;
     }
   },
+  // writeDurable/removeDurable REJECT on a native failure. They used to swallow it, which made
+  // a lost Preferences write invisible to every caller (AS-01). The optimistic callers in
+  // localPersistence still ignore the rejection (they only log it), so their behavior is
+  // unchanged — but the awaited restore/reset/recovery paths can now report which key failed.
   async writeDurable(key, value) {
     const preferences = await getPreferencesPlugin();
     if (!preferences) {
       return;
     }
-    try {
-      await preferences.Preferences.set({ key, value });
-    } catch {
-      // Durable mirror is best-effort; the app stays usable if the native write fails.
-    }
+    await preferences.Preferences.set({ key, value });
   },
   async removeDurable(key) {
     const preferences = await getPreferencesPlugin();
     if (!preferences) {
       return;
     }
-    try {
-      await preferences.Preferences.remove({ key });
-    } catch {
-      // Best-effort across browser and native storage.
-    }
+    await preferences.Preferences.remove({ key });
   },
   async hasDurableBackend() {
     return (await getPreferencesPlugin()) !== null;

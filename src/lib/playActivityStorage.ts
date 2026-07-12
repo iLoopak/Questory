@@ -4,6 +4,7 @@ import {
   type PlayActivityRecoveryMode,
   type PlayActivityRecoveryPreview,
   type PlayActivityRecoveryResult,
+  type PlayActivityRepairDurableResult,
   type PlayActivityRepairResult,
   type PlayActivityStoreStatus,
   type PlayActivityVerification,
@@ -66,6 +67,11 @@ export function verifyPlayActivityStorage(): Promise<PlayActivityVerification> {
 
 export function repairPlayActivitySnapshot(): Promise<PlayActivityRepairResult> {
   return playActivityRepository.repairSnapshot();
+}
+
+/** Durable repair: rewrites the valid rows and deletes invalid/duplicate ones in IndexedDB. */
+export function repairPlayActivityStorage(): Promise<PlayActivityRepairDurableResult> {
+  return playActivityRepository.repairDurable();
 }
 
 export function previewLegacyPlayActivityRecovery(): Promise<PlayActivityRecoveryPreview> {

@@ -51,6 +51,13 @@ export function loadLocalJson<T>(key: string, fallback: T, normalize: (value: un
   }
 }
 
+/**
+ * Optimistic KV write: localStorage synchronously, durable mirror fire-and-forget.
+ *
+ * Unchanged for ordinary feature saves. A durable failure is now logged as a storage issue
+ * (the adapter rejects instead of swallowing), but it still does not block the caller. Restore,
+ * reset and recovery must use `savePersistedJsonDurable` instead.
+ */
 export function savePersistedJson<T>(key: string, value: T) {
   let serializedValue: string;
 
@@ -62,7 +69,95 @@ export function savePersistedJson<T>(key: string, value: T) {
   }
 
   saveLocalJsonStringified(key, serializedValue);
-  void getStorageAdapter().writeDurable(key, serializedValue);
+  void getStorageAdapter()
+    .writeDurable(key, serializedValue)
+    .catch((error: unknown) => {
+      reportStorageIssue(key, error instanceof Error ? error.message : 'Durable storage write failed.');
+    });
+}
+
+/** Outcome of an awaited KV write/remove, per key. */
+export type KvWriteResult = {
+  key: string;
+  ok: boolean;
+  /** True when localStorage was written but the durable (Preferences) mirror was not. */
+  localOnly?: boolean;
+  error?: string;
+};
+
+/**
+ * Awaitable KV write: localStorage synchronously, then the durable mirror awaited.
+ *
+ * Used by backup restore/merge so a Preferences failure is reported instead of lost. There is
+ * no durable backend in the browser, in which case the local write alone is the durable tier.
+ */
+export async function savePersistedJsonDurable<T>(key: string, value: T): Promise<KvWriteResult> {
+  let serializedValue: string;
+
+  try {
+    serializedValue = JSON.stringify(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Value could not be serialized.';
+    reportStorageIssue(key, message);
+    return { key, ok: false, error: message };
+  }
+
+  try {
+    getStorageAdapter().writeLocal(key, serializedValue);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Local storage write failed.';
+    reportStorageIssue(key, message);
+    return { key, ok: false, error: message };
+  }
+
+  const adapter = getStorageAdapter();
+
+  if (!(await adapter.hasDurableBackend())) {
+    return { key, ok: true };
+  }
+
+  try {
+    await adapter.writeDurable(key, serializedValue);
+    return { key, ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Durable storage write failed.';
+    reportStorageIssue(key, message);
+    return { key, ok: false, localOnly: true, error: message };
+  }
+}
+
+/** Awaitable KV removal. Mirrors `removePersistedKeys` but reports per-key failure. */
+export async function removePersistedKeysDurable(keys: string[]): Promise<KvWriteResult[]> {
+  const adapter = getStorageAdapter();
+
+  const results: KvWriteResult[] = keys.map((key) => {
+    try {
+      adapter.removeLocal(key);
+      return { key, ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Local storage remove failed.';
+      reportStorageIssue(key, message);
+      return { key, ok: false, error: message };
+    }
+  });
+
+  if (!(await adapter.hasDurableBackend())) {
+    return results;
+  }
+
+  await Promise.all(
+    keys.map(async (key, index) => {
+      try {
+        await adapter.removeDurable(key);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Durable storage remove failed.';
+        reportStorageIssue(key, message);
+        results[index] = { key, ok: false, localOnly: true, error: message };
+      }
+    }),
+  );
+
+  return results;
 }
 
 export async function hydrateLocalStorageFromPreferences(keys: string[]) {
@@ -116,6 +211,10 @@ export async function hydrateLocalStorageFromPreferences(keys: string[]) {
   );
 }
 
+/**
+ * Optimistic KV removal. Several callers fire this without awaiting, so a durable failure is
+ * logged rather than thrown. `removePersistedKeysDurable` is the reporting variant.
+ */
 export async function removePersistedKeys(keys: string[]) {
   const adapter = getStorageAdapter();
 
@@ -125,7 +224,13 @@ export async function removePersistedKeys(keys: string[]) {
     return;
   }
 
-  await Promise.all(keys.map((key) => adapter.removeDurable(key)));
+  await Promise.all(
+    keys.map((key) =>
+      adapter.removeDurable(key).catch((error: unknown) => {
+        reportStorageIssue(key, error instanceof Error ? error.message : 'Durable storage remove failed.');
+      }),
+    ),
+  );
 }
 
 export function getLocalStorageIssues(): LocalStorageIssue[] {
