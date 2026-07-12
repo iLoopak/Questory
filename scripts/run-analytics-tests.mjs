@@ -64,6 +64,11 @@ const testFiles = [
   { entry: 'scripts/gameEditPatch.test.ts', out: 'gameEditPatch.test.mjs' },
   { entry: 'scripts/providerResults.test.ts', out: 'providerResults.test.mjs' },
   { entry: 'scripts/recommendationProviderFailures.test.ts', out: 'recommendationProviderFailures.test.mjs' },
+  { entry: 'scripts/latestRequest.test.ts', out: 'latestRequest.test.mjs' },
+  // Its own bundle: these stub globalThis.fetch and hold provider responses open, so they must not
+  // interleave with suites that expect a real (or differently stubbed) transport.
+  { entry: 'scripts/screenshotRequests.test.ts', out: 'screenshotRequests.test.mjs' },
+  { entry: 'scripts/recommendationLatestInput.test.ts', out: 'recommendationLatestInput.test.mjs' },
   { entry: 'scripts/discoveryPromotion.test.ts', out: 'discoveryPromotion.test.mjs' },
   { entry: 'scripts/discoveryPromotionCommand.test.ts', out: 'discoveryPromotionCommand.test.mjs' },
   { entry: 'scripts/gameDetailDraft.test.ts', out: 'gameDetailDraft.test.mjs' },
