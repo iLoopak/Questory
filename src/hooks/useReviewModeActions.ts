@@ -1,5 +1,5 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
-import type { ReviewModeAction, ReviewModeActionContext } from '../components/ReviewModePanel';
+import type { ReviewModeAction, ReviewModeActionContext } from '../types/gameActions';
 import { createTranslator } from '../i18n';
 import { formatGameToastMessage } from '../lib/notifications';
 import { removeGameFromPlatformQueue, type PlatformQueueState } from '../lib/platformQueueStorage';
@@ -231,6 +231,9 @@ export function useReviewModeActions({
       // derived the same way the queue actions derive theirs.
       const nextQueueState = removeGameFromPlatformQueue(platformQueueState, game.id, platform);
 
+      // Status and its timestamps are the canonical transition's business now — this used to write
+      // `finishedAt`/`droppedAt` by hand, which is why a Review finish and a Library finish
+      // produced different records.
       updateGameReviewFields(game.id, { platform, status: 'Playing' }, [
         ...derivePlanUndoOperations(platformQueueState, nextQueueState),
         ...reviewDecisionUndoOperations(game.id, ['playing', 'reviewed']),
@@ -243,22 +246,14 @@ export function useReviewModeActions({
     }
 
     if (action === 'finished') {
-      updateGameReviewFields(
-        game.id,
-        { finishedAt: new Date().toISOString(), status: 'Finished' },
-        reviewDecisionUndoOperations(game.id, ['reviewed']),
-      );
+      updateGameReviewFields(game.id, { status: 'Finished' }, reviewDecisionUndoOperations(game.id, ['reviewed']));
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);
       return;
     }
 
     if (action === 'dropped') {
-      updateGameReviewFields(
-        game.id,
-        { droppedAt: new Date().toISOString(), status: 'Dropped' },
-        reviewDecisionUndoOperations(game.id, ['dropped', 'reviewed']),
-      );
+      updateGameReviewFields(game.id, { status: 'Dropped' }, reviewDecisionUndoOperations(game.id, ['dropped', 'reviewed']));
       recordReviewDecision('dropped');
       recordReviewDecision('reviewed');
       markQuestQueueReviewed(game.id);

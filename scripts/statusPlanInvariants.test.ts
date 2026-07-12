@@ -1,16 +1,17 @@
 /**
- * AS-07 — Status and Plan invariants depend on the entry point.
+ * AS-07 — Status transitions and Plan invariants are the same from every surface.
  *
- * "Finish a game" is implemented three times:
- *  - Library / Game Hub  → `useGameLibraryActions.updateGameStatus`      (no finishedAt)
- *  - Platform Plans      → `useQueueActions.updateCurrentlyPlayingGame`  (sets finishedAt)
- *  - Quest Queue review  → `useReviewModeActions.handleReviewAction`     (sets finishedAt)
+ * "Finish a game" used to be implemented three times:
+ *  - Library / Game Hub  → `useGameLibraryActions.updateGameStatus`      (no finishedAt at all)
+ *  - Platform Plans      → `useQueueActions.updateCurrentlyPlayingGame`  (set finishedAt)
+ *  - Quest Queue review  → `useReviewModeActions.handleReviewAction`     (set finishedAt by hand)
  *
- * Achievements keyed on `finishedAt` therefore only count two of the three. Separately,
- * deleting a game filters `games` but leaves its Platform Plan entry behind, and the Plan
- * selectors do not exclude entries whose game is gone.
+ * The rolling completion achievement needs `status === 'Finished' && finishedAt >= cutoff`, so
+ * finishing from the Library did not count. Separately, deleting a game left its Plan entry behind
+ * and the Plan selectors still counted and virtualized it — a phantom count and a blank row.
  *
- * These tests CHARACTERIZE the divergence; they do not centralize the transitions.
+ * These began as characterization tests for that divergence (PR #650). They now assert the
+ * contract: one canonical transition (`lib/gameStatusTransitions`), one set of Plan selectors.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -18,34 +19,177 @@ import { useState } from 'react';
 import { assertTestEnvironment, resetWebStorage } from './testUtils/testEnvironment';
 import { makeLibraryGame } from './testUtils/gameFixtures';
 import { actAsync, renderHook } from './testUtils/reactHarness';
-import type { Game, GamePlatform } from '../src/types/game';
+import type { Game, GamePlatform, GameStatus } from '../src/types/game';
 import type { PlatformQueueState } from '../src/lib/platformQueueStorage';
 import type { ReviewModeState } from '../src/lib/reviewModeStorage';
 import type { IgnoredSteamGame } from '../src/lib/steamIgnoredGamesStorage';
+import type { StatusTransitionEffects } from '../src/lib/gameStatusTransitions';
+import type { UndoOperation } from '../src/lib/undoOperations';
 
 assertTestEnvironment();
 
 const { useGameLibraryActions } = await import('../src/hooks/useGameLibraryActions');
 const { useQueueActions } = await import('../src/hooks/useQueueActions');
 const { useReviewModeActions } = await import('../src/hooks/useReviewModeActions');
+const { useQuestShelfNotifications } = await import('../src/hooks/useQuestShelfNotifications');
 const { createTranslator } = await import('../src/i18n');
 const {
   addGameToPlatformQueue,
+  getOrphanedPlatformQueueEntries,
+  getPlatformQueueEntryCounts,
   getQueueSummary,
   getVisiblePlatformQueueEntries,
   normalizePlatformQueueState,
+  removeGameFromPlatformQueue,
 } = await import('../src/lib/platformQueueStorage');
 const { normalizeReviewModeState } = await import('../src/lib/reviewModeStorage');
 const { getQuestShelfAchievements } = await import('../src/lib/questShelfAchievements');
+const { transitionGameStatus, applyGameChanges } = await import('../src/lib/gameStatusTransitions');
+const { derivePlanUndoOperations } = await import('../src/lib/undoOperations');
 
 const t = createTranslator('en');
 const platform: GamePlatform = 'PC';
 
-function playingGame(): Game {
-  return makeLibraryGame({ id: 'game-1', title: 'The Game', platform, status: 'Playing' });
-}
+/** A fixed clock: every timestamp rule is asserted against it, never against wall time. */
+const clock = new Date('2026-07-10T09:00:00.000Z');
+const clockDate = '2026-07-10';
 
-/** One harness wiring the three action hooks over shared React state, as AppController does. */
+const baseGame = (overrides: Partial<Game> = {}): Game =>
+  makeLibraryGame({ id: 'game-1', title: 'The Game', platform, status: 'Want to play', ...overrides });
+const playingGame = () => baseGame({ status: 'Playing' });
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// The pure transition: the full status/timestamp matrix
+// ════════════════════════════════════════════════════════════════════════════════════
+
+test('AS-07: entering Playing stamps lastPlayedAt and clears both terminal timestamps', () => {
+  const game = baseGame({
+    status: 'Finished',
+    finishedAt: '2026-01-01T00:00:00.000Z',
+    droppedAt: '2026-02-01T00:00:00.000Z',
+    lastPlayedAt: '2025-12-01',
+    rating: 4,
+    notes: 'keep me',
+  });
+
+  const { nextGame } = transitionGameStatus({ game, nextStatus: 'Playing', now: clock });
+
+  assert.equal(nextGame.status, 'Playing');
+  assert.equal(nextGame.lastPlayedAt, clockDate, 'the injected clock, not wall time');
+  assert.equal(nextGame.finishedAt, undefined, 'a game you are playing is not finished');
+  assert.equal(nextGame.droppedAt, undefined, 'nor dropped');
+  assert.equal(nextGame.rating, 4, 'rating survives');
+  assert.equal(nextGame.notes, 'keep me', 'and so does everything else');
+});
+
+test('AS-07: re-asserting Playing is idempotent — it does not rewrite the play date', () => {
+  const game = baseGame({ status: 'Playing', lastPlayedAt: '2026-06-01' });
+
+  const { nextGame, effects } = transitionGameStatus({ game, nextStatus: 'Playing', now: clock });
+
+  assert.equal(nextGame.lastPlayedAt, '2026-06-01', 'a real play date is not overwritten by a repeat');
+  assert.equal(effects.enteredPlaying, false);
+});
+
+test('AS-07: entering Finished stamps finishedAt, clears droppedAt, and leaves lastPlayedAt alone', () => {
+  const game = baseGame({
+    status: 'Playing',
+    lastPlayedAt: '2026-06-05',
+    droppedAt: '2026-02-01T00:00:00.000Z',
+    rating: 5,
+  });
+
+  const { nextGame, effects } = transitionGameStatus({ game, nextStatus: 'Finished', now: clock });
+
+  assert.equal(nextGame.status, 'Finished');
+  assert.equal(nextGame.finishedAt, clock.toISOString());
+  assert.equal(nextGame.droppedAt, undefined, 'a finished game is not also dropped');
+  assert.equal(nextGame.lastPlayedAt, '2026-06-05', 'only Playing writes the play date');
+  assert.equal(nextGame.rating, 5, 'the completion rating sheet owns the rating, not the transition');
+  assert.equal(effects.enteredFinished, true);
+});
+
+test('AS-07: re-finishing does not move a completion that already happened', () => {
+  const game = baseGame({ status: 'Finished', finishedAt: '2026-03-03T00:00:00.000Z' });
+
+  const { nextGame, effects } = transitionGameStatus({ game, nextStatus: 'Finished', now: clock });
+
+  assert.equal(nextGame.finishedAt, '2026-03-03T00:00:00.000Z', 'completion history stays put');
+  assert.equal(effects.enteredFinished, false);
+});
+
+test('AS-07: a Finished game missing its finishedAt (a legacy Library write) is backfilled', () => {
+  const game = baseGame({ status: 'Finished', finishedAt: undefined });
+
+  const { nextGame } = transitionGameStatus({ game, nextStatus: 'Finished', now: clock });
+
+  assert.equal(nextGame.finishedAt, clock.toISOString(), 'the record the old path could not write is repaired');
+});
+
+test('AS-07: entering Dropped stamps droppedAt and clears finishedAt', () => {
+  const game = baseGame({ status: 'Playing', finishedAt: '2026-01-01T00:00:00.000Z' });
+
+  const { nextGame, effects } = transitionGameStatus({ game, nextStatus: 'Dropped', now: clock });
+
+  assert.equal(nextGame.status, 'Dropped');
+  assert.equal(nextGame.droppedAt, clock.toISOString());
+  assert.equal(nextGame.finishedAt, undefined, 'a dropped game must never count as completed');
+  assert.equal(effects.enteredDropped, true);
+});
+
+test('AS-07: returning to Want to play clears both terminal timestamps but keeps play history', () => {
+  const game = baseGame({
+    status: 'Finished',
+    finishedAt: '2026-01-01T00:00:00.000Z',
+    droppedAt: '2026-02-01T00:00:00.000Z',
+    lastPlayedAt: '2026-06-01',
+  });
+
+  const { nextGame } = transitionGameStatus({ game, nextStatus: 'Want to play', now: clock });
+
+  assert.equal(nextGame.status, 'Want to play');
+  assert.equal(nextGame.finishedAt, undefined, 'planned work is not finished work');
+  assert.equal(nextGame.droppedAt, undefined);
+  assert.equal(nextGame.lastPlayedAt, '2026-06-01', 'lastPlayedAt is history, not a terminal marker');
+});
+
+test('AS-07: Paused keeps play history and carries no terminal timestamps', () => {
+  const game = baseGame({ status: 'Playing', lastPlayedAt: '2026-06-01', finishedAt: '2026-01-01T00:00:00.000Z' });
+
+  const { nextGame } = transitionGameStatus({ game, nextStatus: 'Paused', now: clock });
+
+  assert.equal(nextGame.status, 'Paused');
+  assert.equal(nextGame.lastPlayedAt, '2026-06-01');
+  assert.equal(nextGame.finishedAt, undefined);
+  assert.equal(nextGame.droppedAt, undefined);
+});
+
+test('AS-07: the transition is pure and preserves unknown/future fields', () => {
+  const game = { ...baseGame(), futureField: { some: 'value' } } as unknown as Game;
+  const snapshot = JSON.stringify(game);
+
+  const { nextGame } = transitionGameStatus({ game, nextStatus: 'Finished', now: clock });
+
+  assert.equal(JSON.stringify(game), snapshot, 'the input was not mutated');
+  assert.deepEqual((nextGame as unknown as Record<string, unknown>).futureField, { some: 'value' });
+});
+
+test('AS-07: an edit with no status change fires no timestamp rule', () => {
+  const game = baseGame({ status: 'Want to play', lastPlayedAt: null });
+
+  const { nextGame, effects } = applyGameChanges(game, { notes: 'just a note' }, clock);
+
+  assert.equal(nextGame.notes, 'just a note');
+  assert.equal(nextGame.status, 'Want to play');
+  assert.equal(nextGame.lastPlayedAt, null, 'an edit is not a transition');
+  assert.equal(effects.removeFromAllPlans, false);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// Entry-point parity, through the real hooks
+// ════════════════════════════════════════════════════════════════════════════════════
+
+/** One harness wiring the action hooks over shared React state, as AppController does. */
 function useTransitionHarness(initialGames: Game[]) {
   const [games, setGames] = useState<Game[]>(initialGames);
   const [ignoredSteamGames, setIgnoredSteamGames] = useState<IgnoredSteamGame[]>([]);
@@ -55,10 +199,42 @@ function useTransitionHarness(initialGames: Game[]) {
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => normalizeReviewModeState(undefined));
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
-  const noopUndo = () => {};
+  const notifications = useQuestShelfNotifications({
+    activeNavItem: 'Library',
+    games,
+    ignoredSteamGames,
+    platformQueueState,
+    reviewModeState,
+    staleUndoMessage: t('toast.undoUnavailable'),
+    setGames,
+    setIgnoredSteamGames,
+    setPlatformQueueState,
+    setReviewModeState,
+  });
+
+  // The same cross-slice application AppController performs: the transition says what must happen
+  // to the Plans, the Plan owner does it and returns the undo operations.
+  function applyStatusPlanEffects(game: Game, effects: StatusTransitionEffects): UndoOperation[] {
+    if (!effects.removeFromAllPlans && !effects.removeFromPlanForPlatform) {
+      return [];
+    }
+
+    const nextState = effects.removeFromAllPlans
+      ? removeGameFromPlatformQueue(platformQueueState, game.id)
+      : removeGameFromPlatformQueue(platformQueueState, game.id, effects.removeFromPlanForPlatform ?? undefined);
+
+    if (nextState.entries.length === platformQueueState.entries.length) {
+      return [];
+    }
+
+    const operations = derivePlanUndoOperations(platformQueueState, nextState);
+    setPlatformQueueState(nextState);
+    return operations;
+  }
 
   const libraryActions = useGameLibraryActions({
-    addUndoAction: noopUndo,
+    addUndoAction: notifications.addUndoAction,
+    applyStatusPlanEffects,
     games,
     setGames,
     setIgnoredSteamGames,
@@ -68,7 +244,7 @@ function useTransitionHarness(initialGames: Game[]) {
 
   const queueActions = useQueueActions({
     activeQueuePlatforms: [platform],
-    addUndoAction: noopUndo,
+    addUndoAction: notifications.addUndoAction,
     games,
     markOnboardingItemComplete: () => {},
     platformQueueState,
@@ -80,7 +256,8 @@ function useTransitionHarness(initialGames: Game[]) {
   const reviewActions = useReviewModeActions({
     addGameToQueue: queueActions.addGameToQueue,
     addToWishlist: libraryActions.addToWishlist,
-    addUndoAction: noopUndo,
+    addUndoAction: notifications.addUndoAction,
+    platformQueueState,
     refreshGameMetadataFromActions: async () => undefined,
     reviewModeState,
     setActiveNavItem: () => {},
@@ -95,6 +272,7 @@ function useTransitionHarness(initialGames: Game[]) {
   });
 
   return {
+    ...notifications,
     games,
     platformQueueState,
     selectedGameId,
@@ -105,184 +283,342 @@ function useTransitionHarness(initialGames: Game[]) {
   };
 }
 
-const findGame = (games: Game[], id = 'game-1') => games.find((game) => game.id === id);
+type Harness = { current: ReturnType<typeof useTransitionHarness>; unmount: () => Promise<void> };
+const findGame = (games: Game[], id = 'game-1') => games.find((game) => game.id === id)!;
 
-// ── Finishing a game through each entry point ───────────────────────────────────────
+/** The canonical fields a status transition owns. Parity means these agree, whatever the surface. */
+const canonicalFields = (game: Game) => ({
+  status: game.status,
+  hasFinishedAt: Boolean(game.finishedAt),
+  hasDroppedAt: Boolean(game.droppedAt),
+  lastPlayedAt: game.lastPlayedAt,
+  rating: game.rating,
+  notes: game.notes,
+});
 
-test('AS-07: finishing through the Library path sets no finishedAt', async () => {
+test('AS-07: finishing from the Library, Game Detail, Plans and Review produces the same record', async () => {
+  const results: Array<ReturnType<typeof canonicalFields>> = [];
+
+  // Library (a status button on a card).
   resetWebStorage();
-  const handle = await renderHook(useTransitionHarness, [playingGame()]);
+  let handle: Harness = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Finished'));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
 
-  await actAsync(() => {
-    handle.current.libraryActions.updateGameStatus('game-1', 'Finished');
+  // Game Detail (the form save path).
+  resetWebStorage();
+  handle = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.libraryActions.updateGameTracking('game-1', { status: 'Finished' }));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
+
+  // Platform Plans (the compact row's Finish button).
+  resetWebStorage();
+  handle = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.queueActions.finishGameFromCompactRow(playingGame()));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
+
+  // Quest Queue review.
+  resetWebStorage();
+  handle = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.reviewActions.handleReviewAction(playingGame(), 'finished'));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
+
+  // Every surface, one record. The Library used to be the odd one out, with no finishedAt at all.
+  results.forEach((result, index) => {
+    assert.deepEqual(result, results[0], `entry point ${index} diverged: ${JSON.stringify(result)}`);
   });
+  assert.equal(results[0].status, 'Finished');
+  assert.equal(results[0].hasFinishedAt, true, 'and every one of them records the completion');
+  assert.equal(results[0].hasDroppedAt, false);
+});
 
-  const game = findGame(handle.current.games)!;
-  assert.equal(game.status, 'Finished');
-  // Documents unsafe current behavior: the completion timestamp everything else keys on is
-  // never written, so this finish is invisible to history and achievements.
-  assert.equal(game.finishedAt, undefined, 'the Library path does not record finishedAt');
+test('AS-07: dropping from the Library, Plans and Review produces the same record', async () => {
+  const results: Array<ReturnType<typeof canonicalFields>> = [];
+
+  resetWebStorage();
+  let handle: Harness = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Dropped'));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
+
+  resetWebStorage();
+  handle = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.queueActions.dropGameFromCompactRow(playingGame()));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
+
+  resetWebStorage();
+  handle = await renderHook(useTransitionHarness, [playingGame()]);
+  await actAsync(() => handle.current.reviewActions.handleReviewAction(playingGame(), 'dropped'));
+  results.push(canonicalFields(findGame(handle.current.games)));
+  await handle.unmount();
+
+  results.forEach((result, index) => {
+    assert.deepEqual(result, results[0], `entry point ${index} diverged`);
+  });
+  assert.equal(results[0].status, 'Dropped');
+  assert.equal(results[0].hasDroppedAt, true);
+  assert.equal(results[0].hasFinishedAt, false, 'a dropped game is never a completed one');
+});
+
+test('AS-07: marking Playing from the Library and from Game Detail agrees on lastPlayedAt', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  resetWebStorage();
+  let handle: Harness = await renderHook(useTransitionHarness, [baseGame()]);
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Playing'));
+  const fromLibrary = canonicalFields(findGame(handle.current.games));
+  await handle.unmount();
+
+  resetWebStorage();
+  handle = await renderHook(useTransitionHarness, [baseGame()]);
+  await actAsync(() => handle.current.libraryActions.updateGameTracking('game-1', { status: 'Playing' }));
+  const fromDetail = canonicalFields(findGame(handle.current.games));
+  await handle.unmount();
+
+  assert.deepEqual(fromLibrary, fromDetail);
+  assert.equal(fromLibrary.lastPlayedAt, today);
+});
+
+// ── Achievements ────────────────────────────────────────────────────────────────────
+
+/** The rolling 30-day completion achievement: `status === 'Finished' && finishedAt >= cutoff`. */
+const finishedInWindow = (games: Game[]) => {
+  const achievements = getQuestShelfAchievements(games, normalizePlatformQueueState(undefined));
+  const rolling = achievements.find((achievement) => achievement.id === 'backlog-slayer-burst');
+  return rolling ? rolling.current : null;
+};
+
+test('AS-07: finishing through any entry point contributes identically to achievements', async () => {
+  const progressBySurface: Array<number | null> = [];
+
+  for (const finish of ['library', 'plans', 'review'] as const) {
+    resetWebStorage();
+    const handle: Harness = await renderHook(useTransitionHarness, [playingGame()]);
+
+    await actAsync(() => {
+      if (finish === 'library') handle.current.libraryActions.updateGameStatus('game-1', 'Finished');
+      if (finish === 'plans') handle.current.queueActions.finishGameFromCompactRow(playingGame());
+      if (finish === 'review') handle.current.reviewActions.handleReviewAction(playingGame(), 'finished');
+    });
+
+    progressBySurface.push(finishedInWindow(handle.current.games));
+    await handle.unmount();
+  }
+
+  // The Library finish used to contribute 0 while the other two contributed 1.
+  assert.ok(progressBySurface[0] !== null, 'the rolling completion achievement exists');
+  assert.equal(progressBySurface[0], 1, 'finishing in the Library counts');
+  assert.deepEqual(progressBySurface, [progressBySurface[0], progressBySurface[0], progressBySurface[0]]);
+});
+
+test('AS-07: a dropped game is not counted as finished, wherever it was dropped', async () => {
+  resetWebStorage();
+  const handle: Harness = await renderHook(useTransitionHarness, [playingGame()]);
+
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Dropped'));
+
+  assert.equal(finishedInWindow(handle.current.games), 0);
+  assert.equal(findGame(handle.current.games).finishedAt, undefined);
 
   await handle.unmount();
 });
 
-test('AS-07: finishing through Platform Plans sets finishedAt', async () => {
+test('AS-07: finishing a game twice does not produce a second, inconsistent completion', async () => {
   resetWebStorage();
-  const handle = await renderHook(useTransitionHarness, [playingGame()]);
+  const handle: Harness = await renderHook(useTransitionHarness, [playingGame()]);
 
-  await actAsync(() => {
-    handle.current.queueActions.updateCurrentlyPlayingGame('game-1', platform, 'finished');
-  });
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Finished'));
+  const firstFinishedAt = findGame(handle.current.games).finishedAt;
 
-  const game = findGame(handle.current.games)!;
-  assert.equal(game.status, 'Finished');
-  assert.ok(game.finishedAt, 'the Plans path records finishedAt');
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Finished'));
+
+  assert.equal(findGame(handle.current.games).finishedAt, firstFinishedAt, 'the completion did not move');
+  assert.equal(finishedInWindow(handle.current.games), 1, 'and it is still counted exactly once');
 
   await handle.unmount();
 });
 
-test('AS-07: finishing through Quest Queue review sets finishedAt', async () => {
+// ════════════════════════════════════════════════════════════════════════════════════
+// Game versus Plan
+// ════════════════════════════════════════════════════════════════════════════════════
+
+const planIds = (handle: Harness) => handle.current.platformQueueState.entries.map((entry) => entry.gameId);
+
+test('AS-07: a planned game marked Playing leaves the Plan backlog', async () => {
   resetWebStorage();
-  const game = playingGame();
-  const handle = await renderHook(useTransitionHarness, [game]);
+  const game = baseGame();
+  const handle: Harness = await renderHook(useTransitionHarness, [game]);
 
   await actAsync(() => {
-    handle.current.reviewActions.handleReviewAction(game, 'finished');
+    handle.current.setPlatformQueueState((current) => addGameToPlatformQueue(current, game, platform));
   });
+  assert.deepEqual(planIds(handle), ['game-1']);
 
-  const updated = findGame(handle.current.games)!;
-  assert.equal(updated.status, 'Finished');
-  assert.ok(updated.finishedAt, 'the review path records finishedAt');
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Playing'));
+
+  assert.deepEqual(planIds(handle), [], 'a game being played is not also planned work');
+  assert.equal(findGame(handle.current.games).status, 'Playing');
 
   await handle.unmount();
 });
 
-test('AS-07: dropping sets droppedAt from Plans and review, but not from the Library path', async () => {
-  resetWebStorage();
+test('AS-07: a planned game marked Finished or Dropped leaves the Plan, from any surface', async () => {
+  for (const status of ['Finished', 'Dropped'] as GameStatus[]) {
+    resetWebStorage();
+    const game = baseGame();
+    const handle: Harness = await renderHook(useTransitionHarness, [game]);
 
-  const libraryHandle = await renderHook(useTransitionHarness, [playingGame()]);
-  await actAsync(() => {
-    libraryHandle.current.libraryActions.updateGameStatus('game-1', 'Dropped');
-  });
-  const fromLibrary = findGame(libraryHandle.current.games)!;
-  assert.equal(fromLibrary.status, 'Dropped');
-  // Documents unsafe current behavior.
-  assert.equal(fromLibrary.droppedAt, undefined, 'the Library path does not record droppedAt');
-  await libraryHandle.unmount();
+    await actAsync(() => {
+      handle.current.setPlatformQueueState((current) => addGameToPlatformQueue(current, game, platform));
+    });
 
-  const queueHandle = await renderHook(useTransitionHarness, [playingGame()]);
-  await actAsync(() => {
-    queueHandle.current.queueActions.updateCurrentlyPlayingGame('game-1', platform, 'drop');
-  });
-  assert.ok(findGame(queueHandle.current.games)!.droppedAt, 'the Plans path records droppedAt');
-  await queueHandle.unmount();
+    // The Library path used to leave the entry behind, so a finished game sat in the Plan forever.
+    await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', status));
 
-  const reviewGame = playingGame();
-  const reviewHandle = await renderHook(useTransitionHarness, [reviewGame]);
-  await actAsync(() => {
-    reviewHandle.current.reviewActions.handleReviewAction(reviewGame, 'dropped');
-  });
-  assert.ok(findGame(reviewHandle.current.games)!.droppedAt, 'the review path records droppedAt');
-  await reviewHandle.unmount();
+    assert.deepEqual(planIds(handle), [], `${status} is terminal: it is no longer planned work`);
+    await handle.unmount();
+  }
 });
 
-test('AS-07: only the Library path touches lastPlayedAt when marking Playing', async () => {
+test('AS-07: moving a played game back to the backlog re-plans it (the one add case)', async () => {
   resetWebStorage();
-  const wantToPlay = makeLibraryGame({ id: 'game-1', title: 'The Game', platform, status: 'Want to play' });
-  const handle = await renderHook(useTransitionHarness, [wantToPlay]);
+  const handle: Harness = await renderHook(useTransitionHarness, [playingGame()]);
 
-  await actAsync(() => {
-    handle.current.libraryActions.updateGameStatus('game-1', 'Playing');
-  });
-
-  const game = findGame(handle.current.games)!;
-  assert.equal(game.status, 'Playing');
-  assert.equal(game.lastPlayedAt, new Date().toISOString().slice(0, 10), 'lastPlayedAt is stamped');
-  // ...but the completion timestamps still are not managed here at all.
-  assert.equal(game.finishedAt, undefined);
-
-  await handle.unmount();
-});
-
-// ── The achievement consequence ─────────────────────────────────────────────────────
-
-test('AS-07: a game finished from the Library does not count toward the finishedAt achievement', async () => {
-  resetWebStorage();
-
-  const libraryHandle = await renderHook(useTransitionHarness, [playingGame()]);
-  await actAsync(() => {
-    libraryHandle.current.libraryActions.updateGameStatus('game-1', 'Finished');
-  });
-  const libraryGames = libraryHandle.current.games;
-  await libraryHandle.unmount();
-
-  const queueHandle = await renderHook(useTransitionHarness, [playingGame()]);
-  await actAsync(() => {
-    queueHandle.current.queueActions.updateCurrentlyPlayingGame('game-1', platform, 'finished');
-  });
-  const queueGames = queueHandle.current.games;
-  await queueHandle.unmount();
-
-  const progressFor = (games: Game[]) =>
-    getQuestShelfAchievements(games).find((achievement) => achievement.id === 'backlog-slayer-burst')?.current ?? -1;
-
-  // Documents unsafe current behavior: the exact same user action ("I finished this game")
-  // counts toward the rolling 30-day achievement from Plans/Review but not from the Library.
-  assert.equal(progressFor(queueGames), 1, 'finishing in Plans counts');
-  assert.equal(progressFor(libraryGames), 0, 'finishing in the Library does not count');
-
-  // Both are genuinely Finished — only the timestamp differs.
-  assert.equal(findGame(libraryGames)!.status, 'Finished');
-  assert.equal(findGame(queueGames)!.status, 'Finished');
-});
-
-// ── Orphaned Platform Plan entries ──────────────────────────────────────────────────
-
-test('AS-07: deleting a game leaves its Platform Plan entry behind', async () => {
-  resetWebStorage();
-  const game = makeLibraryGame({ id: 'game-1', title: 'The Game', platform, status: 'Want to play' });
-  const handle = await renderHook(useTransitionHarness, [game]);
-
-  await actAsync(() => {
-    handle.current.queueActions.addGameToQueue(game, platform);
-  });
-  assert.equal(handle.current.platformQueueState.entries.length, 1, 'the game is planned');
-
-  await actAsync(() => {
-    handle.current.libraryActions.removeGame('game-1');
-  });
-
-  // Documents unsafe current behavior: removeGame only filters `games`, so the Plan entry
-  // survives, now pointing at a game that no longer exists.
-  assert.deepEqual(handle.current.games, [], 'the game is gone');
-  assert.equal(handle.current.platformQueueState.entries.length, 1, 'the orphaned Plan entry remains');
-  assert.equal(handle.current.platformQueueState.entries[0].gameId, 'game-1');
-
-  await handle.unmount();
-});
-
-test('AS-07: orphaned Plan entries are still counted and rendered by the Plan selectors', () => {
-  const survivingGame = makeLibraryGame({ id: 'kept', title: 'Kept Game', platform, status: 'Want to play' });
-  const deletedGame = makeLibraryGame({ id: 'deleted', title: 'Deleted Game', platform, status: 'Want to play' });
-
-  let state = normalizePlatformQueueState({ entries: [], settings: [{ platform, maxActiveGames: 5 }] });
-  state = addGameToPlatformQueue(state, survivingGame, platform);
-  state = addGameToPlatformQueue(state, deletedGame, platform);
-
-  // The user deletes one of the two planned games.
-  const games = [survivingGame];
-
-  const visible = getVisiblePlatformQueueEntries(state, games);
-  const summary = getQueueSummary(state, games);
-
-  // Documents unsafe current behavior: the selectors filter only by "currently playing", never
-  // by "does this game still exist", so the Plan reports 2 items. QueuePanel then renders null
-  // for the missing one — a phantom count and a blank row.
-  assert.equal(visible.length, 2, 'the orphaned entry is still visible');
-  assert.equal(summary.queuedCount, 2, 'and still counted in the Plan summary');
-  assert.equal(
-    visible.filter((entry) => !games.some((game) => game.id === entry.gameId)).length,
-    1,
-    'one visible entry has no backing game',
+  await actAsync(() =>
+    handle.current.queueActions.updateCurrentlyPlayingGame('game-1', platform, 'move-to-backlog'),
   );
+
+  assert.deepEqual(planIds(handle), ['game-1'], 'it becomes planned work again');
+  assert.equal(findGame(handle.current.games).status, 'Want to play');
+  assert.equal(findGame(handle.current.games).finishedAt, undefined);
+
+  await handle.unmount();
+});
+
+test('AS-07: a status change outside Plans does not disturb OTHER games\' Plan entries', async () => {
+  resetWebStorage();
+  const game = baseGame();
+  const other = makeLibraryGame({ id: 'game-2', title: 'Other', platform, status: 'Want to play' });
+  const handle: Harness = await renderHook(useTransitionHarness, [game, other]);
+
+  await actAsync(() => {
+    handle.current.setPlatformQueueState((current) =>
+      addGameToPlatformQueue(addGameToPlatformQueue(current, game, platform), other, platform),
+    );
+  });
+
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Finished'));
+
+  assert.deepEqual(planIds(handle), ['game-2'], 'only the transitioned game left the Plan');
+
+  await handle.unmount();
+});
+
+// ── Orphaned Plan entries ───────────────────────────────────────────────────────────
+
+test('AS-07: deleting a game leaves its Plan entry persisted, but invisible', async () => {
+  resetWebStorage();
+  const game = baseGame();
+  const other = makeLibraryGame({ id: 'game-2', title: 'Other', platform, status: 'Want to play' });
+  const handle: Harness = await renderHook(useTransitionHarness, [game, other]);
+
+  await actAsync(() => {
+    handle.current.setPlatformQueueState((current) =>
+      addGameToPlatformQueue(addGameToPlatformQueue(current, game, platform), other, platform),
+    );
+  });
+
+  await actAsync(() => handle.current.libraryActions.removeGame('game-1'));
+
+  // The entry is still persisted — deleting a game does not silently rewrite Plan storage, and the
+  // entry is what makes an undo of the delete restore the game's Plan position.
+  assert.deepEqual(planIds(handle).sort(), ['game-1', 'game-2'], 'the record survives for recovery');
+
+  // But it is not visible anywhere: no phantom count, no blank virtualized row.
+  const { games, platformQueueState } = handle.current;
+  assert.deepEqual(
+    getVisiblePlatformQueueEntries(platformQueueState, games).map((entry) => entry.gameId),
+    ['game-2'],
+  );
+  assert.equal(getQueueSummary(platformQueueState, games).queuedCount, 1, 'the count excludes it');
+  assert.deepEqual(
+    getQueueSummary(platformQueueState, games).platformSizes,
+    [{ platform, count: 1 }],
+    'and so does the per-platform size that drives the limits',
+  );
+
+  await handle.unmount();
+});
+
+test('AS-07: orphaned entries are reportable, and separated from visible and persisted counts', () => {
+  const game = baseGame();
+  const state = addGameToPlatformQueue(
+    addGameToPlatformQueue(normalizePlatformQueueState(undefined), game, platform),
+    makeLibraryGame({ id: 'ghost', title: 'Deleted', platform }),
+    platform,
+  );
+
+  // Only `game-1` still exists in the collection.
+  const counts = getPlatformQueueEntryCounts(state, [game]);
+
+  assert.deepEqual(counts, { persisted: 2, visible: 1, orphaned: 1 });
+  assert.deepEqual(
+    getOrphanedPlatformQueueEntries(state, [game]).map((entry) => entry.gameId),
+    ['ghost'],
+    'the missing reference is observable rather than silently swallowed',
+  );
+
+  // Nothing was deleted by asking.
+  assert.equal(state.entries.length, 2, 'a selector never mutates persisted state');
+});
+
+test('AS-07: an orphaned entry becomes visible again if its game comes back', () => {
+  const game = baseGame();
+  const state = addGameToPlatformQueue(normalizePlatformQueueState(undefined), game, platform);
+
+  assert.equal(getVisiblePlatformQueueEntries(state, []).length, 0, 'invisible while the game is gone');
+  assert.equal(getVisiblePlatformQueueEntries(state, [game]).length, 1, 'and back when it is restored');
+});
+
+// ── Undo ────────────────────────────────────────────────────────────────────────────
+
+test('AS-07: undoing a status change restores the timestamps and the Plan entry it removed', async () => {
+  resetWebStorage();
+  const game = baseGame({ lastPlayedAt: '2026-05-01' });
+  const other = makeLibraryGame({ id: 'game-2', title: 'Other', platform, status: 'Want to play' });
+  const handle: Harness = await renderHook(useTransitionHarness, [game, other]);
+
+  await actAsync(() => {
+    handle.current.setPlatformQueueState((current) =>
+      addGameToPlatformQueue(addGameToPlatformQueue(current, game, platform), other, platform),
+    );
+  });
+
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-1', 'Finished'));
+  assert.equal(findGame(handle.current.games).status, 'Finished');
+  assert.deepEqual(planIds(handle), ['game-2']);
+
+  // Unrelated later work, while the toast is still up.
+  await actAsync(() => handle.current.libraryActions.updateGameStatus('game-2', 'Playing'));
+
+  const toast = handle.current.pendingUndoActions.find(
+    (action) => action.historyEntry.affectedGameIds.includes('game-1'),
+  )!;
+  await actAsync(() => handle.current.undoAction(toast.id));
+
+  const restored = findGame(handle.current.games);
+  assert.equal(restored.status, 'Want to play', 'the status went back');
+  assert.equal(restored.finishedAt, undefined, 'and so did the timestamp the transition wrote');
+  assert.equal(restored.lastPlayedAt, '2026-05-01', 'while real history was left alone');
+  assert.ok(planIds(handle).includes('game-1'), 'the Plan entry the transition removed came back');
+
+  // The unrelated newer action survived.
+  assert.equal(findGame(handle.current.games, 'game-2').status, 'Playing');
+
+  await handle.unmount();
 });

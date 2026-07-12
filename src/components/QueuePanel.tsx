@@ -27,7 +27,10 @@ import {
 } from '../lib/platformQueueStorage';
 import type { Game, GamePlatform } from '../types/game';
 
-export type PlayingGameAction = 'move-to-backlog' | 'finished' | 'drop' | 'remove-from-playing';
+// Re-exported so existing component props keep importing it from here (AS-07: the contract itself
+// now lives in the domain, not in this panel).
+export type { PlayingGameAction } from '../types/gameActions';
+import type { PlayingGameAction } from '../types/gameActions';
 import { GameCoverImage } from './GameCoverImage';
 import { AchievementProgressBadge } from './AchievementProgressBadge';
 import { PlatformIdentityBadge } from './PlatformIdentityBadge';

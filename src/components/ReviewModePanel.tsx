@@ -30,25 +30,10 @@ import { RatingBadgeStack } from './RatingBadgeStack';
 import { isInteractiveOrOverlayActive, shouldIgnoreQuestQueueShortcut } from '../lib/keyboardShortcutGuards';
 import { useQuestQueuePrefetch } from '../hooks/useQuestQueuePrefetch';
 
-export type ReviewModeAction =
-  | 'queue'
-  | 'playing'
-  | 'wishlist'
-  | 'finished'
-  | 'dropped'
-  | 'ignore'
-  | 'enrich'
-  | 'find-artwork'
-  | 'open-details'
-  | 'skip'
-  | 'note';
-
-export type ReviewModeActionContext = {
-  /** Active 20-game session batch. */
-  queueGameIds?: string[];
-  /** Full pending, unprocessed Quest Queue candidate order for the current source/filter. */
-  pendingGameIds?: string[];
-};
+// Re-exported so existing component props keep importing them from here (AS-07: the contracts now
+// live in the domain, not in this panel).
+export type { ReviewModeAction, ReviewModeActionContext } from '../types/gameActions';
+import type { ReviewModeAction, ReviewModeActionContext } from '../types/gameActions';
 
 type ReviewModePanelProps = {
   confirmCancelConvention: ConfirmCancelConvention;

@@ -8,6 +8,12 @@ import {
   type NotificationDraft,
 } from '../lib/notifications';
 import { addIgnoredSteamGame, type IgnoredSteamGame } from '../lib/steamIgnoredGamesStorage';
+import {
+  applyGameChanges,
+  transitionGameStatus,
+  type StatusTransitionContext,
+  type StatusTransitionEffects,
+} from '../lib/gameStatusTransitions';
 import type { UndoActionHistoryEntry } from '../lib/undoHistoryStorage';
 import type { UndoOperation } from '../lib/undoOperations';
 import type { Game, GameCollectionType, GameStatus } from '../types/game';
@@ -26,8 +32,17 @@ type AddUndoAction = (
   notification?: Partial<NotificationDraft>,
 ) => void;
 
+/**
+ * AS-07: the cross-slice half of a status transition. The transition itself is pure and says WHAT
+ * must happen to the Plans; the controller that owns Plan state applies it and hands back the undo
+ * operations, so the whole change stays one undoable action.
+ */
+export type ApplyStatusPlanEffects = (game: Game, effects: StatusTransitionEffects) => UndoOperation[];
+
 type UseGameLibraryActionsOptions = {
   addUndoAction: AddUndoAction;
+  /** Defaults to a no-op for surfaces with no Plan owner mounted. */
+  applyStatusPlanEffects?: ApplyStatusPlanEffects;
   games: Game[];
   setGames: Dispatch<SetStateAction<Game[]>>;
   setIgnoredSteamGames: Dispatch<SetStateAction<IgnoredSteamGame[]>>;
@@ -37,12 +52,32 @@ type UseGameLibraryActionsOptions = {
 
 export function useGameLibraryActions({
   addUndoAction,
+  applyStatusPlanEffects = () => [],
   games,
   setGames,
   setIgnoredSteamGames,
   setSelectedGameId,
   t,
 }: UseGameLibraryActionsOptions) {
+  /** Replace one game with the record the canonical transition produced. */
+  function commitGame(nextGame: Game) {
+    setGames((currentGames) =>
+      currentGames.map((currentGame) => (currentGame.id === nextGame.id ? nextGame : currentGame)),
+    );
+  }
+
+  /** The fields a status transition may rewrite — the undo guard and inverse cover exactly these. */
+  const transitionFields = ['status', 'lastPlayedAt', 'finishedAt', 'droppedAt'] as const;
+
+  function statusUndoOperation(game: Game, nextGame: Game, extraFields: Array<keyof Game> = []): UndoOperation {
+    const fields = [...transitionFields, ...extraFields];
+    return {
+      kind: 'game-fields',
+      gameId: game.id,
+      previous: pickFields(game, fields),
+      expected: pickFields(nextGame, fields),
+    };
+  }
   function getLocalizedStatusToastMessage(game: Game, status: GameStatus) {
     if (status === 'Playing') {
       return formatGameToastMessage(t('toast.markedPlayingNow'), game);
@@ -59,78 +94,65 @@ export function useGameLibraryActions({
     return formatMessageTemplate(t('app.statusUpdatedSingle'), { game: formatGameToastMessage('{game}', game), status: translateOption(game.status, t) });
   }
 
-  function updateGameStatus(gameId: string, status: GameStatus, extraOperations: UndoOperation[] = []) {
+  function updateGameStatus(
+    gameId: string,
+    status: GameStatus,
+    extraOperations: UndoOperation[] = [],
+    context: StatusTransitionContext = 'library',
+  ) {
     const game = games.find((currentGame) => currentGame.id === gameId);
-    const nextLastPlayedAt = game
-      ? status === 'Playing'
-        ? new Date().toISOString().slice(0, 10)
-        : game.lastPlayedAt
-      : null;
+    if (!game) {
+      return;
+    }
 
-    if (game && (status === 'Playing' || status === 'Finished' || status === 'Dropped')) {
+    // One canonical transition, whichever surface asked. Library used to set `status` and
+    // `lastPlayedAt` and nothing else, so finishing a game here never wrote `finishedAt` and never
+    // counted toward the completion achievement.
+    const { nextGame, effects } = transitionGameStatus({ game, nextStatus: status, now: new Date(), context });
+    const planOperations = applyStatusPlanEffects(game, effects);
+
+    if (status === 'Playing' || status === 'Finished' || status === 'Dropped') {
       addUndoAction(getLocalizedStatusToastMessage(game, status), {
         actionType: `mark-${status.toLowerCase()}`,
         affectedGameIds: [gameId],
         description: formatMessageTemplate(t('app.restoreGameStatus'), { game: game.title, status: translateOption(game.status, t) }),
       }, [
-        // Only the two fields this action writes. A later edit to the same game's notes or tags
-        // survives the undo; a later edit to its STATUS makes the undo stale instead of silently
-        // overwriting the newer status.
-        {
-          kind: 'game-fields',
-          gameId,
-          previous: { status: game.status, lastPlayedAt: game.lastPlayedAt },
-          expected: { status, lastPlayedAt: nextLastPlayedAt },
-        },
+        statusUndoOperation(game, nextGame),
+        ...planOperations,
         ...extraOperations,
       ], { actions: [getUndoAction(), getViewGameAction(gameId)] });
     }
 
-    setGames((currentGames) =>
-      currentGames.map((currentGame) =>
-        currentGame.id === gameId
-          ? touchGameRecord({
-              ...currentGame,
-              status,
-              lastPlayedAt: status === 'Playing' ? new Date().toISOString().slice(0, 10) : currentGame.lastPlayedAt,
-            })
-          : currentGame,
-      ),
-    );
+    commitGame(nextGame);
   }
 
   function updateManyGameStatuses(gameIds: string[], status: GameStatus) {
     const targetGameIds = new Set(gameIds);
     const updatedGames = games.filter((game) => targetGameIds.has(game.id));
-    const today = new Date().toISOString().slice(0, 10);
+    if (updatedGames.length === 0) {
+      return;
+    }
 
-    if (updatedGames.length > 0 && (status === 'Playing' || status === 'Finished' || status === 'Dropped')) {
+    const now = new Date();
+    const transitions = updatedGames.map((game) => ({
+      game,
+      ...transitionGameStatus({ game, nextStatus: status, now, context: 'bulk' }),
+    }));
+    const planOperations = transitions.flatMap(({ game, effects }) => applyStatusPlanEffects(game, effects));
+
+    if (status === 'Playing' || status === 'Finished' || status === 'Dropped') {
       addUndoAction(updatedGames.length === 1 ? getLocalizedStatusToastMessage(updatedGames[0], status) : formatMessageTemplate(t('app.statusUpdated'), { count: updatedGames.length, status: translateOption(status, t) }), {
         actionType: `bulk-mark-${status.toLowerCase()}`,
         affectedGameIds: updatedGames.map((game) => game.id),
         description: formatMessageTemplate(t('app.restoreGameStatuses'), { count: updatedGames.length }),
-      }, updatedGames.map((game): UndoOperation => ({
-        kind: 'game-fields',
-        gameId: game.id,
-        previous: { status: game.status, lastPlayedAt: game.lastPlayedAt },
-        expected: {
-          status,
-          lastPlayedAt: status === 'Playing' && game.status !== 'Playing' ? today : game.lastPlayedAt,
-        },
-      })));
+      }, [
+        ...transitions.map(({ game, nextGame }) => statusUndoOperation(game, nextGame)),
+        ...planOperations,
+      ]);
     }
 
-    setGames((currentGames) =>
-      currentGames.map((game) =>
-        targetGameIds.has(game.id)
-          ? touchGameRecord({
-              ...game,
-              status,
-              lastPlayedAt: status === 'Playing' && game.status !== 'Playing' ? today : game.lastPlayedAt,
-            })
-          : game,
-      ),
-    );
+    const nextGamesById = new Map(transitions.map(({ nextGame }) => [nextGame.id, nextGame]));
+    setGames((currentGames) => currentGames.map((game) => nextGamesById.get(game.id) ?? game));
   }
 
   function addManualGame(game: Game) {
@@ -318,63 +340,53 @@ export function useGameLibraryActions({
     );
   }
 
-  function updateGameReviewFields(gameId: string, changes: Partial<Game>, extraOperations: UndoOperation[] = []) {
+  function updateGameReviewFields(
+    gameId: string,
+    changes: Partial<Game>,
+    extraOperations: UndoOperation[] = [],
+    context: StatusTransitionContext = 'review',
+  ) {
     const game = games.find((currentGame) => currentGame.id === gameId);
+    if (!game) {
+      return;
+    }
 
-    if (game && (changes.status === 'Playing' || changes.status === 'Finished' || changes.status === 'Dropped')) {
-      const nextLastPlayedAt =
-        changes.status === 'Playing' && game.status !== 'Playing'
-          ? new Date().toISOString().slice(0, 10)
-          : game.lastPlayedAt;
+    // Callers used to hand-write `finishedAt`/`droppedAt` into `changes`. They now pass the status
+    // and the transition stamps the timestamps, so a Quest Queue finish and a Library finish
+    // produce byte-for-byte the same record.
+    const { nextGame, effects } = applyGameChanges(game, changes, new Date(), context);
+    const planOperations = applyStatusPlanEffects(game, effects);
+    const editedFields = Object.keys(changes).filter(
+      (field) => !transitionFields.includes(field as (typeof transitionFields)[number]),
+    ) as Array<keyof Game>;
 
+    if (changes.status === 'Playing' || changes.status === 'Finished' || changes.status === 'Dropped') {
       addUndoAction(getLocalizedStatusToastMessage(game, changes.status), {
         actionType: `mark-${changes.status.toLowerCase()}`,
         affectedGameIds: [gameId],
         description: formatMessageTemplate(t('app.restoreGameStatus'), { game: game.title, status: translateOption(game.status, t) }),
       }, [
-        {
-          kind: 'game-fields',
-          gameId,
-          // Only the fields this call actually changes are captured, so undoing a review decision
-          // cannot revert an unrelated field the user edited afterwards.
-          previous: { ...pickFields(game, Object.keys(changes) as Array<keyof Game>), lastPlayedAt: game.lastPlayedAt },
-          expected: { ...changes, lastPlayedAt: nextLastPlayedAt },
-        },
+        // The transition's own fields plus whatever else this edit changed — and nothing more, so
+        // undoing it cannot revert an unrelated field the user edited afterwards.
+        statusUndoOperation(game, nextGame, editedFields),
+        ...planOperations,
         ...extraOperations,
       ], { actions: [getUndoAction(), getViewGameAction(gameId)] });
     }
 
-    setGames((currentGames) =>
-      currentGames.map((currentGame) =>
-        currentGame.id === gameId
-          ? touchGameRecord({
-              ...currentGame,
-              ...changes,
-              lastPlayedAt:
-                changes.status === 'Playing' && currentGame.status !== 'Playing'
-                  ? new Date().toISOString().slice(0, 10)
-                  : currentGame.lastPlayedAt,
-            })
-          : currentGame,
-      ),
-    );
+    commitGame(nextGame);
   }
 
+  /** Game Detail's form save: an edit that may or may not carry a status change. */
   function updateGameTracking(gameId: string, tracking: GameTrackingUpdate) {
-    setGames((currentGames) =>
-      currentGames.map((game) =>
-        game.id === gameId
-          ? touchGameRecord({
-              ...game,
-              ...tracking,
-              lastPlayedAt:
-                tracking.status === 'Playing' && game.status !== 'Playing'
-                  ? new Date().toISOString().slice(0, 10)
-                  : game.lastPlayedAt,
-            })
-          : game,
-      ),
-    );
+    const game = games.find((currentGame) => currentGame.id === gameId);
+    if (!game) {
+      return;
+    }
+
+    const { nextGame, effects } = applyGameChanges(game, tracking, new Date(), 'game-detail');
+    applyStatusPlanEffects(game, effects);
+    commitGame(nextGame);
   }
 
   return {
