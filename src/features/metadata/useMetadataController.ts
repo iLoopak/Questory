@@ -1,13 +1,15 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { useMetadataArtworkActions, type MetadataSelectionRequest } from '../../hooks/useMetadataArtworkActions';
+import type { SliceCommands } from '../app/useSliceCommands';
 import type { Game } from '../../types/game';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { NavItem } from '../../config/navigation';
 
 export function useMetadataController(args: {
   addToastNotification: Parameters<typeof useMetadataArtworkActions>[0]['addToastNotification'];
-  games: Game[];
+  gamesRef: SliceCommands['gamesRef'];
   markOnboardingItemComplete: (itemId: OnboardingItemId) => void;
+  runGamesCommand: SliceCommands['runGamesCommand'];
   setActiveNavItem: Dispatch<SetStateAction<NavItem>>;
   setGames: Dispatch<SetStateAction<Game[]>>;
   setSelectedGameId: Dispatch<SetStateAction<string | null>>;

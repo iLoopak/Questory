@@ -30,6 +30,7 @@ assertTestEnvironment();
 
 const { useGameLibraryActions } = await import('../src/hooks/useGameLibraryActions');
 const { useQueueActions } = await import('../src/hooks/useQueueActions');
+const { useSliceCommands } = await import('../src/features/app/useSliceCommands');
 const { useReviewModeActions } = await import('../src/hooks/useReviewModeActions');
 const { useQuestShelfNotifications } = await import('../src/hooks/useQuestShelfNotifications');
 const { createTranslator } = await import('../src/i18n');
@@ -199,6 +200,9 @@ function useTransitionHarness(initialGames: Game[]) {
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => normalizeReviewModeState(undefined));
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
+  // The same command boundary AppController owns: one pure transition per action, applied here.
+  const commands = useSliceCommands({ games, platformQueueState, setGames, setPlatformQueueState });
+
   const notifications = useQuestShelfNotifications({
     activeNavItem: 'Library',
     games,
@@ -245,11 +249,9 @@ function useTransitionHarness(initialGames: Game[]) {
   const queueActions = useQueueActions({
     activeQueuePlatforms: [platform],
     addUndoAction: notifications.addUndoAction,
-    games,
     markOnboardingItemComplete: () => {},
-    platformQueueState,
-    setGames,
-    setPlatformQueueState,
+    runCrossSliceCommand: commands.runCrossSliceCommand,
+    runPlanCommand: commands.runPlanCommand,
     t,
   });
 

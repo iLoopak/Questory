@@ -16,6 +16,11 @@ type UseAppPersistenceOptions = {
   playActivity: PlayActivityRecord[];
 };
 
+/**
+ * The single persistence writer for the slices below. AS-14: this includes Platform Plans, which
+ * `usePlatformQueueController` also used to save from inside its state updater — one logical Plan
+ * change now produces exactly one write, from here.
+ */
 export function useAppPersistence({
   games,
   ignoredSteamGames,
@@ -127,7 +132,6 @@ export function useAppPersistence({
     savePlatformQueueState(platformQueueState);
   }, [platformQueueState]);
 
-  return { gamesRef };
 }
 
 function hasPersistedValueChanged<T>(snapshotRef: { current: string }, value: T) {

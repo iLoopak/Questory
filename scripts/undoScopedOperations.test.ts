@@ -27,6 +27,7 @@ const { createTranslator } = await import('../src/i18n');
 const { useQuestShelfNotifications } = await import('../src/hooks/useQuestShelfNotifications');
 const { useGameLibraryActions } = await import('../src/hooks/useGameLibraryActions');
 const { useQueueActions } = await import('../src/hooks/useQueueActions');
+const { useSliceCommands } = await import('../src/features/app/useSliceCommands');
 const { useReviewModeActions } = await import('../src/hooks/useReviewModeActions');
 const { addGameToPlatformQueue, normalizePlatformQueueState } = await import('../src/lib/platformQueueStorage');
 const { normalizeReviewModeState } = await import('../src/lib/reviewModeStorage');
@@ -49,6 +50,8 @@ function useUndoHarness(initialGames: Game[]) {
   );
   const [reviewModeState, setReviewModeState] = useState<ReviewModeState>(() => normalizeReviewModeState(undefined));
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+
+  const commands = useSliceCommands({ games, platformQueueState, setGames, setPlatformQueueState });
 
   const notifications = useQuestShelfNotifications({
     activeNavItem: 'Library',
@@ -75,11 +78,9 @@ function useUndoHarness(initialGames: Game[]) {
   const queueActions = useQueueActions({
     activeQueuePlatforms: ['PC', 'Switch'],
     addUndoAction: notifications.addUndoAction,
-    games,
     markOnboardingItemComplete: () => {},
-    platformQueueState,
-    setGames,
-    setPlatformQueueState,
+    runCrossSliceCommand: commands.runCrossSliceCommand,
+    runPlanCommand: commands.runPlanCommand,
     t,
   });
 
@@ -591,6 +592,8 @@ function useReviewUndoHarness(initialGames: Game[]) {
   }));
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
+  const commands = useSliceCommands({ games, platformQueueState, setGames, setPlatformQueueState });
+
   const notifications = useQuestShelfNotifications({
     activeNavItem: 'Review Mode',
     games,
@@ -616,11 +619,9 @@ function useReviewUndoHarness(initialGames: Game[]) {
   const queueActions = useQueueActions({
     activeQueuePlatforms: ['PC', 'Switch'],
     addUndoAction: notifications.addUndoAction,
-    games,
     markOnboardingItemComplete: () => {},
-    platformQueueState,
-    setGames,
-    setPlatformQueueState,
+    runCrossSliceCommand: commands.runCrossSliceCommand,
+    runPlanCommand: commands.runPlanCommand,
     t,
   });
 

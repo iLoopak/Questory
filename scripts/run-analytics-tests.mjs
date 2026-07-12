@@ -15,6 +15,9 @@ const sharedConfig = {
   // components/hooks, so .tsx sources must compile without a React import in scope.
   jsx: 'automatic',
   define: {
+    // Modules that read `import.meta.env[name]` dynamically (services/steamApi) cannot be covered by
+    // the per-key defines below, and `import.meta.env` itself does not exist under Node.
+    'import.meta.env': JSON.stringify({ DEV: false, PROD: false, VITE_INTEGRATIONS_PROXY_BASE_URL: '' }),
     'import.meta.env.DEV': JSON.stringify(false),
     'import.meta.env.PROD': JSON.stringify(false),
     'import.meta.env.VITE_INTEGRATIONS_PROXY_BASE_URL': JSON.stringify(''),
@@ -65,6 +68,7 @@ const testFiles = [
   { entry: 'scripts/providerResults.test.ts', out: 'providerResults.test.mjs' },
   { entry: 'scripts/recommendationProviderFailures.test.ts', out: 'recommendationProviderFailures.test.mjs' },
   { entry: 'scripts/latestRequest.test.ts', out: 'latestRequest.test.mjs' },
+  { entry: 'scripts/stateTransitions.test.ts', out: 'stateTransitions.test.mjs' },
   // Its own bundle: these stub globalThis.fetch and hold provider responses open, so they must not
   // interleave with suites that expect a real (or differently stubbed) transport.
   { entry: 'scripts/screenshotRequests.test.ts', out: 'screenshotRequests.test.mjs' },
