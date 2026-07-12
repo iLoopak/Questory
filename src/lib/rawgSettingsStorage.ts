@@ -1,5 +1,6 @@
 import type { RawgSettings } from '../types/rawg';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { notifyIntegrationSettingsChanged } from './integrationSettingsRevision';
 
 const STORAGE_KEY = 'questshelf.rawgSettings.v1';
 
@@ -12,7 +13,10 @@ export function loadRawgSettings(): RawgSettings {
 }
 
 export function saveRawgSettings(settings: RawgSettings) {
-  savePersistedJson(STORAGE_KEY, normalizeRawgSettings(settings));
+  const normalized = normalizeRawgSettings(settings);
+  savePersistedJson(STORAGE_KEY, normalized);
+  notifyIntegrationSettingsChanged();
+  return normalized;
 }
 
 export function normalizeRawgSettings(value: unknown): RawgSettings {

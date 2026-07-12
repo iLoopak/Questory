@@ -1,5 +1,6 @@
 import type { SteamSettings } from '../types/steam';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { notifyIntegrationSettingsChanged } from './integrationSettingsRevision';
 
 const STORAGE_KEY = 'questshelf.steamSettings.v1';
 
@@ -15,7 +16,10 @@ export function loadSteamSettings(): SteamSettings {
 }
 
 export function saveSteamSettings(settings: SteamSettings) {
-  savePersistedJson(STORAGE_KEY, normalizeSteamSettings(settings));
+  const normalized = normalizeSteamSettings(settings);
+  savePersistedJson(STORAGE_KEY, normalized);
+  notifyIntegrationSettingsChanged();
+  return normalized;
 }
 
 export function normalizeSteamSettings(value: unknown): SteamSettings {
@@ -51,4 +55,3 @@ function normalizeSteamProfileMetadata(value: unknown): SteamSettings['profile']
 export function getSteamProfileDisplayName(settings: SteamSettings) {
   return settings.profile?.personaName?.trim() || settings.profile?.profileName?.trim() || '';
 }
-

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Icon } from '../../components/Icon';
 import { BackToTopButton } from '../../components/BackToTopButton';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
@@ -87,6 +87,7 @@ import { useAnalytics } from './useAnalytics';
 import { recordRecommendationOutcome } from '../../lib/recommendationFeedback';
 import { useAchievementSystem } from './useAchievementSystem';
 import { getSafeWishlistTitleMatches, normalizeImportMatchTitle } from '../../domain/imports/titleMatching';
+import { getIntegrationSettingsRevision, subscribeIntegrationSettings } from '../../lib/integrationSettingsRevision';
 
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
@@ -96,8 +97,12 @@ export function AppController() {
   const { logPlayedToday, playActivity, setPlayActivity } = usePlayActivity({ setGames });
   const { isScrolled, mainContentRef } = useMainScrollBehavior();
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
-  const [steamSettingsSnapshot, setSteamSettingsSnapshot] = useState(() => loadSteamSettings());
-  const [isRawgApiKeySet, setIsRawgApiKeySet] = useState(() => Boolean(loadRawgSettings().apiKey.trim()));
+  const integrationSettingsRevision = useSyncExternalStore(subscribeIntegrationSettings, getIntegrationSettingsRevision, getIntegrationSettingsRevision);
+  const steamSettingsSnapshot = useMemo(() => loadSteamSettings(), [integrationSettingsRevision]);
+  const isRawgApiKeySet = useMemo(() => Boolean(loadRawgSettings().apiKey.trim()), [integrationSettingsRevision]);
+  // Compatibility callback for existing settings props. The settings storage owner now publishes
+  // the normalized value; AppController no longer accepts a second partial boolean mirror.
+  const setIsRawgApiKeySet = useCallback(() => {}, []);
   const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(steamSettingsSnapshot));
   const {
     accentColorPreference,
@@ -235,7 +240,6 @@ export function AppController() {
 
   function handleSteamProfileNameChange(profileName: string) {
     setSteamProfileName(profileName);
-    setSteamSettingsSnapshot(loadSteamSettings());
   }
 
   const [lastRetroImportGameIds, setLastRetroImportGameIds] = useState<string[]>([]);

@@ -126,12 +126,16 @@ async function requestRawg<T>(path: string, params: Record<string, string> = {})
 
 function mapRawgProxyError(error: unknown): RawgApiError {
   const code = typeof (error as { code?: unknown })?.code === 'string' ? (error as { code: string }).code : '';
+  const boundaryKind = typeof (error as { kind?: unknown })?.kind === 'string' ? (error as { kind: ProviderErrorKind }).kind : undefined;
   const status = typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : undefined;
 
   if (code === 'INVALID_API_KEY') return new RawgApiError('RAWG did not accept this API key.', 'invalid-api-key', { status });
   if (code === 'RATE_LIMITED') return new RawgApiError('RAWG is rate limited. Try again later.', 'rate-limit', { kind: 'rate-limited', status: status ?? 429 });
   if (code === 'PROVIDER_TIMEOUT') return new RawgApiError('RAWG took too long to respond. Try again.', 'rate-limit', { kind: 'timeout', status });
   if (code === 'PROVIDER_UNAVAILABLE') return new RawgApiError('RAWG is temporarily unavailable. Try again later.', 'rate-limit', { kind: 'provider', status });
+  if (boundaryKind === 'network' || boundaryKind === 'aborted' || boundaryKind === 'malformed-response' || boundaryKind === 'timeout') {
+    return new RawgApiError('RAWG request failed through the integration proxy.', 'api-failure', { kind: boundaryKind, status });
+  }
 
   // The proxy itself could not be reached (offline, or the request was aborted): that is a network
   // condition, not a RAWG outage, and the message must not leak the proxy's own error text.

@@ -218,7 +218,7 @@ function SteamStep({ games, isComplete, onComplete, onContinue, onImportGames, o
   const [status, setStatus] = useState('Enter your credentials below, then click Import to bring in your library.');
   const [importResult, setImportResult] = useState<SteamImportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  useEffect(() => saveSteamSettings(settings), [settings]);
+  useEffect(() => { saveSteamSettings(settings); }, [settings]);
   async function importLibrary() {
     if (!settings.apiKey.trim() || !settings.steamId64.trim()) {
       const message = 'Steam API key and SteamID64 are required for automatic library import.';
@@ -316,7 +316,7 @@ function SteamStep({ games, isComplete, onComplete, onContinue, onImportGames, o
 function RawgStep({ onComplete, onOpenSettings }: { onComplete: () => void; onOpenSettings: () => void }) {
   const [settings, setSettings] = useState<RawgSettings>(() => loadRawgSettings());
   const [status, setStatus] = useState('Paste a RAWG key to enable metadata enrichment.');
-  useEffect(() => saveRawgSettings(settings), [settings]);
+  useEffect(() => { saveRawgSettings(settings); }, [settings]);
   return <div><Input label="RAWG API key" value={settings.apiKey} onChange={(apiKey) => { setSettings({ apiKey }); if (apiKey.trim()) { setStatus('RAWG key saved.'); onComplete(); } }} type="password" /><Status text={status} /><Actions primary="Open enrichment settings" onPrimary={onOpenSettings} /></div>;
 }
 

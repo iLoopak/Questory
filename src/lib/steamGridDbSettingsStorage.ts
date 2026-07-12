@@ -1,5 +1,6 @@
 import type { SteamGridDbSettings } from '../types/steamGridDb';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { notifyIntegrationSettingsChanged } from './integrationSettingsRevision';
 
 const STORAGE_KEY = 'questshelf.steamGridDbSettings.v1';
 
@@ -12,7 +13,10 @@ export function loadSteamGridDbSettings(): SteamGridDbSettings {
 }
 
 export function saveSteamGridDbSettings(settings: SteamGridDbSettings) {
-  savePersistedJson(STORAGE_KEY, normalizeSteamGridDbSettings(settings));
+  const normalized = normalizeSteamGridDbSettings(settings);
+  savePersistedJson(STORAGE_KEY, normalized);
+  notifyIntegrationSettingsChanged();
+  return normalized;
 }
 
 export function normalizeSteamGridDbSettings(value: unknown): SteamGridDbSettings {
