@@ -34,6 +34,15 @@ type AddUndoAction = (
   notification?: Partial<NotificationDraft>,
 ) => void;
 
+/** What a batch Plan addition actually did, so the caller can report it honestly. */
+export type AddGamesToQueueSummary = {
+  addedCount: number;
+  alreadyInPlanCount: number;
+  /** Games already being played on the target platform: a Plan entry would be stripped anyway. */
+  skippedPlayingCount: number;
+  platform: GamePlatform;
+};
+
 type UseQueueActionsParams = {
   activeQueuePlatforms: GamePlatform[];
   addUndoAction: AddUndoAction;
@@ -118,6 +127,76 @@ export function useQueueActions({
 
     plan.commit();
     markOnboardingItemComplete('queue-game');
+  }
+
+  /**
+   * Add several games to one Plan in a single action (AS-06: the Retro import's "Add to Platform
+   * Plans", which used to tag the games and mark them Playing without ever writing a Plan entry).
+   *
+   * It is the same canonical Plan mutation as `addGameToQueue`, applied once per game against one
+   * evolving Plan state — not a second Plan persistence path. Nothing about the games' progress is
+   * touched: no status, no play timestamps, no play activity.
+   */
+  function addGamesToQueue(targetGames: Game[], platform: GamePlatform): AddGamesToQueueSummary {
+    const platformTag = getPlatformTag(platformQueueState, platform);
+    const summary: AddGamesToQueueSummary = { addedCount: 0, alreadyInPlanCount: 0, skippedPlayingCount: 0, platform };
+    const tagOperations: UndoOperation[] = [];
+    const addedGames: Game[] = [];
+
+    const plan = planTransition((currentState) =>
+      targetGames.reduce((state, game) => {
+        // A game that is already being played on this platform has no Plan entry by design — the
+        // Plan owner strips entries for currently-playing games. Adding one would create a row
+        // that immediately disappears, so it is reported as skipped rather than faked.
+        if (game.status === 'Playing' && game.platform === platform) {
+          summary.skippedPlayingCount += 1;
+          return state;
+        }
+
+        const alreadyPlanned = state.entries.some(
+          (entry) => entry.gameId === game.id && entry.targetPlatform === platform,
+        );
+
+        if (alreadyPlanned) {
+          // addGameToPlatformQueue would replace the entry, which is idempotent but would reset
+          // its position. Leave it exactly as it is.
+          summary.alreadyInPlanCount += 1;
+          return state;
+        }
+
+        summary.addedCount += 1;
+        addedGames.push(game);
+        return addGameToPlatformQueue(state, game, platform);
+      }, currentState),
+    );
+
+    if (summary.addedCount === 0) {
+      return summary;
+    }
+
+    addedGames.forEach((game) => {
+      tagOperations.push(...withPlatformTag(game, platformTag));
+    });
+
+    addUndoAction(
+      addedGames.length === 1
+        ? formatMessageTemplate(t('toast.addedToPlatformPlan'), { game: formatToastGameTitle(addedGames[0].title), platform })
+        : formatMessageTemplate(t('toast.gamesAddedToPlatformPlan'), { count: addedGames.length, platform }),
+      {
+        actionType: 'add-many-to-queue',
+        affectedGameIds: addedGames.map((game) => game.id),
+        description: formatMessageTemplate(t('app.removeFromPlatformBacklog'), {
+          game: addedGames.map((game) => game.title).join(', '),
+          platform,
+        }),
+      },
+      [...plan.operations, ...tagOperations],
+      { actions: [getUndoAction(), getOpenQueueAction()] },
+    );
+
+    plan.commit();
+    markOnboardingItemComplete('queue-game');
+    return summary;
   }
 
   function playQueueGameNow(gameId: string, platform: GamePlatform) {
@@ -244,5 +323,5 @@ export function useQueueActions({
 
   const updateQueueLimit = (platform: GamePlatform, maxActiveGames: number) => setPlatformQueueState((currentState) => updatePlatformQueueSetting(currentState, platform, maxActiveGames));
 
-  return { addGameToQueue, addQueuePlatform, dropGameFromCompactRow, finishGameFromCompactRow, moveQueueGame, moveQueueGameToPlatform, playGameFromCompactRow, playQueueGameNow, removeQueueGame, updateCurrentlyPlayingGame, updateQueueLimit };
+  return { addGamesToQueue, addGameToQueue, addQueuePlatform, dropGameFromCompactRow, finishGameFromCompactRow, moveQueueGame, moveQueueGameToPlatform, playGameFromCompactRow, playQueueGameNow, removeQueueGame, updateCurrentlyPlayingGame, updateQueueLimit };
 }

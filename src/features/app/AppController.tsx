@@ -137,12 +137,13 @@ export function AppController() {
   const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
   const {
     activeQueuePlatforms,
-    backlogPickerGame,
+    backlogPickerGames,
+    closeBacklogPicker,
     openBacklogPicker,
+    openBacklogPickerForGames,
     platformQueueState,
     queuePlatforms,
     queueSummary,
-    setBacklogPickerGame,
     setPlatformQueueState,
     setTargetQueuePlatform,
     targetQueuePlatform,
@@ -727,25 +728,44 @@ export function AppController() {
     }
   }
 
+  /**
+   * AS-06: "Add to Platform Plans" on the Retro import result.
+   *
+   * It used to add a legacy `queue` tag and flip every `Want to play` game to `Playing` — without
+   * ever writing a Plan entry, so the games never appeared in a Plan and their progress was wrong.
+   * It now routes the imported games into the canonical destination picker, which asks for the
+   * platform once and then adds them through the same Plan command a Library game goes through.
+   * The games' status, timestamps and collection membership are not touched at all.
+   */
   function addRetroImportedGamesToQueue(gameIds: string[]) {
-    const targetGameIds = new Set(gameIds);
+    // Resolve against the persisted collection, so only real game ids ever reach the Plan.
+    const targetGames = gameIds
+      .map((gameId) => games.find((game) => game.id === gameId))
+      .filter((game): game is Game => Boolean(game));
 
-    setGames((currentGames) =>
-      currentGames.map((game) => {
-        if (!targetGameIds.has(game.id)) {
-          return game;
-        }
+    if (targetGames.length === 0) {
+      addToastNotification({ category: 'info', message: t('toast.noGamesToPlan') });
+      return;
+    }
 
-        const tags = new Set(game.tags);
-        tags.add('queue');
+    openBacklogPickerForGames(targetGames);
+  }
 
-        return touchGameRecord({
-          ...game,
-          status: game.status === 'Want to play' ? 'Playing' : game.status,
-          tags: Array.from(tags),
-        });
-      }),
-    );
+  function addPickedGamesToQueue(platform: GamePlatform) {
+    const summary = addGamesToQueue(backlogPickerGames, platform);
+    closeBacklogPicker();
+
+    // The Plan command already toasts what it added. Only the "nothing to do" outcomes need a word,
+    // and they must not claim success.
+    if (summary.addedCount === 0) {
+      const alreadyPresent = summary.alreadyInPlanCount + summary.skippedPlayingCount;
+      addToastNotification({
+        category: 'info',
+        message: alreadyPresent > 0
+          ? formatMessageTemplate(t('toast.gamesAlreadyInPlatformPlan'), { count: alreadyPresent, platform })
+          : t('toast.noGamesToPlan'),
+      });
+    }
   }
 
   const {
@@ -790,6 +810,7 @@ export function AppController() {
   }, [games, platformQueueState.entries]);
 
   const {
+    addGamesToQueue,
     addGameToQueue,
     addQueuePlatform,
     dropGameFromCompactRow,
@@ -1204,15 +1225,16 @@ export function AppController() {
       ) : null}
 
 
-      {backlogPickerGame ? (
+      {backlogPickerGames.length > 0 ? (
         <BacklogPlatformPicker
-          game={backlogPickerGame}
-          isOpen={Boolean(backlogPickerGame)}
+          game={backlogPickerGames[0]}
+          gameCount={backlogPickerGames.length}
+          isOpen={backlogPickerGames.length > 0}
           platforms={activeQueuePlatforms}
           queueState={platformQueueState}
           onAddPlatform={addQueuePlatform}
-          onClose={() => setBacklogPickerGame(null)}
-          onSelectPlatform={(platform) => addGameToQueue(backlogPickerGame, platform)}
+          onClose={closeBacklogPicker}
+          onSelectPlatform={addPickedGamesToQueue}
         />
       ) : null}
 

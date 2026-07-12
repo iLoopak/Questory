@@ -7,6 +7,8 @@ import { useI18n } from '../i18n';
 
 type BacklogPlatformPickerProps = {
   game: Game;
+  /** How many games this destination applies to (AS-06: a Retro import adds a batch at once). */
+  gameCount?: number;
   isOpen: boolean;
   platforms: GamePlatform[];
   queueState?: PlatformQueueState;
@@ -18,6 +20,7 @@ type BacklogPlatformPickerProps = {
 
 export function BacklogPlatformPicker({
   game,
+  gameCount = 1,
   isOpen,
   platforms,
   queueState,
@@ -96,7 +99,11 @@ export function BacklogPlatformPicker({
           <div>
             <div className="inline-flex items-center gap-1.5 qs-label-caps text-accent"><Icon name="list-plus" /> <span>{t('backlog.choosePlatform')}</span></div>
             <h2 className="mt-1 text-xl font-bold leading-tight text-white">{t('backlog.addToQueue')}</h2>
-            <p className="mt-1 line-clamp-2 text-sm text-slate-400">{game.title}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-slate-400">
+              {gameCount > 1
+                ? formatMessageTemplate(t('backlog.gamesSelected'), { count: gameCount })
+                : game.title}
+            </p>
           </div>
           <button
             className="min-h-10 rounded-lg border border-white/10 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
@@ -182,4 +189,8 @@ export function BacklogPlatformPicker({
       </div>
     </ViewportModal>
   );
+}
+
+function formatMessageTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, String(value)), template);
 }
