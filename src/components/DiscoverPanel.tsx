@@ -4,7 +4,9 @@ import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
 import { DiscoverGameCard } from './discovery/DiscoverGameCard';
 import { EmptyState } from './EmptyState';
 import { useI18n, type TFunction } from '../i18n';
-import { fetchPersonalizedReleaseCalendar, ignoreReleaseCalendarGame } from '../services/releaseCalendarService';
+import { fetchPersonalizedReleaseCalendarResult, ignoreReleaseCalendarGame } from '../services/releaseCalendarService';
+import { ProviderStatusNotice } from './discovery/ProviderStatusNotice';
+import type { ProviderStatusSummary } from '../lib/providerResult';
 import { loadRawgSettings } from '../lib/rawgSettingsStorage';
 import { usePersonalizedRecommendations } from '../hooks/usePersonalizedRecommendations';
 import { RECOMMENDATION_COPY } from '../lib/recommendationState';
@@ -54,15 +56,22 @@ function DiscoverGridSkeleton() {
 
 export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOpenGame, onAddToWishlist, onAddToPlans, onOpenSettings, onOpenTasteProfile }: DiscoverPanelProps) {
   const { t } = useI18n();
-  const { candidates: personalizedCandidates, loading: recommendationsLoading, state: recommendationState, submitFeedback } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
+  const { candidates: personalizedCandidates, loading: recommendationsLoading, provider: recommendationProvider, state: recommendationState, refresh: refreshRecommendations, isRefreshing: isRefreshingRecommendations, submitFeedback } = usePersonalizedRecommendations(games, discoveryInboxRawgIds, games.length > 0);
   const candidates = recommendationsLoading && personalizedCandidates.length === 0 ? null : personalizedCandidates.filter((candidate) => candidate.libraryStatus === null);
   const [upcoming, setUpcoming] = useState<DiscoveryCandidate[] | null>(null);
+  // AS-10: the calendar now reports whether it is empty because RAWG said so, or because RAWG never
+  // answered. Those two states no longer render the same way.
+  const [releaseProvider, setReleaseProvider] = useState<ProviderStatusSummary | null>(null);
   const [releaseRefreshToken, setReleaseRefreshToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetchPersonalizedReleaseCalendar(games, discoveryInboxRawgIds, { forceRefresh: releaseRefreshToken > 0 })
-      .then((releaseCalendar) => { if (!cancelled) setUpcoming(releaseCalendar); })
+    fetchPersonalizedReleaseCalendarResult(games, discoveryInboxRawgIds, { forceRefresh: releaseRefreshToken > 0 })
+      .then((result) => {
+        if (cancelled) return;
+        setUpcoming(result.candidates);
+        setReleaseProvider(result.provider);
+      })
       .catch(() => { if (!cancelled) setUpcoming([]); });
     return () => { cancelled = true; };
   }, [games, discoveryInboxRawgIds, releaseRefreshToken]);
@@ -71,6 +80,7 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
     <div className="space-y-8 px-3 pb-24 pt-4">
       <ReleaseCalendarSection
         candidates={upcoming}
+        provider={releaseProvider}
         isRawgConfigured={loadRawgSettings().apiKey.trim().length > 0}
         onAddToWishlist={onAddToWishlist}
         onAddToPlans={onAddToPlans}
@@ -91,6 +101,12 @@ export function DiscoverPanel({ games, discoveryInboxRawgIds, onAddToInbox, onOp
             <button className="rounded-lg border border-mint/30 bg-mint/10 px-3 py-2 text-sm font-semibold text-mint transition hover:bg-mint/20" onClick={onOpenTasteProfile} type="button">Open Gaming DNA</button>
           ) : null}
         </div>
+        <ProviderStatusNotice
+          provider={recommendationProvider}
+          onRetry={refreshRecommendations}
+          onOpenSettings={onOpenSettings}
+          isRetrying={isRefreshingRecommendations}
+        />
         {candidates === null ? (
           <DiscoverGridSkeleton />
         ) : candidates.length === 0 ? (
@@ -151,6 +167,7 @@ function DiscoverSectionHeader({ kicker, title, subtitle }: { kicker: string; ti
 
 function ReleaseCalendarSection({
   candidates,
+  provider,
   isRawgConfigured,
   onAddToWishlist,
   onAddToPlans,
@@ -160,6 +177,7 @@ function ReleaseCalendarSection({
   onRefresh,
 }: {
   candidates: DiscoveryCandidate[] | null;
+  provider: ProviderStatusSummary | null;
   isRawgConfigured: boolean;
   onAddToWishlist?: (game: DiscoveryGame) => void;
   onAddToPlans?: (game: DiscoveryGame) => void;
@@ -187,6 +205,25 @@ function ReleaseCalendarSection({
     return <div className="h-44 animate-pulse rounded-2xl border border-skyglass/10 bg-ink-900/70" />;
   }
 
+  // RAWG never answered. This is NOT the empty state — hiding the section here is precisely what
+  // made an outage look like "nothing is coming out", with nothing for the user to press.
+  if (provider?.status === 'failed' && candidates.length === 0) {
+    return (
+      <section className="rounded-2xl border border-skyglass/15 bg-ink-950/40 p-3 sm:p-4">
+        <DiscoverSectionHeader
+          kicker="Release Calendar"
+          title="Upcoming for You"
+          subtitle="Upcoming releases matched to your library taste."
+        />
+        <div className="mt-3">
+          <ProviderStatusNotice provider={provider} onRetry={onRefresh} onOpenSettings={onOpenSettings} />
+        </div>
+      </section>
+    );
+  }
+
+  // A provider that answered with nothing upcoming keeps the behavior it always had: the section
+  // stays hidden rather than shouting an empty grid.
   if (candidates.length === 0) return null;
 
   return (
@@ -199,6 +236,7 @@ function ReleaseCalendarSection({
         />
         <button className="rounded-lg border border-skyglass/20 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-mint/40 hover:text-mint focus-visible:border-mint/50 focus-visible:outline-none" onClick={onRefresh} type="button">Refresh</button>
       </div>
+      <ProviderStatusNotice provider={provider} onRetry={onRefresh} onOpenSettings={onOpenSettings} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-2.5 sm:gap-3">
         {candidates.slice(0, 6).map((candidate) => {
           return (

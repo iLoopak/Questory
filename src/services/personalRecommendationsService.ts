@@ -13,7 +13,20 @@ import {
   toSlug,
 } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
-import { fetchGameSeries, fetchRecommendedGames, fetchSuggestedGames } from './rawgApi';
+import {
+  fetchGameSeries as fetchGameSeriesResult,
+  fetchRecommendedGames as fetchRecommendedGamesResult,
+  fetchSuggestedGames as fetchSuggestedGamesResult,
+  type RecommendedGamesParams,
+} from './rawgApi';
+import {
+  getProviderErrorCategory,
+  summarizeProviderStatus,
+  type ProviderError,
+  type ProviderResult,
+  type ProviderStatusSummary,
+} from '../lib/providerResult';
+import type { RawgSearchResult as RawgResult } from '../types/rawg';
 import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
 import type { RecommendationEngineStatus } from '../lib/recommendationState';
 import { bucketDuration, bucketSmallGroup, trackAnalyticsEvent } from '../lib/analytics';
@@ -1133,6 +1146,13 @@ const CACHE_STORAGE_KEY = 'questshelf.personalRecommendations.v2';
 export const PERSONAL_RECOMMENDATIONS_CACHE_KEY = CACHE_STORAGE_KEY;
 const OBSOLETE_CACHE_KEYS = ['questshelf.personalizedRecommendations.v1', 'questshelf.personalRecommendations.v1'];
 const CACHE_TTL_MS = recommendationConfig.cacheTtlMs;
+/**
+ * AS-10: how long a successful pool may still be SHOWN once it has expired, when a refresh fails.
+ *
+ * It is never served as fresh past the TTL — it is served as stale, labelled, with a Retry. Beyond
+ * this window it is not worth showing at all, and the user sees the honest empty/failed state.
+ */
+const STALE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const inFlightRequests = new Map<string, Promise<PersonalRecommendationsResult>>();
 let recommendationRequestGeneration = 0;
 
@@ -1168,11 +1188,33 @@ export function validatePersonalRecommendationCacheEntry(value: unknown, now = D
   return { candidates: parsed.candidates, fingerprint: parsed.fingerprint, fetchedAt: parsed.fetchedAt };
 }
 
+/**
+ * AS-10: an EXPIRED entry is not an invalid one.
+ *
+ * This used to delete the stored pool the moment it went stale, which is precisely the data that
+ * stale-if-error needs. A malformed or wrong-version entry is still removed; an expired one is kept
+ * on disk (it simply stops counting as fresh) so a failed refresh has something to fall back to.
+ */
 async function readStoredCache(): Promise<CacheEntry | null> {
   const parsed = await readAppCacheValue<unknown>(CACHE_STORAGE_KEY);
-  const validated = validatePersonalRecommendationCacheEntry(parsed);
-  if (!validated && parsed) await removeAppCacheValue(CACHE_STORAGE_KEY);
-  return validated;
+  if (!parsed) return null;
+
+  const wellFormed = validatePersonalRecommendationCacheEntry(parsed, 0);
+  if (!wellFormed) {
+    await removeAppCacheValue(CACHE_STORAGE_KEY);
+    return null;
+  }
+
+  return validatePersonalRecommendationCacheEntry(parsed);
+}
+
+/** The last successful pool, expired or not, within the stale-retention window. */
+async function readStaleStoredCache(): Promise<CacheEntry | null> {
+  const parsed = await readAppCacheValue<unknown>(CACHE_STORAGE_KEY);
+  const wellFormed = validatePersonalRecommendationCacheEntry(parsed, 0);
+  if (!wellFormed) return null;
+
+  return Date.now() - wellFormed.fetchedAt < STALE_RETENTION_MS ? wellFormed : null;
 }
 function writeStoredCache(entry: CacheEntry): void {
   cache = entry;
@@ -1188,7 +1230,21 @@ export async function clearPersonalRecommendationCaches(): Promise<void> {
   }
 }
 async function getAnyStoredCacheEntry(): Promise<CacheEntry | null> {
-  return cache ?? await readStoredCache();
+  return cache ?? await readStaleStoredCache();
+}
+
+/**
+ * A Retry BYPASSES the caches; it does not destroy them.
+ *
+ * `forceRefresh` used to call `clearPersonalRecommendationCaches`, deleting the last good pool
+ * before attempting a refresh that might fail — so pressing Retry during an outage left the user
+ * with nothing at all. The in-flight requests and the generation counter are still reset (a Retry
+ * supersedes anything already running); the successful pool stays until a new one replaces it.
+ */
+function bypassRecommendationCaches(): void {
+  recommendationRequestGeneration += 1;
+  inFlightRequests.clear();
+  void clearObsoleteRecommendationCaches();
 }
 
 async function getFreshCacheEntry(fingerprint: string): Promise<CacheEntry | null> {
@@ -1207,7 +1263,15 @@ export type FetchPersonalRecommendationsOptions = {
 export type PersonalRecommendationsResult = {
   candidates: DiscoveryCandidate[];
   diagnostics: RecommendationDiagnosticsReport | null;
+  /**
+   * AS-10: how the provider behaved during this generation. `failed` means every RAWG call failed,
+   * so an empty pool says nothing about what RAWG contains — the UI must offer a Retry rather than
+   * "no recommendations", and the pool must not be cached.
+   */
+  provider: ProviderStatusSummary;
 };
+
+const providerOk: ProviderStatusSummary = { status: 'ok', successCount: 0, failureCount: 0, stale: false };
 
 function getDiagnosticsReport(): RecommendationDiagnosticsReport | null {
   return DEBUG_RECOMMENDATIONS ? lastDiagnosticsReport : null;
@@ -1298,9 +1362,11 @@ function trackRecommendationGenerationCompleted(options: {
   finalSelection?: FinalSelectionDiagnostics;
   partialFailureCount: number;
   resultCount: number;
+  /** Every provider call failed: the run produced no knowledge, which is not the same as `empty`. */
+  allProvidersFailed?: boolean;
 }): void {
   trackAnalyticsEvent('recommendation_generation_completed', {
-    outcome: options.partialFailureCount > 0 ? 'partial' : options.resultCount > 0 ? 'success' : 'empty',
+    outcome: options.allProvidersFailed ? 'failed' : options.partialFailureCount > 0 ? 'partial' : options.resultCount > 0 ? 'success' : 'empty',
     result_count_bucket: bucketSmallGroup(options.resultCount),
     duration_bucket: bucketDuration(options.durationMs),
     cache_status: options.cacheStatus,
@@ -1340,6 +1406,7 @@ async function generatePersonalRecommendationsResult(
         lastGenerationError: null,
         cacheAge: null,
       } : null,
+      provider: providerOk,
     };
   }
   const generationStartedAt = performance.now();
@@ -1366,7 +1433,7 @@ async function generatePersonalRecommendationsResult(
   };
 
   if (options.forceRefresh) {
-    await clearPersonalRecommendationCaches();
+    bypassRecommendationCaches();
   } else {
     void clearObsoleteRecommendationCaches();
   }
@@ -1379,12 +1446,14 @@ async function generatePersonalRecommendationsResult(
     events.push({ event: 'cache_hit', candidates: freshCache.candidates.length });
     const cached = applyLibraryStatus(freshCache.candidates.map((c) => c.game), userGames, freshCache.candidates.map((c) => c.reason), inboxRawgIds, freshCache.candidates.map((c) => c.score), freshCache.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus);
     if (recommendationRequestGeneration !== activeRecommendationGeneration) {
-      return { candidates: [], diagnostics: getDiagnosticsReport() };
+      return { candidates: [], diagnostics: getDiagnosticsReport(), provider: providerOk };
     }
     recordRecommendationExposures(cached, fp);
     debugRecommendationReport(events, counts, { fromCache: true, finalCandidates: cached, cacheAge: Date.now() - freshCache.fetchedAt, fingerprint: fp, cacheStatus: 'hit', performance: performanceMarks, feedbackSignalCount: feedback.length, exposureSignalCount: exposure.filter((record) => record.exposureCount > recommendationConfig.exposure.fatigueAfter).length, qualitySummary: summarizeRecommendationQuality(cached) });
     trackRecommendationGenerationCompleted({ cacheStatus: 'hit', durationMs: performanceMarks.cacheReadMs ?? 0, partialFailureCount: 0, resultCount: cached.length });
-    return { candidates: cached, diagnostics: getDiagnosticsReport() };
+    // A cache hit is a success that happens to come from cache — the pool it holds was fetched from
+    // a provider that answered.
+    return { candidates: cached, diagnostics: getDiagnosticsReport(), provider: providerOk };
   }
 
   const { seeds: selectedSeeds, diagnostics: seedDiagnostics } = selectRecommendationSeeds(userGames, 8);
@@ -1394,6 +1463,34 @@ async function generatePersonalRecommendationsResult(
   const seedTitles = [...likedSeeds.map((seed) => seed.game), ...planWishlistSeeds, ...recentSeeds].map((game) => game.title);
   const seen = new Set<number>();
   const collected: ScoredCandidate[] = [];
+
+  // AS-10: every RAWG call in the waterfall is counted, and a failed one is counted as a FAILURE
+  // rather than an empty page. The helpers used to swallow errors into `[]`, so a total outage
+  // produced an empty pool that looked exactly like "RAWG has nothing for you" — and was cached as
+  // such for 24 hours. The local wrappers below keep every call site (and therefore all scoring,
+  // filtering and selection) byte-for-byte unchanged while recording what actually happened.
+  let providerSuccessCount = 0;
+  let providerFailureCount = 0;
+  let firstProviderError: ProviderError | null = null;
+
+  const takeResults = (result: ProviderResult<RawgResult[]>): RawgResult[] => {
+    if (result.ok) {
+      providerSuccessCount += 1;
+      return result.data;
+    }
+
+    providerFailureCount += 1;
+    partialFailureCount += 1;
+    firstProviderError ??= result.error;
+    // The category, never the message body or the URL — nothing here can carry a key or a payload.
+    events.push({ event: 'provider_failed', kind: result.error.kind, category: getProviderErrorCategory(result.error.kind), retryable: result.error.retryable });
+    return [];
+  };
+
+  const fetchRecommendedGames = async (params: RecommendedGamesParams) => takeResults(await fetchRecommendedGamesResult(params));
+  const fetchSuggestedGames = async (rawgId: number) => takeResults(await fetchSuggestedGamesResult(rawgId));
+  const fetchGameSeries = async (rawgId: number) => takeResults(await fetchGameSeriesResult(rawgId));
+
   const addStage = async (name: CandidateSource, producer: () => Promise<Array<{ results: RawgSearchResult[]; anchorTitle?: string; seed?: SelectedRecommendationSeed }>>, minScore: number, relaxation = 0) => {
     const stageStartedAt = performance.now();
     const before = collected.length;
@@ -1517,13 +1614,41 @@ async function generatePersonalRecommendationsResult(
 
   const cacheWriteStartedAt = performance.now();
   if (recommendationRequestGeneration !== activeRecommendationGeneration) {
-    return { candidates: [], diagnostics: getDiagnosticsReport() };
+    return { candidates: [], diagnostics: getDiagnosticsReport(), provider: providerOk };
   }
+
+  // AS-10: every provider call failed. The pool is empty because we learned NOTHING, not because
+  // RAWG has nothing — so it must not be written to the 24-hour success cache, and the last good
+  // pool is served instead, marked stale, with a retryable error the UI can offer to retry.
+  const allProvidersFailed = providerSuccessCount === 0 && providerFailureCount > 0;
+  if (allProvidersFailed) {
+    const staleEntry = await getAnyStoredCacheEntry();
+    const staleCandidates = staleEntry
+      ? applyLibraryStatus(staleEntry.candidates.map((c) => c.game), userGames, staleEntry.candidates.map((c) => c.reason), inboxRawgIds, staleEntry.candidates.map((c) => c.score), staleEntry.candidates.map((c) => c.source as CandidateSource | undefined)).filter((c) => !c.excluded && !c.inboxStatus)
+      : [];
+
+    trackRecommendationGenerationCompleted({ cacheStatus: staleCandidates.length > 0 ? 'stale' : 'miss', durationMs: performanceMarks.totalGenerationMs, finalSelection: finalSelection.diagnostics, partialFailureCount, resultCount: staleCandidates.length, allProvidersFailed: true });
+    return {
+      candidates: staleCandidates,
+      diagnostics: getDiagnosticsReport(),
+      provider: summarizeProviderStatus(providerSuccessCount, providerFailureCount, {
+        stale: staleCandidates.length > 0,
+        error: firstProviderError ?? undefined,
+      }),
+    };
+  }
+
+  // Everything else IS a success — including a genuinely empty pool from a provider that answered.
+  // That empty result is cached, exactly as before: an empty 200 is data.
   writeStoredCache({ candidates: pool, fingerprint: fp, fetchedAt: Date.now() });
   performanceMarks.cacheWriteMs = Math.round(performance.now() - cacheWriteStartedAt);
   recordRecommendationExposures(pool, fp);
   trackRecommendationGenerationCompleted({ cacheStatus: options.forceRefresh ? 'bypass' : 'miss', durationMs: performanceMarks.totalGenerationMs, finalSelection: finalSelection.diagnostics, partialFailureCount, resultCount: pool.length });
-  return { candidates: pool, diagnostics: getDiagnosticsReport() };
+  return {
+    candidates: pool,
+    diagnostics: getDiagnosticsReport(),
+    provider: summarizeProviderStatus(providerSuccessCount, providerFailureCount, { error: firstProviderError ?? undefined }),
+  };
 }
 
 export async function fetchPersonalRecommendationsResult(

@@ -1,4 +1,4 @@
-import { fetchRecommendedGames } from './rawgApi';
+import { fetchRecommendedGames, type RecommendedGamesParams } from './rawgApi';
 import { mapRawgResult, buildDiscoveryCandidates } from './discoveryService';
 import type { Game } from '../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../lib/discovery';
@@ -8,6 +8,24 @@ const CACHE_TTL_MS = 15 * 60 * 1000;
 interface FeedCacheEntry {
   games: DiscoveryGame[];
   fetchedAt: number;
+}
+
+/**
+ * AS-10: refresh a feed's cache, but only from a provider that actually answered.
+ *
+ * These feeds used to cache whatever `fetchRecommendedGames` returned — including the `[]` it
+ * produced from a 401 or an offline device — so one failed request emptied a Discover row for the
+ * next 15 minutes. A failure now leaves the previous entry alone (stale data beats a lie), and only
+ * a success, empty or not, is written.
+ */
+async function refreshFeed(
+  entry: FeedCacheEntry | null,
+  params: RecommendedGamesParams,
+): Promise<FeedCacheEntry | null> {
+  const result = await fetchRecommendedGames(params);
+  if (!result.ok) return entry;
+
+  return { games: result.data.map(mapRawgResult), fetchedAt: Date.now() };
 }
 
 // ── Trending ────────────────────────────────────────────────────────────────
@@ -21,14 +39,13 @@ export async function fetchTrendingGames(
   inboxRawgIds: Set<number>,
 ): Promise<DiscoveryCandidate[]> {
   if (!trendingCache || Date.now() - trendingCache.fetchedAt > CACHE_TTL_MS) {
-    const results = await fetchRecommendedGames({
+    trendingCache = await refreshFeed(trendingCache, {
       ordering: '-added',
       metacriticMin: 70,
       pageSize: 40,
     });
-    trendingCache = { games: results.map(mapRawgResult), fetchedAt: Date.now() };
   }
-  return applyStatus(trendingCache.games, userGames, inboxRawgIds);
+  return applyStatus(trendingCache?.games ?? [], userGames, inboxRawgIds);
 }
 
 // ── Hidden Gems ─────────────────────────────────────────────────────────────
@@ -42,16 +59,15 @@ export async function fetchHiddenGems(
   inboxRawgIds: Set<number>,
 ): Promise<DiscoveryCandidate[]> {
   if (!hiddenGemsCache || Date.now() - hiddenGemsCache.fetchedAt > CACHE_TTL_MS) {
-    const results = await fetchRecommendedGames({
+    hiddenGemsCache = await refreshFeed(hiddenGemsCache, {
       ordering: '-rating',
       tags: 'indie',
       metacriticMin: 65,
       metacriticMax: 84,
       pageSize: 40,
     });
-    hiddenGemsCache = { games: results.map(mapRawgResult), fetchedAt: Date.now() };
   }
-  return applyStatus(hiddenGemsCache.games, userGames, inboxRawgIds);
+  return applyStatus(hiddenGemsCache?.games ?? [], userGames, inboxRawgIds);
 }
 
 // ── Recently Released ───────────────────────────────────────────────────────
@@ -70,16 +86,18 @@ export async function fetchRecentlyReleasedGames(
     recentlyReleasedDateRange !== dateRange ||
     Date.now() - recentlyReleasedCache.fetchedAt > CACHE_TTL_MS
   ) {
-    const results = await fetchRecommendedGames({
+    const refreshed = await refreshFeed(recentlyReleasedDateRange === dateRange ? recentlyReleasedCache : null, {
       ordering: '-released',
       dates: dateRange,
       metacriticMin: 60,
       pageSize: 40,
     });
-    recentlyReleasedCache = { games: results.map(mapRawgResult), fetchedAt: Date.now() };
-    recentlyReleasedDateRange = dateRange;
+    if (refreshed) {
+      recentlyReleasedCache = refreshed;
+      recentlyReleasedDateRange = dateRange;
+    }
   }
-  return applyStatus(recentlyReleasedCache.games, userGames, inboxRawgIds);
+  return applyStatus(recentlyReleasedDateRange === dateRange ? recentlyReleasedCache?.games ?? [] : [], userGames, inboxRawgIds);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

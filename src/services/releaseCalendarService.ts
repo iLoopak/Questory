@@ -5,11 +5,20 @@ import { mapRawgResult } from './discoveryService';
 import { fetchRecommendedGames, type RecommendedGamesParams } from './rawgApi';
 import type { RawgSearchResult } from '../types/rawg';
 import { readAppCacheValue, removeAppCacheValue, writeAppCacheValue } from '../lib/indexedDbAppCache';
+import { summarizeProviderStatus, type ProviderError, type ProviderStatusSummary } from '../lib/providerResult';
 import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile, type TasteSignal } from '../lib/tasteProfile';
 
 const CACHE_KEY = 'questshelf.releaseCalendar.v2';
 const IGNORE_KEY = 'questshelf.releaseCalendarIgnoredRawgIds.v1';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * AS-10: how long a successful result may still be shown once it is stale.
+ *
+ * Beyond the 24-hour TTL the entry is no longer served as fresh, but if the refresh FAILS it is
+ * better to show week-old upcoming releases (clearly labelled) than to show the user an empty
+ * calendar that implies RAWG knows of nothing.
+ */
+const STALE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_DAYS = 90;
 const TARGET_MIN_RECOMMENDATIONS = 8;
 const TARGET_MAX_RECOMMENDATIONS = 20;
@@ -44,18 +53,34 @@ export function ignoreReleaseCalendarGame(rawgId: number): void {
   localStorage.setItem(IGNORE_KEY, JSON.stringify([...ignored]));
 }
 
-export async function fetchPersonalizedReleaseCalendar(
+export type ReleaseCalendarResult = {
+  candidates: DiscoveryCandidate[];
+  provider: ProviderStatusSummary;
+};
+
+/**
+ * AS-10: the calendar reports HOW it got its answer.
+ *
+ * A provider that answers with nothing upcoming still returns `ok` with zero candidates, and that
+ * empty answer is cached — it is data. A provider that fails returns `failed`, is never cached, and
+ * falls back to the last successful result (marked stale) so the section does not silently collapse
+ * into the same empty state an outage used to produce.
+ */
+export async function fetchPersonalizedReleaseCalendarResult(
   userGames: Game[],
   inboxRawgIds: Set<number> = new Set(),
   options: { days?: 30 | 60 | 90; forceRefresh?: boolean } = {},
-): Promise<DiscoveryCandidate[]> {
+): Promise<ReleaseCalendarResult> {
   const days = options.days ?? DEFAULT_DAYS;
   const dateRange = getUpcomingDateRange(days);
   const tasteProfile = getTasteProfileForGames(userGames);
   const fp = `${profileFingerprint(userGames)}::taste=${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::ignored=${[...getIgnoredReleaseRawgIds()].sort().join(',')}`;
+  const restampEntry = (entry: CacheEntry) =>
+    restamp(entry.candidates.map((c) => c.game), userGames, inboxRawgIds, entry.candidates.map((c) => c.reason), entry.candidates.map((c) => c.score));
+
   if (!options.forceRefresh) {
     const fresh = await readCache(fp, dateRange);
-    if (fresh) return restamp(fresh.candidates.map((c) => c.game), userGames, inboxRawgIds, fresh.candidates.map((c) => c.reason), fresh.candidates.map((c) => c.score));
+    if (fresh) return { candidates: restampEntry(fresh), provider: { status: 'ok', successCount: 0, failureCount: 0, stale: false } };
   }
 
   const profile = buildUserProfile(userGames);
@@ -67,13 +92,51 @@ export async function fetchPersonalizedReleaseCalendar(
     requests.push({ dates: dateRange, ordering: 'released', pageSize: 20, genres: profile.topGenres.slice(0, 3).map((g) => g.slug).join(','), platforms: platformSlugs });
   }
 
-  const pages = await Promise.all(requests.map((params) => fetchRecommendedGames(params)));
+  const results = await Promise.all(requests.map((params) => fetchRecommendedGames(params)));
+  const pages: RawgSearchResult[][] = [];
+  let successCount = 0;
+  let failureCount = 0;
+  let firstError: ProviderError | null = null;
+
+  for (const result of results) {
+    if (result.ok) {
+      successCount += 1;
+      pages.push(result.data);
+    } else {
+      failureCount += 1;
+      firstError ??= result.error;
+    }
+  }
+
+  // Nothing came back at all. Serve the last good calendar rather than an empty one, and do not
+  // touch the cache: a failure must never reset the success timestamp as if it were fresh data.
+  if (successCount === 0 && failureCount > 0) {
+    const stale = await readStaleCache(fp, dateRange);
+    return {
+      candidates: stale ? restampEntry(stale) : [],
+      provider: summarizeProviderStatus(successCount, failureCount, { stale: Boolean(stale), error: firstError ?? undefined }),
+    };
+  }
+
   const deduped = dedupeRawgResults(pages.flat()).filter((result) => !isExcludedRelease(result, userGames));
   const scored = rankReleaseCalendarResults(deduped, userGames, tasteProfile);
 
   const games = scored.map(({ result }) => mapRawgResult(result));
   const candidates = restamp(games, userGames, inboxRawgIds, scored.map((s) => s.reason), scored.map((s) => s.score));
   writeCache({ fingerprint: fp, dateRange, fetchedAt: Date.now(), candidates });
+  return {
+    candidates,
+    provider: summarizeProviderStatus(successCount, failureCount, { error: firstError ?? undefined }),
+  };
+}
+
+/** Candidate-only adapter, for callers that do not care how the answer was obtained. */
+export async function fetchPersonalizedReleaseCalendar(
+  userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
+  options: { days?: 30 | 60 | 90; forceRefresh?: boolean } = {},
+): Promise<DiscoveryCandidate[]> {
+  const { candidates } = await fetchPersonalizedReleaseCalendarResult(userGames, inboxRawgIds, options);
   return candidates;
 }
 
@@ -278,6 +341,13 @@ async function readCache(fingerprint: string, dateRange: string): Promise<CacheE
   const entry = await readAppCacheValue<CacheEntry>(CACHE_KEY);
   if (!entry || entry.fingerprint !== fingerprint || entry.dateRange !== dateRange || Date.now() - entry.fetchedAt >= CACHE_TTL_MS) return null;
   return entry;
+}
+
+/** The same entry PAST its TTL — only ever used when a refresh failed, and always labelled stale. */
+async function readStaleCache(fingerprint: string, dateRange: string): Promise<CacheEntry | null> {
+  const entry = await readAppCacheValue<CacheEntry>(CACHE_KEY);
+  if (!entry || entry.fingerprint !== fingerprint || entry.dateRange !== dateRange) return null;
+  return Date.now() - entry.fetchedAt < STALE_RETENTION_MS ? entry : null;
 }
 
 function writeCache(entry: CacheEntry): void {
