@@ -41,6 +41,8 @@ export type ControllableStorageAdapter = {
   adapter: StorageAdapter;
   /** The synchronous local tier (stands in for localStorage). */
   local: Map<string, string>;
+  /** The durable tier (stands in for Capacitor Preferences). Seed it to simulate a restart. */
+  durable: Map<string, string>;
   /** Every durable operation, in the order it was started. */
   operations: DurableOperation[];
   /** `auto`: durable ops settle immediately. `manual`: they stay pending until settled. */
@@ -149,6 +151,7 @@ export function createControllableStorageAdapter(
   return {
     adapter,
     local,
+    durable,
     operations,
     failDurableKeys,
     setDurableMode: (mode) => {
