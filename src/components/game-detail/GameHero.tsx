@@ -6,10 +6,12 @@ import { getArtworkSet } from '../../lib/gameSelectors';
 import { useCoverImageLoaded } from '../../hooks/useCoverImageLoaded';
 import { useI18n } from '../../i18n';
 import { Icon } from '../Icon';
+import { getDisplayTitle } from '../../lib/gameEditPatch';
 
-export function getDisplayTitle(game: Game) {
-  return game.displayTitleOverride?.trim() || game.title;
-}
+// The display-title rule now lives with the edit patch contract, which has to agree with it when it
+// decides whether a corrected title still needs an override. Re-exported so the components that
+// already import it from the hero keep working.
+export { getDisplayTitle };
 
 export function HeroStat({ accent, label, onClick, value }: { accent?: boolean; label: string; onClick?: () => void; value: string }) {
   const className = `rounded-xl border px-2.5 py-2 text-left ${accent ? 'border-mint/30 bg-mint/10' : 'border-white/10 bg-ink-900/80'} ${onClick ? 'cursor-pointer transition hover:border-mint/40 hover:bg-mint/5 active:scale-[0.98]' : ''}`;

@@ -61,6 +61,7 @@ const testFiles = [
   { entry: 'scripts/recoveryStateOwnership.test.ts', out: 'recoveryStateOwnership.test.mjs' },
   { entry: 'scripts/undoScopedOperations.test.ts', out: 'undoScopedOperations.test.mjs' },
   { entry: 'scripts/statusPlanInvariants.test.ts', out: 'statusPlanInvariants.test.mjs' },
+  { entry: 'scripts/gameEditPatch.test.ts', out: 'gameEditPatch.test.mjs' },
   { entry: 'scripts/gameDetailDraft.test.ts', out: 'gameDetailDraft.test.mjs' },
 ];
 

@@ -7,6 +7,19 @@ import { canUseRawgImageAsCover } from '../lib/gameCoverImages';
 import { FullscreenGameShell } from './game-detail/FullscreenGameShell';
 import { GameHero, HeroStat, getDisplayTitle } from './game-detail/GameHero';
 import { EditTitleModal } from './game-detail/EditTitleModal';
+import { EditConflictModal } from './game-detail/EditConflictModal';
+import {
+  applyGameEditPatch,
+  buildGameEditPatch,
+  createEditDraft,
+  detectEditConflicts,
+  getDirtyEditFields,
+  isRetroGame,
+  parseTags,
+  validateEditDraft,
+  type GameEditDraft,
+  type GameEditField,
+} from '../lib/gameEditPatch';
 import { DetailSection } from './game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from './game-detail/GameDetailActions';
 import { GameInformationSection, formatMetacriticScore } from './game-detail/GameInformationSection';
@@ -77,10 +90,14 @@ export function GameDetailView({
 }: GameDetailViewProps) {
   const { t } = useI18n();
   const [tagText, setTagText] = useState(() => game.tags.join(', '));
-  const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editDraft, setEditDraft] = useState(() => createEditDraft(game));
+  // AS-08: the editor only exists while it is open, and it holds the draft together with the BASE
+  // it was initialized from. Dirty fields are derived from that pair, never guessed. There is no
+  // long-lived copy of the game hanging around to go stale between edits.
+  const [editSession, setEditSession] = useState<{ base: GameEditDraft; draft: GameEditDraft } | null>(null);
+  const [conflictFields, setConflictFields] = useState<GameEditField[] | null>(null);
   const [editError, setEditError] = useState('');
+  const isEditing = editSession !== null;
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isRawgLinkOpen, setIsRawgLinkOpen] = useState(false);
   const [isArtworkPickerOpen, setIsArtworkPickerOpen] = useState(false);
@@ -97,13 +114,22 @@ export function GameDetailView({
     detailScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [game.id]);
 
+  // The standalone tag field still follows canonical tags: it is not part of the editor session and
+  // has no unsaved state of its own once committed.
   useEffect(() => {
     setTagText(game.tags.join(', '));
-    setEditDraft(createEditDraft(game));
-    setIsEditing(false);
+  }, [game.id, game.tags]);
+
+  // Only NAVIGATION resets the editor. This used to run on every canonical change (it depended on
+  // `game.tags`), which both destroyed in-progress edits and, worse, silently re-based the draft.
+  // An open editor now survives canonical updates; the save path decides what to do about them.
+  // Closing it on id change is what keeps dirty fields from leaking onto the next game.
+  useEffect(() => {
+    setEditSession(null);
+    setConflictFields(null);
     setIsEditingTitle(false);
     setEditError('');
-  }, [game.id, game.tags]);
+  }, [game.id]);
 
   const parsedTags = useMemo(() => parseTags(tagText), [tagText]);
   const canApplyRawgCover = canUseRawgImageAsCover(game);
@@ -151,21 +177,62 @@ export function GameDetailView({
 
 
 
+  /** Opening the editor is the one moment the canonical record is copied into the form. */
+  function openEditor() {
+    const base = createEditDraft(game);
+    setEditSession({ base, draft: base });
+    setConflictFields(null);
+    setEditError('');
+  }
+
+  function closeEditor() {
+    setEditSession(null);
+    setConflictFields(null);
+    setEditError('');
+  }
+
   function updateEditDraft<K extends keyof GameEditDraft>(field: K, value: GameEditDraft[K]) {
-    setEditDraft((currentDraft) => ({ ...currentDraft, [field]: value }));
+    setEditSession((session) => (session ? { ...session, draft: { ...session.draft, [field]: value } } : session));
+  }
+
+  /**
+   * Submit the fields the user touched, minus any they chose to yield on. Nothing else is mentioned,
+   * so a note, a status change, a rating or a metadata/artwork refresh that landed while the editor
+   * was open is not in the payload and cannot be overwritten by it.
+   */
+  function commitEditPatch(skipFields: GameEditField[]) {
+    if (!editSession) return;
+    const dirty = getDirtyEditFields(editSession.base, editSession.draft);
+    const patch = buildGameEditPatch(game, editSession.draft, dirty, skipFields);
+    closeEditor();
+
+    // A save that changes nothing writes nothing — no patch, no `updatedAt` bump.
+    if (Object.keys(patch).length === 0) return;
+
+    onGameEdit?.(game.id, patch);
+    onGameEditSaved?.(applyGameEditPatch(game, patch));
   }
 
   function saveEditDraft() {
-    const validationError = validateEditDraft(editDraft);
+    if (!editSession) return;
+
+    const validationError = validateEditDraft(editSession.draft);
     if (validationError) {
       setEditError(validationError);
       return;
     }
 
-    onGameEdit?.(game.id, getGameEditChanges(game, editDraft));
-    setIsEditing(false);
-    setEditError('');
-    onGameEditSaved?.({ ...game, ...getGameEditChanges(game, editDraft) });
+    // A conflict needs BOTH sides to have moved: the user edited the field, and its canonical value
+    // is no longer the one the editor opened with. A canonical change to a field the user left alone
+    // is just newer data and never blocks the save.
+    const dirty = getDirtyEditFields(editSession.base, editSession.draft);
+    const conflicts = detectEditConflicts(editSession.base, createEditDraft(game), dirty);
+    if (conflicts.length > 0) {
+      setConflictFields(conflicts);
+      return;
+    }
+
+    commitEditPatch([]);
   }
 
   function saveTitleCorrection(rawTitle: string) {
@@ -249,9 +316,7 @@ export function GameDetailView({
       return;
     }
     if (isEditing) {
-      setEditDraft(createEditDraft(game));
-      setEditError('');
-      setIsEditing(false);
+      closeEditor();
       return;
     }
     onBack();
@@ -303,7 +368,7 @@ export function GameDetailView({
             menuId={overflowMenuId}
             onChangeArtwork={() => setIsArtworkPickerOpen(true)}
             onClose={() => setIsOverflowOpen(false)}
-            onEdit={() => setIsEditing(true)}
+            onEdit={openEditor}
             onFindArtwork={onFindArtwork}
             onRefreshArtwork={handleRefreshArtwork}
             onIgnore={onIgnore}
@@ -370,8 +435,17 @@ export function GameDetailView({
         />
       ) : null}
 
-      {isEditing ? (
-        <GameEditForm draft={editDraft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={() => { setEditDraft(createEditDraft(game)); setEditError(''); setIsEditing(false); }} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
+      {editSession ? (
+        <GameEditForm draft={editSession.draft} error={editError} game={game} isFindingArtwork={isFindingArtwork} onCancel={closeEditor} onFindArtwork={onFindArtwork} onSave={saveEditDraft} onUpdate={updateEditDraft} />
+      ) : null}
+
+      {conflictFields ? (
+        <EditConflictModal
+          fields={conflictFields}
+          onApplyMine={() => commitEditPatch([])}
+          onCancel={() => setConflictFields(null)}
+          onKeepCurrent={() => commitEditPatch(conflictFields)}
+        />
       ) : null}
 
       <GameDetailScreenshotsSection game={game} />
@@ -658,22 +732,6 @@ function DevToolsSubSection({ children, title }: { children: ReactNode; title: s
   );
 }
 
-
-type GameEditDraft = {
-  title: string;
-  platform: GamePlatform;
-  status: GameStatus;
-  collectionType: GameCollectionType;
-  coverImage: string;
-  metadataSearchTitle: string;
-  notes: string;
-  tags: string;
-  rating: string;
-  favorite: boolean;
-  hltbMainHours: string;
-  hltbMainExtraHours: string;
-  hltbCompletionistHours: string;
-};
 
 function pickArtworkChanges(changes: Partial<Game>): Partial<Game> {
   const artworkChanges: Partial<Game> = {};
@@ -1008,22 +1066,26 @@ function NotesField({ onCommit, placeholder, value }: { onCommit: (notes: string
   valueRef.current = value;
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
+  const committedRef = useRef<string | null>(null);
 
-  useEffect(() => () => {
-    if (draftRef.current !== valueRef.current) {
-      onCommitRef.current(draftRef.current);
-    }
-  }, []);
+  /**
+   * Blur and the unmount safety net can both fire for the same text — unmounting a focused field
+   * blurs it, and the owner has not necessarily pushed the new value back down by then. The note is
+   * written once either way.
+   */
+  function commitDraft(next: string) {
+    if (next === valueRef.current || next === committedRef.current) return;
+    committedRef.current = next;
+    onCommitRef.current(next);
+  }
+
+  useEffect(() => () => commitDraft(draftRef.current), []);
 
   return (
     <textarea
       className="mt-2 min-h-20 w-full resize-y rounded-lg border border-white/15 bg-ink-900 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-mint focus:ring-2 focus:ring-mint/20"
       value={draft}
-      onBlur={() => {
-        if (draft !== value) {
-          onCommit(draft);
-        }
-      }}
+      onBlur={() => commitDraft(draft)}
       onChange={(event) => setDraft(event.target.value)}
       placeholder={placeholder}
     />
@@ -1085,21 +1147,6 @@ function EmptyState({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed border-white/15 bg-ink-900/50 p-4 text-sm text-slate-400">{text}</div>;
 }
 
-function parseTags(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-function isRetroGame(game: Game) {
-  return game.externalSource === 'retro-rom' || Boolean(game.romPath || game.romFiles?.length);
-}
-
 function getRawgUrl(game: Game) {
   if (game.rawgSlug) {
     return `https://rawg.io/games/${game.rawgSlug}`;
@@ -1118,45 +1165,6 @@ export function isGameEditable(game: Game) {
   }
 
   return !game.externalSource || game.externalSource === 'manual' || game.externalSource === 'retro-rom' || isRetroGame(game);
-}
-
-function createEditDraft(game: Game): GameEditDraft {
-  return {
-    collectionType: game.collectionType,
-    coverImage: game.coverImage ?? '',
-    favorite: Boolean(game.favorite),
-    hltbCompletionistHours: formatOptionalNumberForInput(game.hltbCompletionistHours),
-    hltbMainExtraHours: formatOptionalNumberForInput(game.hltbMainExtraHours),
-    hltbMainHours: formatOptionalNumberForInput(game.hltbMainHours),
-    metadataSearchTitle: game.metadataSearchTitle ?? '',
-    notes: game.notes ?? '',
-    platform: game.platform,
-    rating: formatOptionalNumberForInput(game.rating),
-    status: game.status,
-    tags: (game.tags ?? []).join(', '),
-    title: getDisplayTitle(game),
-  };
-}
-
-function getGameEditChanges(game: Game, draft: GameEditDraft): Partial<Game> {
-  const title = draft.title.trim();
-  return {
-    collectionType: draft.collectionType,
-    coverImage: draft.coverImage.trim(),
-    displayTitleOverride: title === game.title ? undefined : title,
-    favorite: draft.favorite,
-    hltbCompletionistHours: parseOptionalNonNegativeNumber(draft.hltbCompletionistHours),
-    hltbMainExtraHours: parseOptionalNonNegativeNumber(draft.hltbMainExtraHours),
-    hltbMainHours: parseOptionalNonNegativeNumber(draft.hltbMainHours),
-    metadataSearchTitle: draft.metadataSearchTitle.trim() || title,
-    notes: draft.notes,
-    originalImportedTitle: isRetroGame(game) ? game.originalImportedTitle ?? game.title : game.originalImportedTitle,
-    platform: draft.platform,
-    rating: parseOptionalNonNegativeNumber(draft.rating) ?? null,
-    status: draft.status,
-    tags: parseTags(draft.tags),
-    title,
-  };
 }
 
 /**
@@ -1178,30 +1186,6 @@ export function getTitleCorrectionChanges(game: Game, rawTitle: string): Partial
     displayTitleOverride: undefined,
     originalImportedTitle: game.originalImportedTitle ?? game.title,
   };
-}
-
-function validateEditDraft(draft: GameEditDraft) {
-  if (!draft.title.trim()) return 'Title cannot be empty.';
-  if (!gamePlatforms.includes(draft.platform as never)) return 'Platform must be valid.';
-  if (draft.coverImage.trim() && !isValidUrl(draft.coverImage.trim())) return 'Cover image must be a valid URL.';
-  const rating = parseOptionalNonNegativeNumber(draft.rating);
-  if (draft.rating.trim() && rating === undefined) return 'Rating must be a number between 0 and 5.';
-  if (rating !== undefined && rating > 5) return 'Rating must be between 0 and 5.';
-  return '';
-}
-
-function formatOptionalNumberForInput(value: number | null | undefined) {
-  return typeof value === 'number' ? String(value) : '';
-}
-
-function parseOptionalNonNegativeNumber(value: string) {
-  if (!value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
-}
-
-function isValidUrl(value: string) {
-  try { new URL(value); return true; } catch { return false; }
 }
 
 function formatPlatformSource(game: Game) {
