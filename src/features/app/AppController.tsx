@@ -28,7 +28,9 @@ import { loadGames } from '../../lib/gameStorage';
 import { getRuntimeEnvironment } from '../../lib/capacitorEnvironment';
 import type { OnboardingItemId } from '../../lib/onboardingStorage';
 import type { ItadDealSyncState } from '../../config/syncStates';
-import { addGameToPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
+import { addGameToPlatformQueue, removeGameFromPlatformQueue, type PlatformQueueState } from '../../lib/platformQueueStorage';
+import type { StatusTransitionEffects } from '../../lib/gameStatusTransitions';
+import { derivePlanUndoOperations, type UndoOperation } from '../../lib/undoOperations';
 import { loadRawgSettings } from '../../lib/rawgSettingsStorage';
 import { getSteamProfileDisplayName, loadSteamSettings } from '../../lib/steamSettingsStorage';
 import { formatMessageTemplate } from '../../utils/summaryFormatters';
@@ -300,6 +302,27 @@ export function AppController() {
     startInboxRun: startDiscoveryInboxRun,
   } = useDiscoveryController({ games, t, addToastNotification });
 
+  // AS-07: a status transition says WHAT must happen to the Plans; the controller owns Plan state,
+  // so it applies that here and hands the undo operations back, keeping the whole change one
+  // undoable action. Game and Plan stay separate entities — nothing is merged.
+  function applyStatusPlanEffects(game: Game, effects: StatusTransitionEffects): UndoOperation[] {
+    if (!effects.removeFromAllPlans && !effects.removeFromPlanForPlatform) {
+      return [];
+    }
+
+    const nextState = effects.removeFromAllPlans
+      ? removeGameFromPlatformQueue(platformQueueState, game.id)
+      : removeGameFromPlatformQueue(platformQueueState, game.id, effects.removeFromPlanForPlatform ?? undefined);
+
+    if (nextState.entries.length === platformQueueState.entries.length) {
+      return [];
+    }
+
+    const operations = derivePlanUndoOperations(platformQueueState, nextState);
+    setPlatformQueueState(nextState);
+    return operations;
+  }
+
   const {
     addManualGame,
     addManyToWishlist,
@@ -315,6 +338,7 @@ export function AppController() {
     updateManyGameStatuses,
   } = useGameLibraryActions({
     addUndoAction,
+    applyStatusPlanEffects,
     games,
     setGames,
     setIgnoredSteamGames,

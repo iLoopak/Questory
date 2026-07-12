@@ -457,14 +457,40 @@ export function removeCurrentlyPlayingFromPlatformQueue(state: PlatformQueueStat
   });
 }
 
+/**
+ * The Plan entries a user can actually see and act on.
+ *
+ * AS-07: an entry whose `gameId` no longer resolves is an ORPHAN — deleting a game leaves its Plan
+ * entry behind. Those entries used to be counted, summed and virtualized like any other, while the
+ * row itself rendered `null`: a phantom count and a blank row. They are excluded here, at the one
+ * selector every visible surface already goes through.
+ *
+ * They are NOT deleted. The persisted entry survives, so restoring or re-importing the game brings
+ * its Plan position back, and `getOrphanedPlatformQueueEntries` can report them.
+ */
 export function getVisiblePlatformQueueEntries(state: PlatformQueueState, games: Game[]): PlatformQueueEntry[] {
   const playingGamePlatforms = getCurrentlyPlayingPlatformKeys(games);
+  const knownGameIds = new Set(games.map((game) => game.id));
 
-  if (playingGamePlatforms.size === 0) {
-    return state.entries;
-  }
+  return state.entries.filter(
+    (entry) =>
+      knownGameIds.has(entry.gameId) &&
+      !playingGamePlatforms.has(getPlatformPlanEntryKey(entry.gameId, entry.targetPlatform)),
+  );
+}
 
-  return state.entries.filter((entry) => !playingGamePlatforms.has(getPlatformPlanEntryKey(entry.gameId, entry.targetPlatform)));
+/** Persisted Plan entries whose game no longer exists. Kept for recovery, reported for diagnostics. */
+export function getOrphanedPlatformQueueEntries(state: PlatformQueueState, games: Game[]): PlatformQueueEntry[] {
+  const knownGameIds = new Set(games.map((game) => game.id));
+  return state.entries.filter((entry) => !knownGameIds.has(entry.gameId));
+}
+
+/** Entry counts for diagnostics: what is persisted, what is visible, and what is dangling. */
+export function getPlatformQueueEntryCounts(state: PlatformQueueState, games: Game[]) {
+  const visible = getVisiblePlatformQueueEntries(state, games).length;
+  const orphaned = getOrphanedPlatformQueueEntries(state, games).length;
+
+  return { persisted: state.entries.length, visible, orphaned };
 }
 
 export function moveQueueEntry(state: PlatformQueueState, gameId: string, direction: 'top' | 'up' | 'down', targetPlatform?: GamePlatform): PlatformQueueState {

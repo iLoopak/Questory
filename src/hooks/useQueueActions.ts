@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { PlayingGameAction } from '../components/QueuePanel';
+import type { PlayingGameAction } from '../types/gameActions';
 import { createTranslator } from '../i18n';
 import {
   addActiveQueuePlatform,
@@ -23,6 +23,7 @@ import {
   getViewGameAction,
   type NotificationDraft,
 } from '../lib/notifications';
+import { transitionGameStatus, type StatusTransitionEffects } from '../lib/gameStatusTransitions';
 import type { UndoActionHistoryEntry } from '../lib/undoHistoryStorage';
 import { derivePlanUndoOperations, type UndoOperation } from '../lib/undoOperations';
 import type { Game, GamePlatform, GameStatus } from '../types/game';
@@ -199,17 +200,50 @@ export function useQueueActions({
     return summary;
   }
 
+  /** The Plan half of a status transition, applied by the owner of Plan state (AS-07). */
+  function planStateForEffects(state: PlatformQueueState, gameId: string, effects: StatusTransitionEffects) {
+    if (effects.removeFromAllPlans) {
+      return removeGameFromPlatformQueue(state, gameId);
+    }
+    if (effects.removeFromPlanForPlatform) {
+      return removeGameFromPlatformQueue(state, gameId, effects.removeFromPlanForPlatform);
+    }
+    return state;
+  }
+
+  /** The transition's fields, so the undo guard and inverse cover exactly what it wrote. */
+  function statusFields(game: Game, nextGame: Game, extra: Array<keyof Game> = []): UndoOperation {
+    const fields: Array<keyof Game> = ['status', 'lastPlayedAt', 'finishedAt', 'droppedAt', ...extra];
+    const pick = (source: Game) =>
+      fields.reduce<Partial<Game>>((picked, field) => {
+        (picked as Record<string, unknown>)[field as string] = source[field];
+        return picked;
+      }, {});
+
+    return { kind: 'game-fields', gameId: game.id, previous: pick(game), expected: pick(nextGame) };
+  }
+
   function playQueueGameNow(gameId: string, platform: GamePlatform) {
     const game = games.find((currentGame) => currentGame.id === gameId);
     if (!game) return;
 
-    const today = new Date().toISOString().slice(0, 10);
     const platformTag = getPlatformTag(platformQueueState, platform);
     const nextTags = platformTag ? Array.from(new Set([...game.tags, platformTag])) : game.tags;
 
+    // Starting a game moves it to the platform it is played on and stamps the play date — through
+    // the same canonical transition the Library and Game Detail use.
+    const { nextGame, effects } = transitionGameStatus({
+      game,
+      nextStatus: 'Playing',
+      now: new Date(),
+      context: 'plan',
+      platform,
+      changes: { platform, tags: nextTags },
+    });
+
     const plan = planTransition((currentState) => removeCurrentlyPlayingFromPlatformQueue(
-      removeGameFromPlatformQueue(currentState, gameId, platform),
-      [...games.filter((currentGame) => currentGame.id !== gameId), { ...game, platform, status: 'Playing' }],
+      planStateForEffects(currentState, gameId, effects),
+      [...games.filter((currentGame) => currentGame.id !== gameId), nextGame],
     ));
 
     addUndoAction(formatGameToastMessage(t('toast.markedPlayingNow'), game), {
@@ -217,18 +251,11 @@ export function useQueueActions({
       affectedGameIds: [game.id],
       description: formatMessageTemplate(t('app.restoreToPlatformBacklog'), { game: game.title, platform }),
     }, [
-      {
-        kind: 'game-fields',
-        gameId,
-        previous: { platform: game.platform, status: game.status, tags: game.tags, lastPlayedAt: game.lastPlayedAt },
-        expected: { platform, status: 'Playing', tags: nextTags, lastPlayedAt: today },
-      },
+      statusFields(game, nextGame, ['platform', 'tags']),
       ...plan.operations,
     ], { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
 
-    setGames((currentGames) => currentGames.map((currentGame) => currentGame.id === gameId
-      ? touchGameRecord({ ...currentGame, platform, status: 'Playing', tags: nextTags, lastPlayedAt: today })
-      : currentGame));
+    setGames((currentGames) => currentGames.map((currentGame) => currentGame.id === gameId ? nextGame : currentGame));
     plan.commit();
   }
 
@@ -236,10 +263,7 @@ export function useQueueActions({
     const game = games.find((currentGame) => currentGame.id === gameId);
     if (!game) return;
 
-    const now = new Date().toISOString();
     const nextStatus: GameStatus = action === 'finished' ? 'Finished' : action === 'drop' ? 'Dropped' : 'Want to play';
-    const nextFinishedAt = action === 'finished' ? now : game.finishedAt;
-    const nextDroppedAt = action === 'drop' ? now : game.droppedAt;
     const actionLabels: Record<PlayingGameAction, string> = {
       'move-to-backlog': formatGameToastMessage(t('toast.addedToPlatforms'), game),
       finished: formatGameToastMessage(t('toast.markedFinished'), game),
@@ -247,25 +271,28 @@ export function useQueueActions({
       'remove-from-playing': `${formatGameToastMessage(t('toast.removedFromPlayingNow'), game)} on ${platform}`,
     };
 
+    const { nextGame, effects } = transitionGameStatus({
+      game,
+      nextStatus,
+      now: new Date(),
+      context: 'plan',
+      platform,
+    });
+
     const plan = planTransition((currentState) => action === 'move-to-backlog'
-      ? addGameToPlatformQueueTop(currentState, { ...game, status: 'Want to play' }, platform)
-      : removeGameFromPlatformQueue(currentState, gameId, platform));
+      // Moving back to the backlog is the one action that ADDS a Plan entry rather than clearing
+      // one: the game stops being played and becomes planned work again, at the top of the Plan.
+      ? addGameToPlatformQueueTop(currentState, nextGame, platform)
+      : planStateForEffects(currentState, gameId, effects));
 
     addUndoAction(actionLabels[action], {
       actionType: 'playing-action', affectedGameIds: [game.id], description: formatMessageTemplate(t('app.restoreToPlayingNow'), { game: game.title }),
     }, [
-      {
-        kind: 'game-fields',
-        gameId,
-        previous: { status: game.status, finishedAt: game.finishedAt, droppedAt: game.droppedAt },
-        expected: { status: nextStatus, finishedAt: nextFinishedAt, droppedAt: nextDroppedAt },
-      },
+      statusFields(game, nextGame),
       ...plan.operations,
     ], { actions: [getUndoAction(), getOpenQueueAction(), getViewGameAction(gameId)] });
 
-    setGames((currentGames) => currentGames.map((currentGame) => currentGame.id === gameId
-      ? touchGameRecord({ ...currentGame, status: nextStatus, finishedAt: nextFinishedAt, droppedAt: nextDroppedAt })
-      : currentGame));
+    setGames((currentGames) => currentGames.map((currentGame) => currentGame.id === gameId ? nextGame : currentGame));
     plan.commit();
   }
 
