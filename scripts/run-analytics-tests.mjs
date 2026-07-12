@@ -52,6 +52,7 @@ const testFiles = [
   // Characterization tests for the destructive/cross-store boundaries (ARCHITECTURE_STABILITY_AUDIT).
   { entry: 'scripts/gameIdentity.test.ts', out: 'gameIdentity.test.mjs' },
   { entry: 'scripts/kvPersistence.test.ts', out: 'kvPersistence.test.mjs' },
+  { entry: 'scripts/retroPlanImport.test.ts', out: 'retroPlanImport.test.mjs' },
   { entry: 'scripts/backupRestoreDurability.test.ts', out: 'backupRestoreDurability.test.mjs' },
   // Its own bundle: a rejected IndexedDB write latches the repository into legacy-fallback for the
   // life of the module instance, which would quietly disable IndexedDB for every later test here.
