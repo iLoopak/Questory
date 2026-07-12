@@ -21,6 +21,7 @@ assertTestEnvironment();
 
 const { createTranslator } = await import('../src/i18n');
 const { useQueueActions } = await import('../src/hooks/useQueueActions');
+const { useSliceCommands } = await import('../src/features/app/useSliceCommands');
 const { useQuestShelfNotifications } = await import('../src/hooks/useQuestShelfNotifications');
 const { normalizePlatformQueueState, addGameToPlatformQueue, getPlatformTag, updatePlatformQueueVisualSettings } =
   await import('../src/lib/platformQueueStorage');
@@ -49,6 +50,9 @@ function useRetroPlanHarness(initialGames: Game[]) {
   );
   const [reviewModeState, setReviewModeState] = useState(() => normalizeReviewModeState(undefined));
 
+  // The same command boundary AppController owns: one pure transition per action, applied here.
+  const commands = useSliceCommands({ games, platformQueueState, setGames, setPlatformQueueState });
+
   const notifications = useQuestShelfNotifications({
     activeNavItem: 'Library',
     games,
@@ -65,11 +69,9 @@ function useRetroPlanHarness(initialGames: Game[]) {
   const queueActions = useQueueActions({
     activeQueuePlatforms: ['Retroid', 'PC'],
     addUndoAction: notifications.addUndoAction,
-    games,
     markOnboardingItemComplete: () => {},
-    platformQueueState,
-    setGames,
-    setPlatformQueueState,
+    runCrossSliceCommand: commands.runCrossSliceCommand,
+    runPlanCommand: commands.runPlanCommand,
     t,
   });
 

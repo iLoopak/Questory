@@ -1,12 +1,14 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { createTranslator } from '../i18n';
 import type { NavItem } from '../config/navigation';
-import { hasProtectedArtwork, hasRealArtwork, getStoredArtworkSource, isMissingOrGeneratedCover } from '../lib/gameCoverImages';
+import { hasRealArtwork, getStoredArtworkSource } from '../lib/gameCoverImages';
+import { applyArtworkTransition } from '../lib/artworkTransitions';
 import { mergeRawgMetadataIntoGame } from '../lib/metadataMerge';
 import { formatGameToastMessage, getLinkRawgGameAction, type NotificationDraft } from '../lib/notifications';
 import { refreshRawgMetadataForGame } from '../lib/rawgMetadataEnrichment';
-import { fetchSteamGridDbArtworkForGame, mergeSteamGridDbArtworkIntoGame } from '../lib/steamGridDbArtwork';
+import { fetchSteamGridDbArtworkForGame } from '../lib/steamGridDbArtwork';
 import { RawgApiError } from '../services/rawgApi';
+import type { SliceCommands } from '../features/app/useSliceCommands';
 import type { Game } from '../types/game';
 import type { RawgMetadata } from '../types/rawg';
 
@@ -21,9 +23,11 @@ export type MetadataRefreshResult = 'updated' | 'no-match' | 'error';
 
 type UseMetadataArtworkActionsOptions = {
   addToastNotification: (notification: NotificationDraft) => void;
-  games: Game[];
+  /** AS-14: the latest games, read when the async refresh resolves rather than when it started. */
+  gamesRef: SliceCommands['gamesRef'];
   markOnboardingItemComplete: (itemId: 'metadata-enriched') => void;
   refreshingMetadataGameIds: Set<string>;
+  runGamesCommand: SliceCommands['runGamesCommand'];
   setActiveNavItem: Dispatch<SetStateAction<NavItem>>;
   setGames: Dispatch<SetStateAction<Game[]>>;
   setMetadataSelectionRequest: Dispatch<SetStateAction<MetadataSelectionRequest | null>>;
@@ -34,9 +38,10 @@ type UseMetadataArtworkActionsOptions = {
 
 export function useMetadataArtworkActions({
   addToastNotification,
-  games,
+  gamesRef,
   markOnboardingItemComplete,
   refreshingMetadataGameIds,
+  runGamesCommand,
   setActiveNavItem,
   setGames,
   setMetadataSelectionRequest,
@@ -144,7 +149,18 @@ export function useMetadataArtworkActions({
     );
   }
 
+  /**
+   * Apply the artwork that was found, and report whether anything actually changed. The answer comes
+   * from the transition, not from a flag flipped inside a React updater (AS-14): the toast said
+   * "Artwork updated" or "No artwork found" based on a variable React had not promised to have
+   * written yet.
+   */
+  function applyArtwork(targetGameId: string, sgdbArtwork: Awaited<ReturnType<typeof fetchSteamGridDbArtworkForGame>>, metadata: RawgMetadata | null) {
+    return runGamesCommand((currentGames) => applyArtworkTransition(currentGames, targetGameId, sgdbArtwork, metadata)).appliedArtwork;
+  }
+
   async function refreshGameMetadataFromActions(game: Game, mode: MetadataRefreshMode = 'metadata'): Promise<MetadataRefreshResult> {
+    const games = gamesRef.current;
     const targetGame = games.find((currentGame) => currentGame.id === game.id)
       ?? (typeof game.steamAppId === 'number'
         ? games.find((currentGame) => currentGame.steamAppId === game.steamAppId && currentGame.collectionType === game.collectionType)
@@ -194,9 +210,7 @@ export function useMetadataArtworkActions({
       if (result.status === 'no-match') {
         if (isArtworkRefresh) {
           const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
-          const enrichedGame = mergeSteamGridDbArtworkIntoGame(targetGame, sgdbArtwork);
-          if (enrichedGame !== targetGame) {
-            setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork)) : game)));
+          if (applyArtwork(targetGame.id, sgdbArtwork, null)) {
             addToastNotification({ category: 'success', dedupeKey: toastKey, message: formatGameToastMessage(t('toast.artworkUpdated'), targetGame) });
             return 'updated';
           }
@@ -212,17 +226,7 @@ export function useMetadataArtworkActions({
 
       if (isArtworkRefresh) {
         const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
-        let appliedArtwork = false;
-        setGames((currentGames) => currentGames.map((game) => {
-          if (game.id !== targetGame.id) {
-            return game;
-          }
-
-          let nextGame = mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork);
-          nextGame = applyRawgArtworkOnly(nextGame, result.metadata);
-          appliedArtwork = appliedArtwork || nextGame !== game;
-          return nextGame !== game ? touchGameRecord(nextGame) : game;
-        }));
+        const appliedArtwork = applyArtwork(targetGame.id, sgdbArtwork, result.metadata);
 
         addToastNotification({
           category: appliedArtwork ? 'success' : 'info',
@@ -254,11 +258,10 @@ export function useMetadataArtworkActions({
 
       return 'updated';
     } catch (error) {
+      // RAWG failed, but SteamGridDB is an independent provider: its artwork is still applied.
       if (isArtworkRefresh) {
         const sgdbArtwork = await fetchSteamGridDbArtworkForGame(targetGame);
-        const enrichedGame = mergeSteamGridDbArtworkIntoGame(targetGame, sgdbArtwork);
-        if (enrichedGame !== targetGame) {
-          setGames((currentGames) => currentGames.map((game) => (game.id === targetGame.id ? touchGameRecord(mergeSteamGridDbArtworkIntoGame(game, sgdbArtwork)) : game)));
+        if (applyArtwork(targetGame.id, sgdbArtwork, null)) {
           addToastNotification({ category: 'success', dedupeKey: toastKey, message: formatGameToastMessage(t('toast.artworkUpdated'), targetGame) });
           return 'updated';
         }
@@ -289,20 +292,6 @@ export function useMetadataArtworkActions({
     updateGameArtwork,
     updateGameMetadata,
     updateGameMetadataManagement,
-  };
-}
-
-function applyRawgArtworkOnly(game: Game, metadata: RawgMetadata): Game {
-  const coverImage = metadata.coverImage?.trim() || metadata.backgroundImage?.trim();
-  if (!coverImage || hasProtectedArtwork(game) || !isMissingOrGeneratedCover(game.coverImage)) {
-    return game;
-  }
-
-  return {
-    ...game,
-    artworkSource: 'rawg',
-    artworkUpdatedAt: metadata.artworkUpdatedAt ?? new Date().toISOString(),
-    coverImage,
   };
 }
 

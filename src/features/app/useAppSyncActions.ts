@@ -13,9 +13,12 @@ import { useSteamAchievementSync } from '../integrations/steam/useSteamAchieveme
 import { useSteamPlaytimeSync } from '../integrations/steam/useSteamPlaytimeSync';
 import { useSteamWishlistSync } from '../integrations/steam/useSteamWishlistSync';
 import { useImportSyncActions } from '../imports/useImportSyncActions';
+import type { SliceCommands } from './useSliceCommands';
 
 type UseAppSyncActionsOptions = {
   games: Game[];
+  /** AS-14: the games command boundary, for the syncs whose summary the user is shown. */
+  runGamesCommand: SliceCommands['runGamesCommand'];
   ignoredSteamGames: IgnoredSteamGame[];
   isAppMountedRef: RefObject<boolean>;
   isHltbSyncing: boolean;
@@ -33,6 +36,7 @@ type UseAppSyncActionsOptions = {
 
 export function useAppSyncActions({
   games,
+  runGamesCommand,
   ignoredSteamGames,
   isAppMountedRef,
   isHltbSyncing,
@@ -49,10 +53,10 @@ export function useAppSyncActions({
 }: UseAppSyncActionsOptions) {
   const syncSteamAchievements = useSteamAchievementSync({ games, isAppMountedRef, setGames, setSteamAchievementSyncState, addToastNotification, t });
   const refreshSteamPlaytime = useSteamPlaytimeSync({ games, setGames, setPlayActivity, setSteamPlaytimeRefreshState, addToastNotification, t });
-  const { importSteamWishlistItems, syncSteamWishlist } = useSteamWishlistSync({ games, ignoredSteamGames, setGames, setSteamWishlistSyncState, addToastNotification, t });
+  const { importSteamWishlistItems, syncSteamWishlist } = useSteamWishlistSync({ ignoredSteamGames, runGamesCommand, setSteamWishlistSyncState, addToastNotification, t });
   const syncWishlistDeals = useItadDealSync({ games, itadDealSyncState, setGames, setItadDealSyncState, addToastNotification, t });
   const syncHltb = useHltbSync({ games, isHltbSyncing, setGames, setIsHltbSyncing, addToastNotification, t });
-  const { importMultiGameItems, importSteamWishlistHtmlItems } = useImportSyncActions({ setGames, addToastNotification, t });
+  const { importMultiGameItems, importSteamWishlistHtmlItems } = useImportSyncActions({ runGamesCommand, addToastNotification, t });
 
   async function syncSteamDataForGame(game: Game) {
     const playtimeSummary = await refreshSteamPlaytime([game.id], { showToast: false });

@@ -49,6 +49,7 @@ import type { Game, GamePlatform } from '../../types/game';
 import type { RawgSearchResult } from '../../types/rawg';
 import type { SteamAchievementSyncState, SteamPlaytimeRefreshState, SteamWishlistSyncState } from '../../types/steam';
 import { useAppPersistence } from './useAppPersistence';
+import { useSliceCommands } from './useSliceCommands';
 import { useCanonicalCollectionOwner } from './useCanonicalCollectionOwner';
 import { useAppSyncActions } from './useAppSyncActions';
 import { useNavigationState } from '../navigation/useNavigationState';
@@ -151,6 +152,11 @@ export function AppController() {
     setTargetQueuePlatform,
     targetQueuePlatform,
   } = usePlatformQueueController(games);
+
+  // AS-14: the command boundary. Feature actions compute one pure transition against the latest
+  // games/Plan state and apply it here; they no longer produce results, persistence or nested
+  // setters inside React updater callbacks.
+  const { gamesRef, runCrossSliceCommand, runGamesCommand, runPlanCommand } = useSliceCommands({ games, platformQueueState, setGames, setPlatformQueueState });
   const {
     isShelfProfileOpen,
     libraryOwnerNickname,
@@ -270,7 +276,7 @@ export function AppController() {
 
   const isAppMountedRef = useRef(true);
 
-  const { gamesRef } = useAppPersistence({ games, ignoredSteamGames, onboardingState, platformQueueState, playActivity });
+  useAppPersistence({ games, ignoredSteamGames, onboardingState, platformQueueState, playActivity });
 
   // AS-03: lets Data Management's recovery/repair tools hand a recovered snapshot back to this
   // owner, instead of the owner's next save silently overwriting it. Exposes exactly two
@@ -374,8 +380,9 @@ export function AppController() {
     updateGameMetadataManagement,
   } = useMetadataController({
     addToastNotification,
-    games,
+    gamesRef,
     markOnboardingItemComplete,
+    runGamesCommand,
     setActiveNavItem,
     setGames,
     setSelectedGameId,
@@ -815,6 +822,7 @@ export function AppController() {
     syncWishlistDeals,
   } = useAppSyncActions({
     games,
+    runGamesCommand,
     ignoredSteamGames,
     isAppMountedRef,
     isHltbSyncing,
@@ -860,11 +868,9 @@ export function AppController() {
   } = useQueueActions({
     activeQueuePlatforms,
     addUndoAction,
-    games,
     markOnboardingItemComplete,
-    platformQueueState,
-    setGames,
-    setPlatformQueueState,
+    runCrossSliceCommand,
+    runPlanCommand,
     t,
   });
 
