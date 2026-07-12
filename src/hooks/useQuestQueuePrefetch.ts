@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { Game } from '../types/game';
 import { getCachedScreenshots, setCachedScreenshots } from '../lib/screenshotCache';
 import { fetchScreenshotsForGame } from '../lib/screenshotProviders';
-import { RawgApiError } from '../services/rawgApi';
+import { isProviderSetupErrorKind } from '../lib/providerResult';
 import {
   QuestQueuePrefetchQueue,
   questQueueJobKey,
@@ -77,20 +77,22 @@ export function useQuestQueuePrefetch({
         metadata: (game) => Promise.resolve(ensureMetadataRef.current(game)),
         screenshots: async (game) => {
           if (screenshotsUnavailableRef.current) return;
-          try {
-            const { urls, provider } = await fetchScreenshotsForGame(game);
-            // Warms the shared localStorage cache; the card then mounts without a loading state.
-            setCachedScreenshots(game, urls, provider);
-          } catch (error) {
-            if (
-              error instanceof RawgApiError &&
-              (error.code === 'missing-api-key' || error.code === 'invalid-api-key')
-            ) {
-              screenshotsUnavailableRef.current = true;
-              return;
-            }
-            throw error;
+
+          const result = await fetchScreenshotsForGame(game);
+          if (result.ok) {
+            // Warms the shared cache; the card then mounts without a loading state. Only a genuine
+            // success is written — AS-13: a failed prefetch must not record "no screenshots".
+            setCachedScreenshots(game, result.data.urls, result.data.provider);
+            return;
           }
+
+          if (isProviderSetupErrorKind(result.error.kind)) {
+            screenshotsUnavailableRef.current = true;
+            return;
+          }
+
+          // A retryable failure feeds the queue's own cooldown, as it always did.
+          throw new Error(result.error.safeMessage);
         },
       },
       onEvent: import.meta.env.DEV

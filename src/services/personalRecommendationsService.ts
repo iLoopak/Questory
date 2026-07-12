@@ -1651,6 +1651,36 @@ async function generatePersonalRecommendationsResult(
   };
 }
 
+/**
+ * AS-12: every input that materially changes the result, as one comparable string.
+ *
+ * The hook needs to know whether the run it is about to commit still belongs to the inputs the user
+ * is looking at. Object identity cannot answer that (a new `games` array with the same contents is
+ * not a new input), so the key is built from the same signals the generation itself reads: the
+ * library fingerprint, the taste profile, recommendation preferences and feedback, the Discovery
+ * Inbox exclusions, and whether hydration has completed. It lives here, next to the generation, so
+ * the two cannot drift apart.
+ */
+export function getRecommendationInputKey(
+  userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
+  hydrationReady = true,
+): string {
+  const tasteProfile = getTasteProfileForGames(userGames);
+  const preferences = loadRecommendationPreferences();
+  const feedback = loadRecommendationFeedback();
+  const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
+
+  return [
+    profileFingerprint(userGames),
+    `taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}`,
+    `recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}`,
+    `inbox:${inboxFingerprint}`,
+    `hydration:${hydrationReady}`,
+    `engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`,
+  ].join('::');
+}
+
 export async function fetchPersonalRecommendationsResult(
   userGames: Game[],
   inboxRawgIds: Set<number> = new Set(),

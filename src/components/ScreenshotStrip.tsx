@@ -199,12 +199,29 @@ type ScreenshotStripProps = {
 };
 
 export function ScreenshotStrip({ game, className = '' }: ScreenshotStripProps) {
-  const { screenshots, loading, refetch } = useGameScreenshots(game);
+  const { screenshots, loading, error, refetch } = useGameScreenshots(game);
 
   // Show "Find screenshots" prompt only for games with missing/generated cover art
   // and no screenshots after the fetch resolves.
   const hasMissingArt = isMissingOrGeneratedCover(game.coverImage);
   const showFindPrompt = !loading && screenshots.length === 0 && hasMissingArt;
+
+  // AS-13: a temporary failure is not "this game has no screenshots" — it gets a Retry, in the
+  // affordance this strip already had.
+  if (error && screenshots.length === 0) {
+    return (
+      <div className={`screenshot-strip ${className}`}>
+        <button
+          className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-slate-200 focus-visible:border-accent focus-visible:outline-none"
+          onClick={refetch}
+          type="button"
+        >
+          <Icon name="refresh-cw" />
+          Screenshots unavailable — Retry
+        </button>
+      </div>
+    );
+  }
 
   // Return null when there's nothing to show and no prompt to display.
   if (!loading && screenshots.length === 0 && !showFindPrompt) return null;

@@ -33,12 +33,34 @@ function readLegacyStore(): ScreenshotStore {
   }
 }
 
+/**
+ * AS-13: hydration MERGES; it never replaces.
+ *
+ * The IndexedDB read is asynchronous, and it used to assign the whole stored object over
+ * `storeSnapshot` when it landed — so a screenshot fetched from the network while the read was in
+ * flight was silently thrown away and replaced by the older record. Entries are now merged one by
+ * one, and the newer `cachedAt` wins, so a fresh network result always survives a late hydration.
+ */
+export function mergeScreenshotStores(current: ScreenshotStore, hydrated: ScreenshotStore): ScreenshotStore {
+  const merged: ScreenshotStore = { ...hydrated };
+
+  for (const [key, entry] of Object.entries(current)) {
+    const stored = merged[key];
+    if (!stored || entry.cachedAt >= stored.cachedAt) {
+      merged[key] = entry;
+    }
+  }
+
+  return merged;
+}
+
 function hydrateStore(): void {
   if (hydrated) return;
   hydrated = true;
   storeSnapshot = readLegacyStore();
   void readAppCacheValue<ScreenshotStore>(STORAGE_KEY).then((stored) => {
-    if (stored && Object.keys(stored).length > 0) storeSnapshot = stored;
+    if (!stored || typeof stored !== 'object') return;
+    storeSnapshot = mergeScreenshotStores(storeSnapshot, stored);
   });
 }
 
