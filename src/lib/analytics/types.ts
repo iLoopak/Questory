@@ -1,56 +1,68 @@
-export const analyticsSchemaVersion = 2 as const;
+/**
+ * Client-side types, DERIVED from the canonical contract (AS-17). Nothing is declared twice: an
+ * event name, a property key or an allowed value that is not in `telemetryContract.ts` does not
+ * exist, and TypeScript says so at the call site.
+ */
+import {
+  analyticsSchemaVersion,
+  telemetryEnvelopeFields,
+  telemetryEventRegistry,
+  telemetryRuntimes,
+  telemetrySensitiveFields,
+} from './telemetryContract';
 
-export const telemetryEventRegistry = {
-  app_session_started: { required: ['install_mode','library_size_bucket','has_completed_onboarding','telemetry_schema_version'], optional: [], enums: { runtime: ['pwa','browser','capacitor_android','unknown'], install_mode: ['installed','browser_tab','unknown'], library_size_bucket: ['empty','1_25','26_100','101_300','301_1000','1000_plus'] } },
-  onboarding_completed: { required: ['completion_path','integrations_configured_bucket'], optional: [], enums: { completion_path: ['fresh_install','existing_library','skipped_optional_steps'], integrations_configured_bucket: ['none','one','multiple'] } },
-  onboarding_reset: { required: [], optional: [], enums: {} },
-  telemetry_enabled: { required: ['source'], optional: [], enums: { source: ['onboarding','settings'] } },
-  telemetry_disabled: { required: ['source'], optional: [], enums: { source: ['settings'] } },
-  telemetry_test_sent: { required: ['outcome'], optional: [], enums: { outcome: ['accepted','configuration_missing','rejected','network_error','timeout'] } },
-  library_import_started: { required: ['source'], optional: [], enums: { source: ['steam','playstation_bookmarklet','nintendo_bookmarklet','retro_file','manual','backup_restore','other'] } },
-  library_import_completed: { required: ['source','outcome','imported_count_bucket','duplicate_count_bucket','duration_bucket'], optional: ['error_category'], enums: { source: ['steam','playstation_bookmarklet','nintendo_bookmarklet','retro_file','manual','backup_restore','other'], outcome: ['success','partial_success','cancelled','failed'], imported_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], duplicate_count_bucket: ['zero','1_10','11_50','51_plus'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'], error_category: ['network','authentication','invalid_input','provider_unavailable','parsing','storage','unknown'] } },
-  integration_connected: { required: ['integration','outcome'], optional: ['error_category'], enums: { integration: ['steam','rawg','steamgriddb','itad','hltb','other'], outcome: ['success','failed'], error_category: ['network','authentication','invalid_input','provider_unavailable','parsing','storage','unknown'] } },
-  sync_started: { required: ['sync_type','scope_bucket'], optional: [], enums: { sync_type: ['steam_library','steam_playtime','steam_achievements','metadata','wishlist_deals','artwork','full_maintenance','other'], scope_bucket: ['one','2_10','11_50','51_200','200_plus'] } },
-  sync_completed: { required: ['sync_type','outcome','changed_count_bucket','failed_count_bucket','duration_bucket'], optional: ['error_category'], enums: { sync_type: ['steam_library','steam_playtime','steam_achievements','metadata','wishlist_deals','artwork','full_maintenance','other'], outcome: ['success','partial_success','failed','cancelled'], changed_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], failed_count_bucket: ['zero','1_10','11_50','51_plus'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'], error_category: ['network','authentication','invalid_input','provider_unavailable','parsing','storage','unknown'] } },
-  game_added: { required: ['destination','source'], optional: [], enums: { destination: ['library','wishlist','platform_plan'], source: ['manual','import','discover','recommendation','quest_queue','game_detail','other'] } },
-  game_status_changed: { required: ['from_status','to_status','source'], optional: [], enums: { from_status: ['backlog','planned','playing','finished','dropped','ignored','wishlist','unknown'], to_status: ['backlog','planned','playing','finished','dropped','ignored','wishlist'], source: ['library','game_detail','quest_queue','platform_plans','home','other'] } },
-  game_rating_saved: { required: ['rating_bucket','source'], optional: [], enums: { rating_bucket: ['1','2','3','4','5'], source: ['quest_queue','game_detail','other'] } },
-  bulk_action_completed: { required: ['action','selected_count_bucket','outcome'], optional: [], enums: { action: ['move_platform','change_status','refresh_metadata','refresh_artwork','remove','other'], selected_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], outcome: ['success','partial_success','cancelled','failed'] } },
-  quest_queue_started: { required: ['queue_source','batch_size_bucket','filter_mode'], optional: [], enums: { queue_source: ['library','wishlist','discovery','platform_plan','mixed'], batch_size_bucket: ['1_5','6_10','11_20','20_plus'], filter_mode: ['default','filtered','unknown'] } },
-  quest_queue_action: { required: ['action','position_bucket','source'], optional: [], enums: { action: ['add_to_plans','playing_now','wishlist','finished','dropped','ignored','skipped'], position_bucket: ['early','middle','late'], source: ['library_queue','discovery_inbox'] } },
-  quest_queue_batch_completed: { required: ['queue_source','initial_count_bucket','processed_count_bucket','skipped_count_bucket','completion_state','duration_bucket'], optional: [], enums: { queue_source: ['library','wishlist','discovery','platform_plan','mixed'], initial_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], processed_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], skipped_count_bucket: ['zero','1_10','11_50','51_plus'], completion_state: ['completed','exited_early','empty'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'] } },
-  quest_queue_screenshot_opened: { required: ['source'], optional: [], enums: { source: ['library_queue','discovery_inbox'] } },
-  platform_plan_created: { required: ['creation_method','used_default_artwork'], optional: [], enums: { creation_method: ['manual','onboarding','imported'] } },
-  platform_plan_updated: { required: ['change_type'], optional: [], enums: { change_type: ['identity','artwork','ordering','games','other'] } },
-  platform_plan_opened: { required: ['game_count_bucket','has_currently_playing','used_default_artwork'], optional: [], enums: { game_count_bucket: ['empty','1_5','6_20','21_50','50_plus'] } },
-  platform_plan_game_reordered: { required: ['method'], optional: [], enums: { method: ['drag_drop','controls','other'] } },
-  discover_section_opened: { required: ['section'], optional: [], enums: { section: ['recommendations','release_calendar','discovery_inbox','similar_games','other'] } },
-  discovery_recommendations_requested: { required: ['requested_count','returned_count','source'], optional: [], enums: { source: ['discovery_inbox'] } },
-  recommendation_impression: { required: ['surface','recommendation_type','result_count_bucket'], optional: [], enums: { surface: ['home','game_detail','discover','release_calendar'], recommendation_type: ['personal','similar','because_you_like','release','fallback'], result_count_bucket: ['zero','1_5','6_10','11_plus'] } },
-  recommendation_action: { required: ['surface','recommendation_type','action','position_bucket'], optional: [], enums: { surface: ['home','game_detail','discover','release_calendar'], recommendation_type: ['personal','similar','because_you_like','release','fallback'], action: ['opened','added_to_wishlist','added_to_library','added_to_plans','dismissed'], position_bucket: ['top','middle','lower'] } },
-  recommendation_generation_completed: { required: ['outcome','result_count_bucket','duration_bucket','cache_status','partial_failure_bucket','fallback_tier'], optional: [], enums: { outcome: ['success','partial','empty','failed'], result_count_bucket: ['zero','1_5','6_10','11_plus'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'], cache_status: ['hit','miss','stale','invalid','bypass'], partial_failure_bucket: ['zero','1_5','6_10','11_plus'], fallback_tier: ['none','personalized','adjacent','broad'] } },
-  recommendation_feedback: { required: ['surface','feedback_type','source_category','fallback_tier','rank_bucket','engine_version','scoring_version'], optional: [], enums: { surface: ['home','game_detail','discover','release_calendar'], feedback_type: ['hide','not_interested','less_like_this','already_played','more_like_this'], source_category: ['seed','affinity','intent','fallback','unknown'], fallback_tier: ['none','personalized','adjacent','broad'], rank_bucket: ['top','middle','lower'], engine_version: ['5.0.0'], scoring_version: ['5.0.0'] } },
-  release_calendar_generated: { required: ['result_count_bucket','personalization_mode','outcome'], optional: [], enums: { result_count_bucket: ['zero','1_5','6_10','11_plus'], personalization_mode: ['strict','relaxed','fallback'], outcome: ['success','empty','failed'] } },
-  game_detail_opened: { required: ['source','has_screenshots','has_achievements','has_recommendations','metadata_completeness'], optional: [], enums: { source: ['library','wishlist','home','discover','recommendation','quest_queue','platform_plans','other'], metadata_completeness: ['low','medium','high'] } },
-  game_detail_section_used: { required: ['section','action'], optional: [], enums: { section: ['screenshots','achievements','recommendations','metadata','actions'], action: ['opened','refreshed','expanded'] } },
-  artwork_changed: { required: ['source','surface'], optional: [], enums: { source: ['steamgriddb','uploaded','default','other'], surface: ['game_detail','library_action','platform_plan'] } },
-  home_widget_used: { required: ['widget','action'], optional: [], enums: { widget: ['next_from_plans','play_today','recommended_for_you','sync_maintenance','questory_journey','onboarding','release_calendar','other'], action: ['opened','primary_action','refreshed','dismissed'] } },
-  play_today_generated: { required: ['outcome','candidate_count_bucket'], optional: [], enums: { outcome: ['recommendation_available','empty','failed'], candidate_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'] } },
-  achievements_sync_completed: { required: ['outcome','game_count_bucket','unlocked_count_bucket','duration_bucket'], optional: ['error_category'], enums: { outcome: ['success','partial_success','unsupported','failed'], game_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], unlocked_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'], error_category: ['network','authentication','invalid_input','provider_unavailable','parsing','storage','unknown'] } },
-  achievements_timeline_opened: { required: ['source','entry_count_bucket'], optional: [], enums: { source: ['home','game_detail','other'], entry_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'] } },
-  backup_export_completed: { required: ['outcome','library_size_bucket','duration_bucket'], optional: ['error_category'], enums: { outcome: ['success','failed'], library_size_bucket: ['empty','1_25','26_100','101_300','301_1000','1000_plus'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'], error_category: ['network','authentication','invalid_input','provider_unavailable','parsing','storage','unknown'] } },
-  backup_restore_completed: { required: ['outcome','restored_count_bucket','duration_bucket','migration_required'], optional: ['error_category'], enums: { outcome: ['success','partial_success','failed','cancelled'], restored_count_bucket: ['zero','1_10','11_50','51_200','201_500','500_plus'], duration_bucket: ['under_2s','2_10s','10_30s','30_120s','over_120s'], error_category: ['network','authentication','invalid_input','provider_unavailable','parsing','storage','unknown'] } },
-  appearance_changed: { required: ['theme','surface'], optional: [], enums: { theme: ['light','dark','system'], surface: ['settings','onboarding'] } },
-  library_view_changed: { required: ['view'], optional: [], enums: { view: ['grid','shelf','compact'] } },
-  language_changed: { required: ['language'], optional: [], enums: { language: ['cs','en','other'] } },
-  operation_failed: { required: ['operation','error_category','recoverable'], optional: [], enums: { operation: ['app_startup','storage_read','storage_write','library_import','metadata_fetch','artwork_fetch','recommendation_fetch','achievements_sync','backup_export','backup_restore','telemetry_proxy','other'], error_category: ['network','timeout','authentication','rate_limit','provider_unavailable','invalid_response','parsing','storage','unsupported','unknown'], runtime: ['pwa','browser','capacitor_android','unknown'] } },
-} as const;
+export { analyticsSchemaVersion, telemetryEnvelopeFields, telemetryEventRegistry, telemetryRuntimes, telemetrySensitiveFields };
 
-export type AnalyticsEventName = keyof typeof telemetryEventRegistry;
+export type TelemetryEventRegistry = typeof telemetryEventRegistry;
+export type AnalyticsEventName = keyof TelemetryEventRegistry;
 export const analyticsEventNames = Object.keys(telemetryEventRegistry) as AnalyticsEventName[];
+
+/** Events with a live emitter. `reserved` events are accepted but nothing sends them yet. */
+export type ActiveAnalyticsEventName = {
+  [Name in AnalyticsEventName]: TelemetryEventRegistry[Name]['status'] extends 'active' ? Name : never;
+}[AnalyticsEventName];
+
+export const activeAnalyticsEventNames = analyticsEventNames.filter(
+  (eventName) => telemetryEventRegistry[eventName].status === 'active',
+) as ActiveAnalyticsEventName[];
+
+export const reservedAnalyticsEventNames = analyticsEventNames.filter(
+  (eventName) => telemetryEventRegistry[eventName].status === 'reserved',
+);
+
 export type AnalyticsSchemaVersion = typeof analyticsSchemaVersion;
-export type AnalyticsRuntime = 'pwa' | 'browser' | 'capacitor_android' | 'unknown';
+export type AnalyticsRuntime = (typeof telemetryRuntimes)[number];
 export type TelemetryPropertyValue = string | number | boolean;
 export type TelemetryProperties = Record<string, TelemetryPropertyValue>;
-export type MinimalAnalyticsEvent = { schemaVersion: AnalyticsSchemaVersion; eventName: AnalyticsEventName; eventId: string; timestamp: string; appVersion: string; runtime: AnalyticsRuntime; sessionId?: string } & TelemetryProperties;
+
+type Enums<Name extends AnalyticsEventName> = TelemetryEventRegistry[Name] extends { enums: infer TEnums } ? TEnums : never;
+
+/**
+ * The value a property may carry: one of its declared enum strings, the schema version, or a
+ * boolean. An exact count is not constructible — the privacy rule is enforced by the compiler rather
+ * than by review.
+ */
+type PropertyValue<Name extends AnalyticsEventName, Key extends string> =
+  Key extends keyof Enums<Name>
+    ? Enums<Name>[Key] extends readonly (infer TValue)[] ? TValue : never
+    : Key extends 'telemetry_schema_version' ? AnalyticsSchemaVersion : boolean;
+
+type RequiredKeys<Name extends AnalyticsEventName> = TelemetryEventRegistry[Name]['required'][number] & string;
+type OptionalKeys<Name extends AnalyticsEventName> = TelemetryEventRegistry[Name]['optional'][number] & string;
+
+/** The exact payload one event accepts: required keys required, optional keys optional, nothing else. */
+export type TelemetryPropertiesFor<Name extends AnalyticsEventName> =
+  { [Key in RequiredKeys<Name>]: PropertyValue<Name, Key> }
+  & { [Key in OptionalKeys<Name>]?: PropertyValue<Name, Key> };
+
+export type MinimalAnalyticsEvent = {
+  schemaVersion: AnalyticsSchemaVersion;
+  eventName: AnalyticsEventName;
+  eventId: string;
+  timestamp: string;
+  appVersion: string;
+  runtime: AnalyticsRuntime;
+  sessionId?: string;
+} & TelemetryProperties;
+
 export type AnalyticsCounts = { librarySize: number; wishlistSize: number; platformCount: number; playingCount: number; queueCount: number };

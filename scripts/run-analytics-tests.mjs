@@ -30,6 +30,7 @@ const sharedConfig = {
     'node:assert/strict',
     'node:test',
     'node:fs',
+    'node:path',
     'react',
     'react/jsx-runtime',
     'react-dom',
@@ -69,6 +70,7 @@ const testFiles = [
   { entry: 'scripts/recommendationProviderFailures.test.ts', out: 'recommendationProviderFailures.test.mjs' },
   { entry: 'scripts/latestRequest.test.ts', out: 'latestRequest.test.mjs' },
   { entry: 'scripts/stateTransitions.test.ts', out: 'stateTransitions.test.mjs' },
+  { entry: 'scripts/telemetryContract.test.ts', out: 'telemetryContract.test.mjs' },
   // Its own bundle: these stub globalThis.fetch and hold provider responses open, so they must not
   // interleave with suites that expect a real (or differently stubbed) transport.
   { entry: 'scripts/screenshotRequests.test.ts', out: 'screenshotRequests.test.mjs' },
