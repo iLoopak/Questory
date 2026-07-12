@@ -30,11 +30,25 @@ export const gamePlatforms = [
 export const gameStatuses = ['Want to play', 'Playing', 'Paused', 'Finished', 'Dropped'] as const;
 export const gameCollectionTypes = ['library', 'wishlist'] as const;
 export const wishlistPriorities = ['low', 'medium', 'high'] as const;
+/**
+ * Every provenance value a persisted `Game.externalSource` may hold. This is the single
+ * source of truth: `isGameExternalSource` (lib/gameIdentity) guards against it, so a value
+ * added here is preserved by loading, import, and backup round-trips rather than dropped.
+ */
+export const gameExternalSources = [
+  'manual',
+  'steam',
+  'steam-wishlist',
+  'retro-rom',
+  'playstation-library',
+  'nintendo-virtual-game-cards',
+] as const;
 
 export type GamePlatform = (typeof gamePlatforms)[number] | (string & {});
 export type GameStatus = (typeof gameStatuses)[number];
 export type GameCollectionType = (typeof gameCollectionTypes)[number];
 export type WishlistPriority = (typeof wishlistPriorities)[number];
+export type GameExternalSource = (typeof gameExternalSources)[number];
 export type ItadMatchConfidence = 'exact' | 'title-normalized';
 
 export type ArtworkSource = 'custom' | 'user' | 'steamgriddb' | 'steam' | 'rawg' | 'imported' | 'generated-fallback';
@@ -100,7 +114,7 @@ export type Game = {
   steamAchievements?: SteamAchievement[];
   lastSteamActivityAt?: string;
   lastSteamActivityDeltaMinutes?: number;
-  externalSource?: 'manual' | 'steam' | 'steam-wishlist' | 'retro-rom' | 'playstation-library' | 'nintendo-virtual-game-cards';
+  externalSource?: GameExternalSource;
   externalUrl?: string;
   nintendoVirtualGameCard?: {
     source: 'nintendo-virtual-game-cards';

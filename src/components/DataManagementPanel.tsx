@@ -338,12 +338,27 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   function confirmRestore(mode: 'merge' | 'replace') {
     setIsRestoreModalOpen(false);
     if (!selectedBackup) return;
-    if (mode === 'merge') {
-      mergeQuestShelfBackup(selectedBackup);
-    } else {
-      restoreQuestShelfBackup(selectedBackup);
+
+    const result = mode === 'merge'
+      ? mergeQuestShelfBackup(selectedBackup)
+      : restoreQuestShelfBackup(selectedBackup);
+
+    if (!result.ok) {
+      // Every row in the backup's games section was corrupt. Nothing was written, so the
+      // existing library is intact — say so instead of reporting success and reloading.
+      showMessage(formatMessageTemplate(t('data.backupGamesUnusable'), { rows: result.games.rowCount }), 'error');
+      return;
     }
-    showMessage(t('data.backupImported'), 'success');
+
+    showMessage(
+      result.games.rejectedCount > 0
+        ? formatMessageTemplate(t('data.backupImportedWithSkippedRows'), {
+            imported: result.games.acceptedCount,
+            skipped: result.games.rejectedCount,
+          })
+        : t('data.backupImported'),
+      result.games.rejectedCount > 0 ? 'info' : 'success',
+    );
     onBackupImported?.();
     window.setTimeout(() => window.location.reload(), 600);
   }

@@ -9,6 +9,7 @@ import {
   type LegacyRecoveryPreview,
   type LegacyRecoveryResult,
 } from './indexedDbGameRepository';
+import { isGameExternalSource } from './gameIdentity';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 
 const STORAGE_KEY = 'questshelf.games.v1';
@@ -77,16 +78,75 @@ export function removeMockGames(games: Game[]) {
   return games.filter((game) => !isMockGame(game));
 }
 
-export function normalizeLoadedGame(value: unknown): Game | null {
+/** Why a persisted/backup game row could not be loaded. */
+export type GameRowRejectionReason = 'not-an-object' | 'missing-id' | 'missing-title';
+
+export type GameRowRejection = {
+  /** Position in the original array, so a report can point at the offending row. */
+  index: number;
+  reason: GameRowRejectionReason;
+};
+
+export type GameRowsParseResult = {
+  games: Game[];
+  rejected: GameRowRejection[];
+  /** Rows present in the input (0 when the input was not an array at all). */
+  rowCount: number;
+  /** Rows that normalized successfully. */
+  acceptedCount: number;
+  isArray: boolean;
+};
+
+function getGameRowRejectionReason(value: unknown): GameRowRejectionReason | null {
   if (!value || typeof value !== 'object') {
-    return null;
+    return 'not-an-object';
   }
 
   const game = value as Partial<Game>;
 
-  if (typeof game.id !== 'string' || typeof game.title !== 'string') {
+  if (typeof game.id !== 'string') {
+    return 'missing-id';
+  }
+
+  if (typeof game.title !== 'string') {
+    return 'missing-title';
+  }
+
+  return null;
+}
+
+/**
+ * Per-row parse of a games array (the `questshelf.games.v1` backup section, or the legacy blob).
+ *
+ * Same acceptance rules as `normalizeLoadedGames`, but it reports which rows were dropped and
+ * why, so restore can refuse to silently replace a populated collection with nothing.
+ */
+export function parseLoadedGameRows(value: unknown): GameRowsParseResult {
+  if (!Array.isArray(value)) {
+    return { games: [], rejected: [], rowCount: 0, acceptedCount: 0, isArray: false };
+  }
+
+  const games: Game[] = [];
+  const rejected: GameRowRejection[] = [];
+
+  value.forEach((row, index) => {
+    const reason = getGameRowRejectionReason(row);
+    if (reason) {
+      rejected.push({ index, reason });
+      return;
+    }
+    games.push(normalizeLoadedGame(row) as Game);
+  });
+
+  return { games, rejected, rowCount: value.length, acceptedCount: games.length, isArray: true };
+}
+
+export function normalizeLoadedGame(value: unknown): Game | null {
+  if (getGameRowRejectionReason(value)) {
     return null;
   }
+
+  const game = value as Partial<Game> & Pick<Game, 'id' | 'title'>;
 
   // Migration guard: preserve user-owned optional fields via spread, then repair only the fields
   // that Questory needs to render safely. Do not overwrite valid notes, tags, or status.
@@ -132,9 +192,7 @@ export function normalizeLoadedGame(value: unknown): Game | null {
 }
 
 export function normalizeLoadedGames(value: unknown): Game[] {
-  return Array.isArray(value)
-    ? value.map(normalizeLoadedGame).filter((game): game is Game => Boolean(game))
-    : [];
+  return parseLoadedGameRows(value).games;
 }
 
 function normalizeLoadedCollectionType(collectionType: unknown): GameCollectionType {
@@ -146,12 +204,10 @@ function normalizeLoadedPlatform(platform: unknown): GamePlatform {
 }
 
 function normalizeExternalSource(externalSource: unknown): Game['externalSource'] {
-  return externalSource === 'manual' ||
-    externalSource === 'steam' ||
-    externalSource === 'steam-wishlist' ||
-    externalSource === 'retro-rom'
-    ? externalSource
-    : undefined;
+  // Guards against the canonical list in types/game.ts. Previously this hard-coded four values
+  // and silently erased `playstation-library` / `nintendo-virtual-game-cards` provenance on
+  // every load and backup round-trip, even though importers write them.
+  return isGameExternalSource(externalSource) ? externalSource : undefined;
 }
 
 function normalizeHltbMatchConfidence(confidence: unknown): Game['hltbMatchConfidence'] {
