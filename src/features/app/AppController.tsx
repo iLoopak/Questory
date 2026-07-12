@@ -73,6 +73,7 @@ import { QueueGhost } from '../../components/QueueGhost';
 import { useControllerAction } from '../../lib/controllerActions';
 import { getOwnedGames, getRecentlyPlayedGames, mapSteamGamesToLocalGames, SteamApiError } from '../../services/steamApi';
 import { useDiscoveryController } from './useDiscoveryController';
+import { useDiscoveryPromotion } from './useDiscoveryPromotion';
 import { QuestShelfLogo } from './components/QuestShelfLogo';
 import { AddGameDialog } from './components/AddGameDialog';
 import { AppStartupScreen } from './components/AppStartupScreen';
@@ -344,6 +345,16 @@ export function AppController() {
     setIgnoredSteamGames,
     setSelectedGameId,
     t,
+  });
+
+  // AS-09: the single promotion command. Preview, Inbox and Plans all go through it, so identity
+  // and platform rules exist in exactly one place and a Plan entry can only ever reference a game
+  // that actually got persisted.
+  const { promoteDiscoveryCandidate } = useDiscoveryPromotion({
+    games,
+    importGames: (importedGames) => importGames(importedGames),
+    addToWishlist,
+    moveWishlistToLibrary: moveToLibrary,
   });
 
   const { completionRatingGame, setCompletionRatingGame, updateGameReviewFieldsWithCompletion, updateGameStatusWithCompletion } = useCompletionRating({
@@ -917,51 +928,79 @@ export function AppController() {
   }
 
 
-  function promoteDiscoveryToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
-    const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(discoveryGame, existingIds);
-    addToWishlist({ ...base, collectionType: 'wishlist' });
-    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, 'wishlist');
+  /**
+   * AS-09: every Discovery promotion — preview, Inbox, Library, Wishlist, Plans — runs through the
+   * one command. This function only translates its outcome into navigation and a message; it makes
+   * no identity or platform decision of its own, and it never sees a synthetic candidate id.
+   */
+  function promoteDiscoveryCandidateTo(
+    discoveryGame: import('../../lib/discovery').DiscoveryGame,
+    destination: 'library' | 'wishlist' | 'plans',
+    // The Inbox is a review run: promoting an item must not navigate the user out of it. The
+    // preview, by contrast, evolves into the Game Hub for the game it just added.
+    { openAddedGame = true }: { openAddedGame?: boolean } = {},
+  ) {
+    const result = promoteDiscoveryCandidate({ candidate: discoveryGame, destination });
     closeDiscoveryPreview();
-    addToastNotification({ category: 'success', dedupeKey: `wishlist-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToWishlist'), { game: discoveryGame.title }) });
+
+    if (result.outcome === 'failed' || !result.gameId) {
+      addToastNotification({ category: 'info', dedupeKey: `discovery-add-failed:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryPromotionFailed'), { game: discoveryGame.title }) });
+      return result;
+    }
+
+    // Telemetry emits once, after the canonical outcome is known, and carries no synthetic id.
+    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, destination);
+
+    if (destination === 'plans') {
+      // The picker receives the record that actually exists — never the candidate's temporary id,
+      // which is how a rejected import used to leave an orphan Plan entry behind.
+      const target = result.game ?? games.find((game) => game.id === result.gameId);
+      if (target) openBacklogPicker(target);
+      return result;
+    }
+
+    if (destination === 'wishlist') {
+      addToastNotification({
+        category: result.outcome === 'already-present' ? 'info' : 'success',
+        dedupeKey: `wishlist-add:${discoveryGame.rawgId}`,
+        message: formatMessageTemplate(
+          result.outcome === 'already-present' ? t('toast.discoveryAlreadyInWishlist') : t('toast.discoveryAddedToWishlist'),
+          { game: discoveryGame.title },
+        ),
+      });
+      return result;
+    }
+
+    // Evolve the Preview into the Game Hub for the now-owned game so the transition reads as
+    // "this game is now mine", not a navigation.
+    if (openAddedGame) {
+      setSelectedGameId(result.gameId);
+      setActiveNavItem('Library');
+    }
+
+    if (result.outcome === 'created') {
+      addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToLibrary'), { game: discoveryGame.title }) });
+    } else if (result.outcome === 'reused') {
+      // A Wishlist copy was promoted in place. Saying "added" here would claim a record that was
+      // never created.
+      addToastNotification({ category: 'success', dedupeKey: `library-reuse:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryExistingRecordReused'), { game: discoveryGame.title }) });
+    } else {
+      addToastNotification({ category: 'info', dedupeKey: `library-present:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAlreadyInLibrary'), { game: discoveryGame.title }) });
+    }
+
+    return result;
+  }
+
+  function promoteDiscoveryToWishlist(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
+    promoteDiscoveryCandidateTo(discoveryGame, 'wishlist');
   }
 
   function promoteDiscoveryToLibrary(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
-    // If the game already exists in the collection, never create a second
-    // record: move the wishlist copy in place, or just open the library copy.
-    const existing = games.find((g) => g.rawgId === discoveryGame.rawgId);
-    if (existing) {
-      if (existing.collectionType === 'wishlist') {
-        moveToLibrary(existing);
-      }
-      closeDiscoveryPreview();
-      setSelectedGameId(existing.id);
-      setActiveNavItem('Library');
-      return;
-    }
-
-    const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(discoveryGame, existingIds);
-    importGames([base]);
-    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, 'library');
-    closeDiscoveryPreview();
-    // Evolve the Preview into the Game Hub for the newly owned game so the
-    // transition reads as "this game is now mine", not a navigation.
-    setSelectedGameId(base.id);
-    setActiveNavItem('Library');
-    addToastNotification({ category: 'success', dedupeKey: `library-add:${discoveryGame.rawgId}`, message: formatMessageTemplate(t('toast.discoveryAddedToLibrary'), { game: discoveryGame.title }) });
+    promoteDiscoveryCandidateTo(discoveryGame, 'library');
   }
 
-
   function promoteDiscoveryToPlans(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
-    const existing = games.find((g) => g.rawgId === discoveryGame.rawgId);
-    const target = existing ?? createGameFromDiscovery(discoveryGame, new Set(games.map((g) => g.id)));
-    if (!existing) {
-      importGames([target]);
-    }
-    recordRecommendationOutcome(discoveryGame.rawgId, discoveryGame.title, 'plans');
-    closeDiscoveryPreview();
-    openBacklogPicker(target);
+    promoteDiscoveryCandidateTo(discoveryGame, 'plans');
   }
 
   function handlePreviewOpenLibraryGame(discoveryGame: import('../../lib/discovery').DiscoveryGame) {
@@ -972,29 +1011,28 @@ export function AppController() {
     setActiveNavItem(found.collectionType === 'wishlist' ? 'Wishlist' : 'Library');
   }
 
+  /**
+   * Inbox promotion runs the same command, so a candidate that was imported elsewhere resolves to
+   * the record that already exists instead of minting a second one. The item leaves the Inbox only
+   * when the promotion actually resolved.
+   */
+  function promoteInboxDiscoveryTo(item: DiscoveryInboxItem, destination: 'library' | 'wishlist' | 'plans') {
+    const result = promoteDiscoveryCandidateTo(item.game, destination, { openAddedGame: false });
+    if (result.outcome !== 'failed') {
+      removeFromDiscoveryInbox(item.id);
+    }
+  }
+
   function promoteInboxDiscoveryToLibrary(item: DiscoveryInboxItem) {
-    const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(item.game, existingIds);
-    importGames([base]);
-    recordRecommendationOutcome(item.game.rawgId, item.game.title, 'library');
-    removeFromDiscoveryInbox(item.id);
+    promoteInboxDiscoveryTo(item, 'library');
   }
 
   function promoteInboxDiscoveryToWishlist(item: DiscoveryInboxItem) {
-    const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(item.game, existingIds);
-    addToWishlist({ ...base, collectionType: 'wishlist' });
-    recordRecommendationOutcome(item.game.rawgId, item.game.title, 'wishlist');
-    removeFromDiscoveryInbox(item.id);
+    promoteInboxDiscoveryTo(item, 'wishlist');
   }
 
   function promoteInboxDiscoveryToPlans(item: DiscoveryInboxItem) {
-    const existingIds = new Set(games.map((g) => g.id));
-    const base = createGameFromDiscovery(item.game, existingIds);
-    importGames([base]);
-    recordRecommendationOutcome(item.game.rawgId, item.game.title, 'plans');
-    removeFromDiscoveryInbox(item.id);
-    openBacklogPicker(base);
+    promoteInboxDiscoveryTo(item, 'plans');
   }
 
   function handleInboxIgnore(item: DiscoveryInboxItem) {
@@ -1354,42 +1392,3 @@ export function AppController() {
   );
 }
 
-function createGameFromDiscovery(
-  dg: import('../../lib/discovery').DiscoveryGame,
-  existingIds: Set<string>,
-): import('../../types/game').Game {
-  const base =
-    dg.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game';
-  let id = `rawg-${base}`;
-  let n = 2;
-  while (existingIds.has(id)) { id = `rawg-${base}-${n++}`; }
-  const now = new Date().toISOString();
-  return {
-    id,
-    title: dg.title,
-    platform: dg.hasSteamVersion ? 'Steam' : 'PC',
-    status: 'Want to play',
-    coverImage: dg.coverUrl ?? '',
-    artworkSource: dg.coverUrl ? 'rawg' : undefined,
-    artworkUpdatedAt: dg.coverUrl ? now : undefined,
-    backgroundImage: dg.coverUrl,
-    playtimeHours: 0,
-    tags: [],
-    lastPlayedAt: null,
-    notes: '',
-    collectionType: 'library',
-    externalSource: 'manual',
-    importedAt: now,
-    rawgId: dg.rawgId,
-    rawgSlug: dg.slug ?? undefined,
-    rawgTitle: dg.title,
-    metacritic: dg.metacritic,
-    metacriticScore: dg.metacritic ?? undefined,
-    rawgRating: dg.rawgRating,
-    rawgRatingsCount: dg.rawgRatingsCount,
-    released: dg.released,
-    genres: dg.genres.length > 0 ? dg.genres : undefined,
-    metadataSource: 'rawg',
-    metadataUpdatedAt: now,
-  };
-}

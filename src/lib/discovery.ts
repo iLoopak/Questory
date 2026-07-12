@@ -1,4 +1,5 @@
 import type { Game } from '../types/game';
+import { resolveDiscoveryPlatform } from './discoveryPromotion';
 
 export interface DiscoveryGame {
   rawgId: number;
@@ -83,7 +84,9 @@ export function discoveryGameToGame(game: DiscoveryGame, idPrefix: string): Game
   return {
     id: `${idPrefix}-${game.rawgId}`,
     title: game.title,
-    platform: game.hasSteamVersion ? 'Steam' : (game.platforms[0] ?? 'PC'),
+    // AS-09: the platform the preview shows is the platform the promotion persists — one mapping,
+    // not "first raw provider label here, hardcoded PC there".
+    platform: resolveDiscoveryPlatform(game),
     status: 'Want to play',
     coverImage: game.coverUrl ?? '',
     artworkSource: game.coverUrl ? 'rawg' : undefined,

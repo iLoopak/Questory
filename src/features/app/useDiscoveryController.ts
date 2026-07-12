@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from '../../i18n';
 import type { Game } from '../../types/game';
 import type { DiscoveryCandidate, DiscoveryGame } from '../../lib/discovery';
@@ -7,6 +7,7 @@ import {
   deferDiscoveryInboxItemForFutureSession,
   getDiscoveryInboxRequestGeneration,
   loadDiscoveryInboxState,
+  reconcileDiscoveryInboxState,
   restoreDeferredDiscoveryInboxItem,
   saveDiscoveryInboxState,
   startDiscoveryInboxRun,
@@ -38,6 +39,22 @@ export function useDiscoveryController({ games, t, addToastNotification }: UseDi
   const [previewCandidate, setPreviewCandidate] = useState<DiscoveryCandidate | null>(null);
   const [isRequestingInboxRecommendations, setIsRequestingInboxRecommendations] = useState(false);
   const isRequestingInboxRecommendationsRef = useRef(false);
+
+  // AS-09: `reconcileDiscoveryInboxState` existed but nothing called it, so a game the user imported
+  // (or promoted, or restored from a backup) stayed in the Inbox and could be promoted again into a
+  // duplicate. Canonical games are the trigger: whenever they change — import, manual add, either
+  // promotion path, a collection move, a restore, or a metadata refresh that adds a RAWG id — the
+  // resolved candidates drop out. This is a pure identity pass over state the app already holds; no
+  // provider request is made.
+  useEffect(() => {
+    setInboxState((currentState) => {
+      const reconciledState = reconcileDiscoveryInboxState(currentState, games);
+      if (reconciledState === currentState) return currentState;
+
+      saveDiscoveryInboxState(reconciledState);
+      return reconciledState;
+    });
+  }, [games]);
 
   const inboxRawgIds = useMemo(
     () => new Set([...inboxState.activeQueue, ...inboxState.nextQueue].map((item) => item.rawgId)),

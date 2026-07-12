@@ -165,9 +165,11 @@ export function useGameLibraryActions({
     setGames((currentGames) => [...currentGames, touchGameRecord(game)]);
   }
 
-  function addToWishlist(game: Game, extraOperations: UndoOperation[] = []) {
+  /** Returns the id of the Wishlist copy — the existing one when the game is already wishlisted. */
+  function addToWishlist(game: Game, extraOperations: UndoOperation[] = []): string {
     const wishlistId = createCollectionCopyId(game, 'wishlist', new Set(games.map((currentGame) => currentGame.id)));
-    const alreadyWishlisted = games.some((currentGame) => isWishlistCopyOfGame(currentGame, game));
+    const existingCopy = games.find((currentGame) => isWishlistCopyOfGame(currentGame, game));
+    const alreadyWishlisted = Boolean(existingCopy);
 
     if (!alreadyWishlisted) {
       addUndoAction(formatGameToastMessage(t('toast.addedToWishlist'), game), {
@@ -188,6 +190,8 @@ export function useGameLibraryActions({
 
       return [...currentGames, createWishlistCopy(game, wishlistId)];
     });
+
+    return existingCopy?.id ?? wishlistId;
   }
 
   function addManyToWishlist(targetGames: Game[]) {
