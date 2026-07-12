@@ -12,6 +12,13 @@ import {
 } from '../lib/userProfile';
 import { mapRawgResult } from './discoveryService';
 import { fetchSuggestedGames, fetchGameSeries, fetchRecommendedGames } from './rawgApi';
+import {
+  providerSuccess,
+  summarizeProviderStatus,
+  type ProviderError,
+  type ProviderResult,
+  type ProviderStatusSummary,
+} from '../lib/providerResult';
 import type { RawgSearchResult } from '../types/rawg';
 import { scorePersonalRecommendationCandidate } from './personalRecommendationsService';
 import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile } from '../lib/tasteProfile';
@@ -217,6 +224,8 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
+/** AS-10: a stale pool is still better than an empty section when the refresh fails. */
+const STALE_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 function cacheKey(rawgId: number, userGames: Game[]): string {
   return `${rawgId}:${profileFingerprint(userGames)}`;
@@ -241,12 +250,26 @@ function findLibraryMatch(result: RawgSearchResult | DiscoveryCandidate['game'],
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function fetchContextualRecommendations(
+export type ContextualRecommendationsResult = {
+  candidates: DiscoveryCandidate[];
+  provider: ProviderStatusSummary;
+};
+
+const contextualProviderOk: ProviderStatusSummary = { status: 'ok', successCount: 0, failureCount: 0, stale: false };
+
+/**
+ * AS-10: the four pools each report success or failure.
+ *
+ * Every one of them used to swallow its error into `[]`, so an outage produced an empty pool that
+ * was then cached for 15 minutes as a perfectly good "no similar games". Now a pool that fails is
+ * counted as a failure; if they ALL fail, nothing is cached and the last good pool is served stale.
+ */
+export async function fetchContextualRecommendationsResult(
   game: Game,
   userGames: Game[],
   inboxRawgIds: Set<number> = new Set(),
-): Promise<DiscoveryCandidate[]> {
-  if (!game.rawgId) return [];
+): Promise<ContextualRecommendationsResult> {
+  if (!game.rawgId) return { candidates: [], provider: contextualProviderOk };
 
   const profile = buildUserProfile(userGames);
   const tasteProfile = getTasteProfileForGames(userGames);
@@ -265,8 +288,22 @@ export async function fetchContextualRecommendations(
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return buildCandidates(cached.raw, userGames, inboxRawgIds);
+    return { candidates: buildCandidates(cached.raw, userGames, inboxRawgIds), provider: contextualProviderOk };
   }
+
+  let successCount = 0;
+  let failureCount = 0;
+  let firstError: ProviderError | null = null;
+  const takeResults = (result: ProviderResult<RawgSearchResult[]>): RawgSearchResult[] => {
+    if (result.ok) {
+      successCount += 1;
+      return result.data;
+    }
+
+    failureCount += 1;
+    firstError ??= result.error;
+    return [];
+  };
 
   // -------------------------------------------------------------------------
   // Fetch candidate pool — all three in parallel.
@@ -280,18 +317,18 @@ export async function fetchContextualRecommendations(
   // batch so we don't over-fetch if primary pools are already rich.
   // -------------------------------------------------------------------------
 
-  const [suggested, series] = await Promise.all([
+  const [suggested, series] = (await Promise.all([
     fetchSuggestedGames(game.rawgId),
     fetchGameSeries(game.rawgId),
-  ]);
+  ])).map(takeResults);
 
   const suggestedIds = new Set(suggested.map((r) => r.id));
   const seriesIds = new Set(series.map((r) => r.id));
 
-  const [tagPool, genrePool] = await Promise.all([
+  const [tagPoolResult, genrePoolResult] = await Promise.all([
     specificTagSlugs.length > 0
       ? fetchRecommendedGames({ tags: specificTagSlugs.join(','), pageSize: 20 })
-      : Promise.resolve([] as RawgSearchResult[]),
+      : Promise.resolve(providerSuccess([] as RawgSearchResult[])),
     currentGameGenres.length > 0
       ? fetchRecommendedGames({
           genres: currentGameGenres.slice(0, 2).map(toSlug).join(','),
@@ -305,8 +342,20 @@ export async function fetchContextualRecommendations(
             .join(','),
           pageSize: 15,
         })
-      : Promise.resolve([] as RawgSearchResult[]),
+      : Promise.resolve(providerSuccess([] as RawgSearchResult[])),
   ]);
+  const tagPool = takeResults(tagPoolResult);
+  const genrePool = takeResults(genrePoolResult);
+
+  // Every pool that ran, failed. We know nothing about this game's neighbours — so cache nothing,
+  // and show the last good pool (stale) rather than an empty "no similar games".
+  if (successCount === 0 && failureCount > 0) {
+    const stale = cached && Date.now() - cached.fetchedAt < STALE_RETENTION_MS ? cached : null;
+    return {
+      candidates: stale ? buildCandidates(stale.raw, userGames, inboxRawgIds) : [],
+      provider: summarizeProviderStatus(successCount, failureCount, { stale: Boolean(stale), error: firstError ?? undefined }),
+    };
+  }
 
   // -------------------------------------------------------------------------
   // Merge — deduplicate, exclude the current game, cap at 35 before scoring.
@@ -337,9 +386,10 @@ export async function fetchContextualRecommendations(
   for (const r of tagPool) addIfUnseen(r, seriesIds.has(r.id), suggestedIds.has(r.id));
   for (const r of genrePool) addIfUnseen(r, seriesIds.has(r.id), suggestedIds.has(r.id));
 
+  // A provider that answered with nothing is a real answer, and it is cached like any other.
   if (merged.length === 0) {
     cache.set(key, { raw: [], fetchedAt: Date.now() });
-    return [];
+    return { candidates: [], provider: summarizeProviderStatus(successCount, failureCount, { error: firstError ?? undefined }) };
   }
 
   // -------------------------------------------------------------------------
@@ -402,7 +452,20 @@ export async function fetchContextualRecommendations(
   const diverse = applyDiversityFilter(scored, 14);
 
   cache.set(key, { raw: diverse, fetchedAt: Date.now() });
-  return buildCandidates(diverse, userGames, inboxRawgIds);
+  return {
+    candidates: buildCandidates(diverse, userGames, inboxRawgIds),
+    provider: summarizeProviderStatus(successCount, failureCount, { error: firstError ?? undefined }),
+  };
+}
+
+/** Candidate-only adapter — the shape the Game Detail section has always consumed. */
+export async function fetchContextualRecommendations(
+  game: Game,
+  userGames: Game[],
+  inboxRawgIds: Set<number> = new Set(),
+): Promise<DiscoveryCandidate[]> {
+  const { candidates } = await fetchContextualRecommendationsResult(game, userGames, inboxRawgIds);
+  return candidates;
 }
 
 // ---------------------------------------------------------------------------

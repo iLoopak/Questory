@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Game } from '../../types/game';
 import { discoveryCandidateToGame, type DiscoveryCandidate, type DiscoveryGame } from '../../lib/discovery';
 import { profileFingerprint } from '../../lib/userProfile';
-import { fetchContextualRecommendations } from '../../services/contextualRecommendationsService';
+import { fetchContextualRecommendationsResult } from '../../services/contextualRecommendationsService';
+import { ProviderStatusNotice } from './ProviderStatusNotice';
+import type { ProviderStatusSummary } from '../../lib/providerResult';
 import { GameCard } from '../GameCard';
 import { RatingBadgeStack } from '../RatingBadgeStack';
 import { useI18n } from '../../i18n';
@@ -44,6 +46,10 @@ export function ContextualRecommendationsSection({
   const { t } = useI18n();
   const sectionTitle = title ?? t('recommendations.becauseYouLiked');
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
+  // AS-10: a RAWG failure used to arrive here as an empty list, and the section simply disappeared.
+  // Now it arrives as a failure, and the user gets a line of explanation and a Retry.
+  const [provider, setProvider] = useState<ProviderStatusSummary | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const fetchKeyRef = useRef<string | null>(null);
 
   const fetchKey = game.rawgId
@@ -56,25 +62,29 @@ export function ContextualRecommendationsSection({
       return;
     }
 
-    if (fetchKey === fetchKeyRef.current && candidates !== null) return;
+    if (fetchKey === fetchKeyRef.current && candidates !== null && retryToken === 0) return;
     fetchKeyRef.current = fetchKey;
 
     let cancelled = false;
     if (candidates !== null) setCandidates(null);
 
-    fetchContextualRecommendations(game, userGames, inboxRawgIds).then((result) => {
-      if (!cancelled) setCandidates(result);
+    fetchContextualRecommendationsResult(game, userGames, inboxRawgIds).then((result) => {
+      if (cancelled) return;
+      setCandidates(result.candidates);
+      setProvider(result.provider);
     });
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchKey]);
+  }, [fetchKey, retryToken]);
 
   useEffect(() => {
     if (candidates === null || !fetchKey) return;
     let cancelled = false;
-    fetchContextualRecommendations(game, userGames, inboxRawgIds).then((result) => {
-      if (!cancelled) setCandidates(result);
+    fetchContextualRecommendationsResult(game, userGames, inboxRawgIds).then((result) => {
+      if (cancelled) return;
+      setCandidates(result.candidates);
+      setProvider(result.provider);
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,11 +96,24 @@ export function ContextualRecommendationsSection({
   );
 
   if (!game.rawgId) return null;
+
+  // RAWG failed outright: say so and offer a Retry instead of vanishing, which is what an empty list
+  // used to cause. A provider that genuinely knows of no similar games still hides the section.
+  if (provider?.status === 'failed' && candidates !== null && candidates.length === 0) {
+    return (
+      <section aria-label={sectionTitle} className="space-y-3">
+        <h3 className="text-sm font-semibold text-white">{sectionTitle}</h3>
+        <ProviderStatusNotice provider={provider} onRetry={() => setRetryToken((token) => token + 1)} />
+      </section>
+    );
+  }
+
   if (candidates !== null && candidates.length === 0) return null;
 
   return (
     <section aria-label={sectionTitle} className="space-y-3">
       <h3 className="text-sm font-semibold text-white">{sectionTitle}</h3>
+      <ProviderStatusNotice provider={provider} onRetry={() => setRetryToken((token) => token + 1)} />
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {candidates === null ? (
           Array.from({ length: SKELETON_COUNT }, (_, i) => <CarouselSkeleton key={i} />)

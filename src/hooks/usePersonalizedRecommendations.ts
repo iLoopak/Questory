@@ -7,6 +7,7 @@ import { getRecommendationState } from '../lib/recommendationState';
 import { recordRecommendationFeedback, type RecommendationFeedbackSurface, type RecommendationFeedbackType } from '../lib/recommendationFeedback';
 import { clearPersonalRecommendationCaches } from '../services/personalRecommendationsService';
 import { trackAnalyticsEvent } from '../lib/analytics';
+import { isProviderSetupErrorKind, type ProviderStatusSummary } from '../lib/providerResult';
 import { RECOMMENDATION_ENGINE_VERSION, RECOMMENDATION_SCORING_VERSION } from '../lib/recommendationConfig';
 
 export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<number>, hydrationReady = true) {
@@ -14,6 +15,10 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<PersonalRecommendationsResult['diagnostics']>(null);
+  // AS-10: what the provider actually did. `failed` means every RAWG call failed, which is not the
+  // same thing as RAWG having nothing to recommend — the difference decides whether the user sees an
+  // empty state or a retryable error.
+  const [provider, setProvider] = useState<ProviderStatusSummary | null>(null);
   const inFlight = useRef(false);
   const requestId = useRef(0);
   const previous = useRef<DiscoveryCandidate[]>([]);
@@ -38,6 +43,10 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
       const result = await fetchPersonalRecommendationsResult(games, inboxRawgIds, { hydrationReady, forceRefresh, previous: previous.current });
       if (requestId.current !== currentRequestId) return;
       setDiagnostics(result.diagnostics);
+      setProvider(result.provider);
+      // A total provider failure is reported as an error even when stale picks are shown, so the
+      // surface can say "could not refresh" instead of quietly presenting old data as current.
+      setError(result.provider.status === 'failed' ? result.provider.error?.safeMessage ?? 'Recommendations could not be refreshed.' : null);
       if (result.candidates.length > 0 || (hydrationReady && previous.current.length === 0)) {
         setCandidates(result.candidates);
         if (result.candidates.length > 0) previous.current = result.candidates;
@@ -61,9 +70,9 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
     loading,
     hasResults: candidates.length > 0,
     hasError: error != null,
-    isPartial: Boolean(diagnostics?.partialFailureCount),
-    isStale: diagnostics?.cacheStatus === 'stale',
-  }), [games, hydrationReady, loading, candidates.length, error, diagnostics]);
+    isPartial: Boolean(diagnostics?.partialFailureCount) || provider?.status === 'partial',
+    isStale: diagnostics?.cacheStatus === 'stale' || Boolean(provider?.stale),
+  }), [games, hydrationReady, loading, candidates.length, error, diagnostics, provider]);
 
   const submitFeedback = useCallback((candidate: DiscoveryCandidate, feedbackType: RecommendationFeedbackType, surface: RecommendationFeedbackSurface) => {
     recordRecommendationFeedback(candidate, feedbackType, surface);
@@ -86,5 +95,18 @@ export function usePersonalizedRecommendations(games: Game[], inboxRawgIds: Set<
     previous.current = previous.current.filter((item) => item.game.rawgId !== candidate.game.rawgId);
   }, []);
 
-  return { candidates, loading, error, diagnostics, state, refresh: () => run(true), submitFeedback, isRefreshing: inFlight.current && candidates.length > 0 };
+  return {
+    candidates,
+    loading,
+    error,
+    diagnostics,
+    provider,
+    /** True when the user has to fix the integration rather than wait for the provider. */
+    needsSetup: provider?.error ? isProviderSetupErrorKind(provider.error.kind) : false,
+    state,
+    // Retry bypasses the caches (forceRefresh) and keeps whatever is on screen while it runs.
+    refresh: () => run(true),
+    submitFeedback,
+    isRefreshing: inFlight.current && candidates.length > 0,
+  };
 }
