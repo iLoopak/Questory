@@ -43,6 +43,7 @@ import { clearContextualRecommendationCache } from '../services/contextualRecomm
 import { clearReleaseCalendarCache } from '../services/releaseCalendarService';
 import type { Game } from '../types/game';
 import { discoveryInboxStorageKey, invalidateDiscoveryInboxRequests } from './discoveryInboxStorage';
+import type { CanonicalBackupSnapshots } from './canonicalCollections';
 
 const generatedStateStorageKeys = [
   discoveryInboxStorageKey,
@@ -171,7 +172,7 @@ type BackupParseResult =
 
 const knownBackupStorageKeys = new Set<string>(allBackupStorageKeys);
 
-export function createQuestShelfBackup(includeIntegrationSettings: boolean): QuestShelfBackup {
+export function createQuestShelfBackup(includeIntegrationSettings: boolean, snapshots?: CanonicalBackupSnapshots): QuestShelfBackup {
   const keys = includeIntegrationSettings
     ? [...coreBackupStorageKeys, ...integrationBackupStorageKeys]
     : [...coreBackupStorageKeys];
@@ -190,7 +191,7 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
       // Wave 3: games come from the IndexedDB repository (the blob is inert), but the
       // backup shape is unchanged — still data['questshelf.games.v1'] = Game[].
       if (key === 'questshelf.games.v1') {
-        backupData[key] = normalizeLoadedGames(loadGames());
+        backupData[key] = normalizeLoadedGames(snapshots?.games ?? loadGames());
         return backupData;
       }
 
@@ -202,7 +203,7 @@ export function createQuestShelfBackup(includeIntegrationSettings: boolean): Que
 
       // Wave 4b: play activity also comes from its IndexedDB repository; same blob shape.
       if (key === 'questshelf.playActivity.v1') {
-        backupData[key] = normalizePlayActivityRecords(loadPlayActivity());
+        backupData[key] = normalizePlayActivityRecords(snapshots?.playActivity ?? loadPlayActivity());
         return backupData;
       }
 

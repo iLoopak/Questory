@@ -36,7 +36,6 @@ import type { SteamPlaytimeRefreshState, SteamPlaytimeRefreshSummary, SteamWishl
 
 export type SettingsViewProps = {
   activeCategory: SettingsCategory | null;
-  autoBackupSignal: string;
   completedOnboardingItemIds: Set<OnboardingItemId>;
   skippedOnboardingItemIds: Set<OnboardingItemId>;
   games: Game[];
@@ -121,7 +120,6 @@ export type SettingsViewProps = {
 
 export function SettingsView({
   activeCategory,
-  autoBackupSignal,
   completedOnboardingItemIds,
   skippedOnboardingItemIds,
   games,
@@ -369,7 +367,7 @@ export function SettingsView({
           ) : null}
 
           {activeCategory === 'Data & Backup' ? (
-            <DataManagementPanel autoBackupSignal={autoBackupSignal} onBackupExported={onBackupExported} onBackupImported={onBackupImported} />
+            <DataManagementPanel onBackupExported={onBackupExported} onBackupImported={onBackupImported} />
           ) : null}
 
           {activeCategory === 'Appearance' ? (

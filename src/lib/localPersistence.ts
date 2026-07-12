@@ -9,6 +9,7 @@ import {
   type KvMeta,
 } from './kvRevisions';
 import { getStorageAdapter } from './storageAdapter';
+import { markBackupRelevantChange } from './backupRevision';
 
 const isBrowser = typeof window !== 'undefined';
 const storageIssueKey = 'questshelf.storageIssues.v1';
@@ -110,12 +111,14 @@ export function savePersistedJson<T>(key: string, value: T) {
     return;
   }
 
+  const changed = getStorageAdapter().readLocal(key) !== serializedValue;
   const revision = commitLocalKvWrite(key, serializedValue);
   if (revision === null) {
     return;
   }
 
   void enqueueDurableKv(key, { kind: 'set', revision, value: serializedValue }).then(reportDurableOutcome);
+  if (changed) markBackupRelevantChange(key);
 }
 
 /** Outcome of an awaited KV write/remove, per key. */
@@ -145,11 +148,13 @@ export async function savePersistedJsonDurable<T>(key: string, value: T): Promis
     return { key, ok: false, error: message };
   }
 
+  const changed = getStorageAdapter().readLocal(key) !== serializedValue;
   const revision = commitLocalKvWrite(key, serializedValue);
   if (revision === null) {
     return { key, ok: false, error: 'Local storage write failed.' };
   }
 
+  if (changed) markBackupRelevantChange(key);
   return toKvWriteResult(await enqueueDurableKv(key, { kind: 'set', revision, value: serializedValue }));
 }
 
@@ -157,11 +162,13 @@ export async function savePersistedJsonDurable<T>(key: string, value: T): Promis
 export async function removePersistedKeysDurable(keys: string[]): Promise<KvWriteResult[]> {
   return Promise.all(
     keys.map(async (key) => {
+      const changed = getStorageAdapter().readLocal(key) !== null;
       const revision = commitLocalKvRemove(key);
       if (revision === null) {
         return { key, ok: false, error: 'Local storage remove failed.' };
       }
 
+      if (changed) markBackupRelevantChange(key);
       return toKvWriteResult(await enqueueDurableKv(key, { kind: 'remove', revision }));
     }),
   );
@@ -174,11 +181,13 @@ export async function removePersistedKeysDurable(keys: string[]): Promise<KvWrit
 export async function removePersistedKeys(keys: string[]) {
   await Promise.all(
     keys.map(async (key) => {
+      const changed = getStorageAdapter().readLocal(key) !== null;
       const revision = commitLocalKvRemove(key);
       if (revision === null) {
         return;
       }
 
+      if (changed) markBackupRelevantChange(key);
       reportDurableOutcome(await enqueueDurableKv(key, { kind: 'remove', revision }));
     }),
   );

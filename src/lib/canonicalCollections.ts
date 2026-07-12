@@ -20,6 +20,12 @@ import type { Game } from '../types/game';
 export type CanonicalCollectionOwner = {
   replaceGames: (games: Game[]) => void;
   replacePlayActivity: (records: PlayActivityRecord[]) => void;
+  prepareBackup: () => Promise<CanonicalBackupSnapshots>;
+};
+
+export type CanonicalBackupSnapshots = {
+  games: Game[];
+  playActivity: PlayActivityRecord[];
 };
 
 let owner: CanonicalCollectionOwner | null = null;
@@ -85,6 +91,11 @@ export function replaceCanonicalPlayActivity(records: PlayActivityRecord[]): boo
   }
   owner.replacePlayActivity(records);
   return true;
+}
+
+/** Flush mounted collection owners and return the exact snapshots the backup must serialize. */
+export async function prepareCanonicalBackup(): Promise<CanonicalBackupSnapshots | undefined> {
+  return owner?.prepareBackup();
 }
 
 /** Test seam: drop any registered owner and clear suspensions. */

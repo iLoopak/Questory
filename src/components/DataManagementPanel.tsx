@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   createQuestShelfBackup,
   getQuestShelfBackupSummary,
@@ -58,6 +58,8 @@ import { useI18n } from '../i18n';
 import { SettingsSection, SettingsStatusBlock } from './settings/SettingsSection';
 import { ViewportModal } from './ViewportModal';
 import { downloadRawQuestShelfLocalData, exportQuestShelfBackupFile } from '../lib/backupExport';
+import { AutoBackupScheduler, getBackupRevision, subscribeBackupRevision } from '../lib/backupRevision';
+import { prepareCanonicalBackup } from '../lib/canonicalCollections';
 
 /**
  * Turn a failed import into something the user can act on. Only store ids, keys and error
@@ -91,14 +93,13 @@ function formatMessageTemplate(template: string, values: Record<string, string |
 }
 
 type DataManagementPanelProps = {
-  autoBackupSignal?: string;
   onBackupExported?: () => void;
   onBackupImported?: () => void;
 };
 
 type ImportMode = 'merge' | 'replace';
 
-export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBackupImported }: DataManagementPanelProps) {
+export function DataManagementPanel({ onBackupExported, onBackupImported }: DataManagementPanelProps) {
   const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [includeIntegrationSettings, setIncludeIntegrationSettings] = useState(false);
@@ -116,8 +117,12 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [diagnostics, setDiagnostics] = useState<StorageDiagnostics | null>(null);
-  const autoBackupTimeoutRef = useRef<number | null>(null);
-  const autoBackupSignalRef = useRef(autoBackupSignal);
+  const backupRevision = useSyncExternalStore(subscribeBackupRevision, getBackupRevision, getBackupRevision);
+  const saveBackupNowRef = useRef<(automatic?: boolean) => Promise<boolean>>(async () => false);
+  const autoBackupSchedulerRef = useRef<AutoBackupScheduler | null>(null);
+  if (!autoBackupSchedulerRef.current) {
+    autoBackupSchedulerRef.current = new AutoBackupScheduler(() => saveBackupNowRef.current(true));
+  }
   const supportsFileSystemAccess = useMemo(
     () => typeof window !== 'undefined' && isFileSystemAccessSupported(),
     [],
@@ -159,31 +164,12 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   }, []);
 
   useEffect(() => {
-    if (!syncSettings.autoBackupEnabled || !supportsFileSystemAccess || !autoBackupSignal) {
-      autoBackupSignalRef.current = autoBackupSignal;
-      return;
+    if (syncSettings.autoBackupEnabled && supportsFileSystemAccess && backupRevision > 0) {
+      autoBackupSchedulerRef.current?.schedule(backupRevision);
     }
+  }, [backupRevision, supportsFileSystemAccess, syncSettings.autoBackupEnabled]);
 
-    if (autoBackupSignalRef.current === autoBackupSignal) {
-      return;
-    }
-
-    autoBackupSignalRef.current = autoBackupSignal;
-
-    if (autoBackupTimeoutRef.current) {
-      window.clearTimeout(autoBackupTimeoutRef.current);
-    }
-
-    autoBackupTimeoutRef.current = window.setTimeout(() => {
-      void saveBackupNow(true);
-    }, 1200);
-
-    return () => {
-      if (autoBackupTimeoutRef.current) {
-        window.clearTimeout(autoBackupTimeoutRef.current);
-      }
-    };
-  }, [autoBackupSignal, supportsFileSystemAccess, syncSettings.autoBackupEnabled, syncSettings.includeIntegrationSettings]);
+  useEffect(() => () => autoBackupSchedulerRef.current?.dispose(), []);
 
   const refreshDiagnostics = useCallback(() => {
     void getStorageDiagnostics().then(setDiagnostics);
@@ -207,7 +193,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
 
   async function downloadBackup() {
     try {
-      const backup = createQuestShelfBackup(includeIntegrationSettings);
+      const backup = await createFreshBackup(includeIntegrationSettings);
       const result = await exportQuestShelfBackupFile(backup);
 
       showMessage(
@@ -253,12 +239,20 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
   async function saveBackupNow(isAutomatic = false) {
     if (!supportsFileSystemAccess) {
       if (!isAutomatic) {
-        void downloadBackup();
+        await downloadBackup();
       }
-      return;
+      return false;
     }
 
-    const result = await saveBackupToSelectedFile(syncSettings.includeIntegrationSettings);
+    let backup: QuestShelfBackup;
+    try {
+      backup = await createFreshBackup(syncSettings.includeIntegrationSettings);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Canonical data could not be flushed.';
+      showMessage(`Backup was not saved because current data could not be flushed. ${detail}`, 'error');
+      return false;
+    }
+    const result = await saveBackupToSelectedFile(syncSettings.includeIntegrationSettings, backup);
 
     if (!result.ok) {
       if (result.permissionLost) {
@@ -270,7 +264,7 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       }
 
       showMessage(result.error, 'error');
-      return;
+      return false;
     }
 
     setSyncSettings((currentSettings) => ({
@@ -283,6 +277,13 @@ export function DataManagementPanel({ autoBackupSignal, onBackupExported, onBack
       'success',
     );
     onBackupExported?.();
+    return true;
+  }
+  saveBackupNowRef.current = saveBackupNow;
+
+  async function createFreshBackup(includeSecrets: boolean): Promise<QuestShelfBackup> {
+    const snapshots = await prepareCanonicalBackup();
+    return createQuestShelfBackup(includeSecrets, snapshots);
   }
 
   async function loadBackupWithPicker() {

@@ -471,22 +471,6 @@ export function AppController() {
     ]);
   }, [games, isRawgApiKeySet, platformQueueState, steamSettingsSnapshot, themePreference]);
 
-  const autoBackupSignal = useMemo(
-    () =>
-      JSON.stringify({
-        games: games.map((game) => [
-          game.id,
-          game.collectionType,
-          game.updatedAt,
-          game.importedAt,
-          game.metadataUpdatedAt,
-          game.wishlistSyncedAt,
-          game.status,
-        ]),
-        ignoredSteamGames: ignoredSteamGames.map((game) => [game.steamAppId, game.ignoredAt]),
-      }),
-    [games, ignoredSteamGames],
-  );
   const reviewIgnoredGameIds = useMemo(() => new Set(reviewModeState.ignoredGameIds), [reviewModeState.ignoredGameIds]);
   const runtimeEnvironment = useMemo(() => getRuntimeEnvironment(), []);
   const lastRetroImportedGames = useMemo(
@@ -1252,7 +1236,7 @@ export function AppController() {
           shelf={{ personalizedQuestShelfTitle, computedShelfTitle, shelfIdentity, steamAvatarUrl, libraryOwnerNickname, questShelfAchievements, setLibraryOwnerNickname, setShelfIdentity }}
           discovery={{ discoveryInboxItems, discoveryInboxRawgIds, requestDiscoveryInboxRecommendations, isRequestingDiscoveryInboxRecommendations, handleSelectDiscoveryGame, openDiscoveryPreview, addToDiscoveryInbox, promoteDiscoveryToWishlist, promoteDiscoveryToPlans, promoteInboxDiscoveryToLibrary, promoteInboxDiscoveryToWishlist, promoteInboxDiscoveryToPlans, handleInboxIgnore, handleInboxSkip, startDiscoveryInboxRun }}
           onboarding={{ completedOnboardingItemIds, skippedOnboardingItemIds, isOnboardingOpen, isOnboardingComplete, markOnboardingItemComplete, markOnboardingItemsComplete, hideOnboarding, skipOnboardingItem, handleOnboardingAction, restartOnboarding }}
-          settings={{ activeSettingsCategory, autoBackupSignal, setupTasks, runtimeEnvironment, resolvedTheme, themePreference, appTemplatePreference, accentColorPreference, secondaryAccentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, neonButtonStylePreference, language, navigationVisibility, controllerProfileId, detectedProfileId, isControllerDebugEnabled, isLandscapeLockEnabled, steamPersonaName: steamProfileName, setIsRawgApiKeySet, handleSteamProfileNameChange, setNavigationVisibility, setThemePreference, setAppTemplatePreference, setAccentColorPreference, setSecondaryAccentColorPreference, setGradientOrientationPreference, setNeonButtonGradientBalancePreference, setNeonButtonGradientMidpointPreference, setNeonButtonStylePreference, setLanguage, setControllerProfileId, setIsControllerDebugEnabled, setIsLandscapeLockEnabled, handleBackupExported, handleBackupImported, unignoreSteamGame }}
+          settings={{ activeSettingsCategory, setupTasks, runtimeEnvironment, resolvedTheme, themePreference, appTemplatePreference, accentColorPreference, secondaryAccentColorPreference, gradientOrientationPreference, neonButtonGradientBalancePreference, neonButtonGradientMidpointPreference, neonButtonStylePreference, language, navigationVisibility, controllerProfileId, detectedProfileId, isControllerDebugEnabled, isLandscapeLockEnabled, steamPersonaName: steamProfileName, setIsRawgApiKeySet, handleSteamProfileNameChange, setNavigationVisibility, setThemePreference, setAppTemplatePreference, setAccentColorPreference, setSecondaryAccentColorPreference, setGradientOrientationPreference, setNeonButtonGradientBalancePreference, setNeonButtonGradientMidpointPreference, setNeonButtonStylePreference, setLanguage, setControllerProfileId, setIsControllerDebugEnabled, setIsLandscapeLockEnabled, handleBackupExported, handleBackupImported, unignoreSteamGame }}
           metadata={{ metadataSelectionRequest, refreshingMetadataGameIds, updateGameArtwork, updateGameMetadata, updateGameMetadataManagement, refreshGameMetadataFromActions, startMetadataWorkflow, ensureRawgMetadataForGame }}
           imports={{ importMultiGameItemsWithAnalytics, importSteamWishlistHtmlItemsWithAnalytics, importSteamGames, handleRetroImportGames, addRetroImportedGamesToQueue, enrichRetroImportedGames, viewRetroImportedGames }}
         />
