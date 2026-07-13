@@ -255,7 +255,40 @@ type DiscoveryScreenshotStripProps = {
 };
 
 export function DiscoveryScreenshotStrip({ rawgId, title, className = '' }: DiscoveryScreenshotStripProps) {
-  const { screenshots, loading } = useDiscoveryScreenshots(rawgId);
+  const { screenshots, loading, error, refetch } = useDiscoveryScreenshots(rawgId);
+
+  return <DiscoveryScreenshotGallery className={className} error={error} loading={loading} onRetry={refetch} screenshots={screenshots} title={title} />;
+}
+
+export function DiscoveryScreenshotGallery({
+  className = '',
+  error,
+  loading,
+  onRetry,
+  screenshots,
+  title,
+}: {
+  className?: string;
+  error: boolean;
+  loading: boolean;
+  onRetry: () => void;
+  screenshots: string[];
+  title: string;
+}) {
+  if (error && screenshots.length === 0) {
+    return (
+      <div className={`screenshot-strip ${className}`}>
+        <button
+          className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-slate-200 focus-visible:border-accent focus-visible:outline-none"
+          onClick={onRetry}
+          type="button"
+        >
+          <Icon name="refresh-cw" />
+          Screenshots unavailable — Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <GameScreenshotGallery

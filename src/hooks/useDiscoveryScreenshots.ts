@@ -8,6 +8,8 @@ export type UseDiscoveryScreenshotsResult = {
   screenshots: string[];
   loading: boolean;
   missingApiKey: boolean;
+  error: boolean;
+  refetch: () => void;
 };
 
 const emptyScreenshots: string[] = [];
@@ -23,6 +25,7 @@ export function useDiscoveryScreenshots(rawgId: number): UseDiscoveryScreenshots
   const [screenshots, setScreenshots] = useState<string[]>(() => getCachedScreenshotsByRawgId(rawgId) ?? emptyScreenshots);
   const [loading, setLoading] = useState(() => getCachedScreenshotsByRawgId(rawgId) === null);
   const [missingApiKey, setMissingApiKey] = useState(false);
+  const [error, setError] = useState(false);
 
   const desiredKeyRef = useRef(rawgId);
   desiredKeyRef.current = rawgId;
@@ -42,6 +45,7 @@ export function useDiscoveryScreenshots(rawgId: number): UseDiscoveryScreenshots
       setScreenshots(cached);
       setLoading(false);
       setMissingApiKey(false);
+      setError(false);
       return;
     }
 
@@ -49,6 +53,7 @@ export function useDiscoveryScreenshots(rawgId: number): UseDiscoveryScreenshots
     setScreenshots(emptyScreenshots);
     setLoading(true);
     setMissingApiKey(false);
+    setError(false);
 
     try {
       const urls = await getGameScreenshots(key);
@@ -58,6 +63,7 @@ export function useDiscoveryScreenshots(rawgId: number): UseDiscoveryScreenshots
       setCachedScreenshotsByRawgId(key, unique);
       setScreenshots(unique);
       setLoading(false);
+      setError(false);
     } catch (error) {
       if (!isCurrent()) return;
 
@@ -65,6 +71,8 @@ export function useDiscoveryScreenshots(rawgId: number): UseDiscoveryScreenshots
       setLoading(false);
       if (isProviderSetupErrorKind(toRawgProviderError(error).kind)) {
         setMissingApiKey(true);
+      } else {
+        setError(true);
       }
     }
   }, []);
@@ -73,5 +81,9 @@ export function useDiscoveryScreenshots(rawgId: number): UseDiscoveryScreenshots
     void scheduler.runLatest(false, runTask);
   }, [rawgId, runTask, scheduler]);
 
-  return { screenshots, loading, missingApiKey };
+  const refetch = useCallback(() => {
+    void scheduler.runLatest(true, runTask);
+  }, [runTask, scheduler]);
+
+  return { screenshots, loading, missingApiKey, error, refetch };
 }

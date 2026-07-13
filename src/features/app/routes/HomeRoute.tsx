@@ -1,9 +1,10 @@
 import { HomePanel } from '../../../components/HomePanel';
 import { ShelfAvatar } from '../../../components/ShelfIdentity';
-import type { AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterShelfModel, AppRouterSyncModel } from './routeModels';
+import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterDiscoveryModel, AppRouterGameModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterShelfModel, AppRouterSyncModel } from './routeModels';
 
 type HomeRouteProps = {
   core: Pick<AppRouterCoreModel, 'openGameFromHome' | 'setSelectedGameId' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 'setIsAchievementTimelineOpen' | 'addToastNotification'>;
+  collections: Pick<AppRouterCollectionModel, 'setLibraryFilters'>;
   games: Pick<AppRouterGameModel, 'games' | 'reviewIgnoredGameIds' | 'playActivity' | 'logPlayedToday' | 'updateGameTracking' | 'updateGameStatusWithCompletion'>;
   queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'openQueue' | 'playQueueGameNow' | 'homeSteamSyncGameIds'>;
   review: Pick<AppRouterReviewModel, 'reviewModeState' | 'startReviewMode'>;
@@ -12,7 +13,7 @@ type HomeRouteProps = {
   discovery: Pick<AppRouterDiscoveryModel, 'handleSelectDiscoveryGame' | 'openDiscoveryPreview' | 'discoveryInboxRawgIds'>;
 };
 
-export function HomeRoute({ core, games, queue, review, sync, shelf, discovery }: HomeRouteProps) {
+export function HomeRoute({ core, collections, games, queue, review, sync, shelf, discovery }: HomeRouteProps) {
   return (
     <HomePanel
       appTitle={shelf.personalizedQuestShelfTitle}
@@ -33,6 +34,7 @@ export function HomeRoute({ core, games, queue, review, sync, shelf, discovery }
         core.setSelectedGameId(null);
         core.setActiveNavItem('Library');
       }}
+      onOpenPlayingGames={() => openPlayingLibrary(collections.setLibraryFilters, core.setSelectedGameId, core.setActiveNavItem)}
       onOpenQueue={queue.openQueue}
       onOpenReviewMode={review.startReviewMode}
       onOpenSettings={() => {
@@ -89,4 +91,14 @@ export function HomeRoute({ core, games, queue, review, sync, shelf, discovery }
       discoveryInboxRawgIds={discovery.discoveryInboxRawgIds}
     />
   );
+}
+
+export function openPlayingLibrary(
+  setLibraryFilters: AppRouterCollectionModel['setLibraryFilters'],
+  setSelectedGameId: AppRouterCoreModel['setSelectedGameId'],
+  setActiveNavItem: AppRouterCoreModel['setActiveNavItem'],
+) {
+  setLibraryFilters((currentFilters) => ({ ...currentFilters, status: 'Playing' }));
+  setSelectedGameId(null);
+  setActiveNavItem('Library');
 }

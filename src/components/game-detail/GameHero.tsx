@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { Game } from '../../types/game';
 import { getGameCoverSources, isMissingOrGeneratedCover } from '../../lib/gameCoverImages';
 import { getArtworkSet } from '../../lib/gameSelectors';
 import { useCoverImageLoaded } from '../../hooks/useCoverImageLoaded';
+import { getGameArtworkSemanticRevision, useSemanticImageSource } from '../../hooks/useSemanticImageSource';
 import { useI18n } from '../../i18n';
 import { Icon } from '../Icon';
 import { getDisplayTitle } from '../../lib/gameEditPatch';
@@ -44,8 +45,6 @@ type GameHeroProps = {
  */
 export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
   const { t } = useI18n();
-  const [coverSourceIndex, setCoverSourceIndex] = useState(0);
-  const [heroBgSourceIndex, setHeroBgSourceIndex] = useState(0);
 
   const artworkSet = useMemo(() => getArtworkSet(game), [game]);
   const coverSources = useMemo(() => getGameCoverSources(game), [game]);
@@ -60,14 +59,12 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
     return [...new Set(candidates)];
   }, [artworkSet]);
 
-  useEffect(() => {
-    setCoverSourceIndex(0);
-    setHeroBgSourceIndex(0);
-  }, [coverSources, heroBgSources, game.id]);
-
-  const activeCoverSource = coverSources[coverSourceIndex] ?? null;
+  const artworkRevision = getGameArtworkSemanticRevision(game);
+  const coverImage = useSemanticImageSource({ gameId: game.id, revision: artworkRevision, sources: coverSources });
+  const heroBackground = useSemanticImageSource({ gameId: game.id, revision: artworkRevision, sources: heroBgSources });
+  const activeCoverSource = coverImage.visibleSource;
   const { imgRef: coverImgRef, isLoaded: isCoverLoaded, markBroken: markCoverBroken, markLoaded: markCoverLoaded } = useCoverImageLoaded(activeCoverSource);
-  const activeHeroBgSource = heroBgSources[heroBgSourceIndex] ?? null;
+  const activeHeroBgSource = heroBackground.visibleSource;
   const logoUrl = artworkSet.logo?.trim() || null;
 
   return (
@@ -79,9 +76,28 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
             className="h-full w-full object-cover opacity-[0.85]"
             decoding="async"
             loading="lazy"
-            onError={() => setHeroBgSourceIndex((i) => i + 1)}
+            onError={() => heroBackground.markSourceFailed(activeHeroBgSource)}
+            onLoad={() => {
+              if (activeHeroBgSource === heroBackground.candidateSource) heroBackground.markSourceLoaded(activeHeroBgSource);
+            }}
+            ref={(image) => {
+              if (activeHeroBgSource === heroBackground.candidateSource) heroBackground.recognizeCompletedCandidate(image);
+            }}
             src={activeHeroBgSource}
           />
+          {heroBackground.isTransitioning && heroBackground.candidateSource ? (
+            <img
+              alt=""
+              className="absolute h-px w-px opacity-0"
+              data-semantic-image-probe="true"
+              decoding="async"
+              loading="lazy"
+              onError={() => heroBackground.markSourceFailed(heroBackground.candidateSource!)}
+              onLoad={() => heroBackground.markSourceLoaded(heroBackground.candidateSource!)}
+              ref={heroBackground.recognizeCompletedCandidate}
+              src={heroBackground.candidateSource}
+            />
+          ) : null}
         </div>
       ) : null}
       {/* Left-to-right veil: solid over cover/title area, fades to ~25% on far right so hero is clearly visible */}
@@ -104,12 +120,32 @@ export function GameHero({ game, kicker, onBack, stats }: GameHeroProps) {
                   loading="lazy"
                   onError={() => {
                     markCoverBroken();
-                    setCoverSourceIndex((currentIndex) => Math.min(currentIndex + 1, coverSources.length - 1));
+                    coverImage.markSourceFailed(activeCoverSource);
                   }}
-                  onLoad={markCoverLoaded}
-                  ref={coverImgRef}
+                  onLoad={() => {
+                    markCoverLoaded();
+                    if (activeCoverSource === coverImage.candidateSource) coverImage.markSourceLoaded(activeCoverSource);
+                  }}
+                  ref={(image) => {
+                    coverImgRef.current = image;
+                    if (activeCoverSource === coverImage.candidateSource) coverImage.recognizeCompletedCandidate(image);
+                  }}
                   src={activeCoverSource}
                 />
+                {coverImage.isTransitioning && coverImage.candidateSource ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute h-px w-px opacity-0"
+                    data-semantic-image-probe="true"
+                    decoding="async"
+                    loading="lazy"
+                    onError={() => coverImage.markSourceFailed(coverImage.candidateSource!)}
+                    onLoad={() => coverImage.markSourceLoaded(coverImage.candidateSource!)}
+                    ref={coverImage.recognizeCompletedCandidate}
+                    src={coverImage.candidateSource}
+                  />
+                ) : null}
               </div>
             ) : (
               <div className="grid h-full place-items-center bg-ink-700 px-4 text-center">

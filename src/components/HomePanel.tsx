@@ -43,6 +43,7 @@ type HomePanelProps = {
   steamPlaytimeRefreshState?: SteamPlaytimeRefreshState;
   onOpenDetails: (game: Game) => void;
   onOpenLibrary: () => void;
+  onOpenPlayingGames: () => void;
   onOpenQueue: (platform?: GamePlatform) => void;
   onOpenReviewMode: (source: ReviewSource) => void;
   onOpenSettings?: () => void;
@@ -67,6 +68,7 @@ type NextAdventureEntry = { game: Game; entry: PlatformQueueEntry };
 type AchievementGhostCandidate = QueueGhostAchievement & { id: string; seenIds: string[] };
 
 const focusSelector = '[data-home-focus="true"]';
+export const homeContinuePlayingPreviewLimit = 10;
 
 export function HomePanel({
   appTitle = 'Questory',
@@ -83,6 +85,7 @@ export function HomePanel({
   steamPlaytimeRefreshState,
   onOpenDetails,
   onOpenLibrary,
+  onOpenPlayingGames,
   onOpenQueue,
   onOpenReviewMode,
   onOpenSettings,
@@ -411,20 +414,16 @@ export function HomePanel({
     switch (id) {
       case 'continuePlaying':
         return (
-          <HomeSection key={id} title={t('home.continuePlaying')} subtitle={t('home.sectionSourcePlayingNow')} actionLabel={t('collection.library')} onAction={onOpenLibrary}>
+          <HomeSection
+            key={id}
+            title={t('home.continuePlaying')}
+            subtitle={t('home.sectionSourcePlayingNow')}
+            actionAriaLabel={`${t('home.viewAllPlaying')} (${continuePlayingGames.length})`}
+            actionLabel={`${t('home.viewAllPlaying')} · ${continuePlayingGames.length}`}
+            onAction={onOpenPlayingGames}
+          >
             {continuePlayingGames.length > 0 ? (
-              <div className="qs-home-continue-playing-grid">
-                {continuePlayingGames.map((game) => (
-                  <GamePosterButton
-                    key={game.id}
-                    game={game}
-                    hero={continuePlayingGames.length === 1}
-                    activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
-                    onClick={() => setActionSheetGame(game)}
-                    queueState={queueState}
-                  />
-                ))}
-              </div>
+              <ContinuePlayingPreview games={continuePlayingGames} onSelectGame={setActionSheetGame} playActivity={playActivity} queueState={queueState} />
             ) : libraryGames.length > 0 ? (
               <NoActiveGamesGuide
                 libraryGamesCount={libraryGames.length}
@@ -883,6 +882,7 @@ class HomeWidgetErrorBoundary extends Component<HomeWidgetErrorBoundaryProps, Ho
 }
 
 function HomeSection({
+  actionAriaLabel,
   actionLabel,
   children,
   compact = false,
@@ -890,6 +890,7 @@ function HomeSection({
   title,
   onAction,
 }: {
+  actionAriaLabel?: string;
   actionLabel?: string;
   children: ReactNode;
   compact?: boolean;
@@ -906,6 +907,7 @@ function HomeSection({
         </div>
         {actionLabel && onAction ? (
           <button
+            aria-label={actionAriaLabel}
             className="qs-home-section-action min-h-10 rounded-lg border border-skyglass/15 px-3 qs-label-caps text-slate-300 transition hover:border-mint/35 hover:bg-mint/10 hover:text-white"
             data-home-focus="true"
             onClick={onAction}
@@ -917,6 +919,35 @@ function HomeSection({
       </div>
       {children}
     </section>
+  );
+}
+
+export function ContinuePlayingPreview({
+  games,
+  onSelectGame,
+  playActivity,
+  queueState,
+}: {
+  games: Game[];
+  onSelectGame: (game: Game) => void;
+  playActivity: PlayActivityRecord[];
+  queueState: PlatformQueueState;
+}) {
+  const previewGames = games.slice(0, homeContinuePlayingPreviewLimit);
+
+  return (
+    <div className="qs-home-continue-playing-grid" data-home-continue-playing-grid="true">
+      {previewGames.map((game) => (
+        <GamePosterButton
+          key={game.id}
+          game={game}
+          hero={games.length === 1}
+          activitySignal={getGameActivitySignal(game.id, playActivity, game.lastPlayedAt)}
+          onClick={() => onSelectGame(game)}
+          queueState={queueState}
+        />
+      ))}
+    </div>
   );
 }
 
