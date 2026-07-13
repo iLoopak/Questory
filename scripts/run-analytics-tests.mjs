@@ -63,7 +63,9 @@ const testFiles = [
   // Its own bundle: a rejected IndexedDB write latches the repository into legacy-fallback for the
   // life of the module instance, which would quietly disable IndexedDB for every later test here.
   { entry: 'scripts/backupRestoreIdbRejection.test.ts', out: 'backupRestoreIdbRejection.test.mjs' },
+  { entry: 'scripts/persistenceFailureCharacterization.test.ts', out: 'persistenceFailureCharacterization.test.mjs' },
   { entry: 'scripts/backupGameContracts.test.ts', out: 'backupGameContracts.test.mjs' },
+  { entry: 'scripts/backupIntegrityCharacterization.test.ts', out: 'backupIntegrityCharacterization.test.mjs' },
   { entry: 'scripts/recoveryStateOwnership.test.ts', out: 'recoveryStateOwnership.test.mjs' },
   { entry: 'scripts/undoScopedOperations.test.ts', out: 'undoScopedOperations.test.mjs' },
   { entry: 'scripts/statusPlanInvariants.test.ts', out: 'statusPlanInvariants.test.mjs' },
