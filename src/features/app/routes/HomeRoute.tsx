@@ -6,7 +6,7 @@ type HomeRouteProps = {
   core: Pick<AppRouterCoreModel, 'openGameFromHome' | 'setSelectedGameId' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 'setIsAchievementTimelineOpen' | 'addToastNotification'>;
   collections: Pick<AppRouterCollectionModel, 'setLibraryFilters'>;
   games: Pick<AppRouterGameModel, 'games' | 'reviewIgnoredGameIds' | 'playActivity' | 'logPlayedToday' | 'updateGameTracking' | 'updateGameStatusWithCompletion'>;
-  queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'openQueue' | 'playQueueGameNow' | 'homeSteamSyncGameIds'>;
+  queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'plannedGameIds' | 'openQueue' | 'playQueueGameNow' | 'homeSteamSyncGameIds'>;
   review: Pick<AppRouterReviewModel, 'reviewModeState' | 'startReviewMode'>;
   sync: Pick<AppRouterSyncModel, 'itadDealSyncState' | 'steamAchievementSyncState' | 'steamPlaytimeRefreshState' | 'isImportingNewSteamGames' | 'syncWishlistDeals' | 'importNewSteamGames' | 'syncSteamAchievements' | 'refreshSteamPlaytime'>;
   shelf: Pick<AppRouterShelfModel, 'personalizedQuestShelfTitle' | 'computedShelfTitle' | 'shelfIdentity' | 'steamAvatarUrl'>;
@@ -25,6 +25,7 @@ export function HomeRoute({ core, collections, games, queue, review, sync, shelf
       reviewQueueOrder={review.reviewModeState.queueOrder}
       reviewModeState={review.reviewModeState}
       queueState={queue.platformQueueState}
+      plannedGameIds={queue.plannedGameIds}
       itadDealSyncState={sync.itadDealSyncState}
       steamAchievementSyncState={sync.steamAchievementSyncState}
       steamPlaytimeRefreshState={sync.steamPlaytimeRefreshState}

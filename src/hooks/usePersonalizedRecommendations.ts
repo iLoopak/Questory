@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Game } from '../types/game';
 import type { DiscoveryCandidate } from '../lib/discovery';
 import {
   fetchPersonalRecommendationsResult,
-  getRecommendationInputKey,
+  prepareRecommendationInput,
+  type PreparedRecommendationInput,
   type PersonalRecommendationsResult,
 } from '../services/personalRecommendationsService';
 import { getRecommendationState } from '../lib/recommendationState';
@@ -13,7 +14,9 @@ import { trackAnalyticsEvent } from '../lib/analytics';
 import { isProviderSetupErrorKind, type ProviderStatusSummary } from '../lib/providerResult';
 import { LatestRequestScheduler } from '../lib/latestRequest';
 import { RECOMMENDATION_ENGINE_VERSION, RECOMMENDATION_SCORING_VERSION } from '../lib/recommendationConfig';
-import { noPlannedGameIds, type PlannedGameIds } from '../lib/plannedGames';
+import { noPlannedGameIds, plannedGameFingerprint, type PlannedGameIds } from '../lib/plannedGames';
+import { getRecommendationInputRevision, subscribeRecommendationInputRevision } from '../lib/recommendationInputRevision';
+import { recommendationConfig } from '../lib/recommendationConfig';
 
 /**
  * AS-12: recommendations belong to the library they were generated from.
@@ -63,10 +66,51 @@ export function usePersonalizedRecommendations(
   const candidatesRef = useRef<DiscoveryCandidate[]>(candidates);
   candidatesRef.current = candidates;
 
-  const inputKey = useMemo(
-    () => getRecommendationInputKey(games, inboxRawgIds, hydrationReady, plannedGameIds),
-    [games, inboxRawgIds, hydrationReady, plannedGameIds],
+  const semanticRevision = useSyncExternalStore(
+    subscribeRecommendationInputRevision,
+    getRecommendationInputRevision,
+    getRecommendationInputRevision,
   );
+  const [freshnessWindow, setFreshnessWindow] = useState(() => getRecommendationFreshnessWindow());
+  const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
+  const plannedFingerprint = plannedGameFingerprint(plannedGameIds);
+  const rawInputsRef = useRef({ games, inboxFingerprint, hydrationReady, plannedFingerprint, semanticRevision, revision: 0 });
+  const rawInputs = rawInputsRef.current;
+  if (
+    rawInputs.games !== games ||
+    rawInputs.inboxFingerprint !== inboxFingerprint ||
+    rawInputs.hydrationReady !== hydrationReady ||
+    rawInputs.plannedFingerprint !== plannedFingerprint ||
+    rawInputs.semanticRevision !== semanticRevision
+  ) {
+    rawInputsRef.current = { games, inboxFingerprint, hydrationReady, plannedFingerprint, semanticRevision, revision: rawInputs.revision + 1 };
+  }
+  const rawRevision = rawInputsRef.current.revision;
+  const [preparedState, setPreparedState] = useState<{ input: PreparedRecommendationInput; rawRevision: number } | null>(null);
+
+  useEffect(() => {
+    const input = prepareRecommendationInput(games, plannedGameIds);
+    setPreparedState({ input, rawRevision });
+  }, [games, plannedFingerprint, rawRevision, semanticRevision]);
+
+  useEffect(() => {
+    function refreshAtVisibilityBoundary() {
+      if (document.visibilityState !== 'visible') return;
+      setFreshnessWindow((current) => {
+        const next = getRecommendationFreshnessWindow();
+        return current === next ? current : next;
+      });
+    }
+    document.addEventListener('visibilitychange', refreshAtVisibilityBoundary);
+    return () => document.removeEventListener('visibilitychange', refreshAtVisibilityBoundary);
+  }, []);
+
+  const preparedInput = preparedState?.rawRevision === rawRevision ? preparedState.input : null;
+  const inputKey = preparedInput
+    ? `${preparedInput.semanticKey}::inbox:${inboxFingerprint}::hydration:${hydrationReady}::freshness:${freshnessWindow}`
+    : `pending:${rawRevision}`;
+  const isPreparing = !preparedInput && hydrationReady && games.length > 0;
+  const effectiveLoading = loading || (isPreparing && candidates.length === 0);
 
   // The inputs the run must be judged against. Written during render, so the scheduler's guards
   // always compare against what the user is looking at right now — not what they were looking at
@@ -81,6 +125,8 @@ export function usePersonalizedRecommendations(
   hydrationReadyRef.current = hydrationReady;
   const plannedGameIdsRef = useRef(plannedGameIds);
   plannedGameIdsRef.current = plannedGameIds;
+  const preparedInputRef = useRef(preparedInput);
+  preparedInputRef.current = preparedInput;
 
   const schedulerRef = useRef<LatestRequestScheduler<string> | null>(null);
   if (!schedulerRef.current) {
@@ -95,6 +141,9 @@ export function usePersonalizedRecommendations(
     const currentInbox = inboxRef.current;
     const currentHydrationReady = hydrationReadyRef.current;
     const currentPlannedGameIds = plannedGameIdsRef.current;
+    const currentPreparedInput = preparedInputRef.current;
+
+    if (!currentPreparedInput) return;
 
     const preflight = getRecommendationState({
       games: currentGames,
@@ -122,6 +171,7 @@ export function usePersonalizedRecommendations(
         forceRefresh: force,
         previous: previous.current,
         plannedGameIds: currentPlannedGameIds,
+        preparedInput: currentPreparedInput,
       });
 
       // The guard covers a cache hit exactly as it covers a network result: a result for inputs the
@@ -151,18 +201,19 @@ export function usePersonalizedRecommendations(
   }, []);
 
   useEffect(() => {
+    if (!preparedInput) return;
     void scheduler.schedule(false, runTask);
-  }, [inputKey, runTask, scheduler]);
+  }, [inputKey, preparedInput, runTask, scheduler]);
 
   const state = useMemo(() => getRecommendationState({
     games,
     hydrationReady,
-    loading,
+    loading: effectiveLoading,
     hasResults: candidates.length > 0,
     hasError: error != null,
     isPartial: Boolean(diagnostics?.partialFailureCount) || provider?.status === 'partial',
     isStale: diagnostics?.cacheStatus === 'stale' || Boolean(provider?.stale),
-  }), [games, hydrationReady, loading, candidates.length, error, diagnostics, provider]);
+  }), [games, hydrationReady, effectiveLoading, candidates.length, error, diagnostics, provider]);
 
   const submitFeedback = useCallback((candidate: DiscoveryCandidate, feedbackType: RecommendationFeedbackType, surface: RecommendationFeedbackSurface) => {
     recordRecommendationFeedback(candidate, feedbackType, surface);
@@ -189,7 +240,7 @@ export function usePersonalizedRecommendations(
 
   return {
     candidates,
-    loading,
+    loading: effectiveLoading,
     error,
     diagnostics,
     provider,
@@ -200,6 +251,10 @@ export function usePersonalizedRecommendations(
     // run is already going, this queues exactly one rerun rather than racing it.
     refresh: () => { void scheduler.schedule(true, runTask); },
     submitFeedback,
-    isRefreshing: isFetching && candidates.length > 0,
+    isRefreshing: (isFetching || isPreparing) && candidates.length > 0,
   };
+}
+
+function getRecommendationFreshnessWindow(now = Date.now()): number {
+  return Math.floor(now / recommendationConfig.cacheTtlMs);
 }

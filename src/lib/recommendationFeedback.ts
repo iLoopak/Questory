@@ -2,6 +2,7 @@ import { loadLocalJson, savePersistedJson } from './localPersistence';
 import { toSlug } from './userProfile';
 import { RECOMMENDATION_ENGINE_VERSION, RECOMMENDATION_SCORING_VERSION } from './recommendationConfig';
 import type { DiscoveryCandidate } from './discovery';
+import { invalidateRecommendationInputRevision } from './recommendationInputRevision';
 
 export const recommendationFeedbackStorageKey = 'questshelf.recommendationFeedback.v1';
 export const recommendationExposureStorageKey = 'questshelf.recommendationExposure.v1';
@@ -112,7 +113,10 @@ export function loadRecommendationFeedback(): RecommendationFeedbackRecord[] {
 }
 
 export function saveRecommendationFeedback(records: RecommendationFeedbackRecord[]): void {
-  savePersistedJson(recommendationFeedbackStorageKey, normalizeRecommendationFeedbackRecords(records));
+  const normalized = normalizeRecommendationFeedbackRecords(records);
+  const changed = JSON.stringify(normalized) !== JSON.stringify(loadRecommendationFeedback());
+  savePersistedJson(recommendationFeedbackStorageKey, normalized);
+  if (changed) invalidateRecommendationInputRevision();
 }
 
 export function recordRecommendationFeedback(candidate: DiscoveryCandidate, feedbackType: RecommendationFeedbackType, surface: RecommendationFeedbackSurface): RecommendationFeedbackRecord {
@@ -167,7 +171,10 @@ export function loadRecommendationPreferences(): RecommendationPreferences {
 }
 
 export function saveRecommendationPreferences(preferences: RecommendationPreferences): void {
-  savePersistedJson(recommendationPreferencesStorageKey, normalizeRecommendationPreferences(preferences));
+  const normalized = normalizeRecommendationPreferences(preferences);
+  const changed = JSON.stringify(normalized) !== JSON.stringify(loadRecommendationPreferences());
+  savePersistedJson(recommendationPreferencesStorageKey, normalized);
+  if (changed) invalidateRecommendationInputRevision();
 }
 
 export function normalizeRecommendationExposureRecords(value: unknown): RecommendationExposureRecord[] {
