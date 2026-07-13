@@ -26,7 +26,7 @@ export function useImportSyncActions({ runGamesCommand, addToastNotification, t 
     addToastNotification({
       category: summary.importedCount > 0 || summary.updatedExisting > 0 ? 'success' : 'info',
       dedupeKey: 'multi-game-import',
-      message: `Multi Game Import: ${summary.importedCount} imported · ${summary.updatedExisting} updated · ${summary.skippedDuplicates} duplicates · ${summary.invalidRows} skipped`,
+      message: `Multi Game Import: ${summary.importedCount} imported · ${summary.updatedExisting} updated · ${summary.skippedDuplicates} duplicates · ${summary.ambiguousCount} ambiguous · ${summary.invalidRows} skipped`,
     });
 
     return summary;

@@ -73,6 +73,7 @@ const testFiles = [
   { entry: 'scripts/undoScopedOperations.test.ts', out: 'undoScopedOperations.test.mjs' },
   { entry: 'scripts/statusPlanInvariants.test.ts', out: 'statusPlanInvariants.test.mjs' },
   { entry: 'scripts/gameEditPatch.test.ts', out: 'gameEditPatch.test.mjs' },
+  { entry: 'scripts/dataIntegrityDiagnostics.test.ts', out: 'dataIntegrityDiagnostics.test.mjs' },
   { entry: 'scripts/providerResults.test.ts', out: 'providerResults.test.mjs' },
   { entry: 'scripts/providerIntegrationBoundary.test.ts', out: 'providerIntegrationBoundary.test.mjs' },
   { entry: 'scripts/recommendationProviderFailures.test.ts', out: 'recommendationProviderFailures.test.mjs' },

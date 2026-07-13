@@ -18,8 +18,54 @@ import type { Game } from '../types/game';
 import type { SteamWishlistItem, SteamWishlistSyncSummary } from '../types/steam';
 import type { SteamWishlistHtmlImportSummary } from '../utils/summaryFormatters';
 
+export type SteamOwnedImportSummary = {
+  created: number;
+  movedFromWishlist: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  transitionedGames: Game[];
+};
+
 export function touchGameRecord<T extends { updatedAt?: string }>(game: T): T {
   return { ...game, updatedAt: new Date().toISOString() };
+}
+
+/** Collection-aware Steam owned-games import used by every UI surface. */
+export function steamOwnedGamesImportTransition(
+  currentGames: Game[],
+  importedGames: Game[],
+  ignoredSteamAppIds: ReadonlySet<number> = new Set(),
+  importedAt = new Date().toISOString(),
+): TransitionResult<Game[], SteamOwnedImportSummary> {
+  const nextGames = [...currentGames];
+  const summary: SteamOwnedImportSummary = { created: 0, movedFromWishlist: 0, updated: 0, skipped: 0, failed: 0, transitionedGames: [] };
+
+  for (const imported of importedGames) {
+    if (!Number.isSafeInteger(imported.steamAppId) || (imported.steamAppId ?? 0) <= 0) { summary.failed += 1; continue; }
+    const appId = imported.steamAppId as number;
+    if (ignoredSteamAppIds.has(appId)) { summary.skipped += 1; continue; }
+    const libraryIndex = nextGames.findIndex((game) => game.collectionType === 'library' && game.steamAppId === appId);
+    if (libraryIndex >= 0) {
+      const merged = mergeOwnedSteamGame(nextGames[libraryIndex], imported, importedAt, false);
+      if (areGamesEqual(nextGames[libraryIndex], merged)) summary.skipped += 1;
+      else { nextGames[libraryIndex] = merged; summary.updated += 1; }
+      continue;
+    }
+    const wishlistIndex = nextGames.findIndex((game) => game.collectionType === 'wishlist' && game.steamAppId === appId);
+    if (wishlistIndex >= 0) {
+      const moved = mergeOwnedSteamGame(nextGames[wishlistIndex], imported, importedAt, true);
+      nextGames[wishlistIndex] = moved;
+      summary.movedFromWishlist += 1;
+      summary.transitionedGames.push(moved);
+      continue;
+    }
+    const created = { ...imported, collectionType: 'library' as const, updatedAt: importedAt };
+    nextGames.push(created);
+    summary.created += 1;
+    summary.transitionedGames.push(created);
+  }
+  return { nextState: nextGames, result: summary };
 }
 
 /** A multi-game import (CSV/JSON/PlayStation/Nintendo), as a transition. */
@@ -40,12 +86,14 @@ export function steamWishlistHtmlImportTransition(
   inputSkippedCount: number,
 ): TransitionResult<Game[], SteamWishlistHtmlImportSummary> {
   const existingWishlistIndexBySteamAppId = new Map<number, number>();
+  const librarySteamAppIds = new Set(currentGames.filter((game) => game.collectionType === 'library' && typeof game.steamAppId === 'number').map((game) => game.steamAppId as number));
   currentGames.forEach((game, index) => { if (game.collectionType === 'wishlist' && typeof game.steamAppId === 'number') existingWishlistIndexBySteamAppId.set(game.steamAppId, index); });
   const existingGameIds = new Set(currentGames.map((game) => game.id));
   const nextGames = [...currentGames];
   const summary: SteamWishlistHtmlImportSummary = { addedCount: 0, existingCount: 0, skippedCount: inputSkippedCount };
   items.forEach((item) => {
     if (!item.appid) { summary.existingCount += 1; console.warn('[Steam Wishlist HTML Import] Skipped parsed item without a Steam app id.', { item }); return; }
+    if (librarySteamAppIds.has(item.appid)) { summary.existingCount += 1; return; }
     const mappedGame = mapSteamWishlistItemToLocalGame(item, importedAt);
     const existingWishlistIndex = existingWishlistIndexBySteamAppId.get(item.appid);
     if (typeof existingWishlistIndex === 'number') {
@@ -69,6 +117,41 @@ export function steamWishlistHtmlImportTransition(
     summary.addedCount += 1;
   });
   return { nextState: nextGames, result: summary };
+}
+
+function mergeOwnedSteamGame(existing: Game, imported: Game, importedAt: string, movingFromWishlist: boolean): Game {
+  const preserveArtwork = Boolean(existing.coverImage) && existing.artworkSource !== 'generated-fallback';
+  return {
+    ...existing,
+    ...imported,
+    id: existing.id,
+    title: existing.displayTitleOverride?.trim() ? existing.title : imported.title || existing.title,
+    displayTitleOverride: existing.displayTitleOverride,
+    metadataSearchTitle: existing.metadataSearchTitle,
+    notes: existing.notes,
+    rating: existing.rating,
+    favorite: existing.favorite,
+    tags: [...new Set([...(existing.tags ?? []), ...(imported.tags ?? [])])],
+    coverImage: preserveArtwork ? existing.coverImage : imported.coverImage,
+    artworkSource: preserveArtwork ? existing.artworkSource : imported.artworkSource,
+    artworkUpdatedAt: preserveArtwork ? existing.artworkUpdatedAt : imported.artworkUpdatedAt,
+    artworkSourceMetadata: preserveArtwork ? existing.artworkSourceMetadata : imported.artworkSourceMetadata,
+    collectionType: 'library',
+    importedAt: existing.importedAt ?? imported.importedAt,
+    priority: movingFromWishlist ? undefined : existing.priority,
+    expectedPlaytime: movingFromWishlist ? undefined : existing.expectedPlaytime,
+    priceTarget: movingFromWishlist ? undefined : existing.priceTarget,
+    steamPriceInfo: movingFromWishlist ? undefined : existing.steamPriceInfo,
+    steamDiscountInfo: movingFromWishlist ? undefined : existing.steamDiscountInfo,
+    status: movingFromWishlist ? 'Want to play' : existing.status,
+    updatedAt: importedAt,
+  };
+}
+
+function areGamesEqual(first: Game, second: Game) {
+  const { updatedAt: _firstUpdatedAt, ...firstComparable } = first;
+  const { updatedAt: _secondUpdatedAt, ...secondComparable } = second;
+  return JSON.stringify(firstComparable) === JSON.stringify(secondComparable);
 }
 
 /** The Steam Wishlist API sync. */

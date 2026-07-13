@@ -102,7 +102,9 @@ export function removeMockGames(games: Game[]) {
 }
 
 /** Why a persisted/backup game row could not be loaded. */
-export type GameRowRejectionReason = 'not-an-object' | 'missing-id' | 'missing-title';
+export type GameRowRejectionReason = 'not-an-object' | 'missing-id' | 'missing-title' | 'invalid-id' | 'invalid-title';
+export type GameRowIssueReason = GameRowRejectionReason | 'duplicate-id' | 'malformed-steam-app-id' | 'invalid-rating' | 'invalid-boolean' | 'invalid-date';
+export type GameRowIssue = { index: number; reason: GameRowIssueReason; id?: string };
 
 export type GameRowRejection = {
   /** Position in the original array, so a report can point at the offending row. */
@@ -130,10 +132,12 @@ function getGameRowRejectionReason(value: unknown): GameRowRejectionReason | nul
   if (typeof game.id !== 'string') {
     return 'missing-id';
   }
+  if (!game.id.trim()) return 'invalid-id';
 
   if (typeof game.title !== 'string') {
     return 'missing-title';
   }
+  if (!game.title.trim()) return 'invalid-title';
 
   return null;
 }
@@ -191,8 +195,11 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     hltbTitle: typeof game.hltbTitle === 'string' ? game.hltbTitle : undefined,
     displayTitleOverride: typeof game.displayTitleOverride === 'string' ? game.displayTitleOverride : undefined,
     id: game.id,
-    lastPlayedAt: typeof game.lastPlayedAt === 'string' ? game.lastPlayedAt : null,
-    lastSteamActivityAt: typeof game.lastSteamActivityAt === 'string' ? game.lastSteamActivityAt : undefined,
+    favorite: typeof game.favorite === 'boolean' ? game.favorite : undefined,
+    rating: typeof game.rating === 'number' && Number.isFinite(game.rating) && game.rating >= 0 && game.rating <= 5 ? game.rating : game.rating === null ? null : undefined,
+    steamAppId: typeof game.steamAppId === 'number' && Number.isInteger(game.steamAppId) && game.steamAppId > 0 ? game.steamAppId : undefined,
+    lastPlayedAt: validDateString(game.lastPlayedAt) ? game.lastPlayedAt : null,
+    lastSteamActivityAt: validDateString(game.lastSteamActivityAt) ? game.lastSteamActivityAt : undefined,
     lastSteamActivityDeltaMinutes: getOptionalNonNegativeNumber(game.lastSteamActivityDeltaMinutes),
     metadataSearchTitle: typeof game.metadataSearchTitle === 'string' ? game.metadataSearchTitle : undefined,
     metacriticScore: getOptionalPositiveNumber(game.metacriticScore ?? game.metacritic),
@@ -210,9 +217,28 @@ export function normalizeLoadedGame(value: unknown): Game | null {
     romFiles: normalizeRomFiles(game.romFiles),
     status: normalizeLoadedStatus(game.status),
     tags: Array.isArray(game.tags) ? game.tags.filter((tag): tag is string => typeof tag === 'string') : [],
-    title: game.title,
+    title: game.title.trim(),
   };
 }
+
+/** Inspect raw rows without mutating or exposing their contents in diagnostics. */
+export function analyzePersistedGameRows(value: unknown): { games: Game[]; issues: GameRowIssue[]; problematicRows: unknown[] } {
+  if (!Array.isArray(value)) return { games: [], issues: [], problematicRows: [] };
+  const issues: GameRowIssue[] = []; const problematic = new Set<number>(); const seen = new Set<string>();
+  value.forEach((row, index) => {
+    const rejection = getGameRowRejectionReason(row);
+    if (rejection) { issues.push({ index, reason: rejection }); problematic.add(index); return; }
+    const game = row as Partial<Game> & { id: string };
+    if (seen.has(game.id)) { issues.push({ index, reason: 'duplicate-id', id: game.id }); problematic.add(index); } else seen.add(game.id);
+    if (game.steamAppId !== undefined && !(typeof game.steamAppId === 'number' && Number.isInteger(game.steamAppId) && game.steamAppId > 0)) { issues.push({ index, reason: 'malformed-steam-app-id', id: game.id }); problematic.add(index); }
+    if (game.rating !== undefined && game.rating !== null && !(typeof game.rating === 'number' && Number.isFinite(game.rating) && game.rating >= 0 && game.rating <= 5)) { issues.push({ index, reason: 'invalid-rating', id: game.id }); problematic.add(index); }
+    if (game.favorite !== undefined && typeof game.favorite !== 'boolean') { issues.push({ index, reason: 'invalid-boolean', id: game.id }); problematic.add(index); }
+    for (const date of [game.lastPlayedAt, game.updatedAt, game.importedAt, game.finishedAt, game.droppedAt]) if (date !== undefined && date !== null && !validDateString(date)) { issues.push({ index, reason: 'invalid-date', id: game.id }); problematic.add(index); break; }
+  });
+  return { games: normalizeLoadedGames(value), issues, problematicRows: [...problematic].map((index) => value[index]) };
+}
+
+function validDateString(value: unknown): value is string { return typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Date.parse(value)); }
 
 export function normalizeLoadedGames(value: unknown): Game[] {
   return parseLoadedGameRows(value).games;

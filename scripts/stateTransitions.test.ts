@@ -25,7 +25,7 @@ import type { SteamWishlistItem } from '../src/types/steam';
 
 assertTestEnvironment();
 
-const { multiGameImportTransition, steamWishlistSyncTransition, steamWishlistHtmlImportTransition } = await import('../src/lib/importTransitions');
+const { multiGameImportTransition, steamOwnedGamesImportTransition, steamWishlistSyncTransition, steamWishlistHtmlImportTransition } = await import('../src/lib/importTransitions');
 const { applyArtworkTransition } = await import('../src/lib/artworkTransitions');
 const { addGamesToQueueTransition, addGameToQueueTransition, removeQueueGameTransition, updateCurrentlyPlayingGameTransition } = await import('../src/lib/queueTransitions');
 const { parseMultiGameImportInput } = await import('../src/lib/multiGameImport');
@@ -114,6 +114,31 @@ test('AS-14: the Steam Wishlist sync counts every outcome exactly', () => {
   assert.equal(result.addedCount + result.updatedCount + result.unchangedCount, 2);
   assert.equal(nextState.length, currentGames.length + result.addedCount, 'the state agrees with the summary');
   assert.equal(JSON.stringify(currentGames), frozenGames);
+});
+
+test('Steam owned import moves a Wishlist record in place and preserves user-owned fields', () => {
+  const wished = makeWishlistGame({ id: 'keep-id', title: 'Old title', steamAppId: 42, notes: 'private note', rating: 4, coverImage: 'custom.jpg', artworkSource: 'user', priority: 'high', priceTarget: '10' });
+  const imported = makeLibraryGame({ id: 'incoming-id', title: 'Provider title', steamAppId: 42, coverImage: 'steam.jpg', artworkSource: 'steam' });
+  const first = steamOwnedGamesImportTransition([wished], [imported], new Set(), '2026-01-01T00:00:00.000Z');
+  assert.equal(first.result.movedFromWishlist, 1);
+  assert.equal(first.nextState[0].id, 'keep-id');
+  assert.equal(first.nextState[0].collectionType, 'library');
+  assert.equal(first.nextState[0].notes, 'private note');
+  assert.equal(first.nextState[0].rating, 4);
+  assert.equal(first.nextState[0].coverImage, 'custom.jpg');
+  assert.equal(first.nextState[0].priority, undefined);
+  assert.equal(first.nextState[0].priceTarget, undefined);
+  const second = steamOwnedGamesImportTransition(first.nextState, [imported], new Set(), '2026-01-02T00:00:00.000Z');
+  assert.equal(second.result.skipped, 1);
+  assert.equal(second.result.created + second.result.movedFromWishlist + second.result.updated, 0);
+});
+
+test('Steam Wishlist HTML import does not create a duplicate when App ID is already owned', () => {
+  const owned = makeLibraryGame({ id: 'owned', steamAppId: 77 });
+  const result = steamWishlistHtmlImportTransition([owned], [{ appid: 77, name: 'Owned', storeUrl: 'https://store.steampowered.com/app/77' }], '2026-01-01T00:00:00.000Z', 0);
+  assert.equal(result.nextState.length, 1);
+  assert.equal(result.result.addedCount, 0);
+  assert.equal(result.result.existingCount, 1);
 });
 
 test('AS-14: the Wishlist HTML import reports added and already-present separately', () => {

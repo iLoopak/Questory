@@ -60,6 +60,7 @@ import { SettingsSection, SettingsStatusBlock } from './settings/SettingsSection
 import { ViewportModal } from './ViewportModal';
 import { downloadRawQuestShelfLocalData, exportPreparedQuestShelfBackupFile, prepareQuestShelfBackup } from '../lib/backupExport';
 import { AutoBackupScheduler, getBackupRevision, subscribeBackupRevision } from '../lib/backupRevision';
+import { inspectDataIntegrity, type DataIntegrityReport } from '../lib/dataIntegrityDiagnostics';
 
 /**
  * Turn a failed import into something the user can act on. Only store ids, keys and error
@@ -119,6 +120,7 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
   const [useBackupSingletons, setUseBackupSingletons] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [diagnostics, setDiagnostics] = useState<StorageDiagnostics | null>(null);
+  const [integrityReport, setIntegrityReport] = useState<DataIntegrityReport | null>(null);
   const backupRevision = useSyncExternalStore(subscribeBackupRevision, getBackupRevision, getBackupRevision);
   const saveBackupNowRef = useRef<(automatic?: boolean) => Promise<boolean>>(async () => false);
   const autoBackupSchedulerRef = useRef<AutoBackupScheduler | null>(null);
@@ -148,6 +150,7 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
         setDiagnostics(snapshot);
       }
     });
+    void inspectDataIntegrity().then(({ report }) => { if (active) setIntegrityReport(report); });
 
     function refreshIssues() {
       setStorageIssues(getLocalStorageIssues());
@@ -358,6 +361,17 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
     setIsRestoreModalOpen(true);
   }
 
+  async function downloadQuarantinedRows() {
+    try {
+      const { report, quarantine } = await inspectDataIntegrity();
+      setIntegrityReport(report);
+      downloadRawQuestShelfLocalData(quarantine);
+      showMessage('Quarantined and problematic raw rows exported for recovery.', 'success');
+    } catch (error) {
+      showMessage(`Quarantine export failed. ${error instanceof Error ? error.message : ''}`.trim(), 'error');
+    }
+  }
+
   async function confirmRestore(mode: 'merge' | 'replace', backupSingletons = false) {
     setIsRestoreModalOpen(false);
     if (!selectedBackup || isRestoring) return;
@@ -451,6 +465,30 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
       />
 
       <StorageHealthPanel diagnostics={diagnostics} />
+
+      <section className="mt-4 rounded-md border border-skyglass/15 bg-ink-950/80 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-white">Data integrity report</h3>
+            <p className="mt-1 text-sm text-slate-400">Read-only checks. Questory does not rewrite, delete, or repair raw rows during this scan.</p>
+          </div>
+          <div className="flex gap-2">
+            <button className="h-9 rounded-md border border-skyglass/20 px-3 text-sm text-slate-200" onClick={() => void inspectDataIntegrity().then(({ report }) => setIntegrityReport(report))} type="button">Refresh</button>
+            <button className="h-9 rounded-md border border-amber-300/30 px-3 text-sm text-amber-100" onClick={() => void downloadQuarantinedRows()} type="button">Export quarantine</button>
+          </div>
+        </div>
+        {integrityReport ? (
+          <>
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div><dt className="text-slate-500">Problem rows</dt><dd className="font-semibold text-white">{integrityReport.gameRows.quarantined}</dd></div>
+              <div><dt className="text-slate-500">Malformed Plans / activity</dt><dd className="font-semibold text-white">{integrityReport.malformedPlanEntries} / {integrityReport.malformedPlayActivityRows}</dd></div>
+              <div><dt className="text-slate-500">Plan / review orphans</dt><dd className="font-semibold text-white">{integrityReport.orphans.platformPlans} / {integrityReport.orphans.reviewState}</dd></div>
+              <div><dt className="text-slate-500">Activity orphans</dt><dd className="font-semibold text-white">{integrityReport.orphans.playActivity}</dd></div>
+            </dl>
+            {Object.keys(integrityReport.gameRows.issueCounts).length > 0 ? <p className="mt-3 text-xs text-slate-500">Game issues: {Object.entries(integrityReport.gameRows.issueCounts).map(([reason, count]) => `${reason}: ${count}`).join(' · ')}</p> : null}
+          </>
+        ) : <p className="mt-3 text-sm text-slate-500">Scanning persisted data…</p>}
+      </section>
 
       <StorageToolsPanel
         diagnostics={diagnostics}

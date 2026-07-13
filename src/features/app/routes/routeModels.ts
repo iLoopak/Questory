@@ -52,6 +52,7 @@ import type { QuestShelfAchievementProgress } from '../../../lib/questShelfAchie
 import type { MetadataRefreshMode, MetadataRefreshResult, MetadataSelectionRequest } from '../../../hooks/useMetadataArtworkActions';
 import type { PlayingGameAction, ReviewModeAction, ReviewModeActionContext } from '../../../types/gameActions';
 import type { SteamWishlistHtmlImportSummary } from '../../../utils/summaryFormatters';
+import type { SteamOwnedImportSummary } from '../../../lib/importTransitions';
 
 
 export type AppSectionRouteModel = {
@@ -221,7 +222,7 @@ export type AppSectionRouteModel = {
   importSteamWishlistHtmlItemsWithAnalytics: (items: ParsedSteamWishlistImportItem[], skippedCount?: number) => SteamWishlistHtmlImportSummary;
   syncHltb: (gameIds: string[]) => Promise<HltbSyncSummary | null>;
   importNewSteamGames: () => Promise<void>;
-  importSteamGames: (games: Game[]) => Game[];
+  importSteamGames: (games: Game[]) => SteamOwnedImportSummary;
   handleRetroImportGames: (games: Game[]) => Game[];
 
   // ── Filter actions ─────────────────────────────────────────────────────────

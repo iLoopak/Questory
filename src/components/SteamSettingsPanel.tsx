@@ -16,6 +16,7 @@ import {
   SteamApiError,
 } from '../services/steamApi';
 import type { Game } from '../types/game';
+import type { SteamOwnedImportSummary } from '../lib/importTransitions';
 import type {
   SteamApiDebugEntry,
   SteamConnectionState,
@@ -32,11 +33,7 @@ const initialConnectionState: SteamConnectionState = {
   data: null,
 };
 
-type ImportSummary = {
-  importedCount: number;
-  skippedDuplicateCount: number;
-  skippedIgnoredCount: number;
-};
+type ImportSummary = Omit<SteamOwnedImportSummary, 'transitionedGames'>;
 
 type SteamSettingsPanelProps = {
   games: Game[];
@@ -44,7 +41,7 @@ type SteamSettingsPanelProps = {
   onConnectionTested?: () => void;
   onSteamApiKeyConfigured?: () => void;
   onSteamIdConfigured?: () => void;
-  onImportGames: (games: Game[]) => void;
+  onImportGames: (games: Game[]) => SteamOwnedImportSummary;
   onSteamLibraryImported?: () => void;
   onSteamProfileNameChange?: (profileName: string) => void;
   playtimeRefreshState: SteamPlaytimeRefreshState;
@@ -236,27 +233,25 @@ export function SteamSettingsPanel({
     }
 
     const selectedOwnedGames = connectionState.data.ownedGames.filter((game) => appIds.has(game.appid));
-    const duplicateCount = connectionState.data.ownedGames.filter((game) => existingSteamAppIds.has(game.appid)).length;
-    const ignoredCount = connectionState.data.ownedGames.filter((game) => ignoredSteamAppIds.has(game.appid)).length;
-    const newOwnedGames = selectedOwnedGames.filter(
-      (game) => !existingSteamAppIds.has(game.appid) && !ignoredSteamAppIds.has(game.appid),
-    );
+    const importCandidates = selectedOwnedGames.filter((game) => !ignoredSteamAppIds.has(game.appid));
     const importedAt = new Date().toISOString();
     const mappedGames = mapSteamGamesToLocalGames(
-      newOwnedGames,
+      importCandidates,
       connectionState.data.recentlyPlayedGames,
       importedAt,
     );
 
-    onImportGames(mappedGames);
-    if (mappedGames.length > 0) {
+    const result = onImportGames(mappedGames);
+    if (result.created + result.movedFromWishlist + result.updated > 0) {
       onSteamLibraryImported?.();
     }
     setSelectedAppIds(new Set());
     setImportSummary({
-      importedCount: mappedGames.length,
-      skippedDuplicateCount: duplicateCount,
-      skippedIgnoredCount: ignoredCount,
+      created: result.created,
+      movedFromWishlist: result.movedFromWishlist,
+      updated: result.updated,
+      skipped: result.skipped,
+      failed: result.failed,
     });
   }
 
@@ -372,8 +367,8 @@ export function SteamSettingsPanel({
 
           {importSummary ? (
             <div className="mt-4 rounded-md border border-mint/40 bg-mint/10 px-3 py-3 text-sm leading-6 text-mint">
-              Imported {importSummary.importedCount} games. Skipped {importSummary.skippedDuplicateCount} duplicates and{' '}
-              {importSummary.skippedIgnoredCount} ignored games.
+              {importSummary.created} created, {importSummary.movedFromWishlist} moved from Wishlist, {importSummary.updated}{' '}
+              updated, {importSummary.skipped} skipped, and {importSummary.failed} failed.
             </div>
           ) : null}
         </section>

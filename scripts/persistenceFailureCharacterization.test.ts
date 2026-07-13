@@ -67,7 +67,7 @@ async function characterizeRestart<T extends { id: string }>(options: {
 
   // Known defect: non-empty IDB wins merely because it has rows. The newer rescued
   // fallback state is ignored, so the application comes back with stale state A.
-  assert.deepEqual(restarted.getAllSync(), options.stateA);
+  assert.deepEqual(restarted.getAllSync(), options.normalize(options.stateA), 'restart exposes the safe normalized runtime view of stale state A');
   assert.equal(restarted.getStatus().backend, 'indexeddb');
   assert.deepEqual(harness.inspectLocalStorage(), normalizedFallback, 'the ignored rescue blob remains inspectable');
 }

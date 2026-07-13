@@ -17,6 +17,7 @@ import { defaultAccentColor, normalizeAccentColor, type AccentColorPreference, t
 import type { Game } from '../types/game';
 import type { SteamSettings } from '../types/steam';
 import type { RawgSettings } from '../types/rawg';
+import type { SteamOwnedImportSummary } from '../lib/importTransitions';
 
 type OnboardingChecklistProps = {
   completedItemIds: Set<OnboardingItemId>;
@@ -24,7 +25,7 @@ type OnboardingChecklistProps = {
   onAction?: (itemId: OnboardingItemId, action?: 'primary' | 'secondary') => void;
   onClose?: () => void;
   onComplete: (itemId: OnboardingItemId) => void;
-  onImportGames: (games: Game[]) => Game[];
+  onImportGames: (games: Game[]) => SteamOwnedImportSummary;
   onOpenLibrary: () => void;
   onOpenQueue: () => void;
   onSkip: (itemId: OnboardingItemId) => void;
@@ -212,7 +213,7 @@ export function OnboardingChecklist({
 
 type SteamImportResult = { status: 'success'; importedCount: number; skippedCount: number } | { status: 'error'; message: string };
 
-function SteamStep({ games, isComplete, onComplete, onContinue, onImportGames, onSkip, onSteamLibraryImported, onSteamProfileNameChange }: { games: Game[]; isComplete: boolean; onComplete: () => void; onContinue: () => void; onImportGames: (games: Game[]) => Game[]; onSkip: () => void; onSteamLibraryImported?: () => void; onSteamProfileNameChange?: (profileName: string) => void }) {
+function SteamStep({ games, isComplete, onComplete, onContinue, onImportGames, onSkip, onSteamLibraryImported, onSteamProfileNameChange }: { games: Game[]; isComplete: boolean; onComplete: () => void; onContinue: () => void; onImportGames: (games: Game[]) => SteamOwnedImportSummary; onSkip: () => void; onSteamLibraryImported?: () => void; onSteamProfileNameChange?: (profileName: string) => void }) {
   const [settings, setSettings] = useState<SteamSettings>(() => loadSteamSettings());
   const [status, setStatus] = useState('Enter your credentials below, then click Import to bring in your library.');
   const [importResult, setImportResult] = useState<SteamImportResult | null>(null);
@@ -230,15 +231,15 @@ function SteamStep({ games, isComplete, onComplete, onContinue, onImportGames, o
     setStatus('Importing your Steam library…');
     try {
       const [ownedGames, recentlyPlayedGames, profile] = await Promise.all([getOwnedGames(settings), getRecentlyPlayedGames(settings), getSteamPlayerSummary(settings).catch(() => null)]);
-      const existing = new Set(games.map((game) => game.steamAppId).filter((id): id is number => typeof id === 'number'));
-      const mapped = mapSteamGamesToLocalGames(ownedGames.filter((game) => !existing.has(game.appid)), recentlyPlayedGames);
-      const createdGames = onImportGames(mapped);
-      const skippedCount = Math.max(0, ownedGames.length - createdGames.length);
+      const mapped = mapSteamGamesToLocalGames(ownedGames, recentlyPlayedGames);
+      const result = onImportGames(mapped);
+      const importedCount = result.created + result.movedFromWishlist + result.updated;
+      const skippedCount = result.skipped + result.failed;
       if (profile) setSettings({ ...settings, profile: { ...profile, updatedAt: new Date().toISOString() } });
       onSteamLibraryImported?.();
       onComplete();
       if (profile) onSteamProfileNameChange?.(profile.personaName || profile.profileName || '');
-      setImportResult({ status: 'success', importedCount: createdGames.length, skippedCount });
+      setImportResult({ status: 'success', importedCount, skippedCount });
       setStatus('✓ Steam setup completed. You can continue to the next step.');
     } catch (error) {
       const message = error instanceof SteamApiError ? error.message : 'Steam import failed. Check credentials and profile privacy.';
@@ -319,7 +320,7 @@ function RawgStep({ onComplete, onOpenSettings }: { onComplete: () => void; onOp
   return <div><Input label="RAWG API key" value={settings.apiKey} onChange={(apiKey) => { setSettings({ apiKey }); if (apiKey.trim()) { setStatus('RAWG key saved.'); onComplete(); } }} type="password" /><Status text={status} /><Actions primary="Open enrichment settings" onPrimary={onOpenSettings} /></div>;
 }
 
-function RetroStep({ games, onComplete, onImportGames, onSkip }: { games: Game[]; onComplete: () => void; onImportGames: (games: Game[]) => Game[]; onSkip: () => void }) {
+function RetroStep({ games, onComplete, onImportGames, onSkip }: { games: Game[]; onComplete: () => void; onImportGames: (games: Game[]) => SteamOwnedImportSummary; onSkip: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null); const [platform, setPlatform] = useState<RetroPlatformOverride>(autoDetectPlatformOption); const [status, setStatus] = useState('Choose a ROM folder or files to import.'); const runtime = getRuntimeEnvironment();
   useEffect(() => { inputRef.current?.setAttribute('webkitdirectory', ''); inputRef.current?.setAttribute('directory', ''); }, []);
   function scan(files: ScannableRomFile[]) { const result = scanRomFiles(files, games, platform); const existingIds = new Set(games.map((game) => game.id)); const imported = result.detectedRoms.filter((rom) => !rom.isDuplicate).map((rom) => mapDetectedRomToGame(rom, existingIds)); onImportGames(imported); setStatus(`Imported ${imported.length} retro games from ${result.summary.scannedFiles} scanned files.`); if (imported.length > 0) onComplete(); }

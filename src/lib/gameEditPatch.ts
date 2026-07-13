@@ -60,8 +60,9 @@ export const gameEditFields: GameEditField[] = [
  *
  * A field that is absent means "unchanged" — the editor has nothing to say about it. Clearing is
  * expressed intentionally: `rating: null` clears a rating, an absent `rating` leaves it alone. No
- * field outside this shape can be submitted, so an edit can never rewrite artwork, provider ids,
- * Steam fields or any unknown/future column.
+ * field outside this shape can be submitted. Artwork provenance is included only when the user
+ * explicitly edits the cover; provider ids, Steam fields and unknown/future columns stay outside
+ * the editor contract.
  */
 export type GameEditPatch = Partial<
   Pick<
@@ -74,6 +75,9 @@ export type GameEditPatch = Partial<
     | 'status'
     | 'collectionType'
     | 'coverImage'
+    | 'artworkSource'
+    | 'artworkSourceMetadata'
+    | 'artworkUpdatedAt'
     | 'notes'
     | 'tags'
     | 'rating'
@@ -183,7 +187,13 @@ export function buildGameEditPatch(
   if (applied.has('platform')) patch.platform = draft.platform;
   if (applied.has('status')) patch.status = draft.status;
   if (applied.has('collectionType')) patch.collectionType = draft.collectionType;
-  if (applied.has('coverImage')) patch.coverImage = draft.coverImage.trim();
+  if (applied.has('coverImage')) {
+    const coverImage = draft.coverImage.trim();
+    patch.coverImage = coverImage;
+    patch.artworkSource = coverImage ? 'user' : undefined;
+    patch.artworkSourceMetadata = undefined;
+    patch.artworkUpdatedAt = coverImage ? new Date().toISOString() : undefined;
+  }
   if (applied.has('notes')) patch.notes = draft.notes;
   if (applied.has('tags')) patch.tags = parseTags(draft.tags);
   // Clearing the box clears the rating: `null` says so, rather than leaving it to a stale copy.

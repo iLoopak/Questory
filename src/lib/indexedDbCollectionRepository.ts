@@ -168,6 +168,14 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
 
   const legacyBlobPresent = () => getStorageAdapter().readLocal(legacyKey) !== null;
 
+  function safeRuntimeSnapshot(value: unknown): T[] {
+    const byId = new Map<string, T>();
+    for (const item of io.normalize(value)) {
+      if (!byId.has(item.id)) byId.set(item.id, item);
+    }
+    return [...byId.values()];
+  }
+
   function fallbackToLegacy(message: string) {
     lastError = message;
     if (backend !== 'legacy-fallback') {
@@ -183,7 +191,7 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
 
     const db = getGameDatabase();
     if (!db) {
-      snapshot = io.legacyLoadSync();
+      snapshot = safeRuntimeSnapshot(io.legacyLoadSync());
       isReady = true;
       fallbackToLegacy('IndexedDB is not available in this environment.');
       return;
@@ -206,15 +214,17 @@ export function createIndexedDbCollectionRepository<T extends { id: string }>(
           });
           migratedFromLegacy = true;
         }
-        snapshot = legacy;
+        snapshot = safeRuntimeSnapshot(legacy);
       } else {
         // IndexedDB has records: it is the source of truth; the legacy blob is ignored.
-        snapshot = await table.toArray();
+        // Normalize only the in-memory view. Raw rows remain byte-for-byte untouched in IDB
+        // so a future version or a recovery export can still inspect every original field.
+        snapshot = safeRuntimeSnapshot(await table.toArray());
       }
 
       isReady = true;
     } catch (error) {
-      snapshot = io.legacyLoadSync();
+      snapshot = safeRuntimeSnapshot(io.legacyLoadSync());
       isReady = true;
       fallbackToLegacy(error instanceof Error ? error.message : 'Unknown IndexedDB error.');
     }

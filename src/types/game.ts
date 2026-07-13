@@ -116,6 +116,12 @@ export type Game = {
   lastSteamActivityDeltaMinutes?: number;
   externalSource?: GameExternalSource;
   externalUrl?: string;
+  playStationSource?: {
+    productId?: string;
+    titleId?: string;
+    storeUrl?: string;
+    aliases?: string[];
+  };
   nintendoVirtualGameCard?: {
     source: 'nintendo-virtual-game-cards';
     version: 1;

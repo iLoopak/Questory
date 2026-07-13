@@ -88,6 +88,19 @@ test('a save that changes nothing produces an empty patch', () => {
   assert.deepEqual(buildGameEditPatch(game, base, []), {});
 });
 
+test('manual cover changes record and clear the user artwork override', () => {
+  const game = baseGame({ coverImage: 'provider.jpg', artworkSource: 'rawg', artworkUpdatedAt: '2025-01-01T00:00:00.000Z' });
+  const base = createEditDraft(game);
+  const setPatch = buildGameEditPatch(game, { ...base, coverImage: 'https://cdn/custom.jpg' }, ['coverImage']);
+  assert.equal(setPatch.artworkSource, 'user');
+  assert.match(setPatch.artworkUpdatedAt ?? '', /^\d{4}-\d{2}-\d{2}T/);
+  const cleared = buildGameEditPatch({ ...game, ...setPatch }, { ...base, coverImage: '' }, ['coverImage']);
+  assert.equal(cleared.coverImage, '');
+  assert.equal(cleared.artworkSource, undefined);
+  assert.equal(cleared.artworkUpdatedAt, undefined);
+  assert.equal('artworkSource' in cleared, true, 'the clear is explicit');
+});
+
 test('a patch never touches metadata, artwork or provider fields', () => {
   const game = baseGame({
     heroImage: 'https://cdn/hero.jpg',
