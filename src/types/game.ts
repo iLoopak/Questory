@@ -159,6 +159,8 @@ export type Game = {
   itadHistoricalLowCurrency?: string;
   itadIsHistoricalLow?: boolean;
   itadLastSyncedAt?: string;
+  /** Last attempted ITAD refresh, including failures. Successful freshness remains separate. */
+  itadLastSyncAttemptAt?: string;
   hltbId?: string;
   hltbTitle?: string;
   hltbMainHours?: number;

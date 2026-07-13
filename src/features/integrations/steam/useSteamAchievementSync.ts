@@ -1,7 +1,6 @@
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { hasSteamAchievementSummary } from '../../../lib/steamAchievementSummary';
 import { getSteamProviderState } from '../../../lib/gameSelectors';
-import { saveGames } from '../../../lib/gameStorage';
 import { loadSteamSettings } from '../../../lib/steamSettingsStorage';
 import { isSteamAchievementSyncableGame, syncSteamAchievementsForGames } from '../../../lib/steamAchievementsSync';
 import { formatGameToastMessage, getDismissAction, getOpenSteamSettingsAction, getViewGameAction, type NotificationDraft } from '../../../lib/notifications';
@@ -28,10 +27,13 @@ export type SyncSteamAchievementsOptions = {
 };
 
 export function useSteamAchievementSync({ games, isAppMountedRef, setGames, setSteamAchievementSyncState, addToastNotification, t }: SteamAchievementSyncOptions) {
+  const requestGenerationRef = useRef(0);
   return async function syncSteamAchievements(
     gameIds?: string[],
     options: SyncSteamAchievementsOptions = {},
   ) {
+    const generation = ++requestGenerationRef.current;
+    const isCurrent = () => isAppMountedRef.current && requestGenerationRef.current === generation;
     const targetGames = (gameIds ? games.filter((game) => gameIds.includes(game.id)) : games).filter((game) => game.collectionType === 'library');
     const syncableGames = targetGames.filter(isSteamAchievementSyncableGame);
     const total = syncableGames.length;
@@ -53,10 +55,10 @@ export function useSteamAchievementSync({ games, isAppMountedRef, setGames, setS
       const syncedAt = new Date().toISOString();
       const targetGameIds = new Set(targetGames.map((game) => game.id));
       const result = await withSteamAchievementSyncWatchdog(syncSteamAchievementsForGames(games, targetGameIds, settings, syncedAt, (progress) => {
-        if (!isAppMountedRef.current) return;
+        if (!isCurrent()) return;
         setSteamAchievementSyncState((currentState) => currentState.status === 'loading' ? { ...currentState, progress, summary: null } : currentState);
       }, (batchResult) => {
-        if (!isAppMountedRef.current) { saveGames(batchResult.games); return; }
+        if (!isCurrent()) return;
         setGames((currentGames) => mergeSteamAchievementUpdates(currentGames, batchResult.games, targetGameIds));
         setSteamAchievementSyncState((currentState) => currentState.status === 'loading' ? { ...currentState, progress: batchResult.progress, summary: null } : currentState);
       }, options.force), total);
@@ -64,7 +66,7 @@ export function useSteamAchievementSync({ games, isAppMountedRef, setGames, setS
       summaryToReturn = result.summary;
       debugAchievementSyncDiagnostic('helper resolved', { summary: result.summary });
       debugAchievementSyncDiagnostic('updated games count', { updatedGamesCount: result.games.filter((game) => targetGameIds.has(game.id) && hasSteamAchievementSummary(game)).length });
-      if (!isAppMountedRef.current) return summaryToReturn;
+      if (!isCurrent()) return summaryToReturn;
       setGames((currentGames) => {
         const mergedGames = mergeSteamAchievementUpdates(currentGames, result.games, targetGameIds);
         debugAchievementSyncDiagnostic('state update dispatched', { updatedGamesCount: mergedGames.filter((game) => targetGameIds.has(game.id) && hasSteamAchievementSummary(game)).length });
@@ -81,13 +83,13 @@ export function useSteamAchievementSync({ games, isAppMountedRef, setGames, setS
       const message = error instanceof SteamApiError ? error.message : error instanceof Error ? error.message : t('app.steamAchievementSyncFailedDetails');
       const failedSummary: SteamAchievementSyncSummary = { failedCount: total, noAchievementDataCount: 0, skippedNonSteamCount: targetGames.length - total, unchangedCount: 0, updatedCount: 0 };
       summaryToReturn = failedSummary;
-      if (!isAppMountedRef.current) return summaryToReturn;
+      if (!isCurrent()) return summaryToReturn;
       terminalState = { status: 'error', message, progress: { completed: total, total }, summary: failedSummary };
       addToastNotification({ actions: isCredentialError ? [getOpenSteamSettingsAction()] : [getDismissAction()], category: isCredentialError ? 'warning' : 'error', dedupeKey: isCredentialError ? 'steam-achievements:credentials' : 'steam-achievements:error', details: isCredentialError ? t('app.steamAchievementCredentialsHelp') : message, message: isCredentialError ? t('app.steamCredentialsNeeded') : t('app.steamAchievementSyncFailed') });
       return summaryToReturn;
     } finally {
       debugSteamAchievementSyncFinalization('finally reached', { total, hasTerminalState: terminalState !== null, hasSummary: summaryToReturn !== null });
-      if (isAppMountedRef.current) {
+      if (isCurrent()) {
         debugAchievementSyncDiagnostic('sync state success', { status: terminalState?.status ?? 'error', hasSummary: summaryToReturn !== null });
         setSteamAchievementSyncState(terminalState ?? { status: 'error', message: t('app.steamAchievementSyncStopped'), progress: { completed: total, total }, summary: summaryToReturn });
       }

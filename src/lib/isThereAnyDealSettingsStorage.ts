@@ -1,5 +1,6 @@
 import type { IsThereAnyDealSettings } from '../types/itad';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
+import { notifyIntegrationSettingsChanged } from './integrationSettingsRevision';
 
 export const ITAD_SETTINGS_STORAGE_KEY = 'questshelf.isThereAnyDealSettings.v1';
 const STORAGE_KEY = ITAD_SETTINGS_STORAGE_KEY;
@@ -13,7 +14,10 @@ export function loadIsThereAnyDealSettings(): IsThereAnyDealSettings {
 }
 
 export function saveIsThereAnyDealSettings(settings: IsThereAnyDealSettings) {
-  savePersistedJson(STORAGE_KEY, normalizeIsThereAnyDealSettings(settings));
+  const normalized = normalizeIsThereAnyDealSettings(settings);
+  savePersistedJson(STORAGE_KEY, normalized);
+  notifyIntegrationSettingsChanged();
+  return normalized;
 }
 
 export function normalizeIsThereAnyDealSettings(value: unknown): IsThereAnyDealSettings {
