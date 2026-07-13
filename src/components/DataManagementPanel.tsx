@@ -3,11 +3,13 @@ import {
   getQuestShelfBackupSummary,
   mergeQuestShelfBackup,
   parseQuestShelfBackupText,
+  previewQuestShelfBackupMerge,
   resetQuestShelfLocalData,
   restoreQuestShelfBackup,
   type QuestShelfBackup,
   type QuestShelfBackupImportResult,
   type QuestShelfBackupSummary,
+  type BackupMergePreview,
 } from '../lib/backupStorage';
 import { suspendCanonicalCollectionWrites } from '../lib/canonicalCollections';
 import { previewLegacyGameRecovery, verifyGameStorage } from '../lib/gameStorage';
@@ -113,6 +115,8 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
   );
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [mergePreview, setMergePreview] = useState<BackupMergePreview | null>(null);
+  const [useBackupSingletons, setUseBackupSingletons] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [diagnostics, setDiagnostics] = useState<StorageDiagnostics | null>(null);
   const backupRevision = useSyncExternalStore(subscribeBackupRevision, getBackupRevision, getBackupRevision);
@@ -349,10 +353,12 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
       showMessage(t('data.chooseBackupFirst'), 'error');
       return;
     }
+    setUseBackupSingletons(false);
+    setMergePreview(previewQuestShelfBackupMerge(selectedBackup));
     setIsRestoreModalOpen(true);
   }
 
-  async function confirmRestore(mode: 'merge' | 'replace') {
+  async function confirmRestore(mode: 'merge' | 'replace', backupSingletons = false) {
     setIsRestoreModalOpen(false);
     if (!selectedBackup || isRestoring) return;
 
@@ -365,7 +371,7 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
 
     try {
       const result = mode === 'merge'
-        ? await mergeQuestShelfBackup(selectedBackup)
+        ? await mergeQuestShelfBackup(selectedBackup, { useBackupSingletons: backupSingletons })
         : await restoreQuestShelfBackup(selectedBackup);
 
       if (!result.ok) {
@@ -634,8 +640,16 @@ export function DataManagementPanel({ onBackupExported, onBackupImported }: Data
 
       {isRestoreModalOpen && selectedBackupSummary ? (
         <RestoreConfirmModal
+          mergePreview={mergePreview}
           summary={selectedBackupSummary}
-          onMerge={() => confirmRestore('merge')}
+          useBackupSingletons={useBackupSingletons}
+          onUseBackupSingletonsChange={(nextValue) => {
+            setUseBackupSingletons(nextValue);
+            if (selectedBackup) {
+              setMergePreview(previewQuestShelfBackupMerge(selectedBackup, { useBackupSingletons: nextValue }));
+            }
+          }}
+          onMerge={() => confirmRestore('merge', useBackupSingletons)}
           onReplace={() => confirmRestore('replace')}
           onClose={() => setIsRestoreModalOpen(false)}
         />
@@ -692,12 +706,18 @@ function ResetConfirmModal({ onConfirm, onClose }: { onConfirm: () => void; onCl
 }
 
 function RestoreConfirmModal({
+  mergePreview,
   summary,
+  useBackupSingletons,
+  onUseBackupSingletonsChange,
   onMerge,
   onReplace,
   onClose,
 }: {
+  mergePreview: BackupMergePreview | null;
   summary: QuestShelfBackupSummary;
+  useBackupSingletons: boolean;
+  onUseBackupSingletonsChange: (nextValue: boolean) => void;
   onMerge: () => void;
   onReplace: () => void;
   onClose: () => void;
@@ -716,6 +736,55 @@ function RestoreConfirmModal({
           <div><span className="text-slate-500">Wishlist items:</span> <span className="text-slate-200">{summary.wishlistCount}</span></div>
         </div>
         <div className="mt-4 grid gap-2">
+          {mergePreview ? (
+            <div className="rounded-md border border-mint/25 bg-mint/5 p-3 text-sm text-slate-300">
+              <div className="font-semibold text-white">Merge preview</div>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <MergePreviewStat label="Games added" value={mergePreview.games.added} />
+                <MergePreviewStat label="Games updated" value={mergePreview.games.updated} />
+                <MergePreviewStat label="Unchanged" value={mergePreview.games.unchanged} />
+                <MergePreviewStat label="Conflicting" value={mergePreview.games.ambiguous} />
+              </div>
+              <div className="mt-3 max-h-44 space-y-1 overflow-y-auto rounded border border-white/10 bg-ink-950/70 p-2">
+                {mergePreview.sections.map((section) => (
+                  <div className="flex items-start justify-between gap-3 text-xs" key={section.key}>
+                    <span>
+                      <span className="text-slate-200">{section.label}</span>{' '}
+                      <span className="text-slate-500">({formatMergePolicy(section.policy)})</span>
+                    </span>
+                    <span className={section.willReplace ? 'text-amber-200' : 'text-slate-400'}>
+                      {section.willReplace
+                        ? 'will replace local'
+                        : `+${section.added} / ~${section.updated} updated / ${section.localOnlyPreserved} local kept`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {mergePreview.unresolvedGameReferences.length > 0 ? (
+                <div className="mt-2 rounded border border-amber-300/30 bg-amber-300/10 p-2 text-xs text-amber-100">
+                  <p>{mergePreview.unresolvedGameReferences.length} game reference(s) could not be mapped. They will remain unchanged and will not be attached to another game.</p>
+                  <ul className="mt-1 list-inside list-disc font-mono text-[11px] text-amber-100/80">
+                    {mergePreview.unresolvedGameReferences.slice(0, 8).map((reference) => (
+                      <li key={`${reference.section}:${reference.gameId}`}>{reference.section}: {reference.gameId}</li>
+                    ))}
+                  </ul>
+                  {mergePreview.unresolvedGameReferences.length > 8 ? <p className="mt-1">And {mergePreview.unresolvedGameReferences.length - 8} more.</p> : null}
+                </div>
+              ) : null}
+              <label className="mt-3 flex items-start gap-2 rounded border border-amber-300/20 p-2 text-xs text-slate-300">
+                <input
+                  checked={useBackupSingletons}
+                  className="mt-0.5 accent-mint"
+                  onChange={(event) => onUseBackupSingletonsChange(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  Use backup settings, identity, personalization, and included integration secrets where present.
+                  Local values are preserved when this is off.
+                </span>
+              </label>
+            </div>
+          ) : null}
           <button
             className="h-11 rounded-md bg-mint px-4 text-sm font-semibold text-ink-950 transition hover:bg-mint/90"
             onClick={onMerge}
@@ -741,6 +810,19 @@ function RestoreConfirmModal({
       </div>
     </ViewportModal>
   );
+}
+
+function MergePreviewStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded border border-white/10 bg-ink-950/80 px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-0.5 font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+function formatMergePolicy(policy: BackupMergePreview['sections'][number]['policy']) {
+  return policy.replaceAll('-', ' ');
 }
 
 function BackupSummaryStat({ label, value }: { label: string; value: string }) {

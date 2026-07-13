@@ -335,7 +335,7 @@ test('AS-01: DataManagementPanel awaits the restore and reloads only on success'
   assert.ok(confirmRestore.length > 0, 'located confirmRestore');
 
   // Both facades are awaited, so nothing is announced before the stores settle.
-  assert.match(confirmRestore, /await mergeQuestShelfBackup\(selectedBackup\)/);
+  assert.match(confirmRestore, /await mergeQuestShelfBackup\(selectedBackup, \{ useBackupSingletons: backupSingletons \}\)/);
   assert.match(confirmRestore, /await restoreQuestShelfBackup\(selectedBackup\)/);
 
   // A failed or partial restore stays on screen with a reason, and does NOT reload.

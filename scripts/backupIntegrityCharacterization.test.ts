@@ -105,7 +105,7 @@ test('DPI-06 current behavior: duplicate Game.id rows survive the snapshot but c
   assert.equal((await database.games.get(duplicateId))?.title, 'Second duplicate');
 });
 
-test('DPI-03 current behavior: merge preserves a local ID but leaves backup-side dependent references orphaned', async () => {
+test('DPI-03: merge preserves a local ID and remaps every dependent backup reference', async () => {
   await setup();
   const local = makeLibraryGame({
     id: 'local-game-id', title: 'Alias Game', steamAppId: 123, updatedAt: '2026-06-01T00:00:00.000Z',
@@ -124,17 +124,17 @@ test('DPI-03 current behavior: merge preserves a local ID but leaves backup-side
 
   assert.deepEqual(loadGames().map((game) => game.id), [local.id], 'the canonical game keeps the local id');
   assert.equal(loadGames()[0].notes, 'new backup notes');
-  assert.deepEqual(loadPlatformQueueState().entries.map((entry) => entry.gameId), [backupSide.id]);
-  assert.deepEqual(loadReviewModeState().queueOrder, [backupSide.id]);
-  assert.deepEqual(loadReviewModeState().ignoredGameIds, [backupSide.id]);
-  assert.deepEqual(Object.keys(loadReviewModeState().reviewedGames), [backupSide.id]);
-  assert.deepEqual(loadPlayActivity().map((row) => row.gameId), [backupSide.id]);
+  assert.deepEqual(loadPlatformQueueState().entries.map((entry) => entry.gameId), [local.id]);
+  assert.deepEqual(loadReviewModeState().queueOrder, [local.id]);
+  assert.deepEqual(loadReviewModeState().ignoredGameIds, [local.id]);
+  assert.deepEqual(Object.keys(loadReviewModeState().reviewedGames), [local.id]);
+  assert.deepEqual(loadPlayActivity().map((row) => row.gameId), [local.id]);
 
   const knownIds = new Set(loadGames().map((game) => game.id));
-  assert.equal(knownIds.has(backupSide.id), false, 'all backup-side references are now orphaned');
+  assert.equal(knownIds.has(local.id), true, 'all dependent references resolve to the canonical game');
 });
 
-test('DPI-02 current behavior: present merge sections replace local-only Plans, ignored Steam IDs and activity', async () => {
+test('DPI-02: present merge sections preserve local-only Plans, ignored Steam IDs and activity', async () => {
   const storage = await setup();
   const localGame = makeLibraryGame({ id: 'local-only', title: 'Local only' });
   const backupGame = makeLibraryGame({ id: 'backup-only', title: 'Backup only' });
@@ -153,9 +153,9 @@ test('DPI-02 current behavior: present merge sections replace local-only Plans, 
   }), noSnapshot));
 
   assert.deepEqual(loadGames().map((game) => game.id).sort(), [backupGame.id, localGame.id].sort(), 'games merge additively');
-  assert.deepEqual(loadPlatformQueueState().entries.map((entry) => entry.gameId), [backupGame.id], 'local-only Plan was replaced');
-  assert.deepEqual(JSON.parse(storage.local.get('questshelf.steamIgnoredGames.v1')!).map((row: { steamAppId: number }) => row.steamAppId), [20]);
-  assert.deepEqual(loadPlayActivity().map((row) => row.gameId), [backupGame.id], 'local-only activity was replaced');
+  assert.deepEqual(loadPlatformQueueState().entries.map((entry) => entry.gameId).sort(), [backupGame.id, localGame.id].sort(), 'local-only Plan survives');
+  assert.deepEqual(JSON.parse(storage.local.get('questshelf.steamIgnoredGames.v1')!).map((row: { steamAppId: number }) => row.steamAppId), [10, 20]);
+  assert.deepEqual(loadPlayActivity().map((row) => row.gameId).sort(), [backupGame.id, localGame.id].sort(), 'local-only activity survives');
 });
 
 function goldenData(): QuestShelfBackup['data'] {

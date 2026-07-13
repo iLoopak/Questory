@@ -1,6 +1,5 @@
 import { normalizeAchievementCounters } from './achievementCounters';
 import { loadIgnoredSteamGames, normalizeIgnoredSteamGames } from './steamIgnoredGamesStorage';
-import { findGameRecordIndex } from './gameIdentity';
 import { gameRepository, loadGames, normalizeLoadedGames, parseLoadedGameRows, type GameRowRejection } from './gameStorage';
 import {
   removePersistedKeys,
@@ -15,7 +14,7 @@ import { getPlannedGameIds, type PlannedGameIds } from './plannedGames';
 import { loadPlayActivity, normalizePlayActivityRecords, playActivityRepository } from './playActivityStorage';
 import { loadRawgMetadataCache, normalizeRawgMetadataCache, rawgMetadataCacheRepository } from './rawgMetadataCache';
 import { normalizeRawgSettings } from './rawgSettingsStorage';
-import { normalizeReviewModeState } from './reviewModeStorage';
+import { loadReviewModeState, normalizeReviewModeState } from './reviewModeStorage';
 import { normalizeIsThereAnyDealSettings } from './isThereAnyDealSettingsStorage';
 import {
   coreBackupStorageKeys,
@@ -44,6 +43,12 @@ import { clearReleaseCalendarCache } from '../services/releaseCalendarService';
 import type { Game } from '../types/game';
 import { discoveryInboxStorageKey, invalidateDiscoveryInboxRequests } from './discoveryInboxStorage';
 import type { CanonicalBackupSnapshots } from './canonicalCollections';
+import {
+  backupMergePolicies,
+  prepareBackupMerge,
+  type BackupMergePreview,
+  type PreparedBackupMerge,
+} from './backupMerge';
 
 const generatedStateStorageKeys = [
   discoveryInboxStorageKey,
@@ -114,7 +119,12 @@ export type BackupStoreOutcome = {
 export type BackupImportOptions = {
   /** Skip the pre-restore safety snapshot. Used by tests and by the snapshot-restore path itself. */
   skipRecoverySnapshot?: boolean;
+  /** Singleton settings remain local by default; the preview can explicitly opt into backup values. */
+  useBackupSingletons?: boolean;
 };
+
+export { backupMergePolicies };
+export type { BackupMergePreview };
 
 /**
  * Result of restoring/merging a backup (AS-01).
@@ -336,7 +346,15 @@ export async function restoreQuestShelfBackup(
   return finishImport(gamesReport, stores);
 }
 
-/** Merge-restore. Additive, but awaited and reported exactly like replace. */
+/** Pure preview: reads current state but performs no writes and does not create a recovery snapshot. */
+export function previewQuestShelfBackupMerge(
+  backup: QuestShelfBackup,
+  options: Pick<BackupImportOptions, 'useBackupSingletons'> = {},
+): BackupMergePreview {
+  return prepareQuestShelfBackupMerge(backup, options).preview;
+}
+
+/** Merge-restore. Applies the same explicit policy plan shown by the pure preview. */
 export async function mergeQuestShelfBackup(
   backup: QuestShelfBackup,
   options: BackupImportOptions = {},
@@ -353,31 +371,49 @@ export async function mergeQuestShelfBackup(
     };
   }
 
-  // Pre-normalize before touching storage so an unexpected normalize error cannot leave
-  // storage in a partially-written state.
-  const mergedGames = mergeGames(loadGames(), getBackupGames(backup));
+  // Prepare every remap and section merge before touching storage. This is the same pure
+  // computation used by the UI preview, so normalization cannot fail halfway through writes.
+  const prepared = prepareQuestShelfBackupMerge(backup, options);
+  const mergedGames = prepared.games.games;
   const writes: Array<[(typeof allBackupStorageKeys)[number], unknown]> = [];
   const backupTasteProfile = Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.tasteProfile.v1')
     ? normalizeTasteProfile(backup.data['questshelf.tasteProfile.v1'])
     : null;
-  // AS-15: the taste profile is rebuilt from the library, and Platform Plans are part of that input.
-  // A backup that carries Plans overwrites the local ones, so the profile must be rebuilt against
-  // the Plans the user will actually have when the restore finishes.
-  const restoredPlannedGameIds = getRestoredPlannedGameIds(backup, mergedGames);
+  const restoredPlannedGameIds = getPlannedGameIds(prepared.platformQueues, mergedGames);
 
   allBackupStorageKeys.forEach((key) => {
     if (isCollectionBackedKey(key)) {
       return;
     }
 
-    if (key === 'questshelf.tasteProfile.v1' || key === 'questshelf.recommendationFeedback.v1') {
+    if (
+      key === 'questshelf.tasteProfile.v1' ||
+      key === 'questshelf.recommendationFeedback.v1' ||
+      key === 'questshelf.steamIgnoredGames.v1' ||
+      key === 'questshelf.platformQueues.v1' ||
+      key === 'questshelf.reviewMode.v1'
+    ) {
       return;
     }
 
-    if (Object.prototype.hasOwnProperty.call(backup.data, key)) {
+    const policy = backupMergePolicies.find((entry) => entry.key === key)?.policy;
+    if (
+      Object.prototype.hasOwnProperty.call(backup.data, key) &&
+      policy === 'requires-explicit-user-choice' && options.useBackupSingletons
+    ) {
       writes.push([key, normalizeBackupDataSection(key, backup.data[key])]);
     }
   });
+
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.steamIgnoredGames.v1')) {
+    writes.push(['questshelf.steamIgnoredGames.v1', prepared.ignoredSteamGames]);
+  }
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.platformQueues.v1')) {
+    writes.push(['questshelf.platformQueues.v1', normalizePlatformQueuePersistedState(prepared.platformQueues)]);
+  }
+  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.reviewMode.v1')) {
+    writes.push(['questshelf.reviewMode.v1', prepared.reviewMode]);
+  }
 
   if (backupTasteProfile) {
     const localTasteProfile = normalizeTasteProfile(readStorageJson('questshelf.tasteProfile.v1'));
@@ -406,26 +442,13 @@ export async function mergeQuestShelfBackup(
   // Merged games go through the repository (IndexedDB + snapshot).
   stores.push(await runStore('games', 'questshelf.games.v1', () => gameRepository.replaceAllDurable(mergedGames)));
 
-  // A present RAWG cache section overwrites the cache through its repository (merge only
-  // adds/overwrites present sections; an absent section leaves the existing cache intact).
-  if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.rawgMetadataCache.v1')) {
-    stores.push(
-      await runStore('rawgMetadataCache', 'questshelf.rawgMetadataCache.v1', () =>
-        rawgMetadataCacheRepository.replaceAllDurable(
-          normalizeRawgMetadataCache(backup.data['questshelf.rawgMetadataCache.v1']),
-        ),
-      ),
-    );
-  }
+  // RAWG metadata is derived cache data, so incoming cache rows are deliberately ignored.
 
-  // A present play activity section overwrites the store through its repository (merge only
-  // adds/overwrites present sections; an absent section leaves the existing records intact).
+  // Play activity is remapped first, then unioned by its normalized stable record ID.
   if (Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.playActivity.v1')) {
     stores.push(
       await runStore('playActivity', 'questshelf.playActivity.v1', () =>
-        playActivityRepository.replaceAllDurable(
-          normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']),
-        ),
+        playActivityRepository.replaceAllDurable(prepared.playActivity),
       ),
     );
   }
@@ -433,6 +456,27 @@ export async function mergeQuestShelfBackup(
   stores.push(await clearGeneratedRecommendationState());
 
   return finishImport(gamesReport, stores);
+}
+
+function prepareQuestShelfBackupMerge(
+  backup: QuestShelfBackup,
+  options: Pick<BackupImportOptions, 'useBackupSingletons'>,
+): PreparedBackupMerge {
+  const presentKeys = new Set(Object.keys(backup.data));
+  return prepareBackupMerge({
+    backupGames: getBackupGames(backup),
+    backupIgnoredSteamGames: normalizeIgnoredSteamGames(backup.data['questshelf.steamIgnoredGames.v1']),
+    backupPlayActivity: normalizePlayActivityRecords(backup.data['questshelf.playActivity.v1']),
+    backupPlatformQueues: normalizePlatformQueueState(backup.data['questshelf.platformQueues.v1']),
+    backupReviewMode: normalizeReviewModeState(backup.data['questshelf.reviewMode.v1']),
+    localGames: loadGames(),
+    localIgnoredSteamGames: loadIgnoredSteamGames(),
+    localPlayActivity: loadPlayActivity(),
+    localPlatformQueues: loadPlatformQueueState(),
+    localReviewMode: loadReviewModeState(),
+    presentKeys,
+    useBackupSingletons: options.useBackupSingletons,
+  });
 }
 
 function isCollectionBackedKey(key: (typeof allBackupStorageKeys)[number]): boolean {
@@ -762,42 +806,6 @@ function wouldWipeGamesCollection(report: BackupGamesReport): boolean {
   return report.present && report.rowCount > 0 && report.acceptedCount === 0 && loadGames().length > 0;
 }
 
-function mergeGames(localGames: Game[], backupGames: Game[]) {
-  const mergedGames = [...localGames];
-
-  backupGames.forEach((backupGame) => {
-    // Collection-aware: a Wishlist copy never resolves to its Library original (and vice
-    // versa), so the pair survives the merge as two records regardless of input order.
-    const existingIndex = findGameRecordIndex(mergedGames, backupGame);
-
-    if (existingIndex === -1) {
-      mergedGames.push(backupGame);
-      return;
-    }
-
-    if (isBackupGameNewer(backupGame, mergedGames[existingIndex])) {
-      mergedGames[existingIndex] = {
-        ...mergedGames[existingIndex],
-        ...backupGame,
-        // Keep the local record's primary key. Matching by a provider id/title means the two
-        // rows are the same record under different ids, and rewriting the id here would orphan
-        // everything that references it (Platform Plan entries, selection, undo snapshots).
-        id: mergedGames[existingIndex].id,
-      };
-    }
-  });
-
-  return mergedGames;
-}
-
-/** The Plans that will be in effect once this restore is written: the backup's if it carries any, else the local ones. */
-function getRestoredPlannedGameIds(backup: QuestShelfBackup, mergedGames: Game[]): PlannedGameIds {
-  const state = Object.prototype.hasOwnProperty.call(backup.data, 'questshelf.platformQueues.v1')
-    ? normalizePlatformQueueState(backup.data['questshelf.platformQueues.v1'])
-    : loadPlatformQueueState();
-  return getPlannedGameIds(state, mergedGames);
-}
-
 function mergeTasteProfiles(localProfile: TasteProfile, backupProfile: TasteProfile, mergedGames: Game[], plannedGameIds: PlannedGameIds): TasteProfile {
   const now = new Date();
   const explicit = mergeTasteSignals(localProfile.explicit, backupProfile.explicit);
@@ -835,20 +843,6 @@ function mergeRecommendationFeedback(localRecords: RecommendationFeedbackRecord[
   return [...byIdentity.values()].sort((a, b) => a.createdAt - b.createdAt);
 }
 
-function isBackupGameNewer(backupGame: Game, localGame: Game) {
-  const backupUpdatedAt = getGameUpdatedAt(backupGame);
-  const localUpdatedAt = getGameUpdatedAt(localGame);
-
-  if (!backupUpdatedAt || !localUpdatedAt) {
-    return Boolean(backupUpdatedAt && !localUpdatedAt);
-  }
-
-  return backupUpdatedAt >= localUpdatedAt;
-}
-
-function getGameUpdatedAt(game: Game) {
-  return game.updatedAt ?? game.metadataUpdatedAt ?? game.wishlistSyncedAt ?? game.importedAt ?? game.wishlistImportedAt ?? null;
-}
 
 function isValidBackupDataSection(key: (typeof allBackupStorageKeys)[number], value: unknown) {
   switch (key) {
