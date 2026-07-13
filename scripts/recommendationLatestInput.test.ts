@@ -123,7 +123,9 @@ const rawgIds = (candidates: DiscoveryCandidate[]) => candidates.map((candidate)
 /** Let the released generation finish and React commit it. */
 async function settle() {
   await actAsync(async () => {
-    for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    // Preparation is intentionally scheduled after the initiating interaction, then the provider
+    // waterfall advances through several awaited requests. Wait through both phases.
+    for (let i = 0; i < 64; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
 

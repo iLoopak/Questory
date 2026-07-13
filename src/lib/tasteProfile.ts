@@ -2,6 +2,7 @@ import type { Game } from '../types/game';
 import { loadLocalJson, savePersistedJson } from './localPersistence';
 import { loadRecommendationFeedback } from './recommendationFeedback';
 import { isGenericPreferenceTag, profileFingerprint, recommendationFranchiseKey, signalInformationValue, toSlug } from './userProfile';
+import { invalidateRecommendationInputRevision } from './recommendationInputRevision';
 import { noPlannedGameIds, type PlannedGameIds } from './plannedGames';
 
 export const tasteProfileStorageKey = 'questshelf.tasteProfile.v1';
@@ -101,7 +102,9 @@ export function loadTasteProfile(): TasteProfile {
 
 export function saveTasteProfile(profile: TasteProfile): TasteProfile {
   const normalized = normalizeTasteProfile(profile);
+  const changed = JSON.stringify(normalized) !== JSON.stringify(loadTasteProfile());
   savePersistedJson(tasteProfileStorageKey, normalized);
+  if (changed) invalidateRecommendationInputRevision();
   return normalized;
 }
 

@@ -48,6 +48,7 @@ import {
 } from '../lib/recommendationConfig';
 import { summarizeRecommendationQuality, type RecommendationQualitySummary } from '../lib/recommendationQuality';
 import { getActiveTasteSignals, getTasteProfileForGames, type TasteProfile, type TasteSignal } from '../lib/tasteProfile';
+import { getRecommendationInputRevision } from '../lib/recommendationInputRevision';
 
 // ---------------------------------------------------------------------------
 // Recommendation waterfall
@@ -1161,6 +1162,9 @@ const CACHE_TTL_MS = recommendationConfig.cacheTtlMs;
 const STALE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const inFlightRequests = new Map<string, Promise<PersonalRecommendationsResult>>();
 let recommendationRequestGeneration = 0;
+const preparedInputCache = new Map<string, PreparedRecommendationInput>();
+let preparedInputIdentityCache = new WeakMap<Game[], Map<PlannedGameIds, { revision: number; input: PreparedRecommendationInput }>>();
+let recommendationPreparationCount = 0;
 
 type PersistedCacheEntry = Partial<CacheEntry> & { version?: number; expiresAt?: number };
 
@@ -1270,7 +1274,74 @@ export type FetchPersonalRecommendationsOptions = {
    * about Plans that scoring depends on. Omitted means "no Plans", which is also the cold start.
    */
   plannedGameIds?: PlannedGameIds;
+  preparedInput?: PreparedRecommendationInput;
 };
+
+export type PreparedRecommendationInput = {
+  fingerprint: string;
+  semanticKey: string;
+  profile: UserProfile;
+  tasteProfile: TasteProfile;
+  feedback: RecommendationFeedbackRecord[];
+  preferences: RecommendationPreferences;
+};
+
+export type RecommendationPreparationMetrics = {
+  cacheEntries: number;
+  profileBuilds: number;
+};
+
+export function getRecommendationPreparationMetrics(): RecommendationPreparationMetrics {
+  return { cacheEntries: preparedInputCache.size, profileBuilds: recommendationPreparationCount };
+}
+
+export function resetRecommendationPreparationCache(): void {
+  preparedInputCache.clear();
+  preparedInputIdentityCache = new WeakMap();
+  recommendationPreparationCount = 0;
+}
+
+/**
+ * Builds the expensive semantic recommendation inputs once per canonical fingerprint/revision.
+ * Callers schedule this outside render; Home and Discover then share the same immutable snapshot.
+ */
+export function prepareRecommendationInput(
+  userGames: Game[],
+  plannedGameIds: PlannedGameIds = noPlannedGameIds,
+): PreparedRecommendationInput {
+  const revision = getRecommendationInputRevision();
+  const identityMatch = preparedInputIdentityCache.get(userGames)?.get(plannedGameIds);
+  if (identityMatch?.revision === revision) return identityMatch.input;
+  const fingerprint = profileFingerprint(userGames, plannedGameIds);
+  const cacheKey = `${fingerprint}::revision:${revision}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
+  const cachedInput = preparedInputCache.get(cacheKey);
+  if (cachedInput) {
+    const byPlan = preparedInputIdentityCache.get(userGames) ?? new Map();
+    byPlan.set(plannedGameIds, { revision, input: cachedInput });
+    preparedInputIdentityCache.set(userGames, byPlan);
+    return cachedInput;
+  }
+
+  const profile = buildUserProfile(userGames, plannedGameIds);
+  const tasteProfile = getTasteProfileForGames(userGames, plannedGameIds);
+  const feedback = loadRecommendationFeedback();
+  const preferences = loadRecommendationPreferences();
+  const semanticKey = `${fingerprint}::taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
+  const preparedInput = { fingerprint: semanticKey, semanticKey, profile, tasteProfile, feedback, preferences };
+  const finalCacheKey = `${fingerprint}::revision:${getRecommendationInputRevision()}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
+
+  recommendationPreparationCount += 1;
+  preparedInputCache.set(finalCacheKey, preparedInput);
+  const byPlan = preparedInputIdentityCache.get(userGames) ?? new Map();
+  byPlan.set(plannedGameIds, { revision: getRecommendationInputRevision(), input: preparedInput });
+  preparedInputIdentityCache.set(userGames, byPlan);
+  while (preparedInputCache.size > 8) {
+    const oldestKey = preparedInputCache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    preparedInputCache.delete(oldestKey);
+  }
+  return preparedInput;
+}
 
 export type PersonalRecommendationsResult = {
   candidates: DiscoveryCandidate[];
@@ -1425,15 +1496,13 @@ async function generatePersonalRecommendationsResult(
   const generationStartedAt = performance.now();
   const performanceMarks: Record<string, number> = {};
   const profileStartedAt = performance.now();
-  const profile = buildUserProfile(userGames, plannedGameIds);
-  const tasteProfile = getTasteProfileForGames(userGames, plannedGameIds);
+  const preparedInput = options.preparedInput ?? prepareRecommendationInput(userGames, plannedGameIds);
+  const { feedback, preferences, profile, tasteProfile } = preparedInput;
   performanceMarks.profileBuildMs = Math.round(performance.now() - profileStartedAt);
-  const feedback = loadRecommendationFeedback();
-  const preferences = loadRecommendationPreferences();
   const exposure = loadRecommendationExposure();
   const exposureCounts = new Map(exposure.map((record) => [record.rawgId != null ? `id:${record.rawgId}` : `title:${record.normalizedTitle}`, record.exposureCount]));
   const feedbackContext: FeedbackContext = { feedback, preferences, exposureCounts };
-  const fp = `${profileFingerprint(userGames, plannedGameIds)}::taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}::recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}::engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`;
+  const fp = preparedInput.fingerprint;
   const events: DebugEvent[] = [];
   let partialFailureCount = 0;
   const counts = {
@@ -1681,18 +1750,13 @@ export function getRecommendationInputKey(
   hydrationReady = true,
   plannedGameIds: PlannedGameIds = noPlannedGameIds,
 ): string {
-  const tasteProfile = getTasteProfileForGames(userGames, plannedGameIds);
-  const preferences = loadRecommendationPreferences();
-  const feedback = loadRecommendationFeedback();
+  const preparedInput = prepareRecommendationInput(userGames, plannedGameIds);
   const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
 
   return [
-    profileFingerprint(userGames, plannedGameIds),
-    `taste:${tasteProfile.lastUpdatedAt}:${tasteProfile.explicit.length}:${tasteProfile.temporary.length}`,
-    `recommendations:${recommendationPreferenceFingerprint(preferences, feedback)}`,
+    preparedInput.semanticKey,
     `inbox:${inboxFingerprint}`,
     `hydration:${hydrationReady}`,
-    `engine:${RECOMMENDATION_ENGINE_VERSION}:scoring:${RECOMMENDATION_SCORING_VERSION}`,
   ].join('::');
 }
 
@@ -1702,12 +1766,13 @@ export async function fetchPersonalRecommendationsResult(
   options: FetchPersonalRecommendationsOptions = {},
 ): Promise<PersonalRecommendationsResult> {
   const plannedGameIds = options.plannedGameIds ?? noPlannedGameIds;
-  const fp = profileFingerprint(userGames, plannedGameIds);
+  const preparedInput = options.preparedInput ?? prepareRecommendationInput(userGames, plannedGameIds);
+  const fp = preparedInput.fingerprint;
   const inboxFingerprint = [...inboxRawgIds].sort((a, b) => a - b).join('|');
   const requestKey = options.forceRefresh ? `force:${crypto.randomUUID()}` : `${fp}:${inboxFingerprint}:${options.hydrationReady !== false}`;
   const existing = inFlightRequests.get(requestKey);
   if (existing) return existing;
-  const request = generatePersonalRecommendationsResult(userGames, inboxRawgIds, options)
+  const request = generatePersonalRecommendationsResult(userGames, inboxRawgIds, { ...options, preparedInput })
     .finally(() => { inFlightRequests.delete(requestKey); });
   inFlightRequests.set(requestKey, request);
   return request;

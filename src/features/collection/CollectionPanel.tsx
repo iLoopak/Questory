@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { BacklogPlatformPicker } from '../../components/BacklogPlatformPicker';
 import { GameListEmptyState, GameListShell } from '../../components/GameListShell';
@@ -56,6 +56,7 @@ import type {
   SteamWishlistSyncState,
 } from '../../types/steam';
 import type { ReviewModeState, ReviewSource } from '../../lib/reviewModeStorage';
+import type { CollectionDetailAnchor } from '../../hooks/useCollectionAnchorRestoration';
 
 export type CollectionPanelCollectionActions = {
   addGame: () => void;
@@ -64,7 +65,7 @@ export type CollectionPanelCollectionActions = {
   findArtwork?: (game: Game) => void;
   findMetadata: (game: Game) => void;
   moveToLibrary: (game: Game) => void;
-  openDetails: (gameId: string) => void;
+  openDetails: (gameId: string, anchor?: CollectionDetailAnchor) => void;
   remove: (gameId: string) => void;
   removeAndIgnore: (game: Game) => void;
   statusChange: (gameId: string, status: GameStatus) => void;
@@ -133,6 +134,8 @@ export type CollectionPanelProps = {
   navigationActions?: CollectionPanelNavigationActions;
   filterActions: CollectionPanelFilterActions;
   itadDealSyncState?: ItadDealSyncState;
+  restorationAnchor?: CollectionDetailAnchor | null;
+  onRestorationComplete?: (requestId: number) => void;
 };
 
 export function CollectionPanel({
@@ -158,6 +161,8 @@ export function CollectionPanel({
   filterActions,
   itadDealSyncState,
   isHltbSyncing = false,
+  restorationAnchor,
+  onRestorationComplete,
 }: CollectionPanelProps) {
   const {
     addGame: onAddGame,
@@ -236,6 +241,19 @@ export function CollectionPanel({
     [collectionType, filters, viewMode],
   );
   const visibleGames = games;
+  const handleOpenDetails = useCallback((gameId: string, anchor?: CollectionDetailAnchor) => {
+    const itemIndex = games.findIndex((game) => game.id === gameId);
+    const safeIndex = itemIndex >= 0 ? itemIndex : anchor?.itemIndex ?? 0;
+    onOpenDetails(gameId, anchor ? {
+      ...anchor,
+      collectionType,
+      collectionKey: virtualResetKey,
+      viewMode,
+      itemIndex: safeIndex,
+      previousGameId: games[safeIndex - 1]?.id,
+      nextGameId: games[safeIndex + 1]?.id,
+    } : undefined);
+  }, [collectionType, games, onOpenDetails, viewMode, virtualResetKey]);
   const realCoverCount = useMemo(() => games.reduce((count, game) => count + (isMissingOrGeneratedCover(game.coverImage) ? 0 : 1), 0), [games]);
   const selectedGames = useMemo(() => games.filter((game) => selectedGameIds.has(game.id)), [games, selectedGameIds]);
   const selectedCount = selectedGames.length;
@@ -883,12 +901,15 @@ export function CollectionPanel({
             onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
-            onOpenDetails={onOpenDetails}
+            onOpenDetails={handleOpenDetails}
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
+            collectionKey={virtualResetKey}
+            restorationAnchor={restorationAnchor}
+            onRestorationComplete={onRestorationComplete}
           />
         ) : viewMode === 'Compact View' ? (
           <CollectionList
@@ -904,13 +925,16 @@ export function CollectionPanel({
             onPlayNow={onPlayNow}
             onFinish={onFinish}
             onDrop={onDrop}
-            onOpenDetails={onOpenDetails}
+            onOpenDetails={handleOpenDetails}
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
             scrollElementRef={contentScrollRef}
+            collectionKey={virtualResetKey}
+            restorationAnchor={restorationAnchor}
+            onRestorationComplete={onRestorationComplete}
           />
         ) : (
           <CollectionGrid
@@ -923,13 +947,16 @@ export function CollectionPanel({
             onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
-            onOpenDetails={onOpenDetails}
+            onOpenDetails={handleOpenDetails}
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
             onToggleSelected={toggleSelectedGame}
             platformQueueState={platformQueueState}
             scrollElementRef={contentScrollRef}
+            collectionKey={virtualResetKey}
+            restorationAnchor={restorationAnchor}
+            onRestorationComplete={onRestorationComplete}
           />
         )
       ) : collectionType === 'library' && !hasActiveFilters ? (

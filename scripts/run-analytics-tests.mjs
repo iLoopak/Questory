@@ -58,6 +58,9 @@ const testFiles = [
   { entry: 'scripts/discoveryPreviewArtwork.test.ts', out: 'discoveryPreviewArtwork.test.mjs' },
   { entry: 'scripts/semanticImageLifecycle.test.ts', out: 'semanticImageLifecycle.test.mjs' },
   { entry: 'scripts/homeContinuePlaying.test.ts', out: 'homeContinuePlaying.test.mjs' },
+  { entry: 'scripts/lazyFeatureRoutes.test.ts', out: 'lazyFeatureRoutes.test.mjs' },
+  { entry: 'scripts/recommendationSemanticInput.test.ts', out: 'recommendationSemanticInput.test.mjs' },
+  { entry: 'scripts/collectionAnchorRestoration.test.ts', out: 'collectionAnchorRestoration.test.mjs' },
   { entry: 'scripts/titleMatching.test.ts', out: 'titleMatching.test.mjs' },
   { entry: 'scripts/tasteProfileUi.test.ts', out: 'tasteProfileUi.test.mjs' },
   // Characterization tests for the destructive/cross-store boundaries (ARCHITECTURE_STABILITY_AUDIT).
@@ -93,8 +96,16 @@ const testFiles = [
   { entry: 'scripts/serviceWorkerOffline.test.ts', out: 'serviceWorkerOffline.test.mjs' },
 ];
 
+const requestedTestFiles = process.env.QS_TEST_FILTER
+  ? testFiles.filter(({ entry, out }) => `${entry}:${out}`.toLowerCase().includes(process.env.QS_TEST_FILTER.toLowerCase()))
+  : testFiles;
+
+if (requestedTestFiles.length === 0) {
+  throw new Error(`QS_TEST_FILTER did not match a test entry: ${process.env.QS_TEST_FILTER}`);
+}
+
 await Promise.all(
-  testFiles.map(({ entry, out }) =>
+  requestedTestFiles.map(({ entry, out }) =>
     build({ ...sharedConfig, entryPoints: [entry], outfile: resolve(outdir, out) }),
   ),
 );
@@ -104,6 +115,6 @@ await Promise.all(
 // its own module init.
 await import('./testUtils/installBrowserGlobals.mjs');
 
-for (const { out } of testFiles) {
+for (const { out } of requestedTestFiles) {
   await import(pathToFileURL(resolve(outdir, out)).href);
 }
