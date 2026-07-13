@@ -86,9 +86,13 @@ import { useCompletionRating } from './useCompletionRating';
 import { useAnalytics } from './useAnalytics';
 import { recordRecommendationOutcome } from '../../lib/recommendationFeedback';
 import { useAchievementSystem } from './useAchievementSystem';
-import { getSafeWishlistTitleMatches, normalizeImportMatchTitle } from '../../domain/imports/titleMatching';
 import { getIntegrationSettingsRevision, subscribeIntegrationSettings } from '../../lib/integrationSettingsRevision';
 import { getGamePersistenceState, subscribeGamePersistence } from '../../lib/gameStorage';
+import { steamOwnedGamesImportTransition } from '../../lib/importTransitions';
+
+function bucketDuplicateCount(count: number): 'zero' | '1_10' | '11_50' | '51_plus' {
+  return count <= 0 ? 'zero' : count <= 10 ? '1_10' : count <= 50 ? '11_50' : '51_plus';
+}
 
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
@@ -595,11 +599,18 @@ export function AppController() {
 
 
   function importSteamGames(importedGames: Game[]) {
-    const createdGames = importGames(importedGames);
-    if (createdGames.length > 0) {
-      trackMinimalAnalyticsEvent('library_import_completed', { source: 'steam', outcome: 'success', imported_count_bucket: bucketItemCount(createdGames.length), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
+    const result = runGamesCommand((currentGames) =>
+      steamOwnedGamesImportTransition(
+        currentGames,
+        importedGames,
+        new Set(ignoredSteamGames.map((game) => game.steamAppId)),
+      ),
+    );
+    const changedCount = result.created + result.movedFromWishlist + result.updated;
+    if (changedCount > 0) {
+      trackMinimalAnalyticsEvent('library_import_completed', { source: 'steam', outcome: 'success', imported_count_bucket: bucketItemCount(changedCount), duplicate_count_bucket: bucketDuplicateCount(result.skipped), duration_bucket: 'under_2s' });
     }
-    return createdGames;
+    return result;
   }
 
   async function importNewSteamGames() {
@@ -614,99 +625,39 @@ export function AppController() {
         getRecentlyPlayedGames(settings).catch(() => []),
       ]);
       const importedAt = new Date().toISOString();
-      const librarySteamAppIds = new Set(
-        games
-          .filter((game) => game.collectionType === 'library')
-          .map((game) => game.steamAppId)
-          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
-      );
-      const wishlistSteamAppIds = new Set(
-        games
-          .filter((game) => game.collectionType === 'wishlist')
-          .map((game) => game.steamAppId)
-          .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
-      );
-      const existingTitleMatches = getSafeWishlistTitleMatches(games);
       const ignoredSteamAppIds = new Set(ignoredSteamGames.map((game) => game.steamAppId));
-      const newOwnedGames = ownedGames.filter(
-        (game) => !librarySteamAppIds.has(game.appid) && !ignoredSteamAppIds.has(game.appid),
-      );
-      const mappedGames = mapSteamGamesToLocalGames(newOwnedGames, recentlyPlayedGames, importedAt).map((game) =>
+      const mappedGames = mapSteamGamesToLocalGames(ownedGames, recentlyPlayedGames, importedAt).map((game) =>
         touchGameRecord({
           ...game,
           collectionType: 'library' as const,
           notes: game.notes.replace('Imported from Steam API test results. Not saved to local library yet.', 'Imported from Steam owned games. Queued for triage.'),
         }),
       );
-      const mappedGamesByAppId = new Map(mappedGames.map((game) => [game.steamAppId, game]));
-      const mappedGameTitles = new Set(mappedGames.map((game) => normalizeImportMatchTitle(game.title)).filter(Boolean));
-      const removedWishlistIds = new Set(
-        games
-          .filter((game) => {
-            if (game.collectionType !== 'wishlist') return false;
-            if (typeof game.steamAppId === 'number') return newOwnedGames.some((ownedGame) => ownedGame.appid === game.steamAppId);
-            const normalizedTitle = normalizeImportMatchTitle(game.title);
-            return mappedGameTitles.has(normalizedTitle) && existingTitleMatches.get(normalizedTitle) === game.id;
-          })
-          .map((game) => game.id),
+      const result = runGamesCommand((currentGames) =>
+        steamOwnedGamesImportTransition(currentGames, mappedGames, ignoredSteamAppIds, importedAt),
       );
-      const createdGames = mappedGames;
+      const changedCount = result.created + result.movedFromWishlist + result.updated;
 
-      setGames((currentGames) => {
-        const currentLibrarySteamAppIds = new Set(
-          currentGames
-            .filter((game) => game.collectionType === 'library')
-            .map((game) => game.steamAppId)
-            .filter((steamAppId): steamAppId is number => typeof steamAppId === 'number'),
-        );
-
-        const nextLibraryGames: Game[] = [];
-
-        for (const ownedGame of newOwnedGames) {
-          if (currentLibrarySteamAppIds.has(ownedGame.appid)) continue;
-          const mappedGame = mappedGamesByAppId.get(ownedGame.appid);
-          if (!mappedGame) continue;
-          nextLibraryGames.push(mappedGame);
-          currentLibrarySteamAppIds.add(ownedGame.appid);
-        }
-
-        const nextGames = currentGames.filter((game) => {
-          if (game.collectionType !== 'wishlist') return true;
-          if (typeof game.steamAppId === 'number' && nextLibraryGames.some((newGame) => newGame.steamAppId === game.steamAppId)) {
-            return false;
-          }
-
-          const matchingNewGame = nextLibraryGames.find((newGame) => normalizeImportMatchTitle(newGame.title) === normalizeImportMatchTitle(game.title));
-          if (!game.steamAppId && matchingNewGame && existingTitleMatches.get(normalizeImportMatchTitle(game.title)) === game.id) {
-            return false;
-          }
-
-          return true;
-        });
-
-        return [...nextGames, ...nextLibraryGames];
-      });
-
-      if (createdGames.length > 0) {
+      if (result.transitionedGames.length > 0) {
         setPlatformQueueState((currentState) =>
-          createdGames.reduce((nextState, game) => addGameToPlatformQueue(nextState, game, game.platform), currentState),
+          result.transitionedGames.reduce((nextState, game) => addGameToPlatformQueue(nextState, game, game.platform), currentState),
         );
-        trackMinimalAnalyticsEvent('library_import_completed', { source: 'steam', outcome: 'success', imported_count_bucket: bucketItemCount(ownedGames.length), duplicate_count_bucket: 'zero', duration_bucket: 'under_2s' });
+      }
+      if (changedCount > 0) {
+        trackMinimalAnalyticsEvent('library_import_completed', { source: 'steam', outcome: 'success', imported_count_bucket: bucketItemCount(changedCount), duplicate_count_bucket: bucketDuplicateCount(result.skipped), duration_bucket: 'under_2s' });
       }
 
-      const duplicateCount = ownedGames.filter((game) => librarySteamAppIds.has(game.appid)).length;
-      const wishlistRemovedByAppIdCount = newOwnedGames.filter((game) => wishlistSteamAppIds.has(game.appid)).length;
-      const removedWishlistCount = Math.max(removedWishlistIds.size, wishlistRemovedByAppIdCount);
       const message = [
-        `${createdGames.length} new Steam games imported`,
-        `${duplicateCount} already in library`,
-        `${removedWishlistCount} removed from Wishlist / marked owned`,
-        `${createdGames.length} added to Quest Queue`,
+        `${result.created} created`,
+        `${result.movedFromWishlist} moved from Wishlist`,
+        `${result.updated} updated`,
+        `${result.skipped} skipped`,
+        `${result.failed} failed`,
       ].join(' Â· ');
 
       addToastNotification({
-        actions: createdGames.length > 0 ? [getOpenQueueAction()] : undefined,
-        category: createdGames.length > 0 ? 'success' : 'info',
+        actions: result.transitionedGames.length > 0 ? [getOpenQueueAction()] : undefined,
+        category: changedCount > 0 ? 'success' : result.failed > 0 ? 'error' : 'info',
         dedupeKey: 'steam-import-new-games',
         message,
       });
@@ -1357,7 +1308,7 @@ export function AppController() {
           onAction={handleOnboardingAction}
           onClose={hideOnboarding}
           onComplete={markOnboardingItemComplete}
-          onImportGames={importGames}
+          onImportGames={importSteamGames}
           onOpenLibrary={() => handleOnboardingAction('ready', 'primary')}
           onOpenQueue={() => handleOnboardingAction('ready', 'secondary')}
           onSkip={skipOnboardingItem}

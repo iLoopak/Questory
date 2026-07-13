@@ -432,7 +432,7 @@ export function WishlistSettingsPanel({
       return;
     }
     const summary = onImportMultiGames(parsed);
-    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.invalidRows} skipped · source: ${summary.source === 'nintendo-virtual-game-cards' ? 'Nintendo Virtual Game Cards' : summary.source}`);
+    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.ambiguousCount} ambiguous · ${summary.invalidRows} skipped · source: ${summary.source === 'nintendo-virtual-game-cards' ? 'Nintendo Virtual Game Cards' : summary.source}`);
   }
 
   return (

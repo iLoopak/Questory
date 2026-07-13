@@ -17,6 +17,7 @@ import { SetupCenterPanel } from '../../components/settings/SetupCenterPanel';
 import { SettingsSection } from '../../components/settings/SettingsSection';
 import { SteamWishlistHtmlImportModal, WishlistSettingsPanel } from '../../components/settings/WishlistSettingsPanel';
 import type { MultiGameImportParseResult, MultiGameImportSummary } from '../../lib/multiGameImport';
+import type { SteamOwnedImportSummary } from '../../lib/importTransitions';
 import { getSettingsCategoryMeta, settingsCategories, type SettingsCategory } from '../../config/settings';
 import { createTranslator, translateSettingsCategory, useI18n, type AppLanguage } from '../../i18n';
 import { getSetupProgress, type SetupTask } from '../../lib/setupTasks';
@@ -82,7 +83,7 @@ export type SettingsViewProps = {
   onClearLibraryFilters: () => void;
   onConnectionTested: () => void;
   onEnrichRetroImportedGames: (gameIds: string[]) => void;
-  onImportGames: (games: Game[]) => void;
+  onImportGames: (games: Game[]) => SteamOwnedImportSummary;
   onImportRetroGames: (games: Game[]) => Game[];
   onControllerDebugChange: (isEnabled: boolean) => void;
   onControllerProfileChange: (profileId: ControllerProfileId) => void;

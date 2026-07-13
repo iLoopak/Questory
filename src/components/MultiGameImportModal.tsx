@@ -47,7 +47,7 @@ export function MultiGameImportModal({ onClose, onImport, restoreFocusRef }: Mul
     }
 
     const summary = onImport(parsed);
-    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.invalidRows} skipped · source: ${summary.source === 'nintendo-virtual-game-cards' ? 'Nintendo Virtual Game Cards' : summary.source}`);
+    setMultiImportMessage(`${summary.importedCount} imported · ${summary.skippedDuplicates} duplicates · ${summary.updatedExisting} updated · ${summary.ambiguousCount} ambiguous · ${summary.invalidRows} skipped · source: ${summary.source === 'nintendo-virtual-game-cards' ? 'Nintendo Virtual Game Cards' : summary.source}`);
   }
 
   return (
