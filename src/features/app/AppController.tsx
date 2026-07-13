@@ -86,6 +86,7 @@ import { useCompletionRating } from './useCompletionRating';
 import { useAnalytics } from './useAnalytics';
 import { recordRecommendationOutcome } from '../../lib/recommendationFeedback';
 import { useAchievementSystem } from './useAchievementSystem';
+import type { CollectionDetailAnchor } from '../../hooks/useCollectionAnchorRestoration';
 import { getIntegrationSettingsRevision, subscribeIntegrationSettings } from '../../lib/integrationSettingsRevision';
 import { getGamePersistenceState, subscribeGamePersistence } from '../../lib/gameStorage';
 import { steamOwnedGamesImportTransition } from '../../lib/importTransitions';
@@ -110,6 +111,9 @@ export function AppController() {
   // the normalized value; AppController no longer accepts a second partial boolean mirror.
   const setIsRawgApiKeySet = useCallback(() => {}, []);
   const [steamProfileName, setSteamProfileName] = useState(() => getSteamProfileDisplayName(steamSettingsSnapshot));
+  const collectionDetailOriginRef = useRef<CollectionDetailAnchor | null>(null);
+  const collectionRestorationRequestRef = useRef(0);
+  const [collectionDetailReturnAnchor, setCollectionDetailReturnAnchor] = useState<CollectionDetailAnchor | null>(null);
   const {
     accentColorPreference,
     accentThemeStyle,
@@ -149,7 +153,11 @@ export function AppController() {
     setActiveSettingsCategory,
     setNavigationVisibility,
     visibleNavItems,
-  } = useNavigationState({ onSectionChange: () => setSelectedGameId(null) });
+  } = useNavigationState({ onSectionChange: () => {
+    collectionDetailOriginRef.current = null;
+    setCollectionDetailReturnAnchor(null);
+    setSelectedGameId(null);
+  } });
   const { isAddGameOpen, selectedGame, selectedGameId, setIsAddGameOpen, setSelectedGameId } = useGameSelection(games);
   const {
     activeQueuePlatforms,
@@ -868,6 +876,8 @@ export function AppController() {
   // The Game Hub opens as a fullscreen overlay, so the originating screen
   // stays mounted behind it and back restores scroll/focus for free.
   function openGameFromHome(game: Game) {
+    collectionDetailOriginRef.current = null;
+    setCollectionDetailReturnAnchor(null);
     setSelectedGameId(game.id);
   }
 
@@ -1006,31 +1016,40 @@ export function AppController() {
   }
 
   function selectNavigationItem(item: TopNavItem | MoreNavItem) {
+    collectionDetailOriginRef.current = null;
+    setCollectionDetailReturnAnchor(null);
     setSelectedGameId(null);
     setActiveNavItem(item);
     setIsMoreMenuOpen(false);
   }
 
-  const handleOpenDetailsFromCollection = useCallback((gameId: string) => {
+  const handleOpenDetailsFromCollection = useCallback((gameId: string, anchor?: CollectionDetailAnchor) => {
+    collectionDetailOriginRef.current = anchor ?? null;
+    setCollectionDetailReturnAnchor(null);
     setSelectedGameId(gameId);
   }, []);
 
   function handleBackFromDetail() {
     const returningGameId = selectedGameId;
+    const origin = collectionDetailOriginRef.current;
+    collectionDetailOriginRef.current = null;
     setSelectedGameId(null);
-    // Controller/keyboard flow: put focus back on the originating card.
-    // Scroll position is already preserved because the previous screen
-    // stays mounted behind the fullscreen Game Hub; scroll-mt on the card
-    // handles the edge case where it sits just outside the viewport.
-    if (returningGameId) {
+    if (origin) {
+      collectionRestorationRequestRef.current += 1;
+      setCollectionDetailReturnAnchor({ ...origin, requestId: collectionRestorationRequestRef.current });
+    } else if (returningGameId) {
       window.setTimeout(() => {
         const card = mainContentRef.current?.querySelector<HTMLElement>(
           `[data-game-id="${CSS.escape(returningGameId)}"]`,
         );
-        card?.focus();
+        card?.focus({ preventScroll: true });
       }, 0);
     }
   }
+
+  const completeCollectionDetailReturn = useCallback((requestId: number) => {
+    setCollectionDetailReturnAnchor((current) => current?.requestId === requestId ? null : current);
+  }, []);
 
   const handleClearLibraryFilters = useCallback(() => {
     setLibraryFilters(initialCollectionFilters);
@@ -1203,10 +1222,10 @@ export function AppController() {
         </header>
 
         <AppSectionRouter
-          core={{ activeNavItem, mainContentRef, t, addToastNotification, setActiveNavItem, setActiveSettingsCategory, setSelectedGameId, setIsAddGameOpen, openOnboarding, setIsAchievementTimelineOpen, openGameFromHome }}
+          core={{ activeNavItem, mainContentRef, t, addToastNotification, setActiveNavItem, setActiveSettingsCategory, setSelectedGameId, setIsAddGameOpen, openOnboarding, setIsAchievementTimelineOpen, openGameFromHome, collectionDetailReturnAnchor, completeCollectionDetailReturn }}
           games={{ games, filteredLibraryGames, filteredWishlistGames, playActivity, reviewIgnoredGameIds, ignoredSteamGames, addToWishlist, addManyToWishlist, moveToLibrary, removeGame, removeAndIgnoreSteamGame, removeManyGames, removeAndIgnoreManyGames, updateGameStatusWithCompletion, updateManyGameStatuses, updateGameTracking, updateGameReviewFieldsWithCompletion, logPlayedToday, handleOpenDetailsFromCollection }}
           collections={{ libraryFilters, wishlistFilters, platformOptions, tags, areLastRetroImportsHiddenByFilters, handleClearLibraryFilters, handleClearWishlistFilters, handleLibraryFiltersChange, handleWishlistFiltersChange, setLibraryFilters }}
-          queue={{ platformQueueState, queueSummary, activeQueuePlatforms, targetQueuePlatform, homeSteamSyncGameIds, openQueue, openBacklogPicker, addGameToQueue, addQueuePlatform, updateQueueLimit, setPlatformQueueState, moveQueueGame, moveQueueGameToPlatform, playQueueGameNow, updateCurrentlyPlayingGame, removeQueueGame, playGameFromCompactRow, finishGameFromCompactRow, dropGameFromCompactRow }}
+          queue={{ platformQueueState, plannedGameIds, queueSummary, activeQueuePlatforms, targetQueuePlatform, homeSteamSyncGameIds, openQueue, openBacklogPicker, addGameToQueue, addQueuePlatform, updateQueueLimit, setPlatformQueueState, moveQueueGame, moveQueueGameToPlatform, playQueueGameNow, updateCurrentlyPlayingGame, removeQueueGame, playGameFromCompactRow, finishGameFromCompactRow, dropGameFromCompactRow }}
           review={{ reviewModeState, activeReviewSource, confirmCancelConvention, handleReviewAction, startReviewMode, setReviewSource, restoreReviewIgnoredGames }}
           sync={{ itadDealSyncState, steamAchievementSyncState, steamPlaytimeRefreshState, steamWishlistSyncState, isImportingNewSteamGames, isHltbSyncing, syncSteamAchievements, refreshSteamPlaytime, syncWishlistDeals, syncSteamWishlist, syncHltb, importNewSteamGames }}
           shelf={{ personalizedQuestShelfTitle, computedShelfTitle, shelfIdentity, steamAvatarUrl, libraryOwnerNickname, questShelfAchievements, setLibraryOwnerNickname, setShelfIdentity }}

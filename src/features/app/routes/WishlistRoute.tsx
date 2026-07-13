@@ -2,7 +2,7 @@ import { CollectionPanel } from '../../collection/CollectionPanel';
 import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSyncModel } from './routeModels';
 
 type WishlistRouteProps = {
-  core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setIsAddGameOpen'>;
+  core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setIsAddGameOpen' | 'collectionDetailReturnAnchor' | 'completeCollectionDetailReturn'>;
   games: Pick<AppRouterGameModel, 'filteredWishlistGames' | 'addToWishlist' | 'addManyToWishlist' | 'moveToLibrary' | 'handleOpenDetailsFromCollection' | 'removeGame' | 'removeAndIgnoreSteamGame' | 'updateGameStatusWithCompletion' | 'removeManyGames' | 'removeAndIgnoreManyGames' | 'updateManyGameStatuses'>;
   collections: Pick<AppRouterCollectionModel, 'wishlistFilters' | 'platformOptions' | 'tags' | 'handleClearWishlistFilters' | 'handleWishlistFiltersChange'>;
   queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'openBacklogPicker' | 'playGameFromCompactRow' | 'finishGameFromCompactRow' | 'dropGameFromCompactRow'>;
@@ -17,6 +17,8 @@ export function WishlistRoute({ core, games, collections, queue, review, sync, m
     <CollectionPanel
       collectionType="wishlist"
       contentScrollRef={core.mainContentRef}
+      restorationAnchor={core.collectionDetailReturnAnchor?.collectionType === 'wishlist' ? core.collectionDetailReturnAnchor : null}
+      onRestorationComplete={core.completeCollectionDetailReturn}
       filters={collections.wishlistFilters}
       games={games.filteredWishlistGames}
       platformOptions={collections.platformOptions}

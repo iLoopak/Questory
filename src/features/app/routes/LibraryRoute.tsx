@@ -3,7 +3,7 @@ import { formatMessageTemplate, formatSteamAchievementSyncSummary } from '../../
 import type { AppRouterCollectionModel, AppRouterCoreModel, AppRouterGameModel, AppRouterImportModel, AppRouterMetadataModel, AppRouterQueueModel, AppRouterReviewModel, AppRouterSyncModel } from './routeModels';
 
 type LibraryRouteProps = {
-  core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setIsAddGameOpen' | 'openOnboarding' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 't'>;
+  core: Pick<AppRouterCoreModel, 'mainContentRef' | 'setIsAddGameOpen' | 'openOnboarding' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 't' | 'collectionDetailReturnAnchor' | 'completeCollectionDetailReturn'>;
   games: Pick<AppRouterGameModel, 'filteredLibraryGames' | 'games' | 'reviewIgnoredGameIds' | 'addToWishlist' | 'addManyToWishlist' | 'moveToLibrary' | 'handleOpenDetailsFromCollection' | 'removeGame' | 'removeAndIgnoreSteamGame' | 'updateGameStatusWithCompletion' | 'removeManyGames' | 'removeAndIgnoreManyGames' | 'updateManyGameStatuses'>;
   collections: Pick<AppRouterCollectionModel, 'libraryFilters' | 'platformOptions' | 'tags' | 'handleClearLibraryFilters' | 'handleLibraryFiltersChange'>;
   queue: Pick<AppRouterQueueModel, 'platformQueueState' | 'openBacklogPicker' | 'playGameFromCompactRow' | 'finishGameFromCompactRow' | 'dropGameFromCompactRow'>;
@@ -18,6 +18,8 @@ export function LibraryRoute({ core, games, collections, queue, review, sync, me
     <CollectionPanel
       collectionType="library"
       contentScrollRef={core.mainContentRef}
+      restorationAnchor={core.collectionDetailReturnAnchor?.collectionType === 'library' ? core.collectionDetailReturnAnchor : null}
+      onRestorationComplete={core.completeCollectionDetailReturn}
       filters={collections.libraryFilters}
       steamAchievementSyncState={sync.steamAchievementSyncState}
       steamPlaytimeRefreshState={sync.steamPlaytimeRefreshState}

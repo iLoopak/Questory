@@ -51,6 +51,8 @@ import type { ParsedSteamWishlistImportItem } from '../../../lib/steamWishlistHt
 import type { QuestShelfAchievementProgress } from '../../../lib/questShelfAchievements';
 import type { MetadataRefreshMode, MetadataRefreshResult, MetadataSelectionRequest } from '../../../hooks/useMetadataArtworkActions';
 import type { PlayingGameAction, ReviewModeAction, ReviewModeActionContext } from '../../../types/gameActions';
+import type { PlannedGameIds } from '../../../lib/plannedGames';
+import type { CollectionDetailAnchor } from '../../../hooks/useCollectionAnchorRestoration';
 import type { SteamWishlistHtmlImportSummary } from '../../../utils/summaryFormatters';
 import type { SteamOwnedImportSummary } from '../../../lib/importTransitions';
 
@@ -72,6 +74,7 @@ export type AppSectionRouteModel = {
 
   // ── Platform / queue ─────────────────────────────────────────────────────
   platformQueueState: PlatformQueueState;
+  plannedGameIds: PlannedGameIds;
   queueSummary: PlatformQueueSummary;
   activeQueuePlatforms: GamePlatform[];
   targetQueuePlatform: GamePlatform | undefined;
@@ -154,6 +157,8 @@ export type AppSectionRouteModel = {
   openOnboarding: () => void;
   setIsAchievementTimelineOpen: (open: boolean) => void;
   openGameFromHome: (game: Game) => void;
+  collectionDetailReturnAnchor: CollectionDetailAnchor | null;
+  completeCollectionDetailReturn: (requestId: number) => void;
   openQueue: (platform?: GamePlatform) => void;
 
   // ── Game library actions ───────────────────────────────────────────────────
@@ -172,7 +177,7 @@ export type AppSectionRouteModel = {
   updateGameMetadata: (gameId: string, metadata: RawgMetadata) => void;
   updateGameMetadataManagement: (gameId: string, changes: Pick<Game, 'metadataManualManagedAt' | 'metadataSkippedAt'>) => void;
   logPlayedToday: (game: Game) => void;
-  handleOpenDetailsFromCollection: (gameId: string) => void;
+  handleOpenDetailsFromCollection: (gameId: string, anchor?: CollectionDetailAnchor) => void;
 
   // ── Metadata actions ───────────────────────────────────────────────────────
   refreshGameMetadataFromActions: (game: Game, mode?: MetadataRefreshMode) => Promise<MetadataRefreshResult>;
@@ -266,10 +271,10 @@ export type AppSectionRouteModel = {
   unignoreSteamGame: (steamAppId: number) => void;
 };
 
-type AppRouterCoreKeys = 'activeNavItem' | 'mainContentRef' | 't' | 'addToastNotification' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 'setSelectedGameId' | 'setIsAddGameOpen' | 'openOnboarding' | 'setIsAchievementTimelineOpen' | 'openGameFromHome';
+type AppRouterCoreKeys = 'activeNavItem' | 'mainContentRef' | 't' | 'addToastNotification' | 'setActiveNavItem' | 'setActiveSettingsCategory' | 'setSelectedGameId' | 'setIsAddGameOpen' | 'openOnboarding' | 'setIsAchievementTimelineOpen' | 'openGameFromHome' | 'collectionDetailReturnAnchor' | 'completeCollectionDetailReturn';
 type AppRouterGameKeys = 'games' | 'filteredLibraryGames' | 'filteredWishlistGames' | 'playActivity' | 'reviewIgnoredGameIds' | 'ignoredSteamGames' | 'addToWishlist' | 'addManyToWishlist' | 'moveToLibrary' | 'removeGame' | 'removeAndIgnoreSteamGame' | 'removeManyGames' | 'removeAndIgnoreManyGames' | 'updateGameStatusWithCompletion' | 'updateManyGameStatuses' | 'updateGameTracking' | 'updateGameReviewFieldsWithCompletion' | 'logPlayedToday' | 'handleOpenDetailsFromCollection';
 type AppRouterCollectionKeys = 'libraryFilters' | 'wishlistFilters' | 'platformOptions' | 'tags' | 'areLastRetroImportsHiddenByFilters' | 'handleClearLibraryFilters' | 'handleClearWishlistFilters' | 'handleLibraryFiltersChange' | 'handleWishlistFiltersChange' | 'setLibraryFilters';
-type AppRouterQueueKeys = 'platformQueueState' | 'queueSummary' | 'activeQueuePlatforms' | 'targetQueuePlatform' | 'homeSteamSyncGameIds' | 'openQueue' | 'openBacklogPicker' | 'addGameToQueue' | 'addQueuePlatform' | 'updateQueueLimit' | 'setPlatformQueueState' | 'moveQueueGame' | 'moveQueueGameToPlatform' | 'playQueueGameNow' | 'updateCurrentlyPlayingGame' | 'removeQueueGame' | 'playGameFromCompactRow' | 'finishGameFromCompactRow' | 'dropGameFromCompactRow';
+type AppRouterQueueKeys = 'platformQueueState' | 'plannedGameIds' | 'queueSummary' | 'activeQueuePlatforms' | 'targetQueuePlatform' | 'homeSteamSyncGameIds' | 'openQueue' | 'openBacklogPicker' | 'addGameToQueue' | 'addQueuePlatform' | 'updateQueueLimit' | 'setPlatformQueueState' | 'moveQueueGame' | 'moveQueueGameToPlatform' | 'playQueueGameNow' | 'updateCurrentlyPlayingGame' | 'removeQueueGame' | 'playGameFromCompactRow' | 'finishGameFromCompactRow' | 'dropGameFromCompactRow';
 type AppRouterReviewKeys = 'reviewModeState' | 'activeReviewSource' | 'confirmCancelConvention' | 'handleReviewAction' | 'startReviewMode' | 'setReviewSource' | 'restoreReviewIgnoredGames';
 type AppRouterSyncKeys = 'itadDealSyncState' | 'steamAchievementSyncState' | 'steamPlaytimeRefreshState' | 'steamWishlistSyncState' | 'isImportingNewSteamGames' | 'isHltbSyncing' | 'syncSteamAchievements' | 'refreshSteamPlaytime' | 'syncWishlistDeals' | 'syncSteamWishlist' | 'syncHltb' | 'importNewSteamGames';
 type AppRouterShelfKeys = 'personalizedQuestShelfTitle' | 'computedShelfTitle' | 'shelfIdentity' | 'steamAvatarUrl' | 'libraryOwnerNickname' | 'questShelfAchievements' | 'setLibraryOwnerNickname' | 'setShelfIdentity';

@@ -16,6 +16,11 @@ import { DealCoverBadges } from './DealCoverBadges';
 import { HltbBadge } from './HltbBadge';
 import { useVirtualWindow } from '../hooks/useVirtualWindow';
 import { useCoverImageLoaded } from '../hooks/useCoverImageLoaded';
+import {
+  captureCollectionDetailAnchor,
+  useCollectionAnchorRestoration,
+  type CollectionDetailAnchor,
+} from '../hooks/useCollectionAnchorRestoration';
 
 type CollectionActionHandlers = {
   onAddToQueue?: (game: Game) => void;
@@ -26,7 +31,7 @@ type CollectionActionHandlers = {
   onPlayNow?: (game: Game) => void;
   onFinish?: (game: Game) => void;
   onDrop?: (game: Game) => void;
-  onOpenDetails: (gameId: string) => void;
+  onOpenDetails: (gameId: string, anchor?: CollectionDetailAnchor) => void;
   onRemove: (gameId: string) => void;
   onRemoveAndIgnore: (game: Game) => void;
   onStatusChange: (gameId: string, status: GameStatus) => void;
@@ -52,6 +57,9 @@ type CollectionViewProps = CollectionActionHandlers &
     debugLabel?: string;
     platformQueueState?: PlatformQueueState;
     scrollElementRef?: RefObject<HTMLElement | null>;
+    collectionKey?: string;
+    restorationAnchor?: CollectionDetailAnchor | null;
+    onRestorationComplete?: (requestId: number) => void;
   };
 
 
@@ -76,6 +84,9 @@ export function CollectionGrid({
   onToggleSelected,
   platformQueueState,
   scrollElementRef,
+  collectionKey = '',
+  restorationAnchor,
+  onRestorationComplete,
 }: CollectionViewProps) {
   const gridRef = useRef<HTMLDivElement | null>(null);
   const renderedGridRef = useRef<HTMLDivElement | null>(null);
@@ -119,6 +130,33 @@ export function CollectionGrid({
   const startItemIndex = Math.min(games.length, virtualRows.startIndex * columns);
   const endItemIndex = Math.min(games.length, (virtualRows.endIndex + 1) * columns);
   const renderedGames = games.slice(startItemIndex, endItemIndex);
+  const gameIds = useMemo(() => games.map((game) => game.id), [games]);
+  const gameIndexById = useMemo(() => new Map(gameIds.map((id, index) => [id, index])), [gameIds]);
+  const handleOpenDetails = useCallback((gameId: string) => {
+    const itemIndex = gameIndexById.get(gameId) ?? 0;
+    onOpenDetails(gameId, captureCollectionDetailAnchor({
+      axis: 'vertical',
+      columns,
+      gameId,
+      itemIndex,
+      itemSize: rowHeight,
+      scrollElement: scrollElementRef?.current ?? null,
+      virtualIndex: Math.floor(itemIndex / Math.max(1, columns)),
+      virtualizerElement: gridRef.current,
+    }));
+  }, [columns, gameIndexById, onOpenDetails, rowHeight, scrollElementRef]);
+
+  useCollectionAnchorRestoration({
+    anchor: restorationAnchor,
+    axis: 'vertical',
+    collectionKey,
+    columns,
+    gameIds,
+    itemSize: rowHeight,
+    onComplete: onRestorationComplete,
+    scrollElementRef: scrollElementRef ?? gridRef,
+    virtualizerRef: gridRef,
+  });
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') {
@@ -227,7 +265,7 @@ export function CollectionGrid({
             onFindArtwork={onFindArtwork}
             onFindMetadata={onFindMetadata}
             onMoveToLibrary={onMoveToLibrary}
-            onOpenDetails={onOpenDetails}
+            onOpenDetails={handleOpenDetails}
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
@@ -261,6 +299,9 @@ export function CollectionShelf({
   onStatusChange,
   onToggleSelected,
   platformQueueState,
+  collectionKey = '',
+  restorationAnchor,
+  onRestorationComplete,
 }: CollectionViewProps) {
   const { t } = useI18n();
   const shelfScrollerRef = useRef<HTMLDivElement | null>(null);
@@ -275,6 +316,33 @@ export function CollectionShelf({
     scrollElementRef: shelfScrollerRef,
   });
   const renderedShelfGames = games.slice(virtualItems.startIndex, virtualItems.endIndex + 1);
+  const gameIds = useMemo(() => games.map((game) => game.id), [games]);
+  const gameIndexById = useMemo(() => new Map(gameIds.map((id, index) => [id, index])), [gameIds]);
+  const handleOpenDetails = useCallback((gameId: string) => {
+    const itemIndex = gameIndexById.get(gameId) ?? 0;
+    onOpenDetails(gameId, captureCollectionDetailAnchor({
+      axis: 'horizontal',
+      columns: 1,
+      gameId,
+      itemIndex,
+      itemSize: cardSize,
+      scrollElement: shelfScrollerRef.current,
+      virtualIndex: itemIndex,
+      virtualizerElement: shelfScrollerRef.current?.firstElementChild as HTMLElement | null,
+    }));
+  }, [cardSize, gameIndexById, onOpenDetails]);
+
+  useCollectionAnchorRestoration({
+    anchor: restorationAnchor,
+    axis: 'horizontal',
+    collectionKey,
+    columns: 1,
+    gameIds,
+    itemSize: cardSize,
+    onComplete: onRestorationComplete,
+    scrollElementRef: shelfScrollerRef,
+    virtualizerRef: shelfScrollerRef,
+  });
   // Stable signature of game IDs in order. Only resets scroll when the set or
   // order of games actually changes — not on every property mutation.
   const shelfGameIdsSignature = useMemo(() => games.map((g) => g.id).join('|'), [games]);
@@ -412,7 +480,7 @@ export function CollectionShelf({
                   onFindMetadata={onFindMetadata}
                   onKeyDown={handleShelfKeyDown}
                   onMoveToLibrary={onMoveToLibrary}
-                  onOpenDetails={onOpenDetails}
+                  onOpenDetails={handleOpenDetails}
                   onRemove={onRemove}
                   onRemoveAndIgnore={onRemoveAndIgnore}
                   onStatusChange={onStatusChange}
@@ -454,6 +522,9 @@ export function CollectionList({
   onToggleSelected,
   platformQueueState,
   scrollElementRef,
+  collectionKey = '',
+  restorationAnchor,
+  onRestorationComplete,
 }: CollectionViewProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const rowHeight = 98;
@@ -466,6 +537,33 @@ export function CollectionList({
     virtualizerRef: listRef,
   });
   const renderedGames = games.slice(virtualRows.startIndex, virtualRows.endIndex + 1);
+  const gameIds = useMemo(() => games.map((game) => game.id), [games]);
+  const gameIndexById = useMemo(() => new Map(gameIds.map((id, index) => [id, index])), [gameIds]);
+  const handleOpenDetails = useCallback((gameId: string) => {
+    const itemIndex = gameIndexById.get(gameId) ?? 0;
+    onOpenDetails(gameId, captureCollectionDetailAnchor({
+      axis: 'vertical',
+      columns: 1,
+      gameId,
+      itemIndex,
+      itemSize: rowHeight,
+      scrollElement: scrollElementRef?.current ?? null,
+      virtualIndex: itemIndex,
+      virtualizerElement: listRef.current,
+    }));
+  }, [gameIndexById, onOpenDetails, scrollElementRef]);
+
+  useCollectionAnchorRestoration({
+    anchor: restorationAnchor,
+    axis: 'vertical',
+    collectionKey,
+    columns: 1,
+    gameIds,
+    itemSize: rowHeight,
+    onComplete: onRestorationComplete,
+    scrollElementRef: scrollElementRef ?? listRef,
+    virtualizerRef: listRef,
+  });
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -507,7 +605,7 @@ export function CollectionList({
             onPlayNow={onPlayNow}
             onFinish={onFinish}
             onDrop={onDrop}
-            onOpenDetails={onOpenDetails}
+            onOpenDetails={handleOpenDetails}
             onRemove={onRemove}
             onRemoveAndIgnore={onRemoveAndIgnore}
             onStatusChange={onStatusChange}
