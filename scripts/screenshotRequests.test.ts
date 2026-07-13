@@ -12,14 +12,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { assertTestEnvironment, resetWebStorage } from './testUtils/testEnvironment';
-import { actAsync, renderHook } from './testUtils/reactHarness';
+import { actAsync, renderComponent, renderHook } from './testUtils/reactHarness';
 import { saveRawgSettings } from '../src/lib/rawgSettingsStorage';
-import { getCachedScreenshots, mergeScreenshotStores } from '../src/lib/screenshotCache';
+import { getCachedScreenshots, getCachedScreenshotsByRawgId, mergeScreenshotStores, setCachedScreenshotsByRawgId } from '../src/lib/screenshotCache';
 import type { Game } from '../src/types/game';
 
 assertTestEnvironment();
 
 const { useGameScreenshots } = await import('../src/hooks/useGameScreenshots');
+const { useDiscoveryScreenshots } = await import('../src/hooks/useDiscoveryScreenshots');
+const { DiscoveryScreenshotGallery } = await import('../src/components/ScreenshotStrip');
 
 // ---------------------------------------------------------------------------
 // A hand-released integration proxy. Every request parks until the test lets it go.
@@ -259,6 +261,78 @@ test('AS-13: a late cache hydration cannot overwrite newer network data', () => 
 
   assert.deepEqual(merged['rawg:1'].urls, ['https://cdn/new.jpg'], 'the fresh network result survives the late read');
   assert.deepEqual(merged['rawg:2'].urls, ['https://cdn/other.jpg'], 'and the hydrated entries it does not know about are kept');
+});
+
+test('Discovery Preview has one screenshot request owner for an uncached game', async () => {
+  setup();
+  const handle = await renderHook((rawgId: number) => useDiscoveryScreenshots(rawgId), 901);
+
+  assert.equal(pending.length, 1, 'the owner starts exactly one uncached request');
+  assert.equal(pending[0]?.rawgId, 901);
+  await release(901, { urls: ['https://cdn/discovery.jpg'] });
+  assert.deepEqual(handle.current.screenshots, ['https://cdn/discovery.jpg']);
+  await handle.unmount();
+});
+
+test('Discovery Preview presentational gallery never starts its own request', async () => {
+  setup();
+  const handle = await renderComponent(DiscoveryScreenshotGallery, {
+    error: false,
+    loading: false,
+    onRetry: () => {},
+    screenshots: ['https://cdn/presentational.jpg'],
+    title: 'Presentational',
+  });
+
+  assert.equal(pending.length, 0, 'rendering the child gallery performs no fetch');
+  await handle.unmount();
+});
+
+test('Discovery screenshot cache hits perform no request', async () => {
+  setup();
+  setCachedScreenshotsByRawgId(902, ['https://cdn/cached.jpg']);
+
+  const handle = await renderHook((rawgId: number) => useDiscoveryScreenshots(rawgId), 902);
+  assert.equal(pending.length, 0);
+  assert.deepEqual(handle.current.screenshots, ['https://cdn/cached.jpg']);
+  assert.equal(handle.current.loading, false);
+  await handle.unmount();
+});
+
+test('Discovery screenshot failures remain retryable and are not cached as empty', async () => {
+  setup();
+  const handle = await renderHook((rawgId: number) => useDiscoveryScreenshots(rawgId), 903);
+  await release(903, { failWith: 503 });
+
+  assert.equal(handle.current.error, true);
+  assert.equal(getCachedScreenshotsByRawgId(903), null);
+  await actAsync(() => handle.current.refetch());
+  assert.equal(pending.length, 1);
+  await release(903, { urls: ['https://cdn/retry.jpg'] });
+
+  assert.equal(handle.current.error, false);
+  assert.deepEqual(handle.current.screenshots, ['https://cdn/retry.jpg']);
+  await handle.unmount();
+});
+
+test('Discovery screenshot switching ignores a stale result for the previous candidate', async () => {
+  setup();
+  const handle = await renderHook((rawgId: number) => useDiscoveryScreenshots(rawgId), 904);
+  await handle.rerender(905);
+
+  await release(905, { urls: ['https://cdn/current.jpg'] });
+  await release(904, { urls: ['https://cdn/stale.jpg'] });
+  assert.deepEqual(handle.current.screenshots, ['https://cdn/current.jpg']);
+  assert.equal(getCachedScreenshotsByRawgId(904), null, 'the stale owner does not populate cache after switching');
+  await handle.unmount();
+});
+
+test('Discovery screenshot owner commits nothing after unmount', async () => {
+  setup();
+  const handle = await renderHook((rawgId: number) => useDiscoveryScreenshots(rawgId), 906);
+  await handle.unmount();
+  await release(906, { urls: ['https://cdn/late-discovery.jpg'] });
+  assert.equal(getCachedScreenshotsByRawgId(906), null);
 });
 
 test('teardown', () => {

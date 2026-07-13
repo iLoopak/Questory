@@ -12,7 +12,7 @@ import { DetailSection } from '../game-detail/DetailSection';
 import { GameDetailActionBar, GameDetailActionButton, type GameDetailAction } from '../game-detail/GameDetailActions';
 import { GameInformationSection, formatMetacriticScore } from '../game-detail/GameInformationSection';
 import { RawgRatingBadge, getRawgRatingDisplay } from '../RawgRatingBadge';
-import { DiscoveryScreenshotStrip } from '../ScreenshotStrip';
+import { DiscoveryScreenshotGallery } from '../ScreenshotStrip';
 import { ContextualRecommendationsSection } from './ContextualRecommendationsSection';
 
 type Props = {
@@ -54,7 +54,7 @@ export function DiscoveryPreviewPanel({
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const { screenshots, loading: screenshotsLoading } = useDiscoveryScreenshots(game.rawgId);
+  const { screenshots, loading: screenshotsLoading, error: screenshotsError, refetch: refetchScreenshots } = useDiscoveryScreenshots(game.rawgId);
 
   // Real-time collection status (reacts to changes while the panel is open).
   const realMatch = userGames.find((g) => g.rawgId === game.rawgId);
@@ -238,9 +238,15 @@ export function DiscoveryPreviewPanel({
         )}
       </DetailSection>
 
-      {screenshotsLoading || screenshots.length > 0 ? (
+      {screenshotsLoading || screenshotsError || screenshots.length > 0 ? (
         <DetailSection title={t('preview.screenshots')}>
-          <DiscoveryScreenshotStrip rawgId={game.rawgId} title={game.title} />
+          <DiscoveryScreenshotGallery
+            error={screenshotsError}
+            loading={screenshotsLoading}
+            onRetry={refetchScreenshots}
+            screenshots={screenshots}
+            title={game.title}
+          />
         </DetailSection>
       ) : null}
 
