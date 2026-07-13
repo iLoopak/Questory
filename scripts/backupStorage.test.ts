@@ -189,9 +189,9 @@ test('replace restore from backup without integration secrets preserves existing
   assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'existing-rawg' });
   assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'existing-steam', steamId64: '76561198000000000' });});
 
-test('export -> merge roundtrip applies the backup achievement counters', async () => {
+test('export -> merge preserves local achievement counters by policy', async () => {
   installMemoryStorage();
-  // Local state differs from the backup; a present section overwrites on merge.
+  // Counters are a singleton/aggregate: merging them would silently double-count or replace local progress.
   saveAchievementCounters(makeCounters({ questRunnerRuns: 1 }));
 
   const backup = parseOrThrow(makeFreshBackup({
@@ -199,7 +199,28 @@ test('export -> merge roundtrip applies the backup achievement counters', async 
   }));
   await mergeQuestShelfBackup(backup);
 
-  assert.equal(loadAchievementCounters().questRunnerRuns, 42);});
+  assert.equal(loadAchievementCounters().questRunnerRuns, 1);});
+
+test('merge preserves local integration secrets unless backup values are explicitly selected', async () => {
+  const { store } = installMemoryStorage();
+  store.set(RAWG_SETTINGS_KEY, JSON.stringify({ apiKey: 'local-rawg' }));
+  store.set(STEAM_SETTINGS_KEY, JSON.stringify({ apiKey: 'local-steam', steamId64: 'local-id' }));
+  const secretBackup = makeFreshBackup({
+    [RAWG_SETTINGS_KEY]: { apiKey: 'backup-rawg' },
+    [STEAM_SETTINGS_KEY]: { apiKey: 'backup-steam', steamId64: 'backup-id' },
+  });
+  secretBackup.metadata.includesIntegrationSettings = true;
+  secretBackup.metadata.includesSecrets = true;
+  const backup = parseOrThrow(secretBackup);
+
+  await mergeQuestShelfBackup(backup);
+  assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'local-rawg' });
+  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'local-steam', steamId64: 'local-id' });
+
+  await mergeQuestShelfBackup(backup, { useBackupSingletons: true });
+  assert.deepEqual(JSON.parse(store.get(RAWG_SETTINGS_KEY)!), { apiKey: 'backup-rawg' });
+  assert.deepEqual(JSON.parse(store.get(STEAM_SETTINGS_KEY)!), { apiKey: 'backup-steam', steamId64: 'backup-id', wishlistUrl: '' });
+});
 
 test('backup missing the achievement counters section still imports', async () => {
   installMemoryStorage();
