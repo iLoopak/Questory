@@ -4,14 +4,16 @@ import {
   suspendCanonicalCollectionWrites,
 } from '../../lib/canonicalCollections';
 import type { PlayActivityRecord } from '../../lib/playActivityStorage';
-import { playActivityRepository } from '../../lib/playActivityStorage';
-import { gameRepository } from '../../lib/gameStorage';
+import { flushPlayActivityWrites } from '../../lib/playActivityStorage';
+import { flushGameWrites } from '../../lib/gameStorage';
 import { getDurableKvFailures, whenDurableKvSettled } from '../../lib/kvDurableQueue';
 import { isBackupRelevantStorageKey } from '../../lib/backupRevision';
 import type { Game } from '../../types/game';
+import { savePlatformQueueState, type PlatformQueueState } from '../../lib/platformQueueStorage';
 
 type UseCanonicalCollectionOwnerOptions = {
   games: Game[];
+  platformQueueState: PlatformQueueState;
   playActivity: PlayActivityRecord[];
   setGames: (games: Game[]) => void;
   setPlayActivity: (records: PlayActivityRecord[]) => void;
@@ -29,6 +31,7 @@ type UseCanonicalCollectionOwnerOptions = {
  */
 export function useCanonicalCollectionOwner({
   games,
+  platformQueueState,
   playActivity,
   setGames,
   setPlayActivity,
@@ -39,6 +42,8 @@ export function useCanonicalCollectionOwner({
   gamesRef.current = games;
   const playActivityRef = useRef(playActivity);
   playActivityRef.current = playActivity;
+  const platformQueueStateRef = useRef(platformQueueState);
+  platformQueueStateRef.current = platformQueueState;
 
   useEffect(() => {
     function beginReplacement() {
@@ -60,16 +65,15 @@ export function useCanonicalCollectionOwner({
       prepareBackup: async () => {
         const gamesSnapshot = gamesRef.current;
         const playActivitySnapshot = playActivityRef.current;
-        const [gamesResult, playActivityResult] = await Promise.all([
-          gameRepository.replaceAllDurable(gamesSnapshot),
-          playActivityRepository.replaceAllDurable(playActivitySnapshot),
+        // A same-tick export can run before the ordinary Plan persistence effect.
+        // Commit the exact owner snapshot synchronously, then await its durable mirror.
+        savePlatformQueueState(platformQueueStateRef.current);
+        await Promise.all([
+          flushGameWrites(gamesSnapshot),
+          flushPlayActivityWrites(playActivitySnapshot),
           whenDurableKvSettled(),
         ]);
-        const failures = [gamesResult, playActivityResult].filter((result) => !result.ok);
         const kvFailures = getDurableKvFailures().filter((result) => isBackupRelevantStorageKey(result.key));
-        if (failures.length > 0) {
-          throw new Error(failures.map((result) => result.error ?? 'Canonical collection flush failed.').join(' · '));
-        }
         if (kvFailures.length > 0) {
           throw new Error(kvFailures.map((result) => `${result.key}: ${result.error ?? 'durable write failed'}`).join(' · '));
         }

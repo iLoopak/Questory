@@ -13,6 +13,7 @@ import {
 import { isGameExternalSource } from './gameIdentity';
 import { gameStatuses, type Game, type GameCollectionType, type GamePlatform, type GameStatus } from '../types/game';
 import { markBackupRelevantChange } from './backupRevision';
+import { SerializedPersistenceCoordinator, type PersistenceState } from './gamePersistenceLifecycle';
 
 const STORAGE_KEY = 'questshelf.games.v1';
 
@@ -30,6 +31,12 @@ export const gameRepository = createIndexedDbGameRepository({
   legacySaveAll: (games) => savePersistedJson(STORAGE_KEY, normalizeLoadedGames(games)),
 });
 
+const gamePersistence = new SerializedPersistenceCoordinator<Game[]>({
+  initialValue: gameRepository.getAllSync(),
+  serialize: (games) => JSON.stringify(normalizeLoadedGames(games)),
+  write: (games) => gameRepository.replaceAllDurable(normalizeLoadedGames(games)),
+});
+
 /** Awaited once at boot (before React renders) so getAllSync() is correct on first paint. */
 export function initGameRepository(): Promise<void> {
   return gameRepository.ready();
@@ -44,9 +51,20 @@ export function loadGames(): Game[] {
 }
 
 export function saveGames(games: Game[]) {
-  const changed = JSON.stringify(gameRepository.getAllSync()) !== JSON.stringify(normalizeLoadedGames(games));
-  gameRepository.replaceAll(games);
-  if (changed) markBackupRelevantChange(STORAGE_KEY);
+  if (gamePersistence.save(normalizeLoadedGames(games))) markBackupRelevantChange(STORAGE_KEY);
+}
+
+/** Await every older game write and durably persist the supplied latest canonical snapshot. */
+export function flushGameWrites(games?: Game[]): Promise<void> {
+  return gamePersistence.flush(typeof games === 'undefined' ? undefined : normalizeLoadedGames(games));
+}
+
+export function getGamePersistenceState(): PersistenceState {
+  return gamePersistence.getState();
+}
+
+export function subscribeGamePersistence(listener: () => void): () => void {
+  return gamePersistence.subscribe(listener);
 }
 
 // Wave 5: storage verification / repair / recovery (games). See indexedDbGameRepository.

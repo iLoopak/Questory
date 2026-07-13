@@ -1,4 +1,4 @@
-import { createQuestShelfBackup, parseQuestShelfBackupText, type QuestShelfBackup } from './backupStorage';
+import { parseQuestShelfBackupText, type QuestShelfBackup } from './backupStorage';
 
 type FilePickerAcceptType = {
   accept: Record<string, string[]>;
@@ -119,7 +119,7 @@ export async function openBackupFileWithPicker() {
   return readBackupFromHandle(handle);
 }
 
-export async function saveBackupToSelectedFile(includeIntegrationSettings: boolean, preparedBackup?: QuestShelfBackup) {
+export async function saveBackupToSelectedFile(preparedBackup: QuestShelfBackup) {
   const handle = await loadBackupFileHandle();
 
   if (!handle) {
@@ -140,7 +140,7 @@ export async function saveBackupToSelectedFile(includeIntegrationSettings: boole
     };
   }
 
-  const backup = preparedBackup ?? createQuestShelfBackup(includeIntegrationSettings);
+  const backup = preparedBackup;
   await writeBackupToHandle(handle, backup);
 
   return {

@@ -10,6 +10,7 @@ import {
   type PlayActivityVerification,
 } from './indexedDbPlayActivityRepository';
 import { markBackupRelevantChange } from './backupRevision';
+import { SerializedPersistenceCoordinator } from './gamePersistenceLifecycle';
 
 const STORAGE_KEY = 'questshelf.playActivity.v1';
 export const PLAY_ACTIVITY_SOURCES = ['manual', 'steam'] as const;
@@ -52,6 +53,12 @@ export const playActivityRepository = createIndexedDbPlayActivityRepository({
   legacySaveAll: (records) => savePersistedJson(STORAGE_KEY, normalizePlayActivityRecords(records)),
 });
 
+const playActivityPersistence = new SerializedPersistenceCoordinator<PlayActivityRecord[]>({
+  initialValue: playActivityRepository.getAllSync(),
+  serialize: (records) => JSON.stringify(normalizePlayActivityRecords(records)),
+  write: (records) => playActivityRepository.replaceAllDurable(normalizePlayActivityRecords(records)),
+});
+
 /** Awaited once at boot (before React renders) so the snapshot is populated. */
 export function initPlayActivityRepository(): Promise<void> {
   return playActivityRepository.ready();
@@ -89,9 +96,12 @@ export function loadPlayActivity(): PlayActivityRecord[] {
 
 export function savePlayActivity(records: PlayActivityRecord[]) {
   const normalized = normalizePlayActivityRecords(records);
-  const changed = JSON.stringify(playActivityRepository.getAllSync()) !== JSON.stringify(normalized);
-  playActivityRepository.replaceAll(normalized);
-  if (changed) markBackupRelevantChange(STORAGE_KEY);
+  if (playActivityPersistence.save(normalized)) markBackupRelevantChange(STORAGE_KEY);
+}
+
+/** Await every older activity write and persist the latest canonical activity snapshot. */
+export function flushPlayActivityWrites(records?: PlayActivityRecord[]): Promise<void> {
+  return playActivityPersistence.flush(typeof records === 'undefined' ? undefined : normalizePlayActivityRecords(records));
 }
 
 export function createPlayedTodayRecord(gameId: string, now = new Date()): PlayActivityRecord {
