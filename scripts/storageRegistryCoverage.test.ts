@@ -70,7 +70,7 @@ const legacyCompatibilityKeys = new Set([
 
 function sourceFiles(directory = 'src'): string[] {
   return readdirSync(directory).flatMap((entry) => {
-    const path = join(directory, entry);
+    const path = join(directory, entry).replaceAll('\\', '/');
     if (statSync(path).isDirectory()) return sourceFiles(path);
     return /\.tsx?$/.test(path) && !path.endsWith('.typetest.ts') ? [path] : [];
   });

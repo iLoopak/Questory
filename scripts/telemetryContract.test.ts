@@ -83,8 +83,8 @@ test('AS-17: the checked-in server schema is exactly what the canonical contract
   });
 
   assert.equal(
-    readFileSync('api/telemetry-schema.js', 'utf8'),
-    generated,
+    readFileSync('api/telemetry-schema.js', 'utf8').replaceAll('\r\n', '\n'),
+    generated.replaceAll('\r\n', '\n'),
     'api/telemetry-schema.js is stale — run `npm run generate:telemetry-schema`. The two registries may not be edited separately.',
   );
 });
