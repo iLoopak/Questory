@@ -1,17 +1,13 @@
+import { lazy, Suspense } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { PanelLoadingFallback } from '../../components/PanelLoadingFallback';
 import { PlaceholderPanel } from './components/PlaceholderPanel';
-import { ArtworkRoute } from './routes/ArtworkRoute';
-import { DiscoveryInboxRoute } from './routes/DiscoveryInboxRoute';
-import { DiscoveryRoute } from './routes/DiscoveryRoute';
 import { HomeRoute } from './routes/HomeRoute';
 import { LibraryRoute } from './routes/LibraryRoute';
 import { MetadataRoute } from './routes/MetadataRoute';
-import { QuestQueueRoute } from './routes/QuestQueueRoute';
 import { QuestRunnerRoute } from './routes/QuestRunnerRoute';
-import { ReviewModeRoute } from './routes/ReviewModeRoute';
 import { SettingsRoute } from './routes/SettingsRoute';
 import { StatsRoute } from './routes/StatsRoute';
-import { TasteProfileRoute } from './routes/TasteProfileRoute';
 import { WishlistRoute } from './routes/WishlistRoute';
 
 import type {
@@ -29,6 +25,13 @@ import type {
   AppRouterMetadataModel,
   AppRouterImportModel,
 } from './routes/routeModels';
+
+const ArtworkRoute = lazy(() => import('./routes/ArtworkRoute').then((module) => ({ default: module.ArtworkRoute })));
+const DiscoveryInboxRoute = lazy(() => import('./routes/DiscoveryInboxRoute').then((module) => ({ default: module.DiscoveryInboxRoute })));
+const DiscoveryRoute = lazy(() => import('./routes/DiscoveryRoute').then((module) => ({ default: module.DiscoveryRoute })));
+const QuestQueueRoute = lazy(() => import('./routes/QuestQueueRoute').then((module) => ({ default: module.QuestQueueRoute })));
+const ReviewModeRoute = lazy(() => import('./routes/ReviewModeRoute').then((module) => ({ default: module.ReviewModeRoute })));
+const TasteProfileRoute = lazy(() => import('./routes/TasteProfileRoute').then((module) => ({ default: module.TasteProfileRoute })));
 
 // The models are the routes' contract (see routes/routeModels.ts); re-exported so every
 // existing `from '../AppSectionRouter'` import keeps resolving.
@@ -69,6 +72,7 @@ export function AppSectionRouter(props: AppSectionRouterProps) {
 
   return (
     <section ref={mainContentRef} className={`qs-main-scroll py-2 ${activeNavItem === 'Home' ? 'qs-main-scroll--home' : 'bg-ink-950'}`}>
+      <Suspense fallback={<PanelLoadingFallback />}>
       {activeNavItem === 'Home' ? (
         <HomeRoute
           core={core}
@@ -136,6 +140,7 @@ export function AppSectionRouter(props: AppSectionRouterProps) {
       ) : (
         <PlaceholderPanel title={activeNavItem} />
       )}
+      </Suspense>
     </section>
   );
 }

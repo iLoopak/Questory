@@ -29,6 +29,12 @@ const bundleFiles = [
   'assets/StatsPanel-ccc333.js',
   'assets/MetadataEnrichmentPanel-ddd444.js',
   'assets/QuestRunnerGame-eee555.js',
+  'assets/ArtworkRoute-fff666.js',
+  'assets/DiscoveryInboxRoute-ggg777.js',
+  'assets/DiscoveryRoute-hhh888.js',
+  'assets/QuestQueueRoute-iii999.js',
+  'assets/ReviewModeRoute-jjj000.js',
+  'assets/TasteProfileRoute-kkk111.js',
   'assets/index-abc123.js.map',
 ];
 
@@ -43,7 +49,7 @@ test('AS-11: the precache manifest is the real build output — bundles, CSS and
   assert.ok(assets.includes('/index.html'));
   assert.ok(assets.includes('/'), 'the start URL');
 
-  for (const chunk of ['SettingsView', 'StatsPanel', 'MetadataEnrichmentPanel', 'QuestRunnerGame']) {
+  for (const chunk of ['SettingsView', 'StatsPanel', 'MetadataEnrichmentPanel', 'QuestRunnerGame', 'ArtworkRoute', 'DiscoveryInboxRoute', 'DiscoveryRoute', 'QuestQueueRoute', 'ReviewModeRoute', 'TasteProfileRoute']) {
     assert.ok(
       assets.some((asset) => asset.includes(chunk)),
       `${chunk} is a lazy route: without its chunk, the first OFFLINE visit to that route fails`,
