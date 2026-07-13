@@ -88,6 +88,7 @@ import { recordRecommendationOutcome } from '../../lib/recommendationFeedback';
 import { useAchievementSystem } from './useAchievementSystem';
 import { getSafeWishlistTitleMatches, normalizeImportMatchTitle } from '../../domain/imports/titleMatching';
 import { getIntegrationSettingsRevision, subscribeIntegrationSettings } from '../../lib/integrationSettingsRevision';
+import { getGamePersistenceState, subscribeGamePersistence } from '../../lib/gameStorage';
 
 export function AppController() {
   const [games, setGames] = useState<Game[]>(() => loadGames());
@@ -98,6 +99,7 @@ export function AppController() {
   const { isScrolled, mainContentRef } = useMainScrollBehavior();
   const { filteredLibraryGames, filteredWishlistGames, libraryFilters, platformOptions, setLibraryFilters, setWishlistFilters, tags, wishlistFilters } = useCollectionFilters(games);
   const integrationSettingsRevision = useSyncExternalStore(subscribeIntegrationSettings, getIntegrationSettingsRevision, getIntegrationSettingsRevision);
+  const gamePersistenceState = useSyncExternalStore(subscribeGamePersistence, getGamePersistenceState, getGamePersistenceState);
   const steamSettingsSnapshot = useMemo(() => loadSteamSettings(), [integrationSettingsRevision]);
   const isRawgApiKeySet = useMemo(() => Boolean(loadRawgSettings().apiKey.trim()), [integrationSettingsRevision]);
   // Compatibility callback for existing settings props. The settings storage owner now publishes
@@ -286,7 +288,7 @@ export function AppController() {
   // AS-03: lets Data Management's recovery/repair tools hand a recovered snapshot back to this
   // owner, instead of the owner's next save silently overwriting it. Exposes exactly two
   // replacement commands — no raw setGames is threaded through the component tree.
-  useCanonicalCollectionOwner({ games, playActivity, setGames, setPlayActivity });
+  useCanonicalCollectionOwner({ games, platformQueueState, playActivity, setGames, setPlayActivity });
   const { addToastNotification, addUndoAction, dismissToast, pendingUndoActions, undoAction } = useToastState({
     activeNavItem,
     games,
@@ -1225,6 +1227,25 @@ export function AppController() {
                 </div>
               ) : null}
           </div>
+
+          {gamePersistenceState.phase !== 'idle' ? (
+            <span
+              aria-live="polite"
+              className={`hidden shrink-0 items-center gap-1 text-[10px] font-semibold sm:inline-flex ${
+                gamePersistenceState.phase === 'failed' ? 'text-rose-300' : 'text-slate-400'
+              }`}
+              title={gamePersistenceState.phase === 'failed' ? 'Questory could not save the latest game changes. It will retry while the app remains open.' : undefined}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${gamePersistenceState.phase === 'failed' ? 'bg-rose-400' : gamePersistenceState.phase === 'saved' ? 'bg-mint' : 'animate-pulse bg-amber-300'}`} />
+              {gamePersistenceState.phase === 'failed'
+                ? 'Save failed'
+                : gamePersistenceState.phase === 'saved'
+                  ? 'Saved'
+                  : gamePersistenceState.phase === 'retrying'
+                    ? 'Retrying save'
+                    : 'Saving'}
+            </span>
+          ) : null}
 
           <PwaStatusBanner appTitle={personalizedQuestShelfTitle} />
           <BackToTopButton />

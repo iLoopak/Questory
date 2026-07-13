@@ -8,8 +8,7 @@ import { autoDetectPlatformOption, mapDetectedRomToGame, retroImportPlatforms, s
 import { getRuntimeEnvironment } from '../lib/capacitorEnvironment';
 import { RetroFolderPicker } from '../lib/retroFolderPicker';
 import { loadRawgSettings, saveRawgSettings } from '../lib/rawgSettingsStorage';
-import { createQuestShelfBackup } from '../lib/backupStorage';
-import { exportQuestShelfBackupFile } from '../lib/backupExport';
+import { exportPreparedQuestShelfBackupFile } from '../lib/backupExport';
 import { ShelfAvatar, ShelfIdentityEditor } from './ShelfIdentity';
 import { getComputedShelfTitle, type ShelfIdentitySettings } from '../lib/shelfIdentity';
 import { getOnboardingProgress, onboardingItemIds, type OnboardingItemId } from '../lib/onboardingStorage';
@@ -330,7 +329,16 @@ function RetroStep({ games, onComplete, onImportGames, onSkip }: { games: Game[]
 
 function BackupStep({ onComplete, onOpenSettings }: { onComplete: () => void; onOpenSettings: () => void }) {
   const [status, setStatus] = useState('Export a portable JSON backup. Integration keys are excluded from this quick export.');
-  async function exportBackup() { const result = await exportQuestShelfBackupFile(createQuestShelfBackup(false)); setStatus(`Backup exported as ${result.fileName}.`); onComplete(); }
+  async function exportBackup() {
+    try {
+      const result = await exportPreparedQuestShelfBackupFile(false);
+      setStatus(`Backup exported as ${result.fileName}.`);
+      onComplete();
+    } catch (error) {
+      const detail = error instanceof Error && error.message.trim() ? ` ${error.message}` : '';
+      setStatus(`Backup export failed.${detail} Your current data was not downloaded. Try again.`);
+    }
+  }
   return <div><Status text={status} /><Actions primary="Export backup" onPrimary={() => { void exportBackup(); }} /><button className="mt-3 h-10 rounded-md border border-skyglass/15 px-4 text-sm text-slate-200" onClick={onOpenSettings} type="button">Open backup settings</button></div>;
 }
 
