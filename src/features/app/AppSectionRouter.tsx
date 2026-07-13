@@ -72,6 +72,7 @@ export function AppSectionRouter(props: AppSectionRouterProps) {
       {activeNavItem === 'Home' ? (
         <HomeRoute
           core={core}
+          collections={collections}
           games={games}
           queue={queue}
           review={review}
